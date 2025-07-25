@@ -7,13 +7,16 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import ThemeToggle from "@/components/theme-toggle"
 import SettingsMenu from "@/components/settings-menu"
 import { useTimetable } from "@/contexts/timetable-context"
-import { Calendar, Clock, ArrowRight } from "lucide-react"
+import { Calendar, Clock, ArrowRight, LogIn, LogOut } from "lucide-react" // Add LogIn, LogOut
+import { Button } from "@/components/ui/button" // Import Button
+import { useAuth } from "@/lib/api/hooks" // Import useAuth
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
   // Use currentMomentPeriodInfo for the header status
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable()
+  const { isAuthenticated } = useAuth() // Get authentication status
 
   // Memoize current day for the main timetable display
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay])
@@ -125,6 +128,21 @@ export default function Home() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
           </div>
           <div className="flex gap-2">
+            {/* Login/Logout Button */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
+              onClick={() => {
+                // This is a non-functional placeholder.
+                // In a real app, you'd call isAuthenticated ? logout() : initiateLogin()
+                console.log(isAuthenticated ? "Logout clicked (non-functional)" : "Login clicked (non-functional)")
+              }}
+            >
+              <div className="glass-icon-enhanced rounded-full p-1">
+                {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+              </div>
+            </Button>
             <SettingsMenu />
             <ThemeToggle />
           </div>
