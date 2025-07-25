@@ -9,7 +9,7 @@ import SettingsMenu from "@/components/settings-menu"
 import { useTimetable } from "@/contexts/timetable-context"
 import { Calendar, Clock, ArrowRight } from "lucide-react"
 import { useAuth } from "@/lib/api/hooks" // Import useAuth
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button" // Import Button
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
@@ -149,6 +149,7 @@ export default function Home() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
           </div>
           <div className="flex gap-2">
+            {/* Login/Logout Button */}
             <Button
               variant="outline"
               size="sm"
