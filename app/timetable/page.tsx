@@ -13,7 +13,7 @@ export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, setCurrentWeek, timetableData, originalTimetableData } = useTimetable()
+  const { currentWeek, setCurrentWeek, timetableData } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -98,7 +98,6 @@ export default function TimetablePage() {
   const selectedDayName = getSelectedDayName()
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
   const todaysTimetable = timetableData[selectedDayName] || []
-  const originalTodaysTimetable = originalTimetableData[selectedDayName] || []
 
   if (!mounted) return null
 
@@ -196,10 +195,6 @@ export default function TimetablePage() {
               ) : todaysTimetable.length > 0 ? (
                 <div className="space-y-1.5">
                   {todaysTimetable.map((period) => {
-                    const originalPeriod = originalTodaysTimetable.find((p) => p.id === period.id)
-                    const isTeacherChanged = originalPeriod && originalPeriod.teacher !== period.teacher
-                    const isRoomChanged = originalPeriod && originalPeriod.room !== period.room
-
                     return (
                       <div
                         key={period.id}
@@ -221,15 +216,7 @@ export default function TimetablePage() {
                           {/* Teacher and Room (only for non-break periods) */}
                           {period.subject !== "Break" && (
                             <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto">
-                              <span
-                                className={isTeacherChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}
-                              >
-                                {period.teacher}
-                              </span>{" "}
-                              •{" "}
-                              <span className={isRoomChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}>
-                                {period.room}
-                              </span>
+                              {period.teacher} • {period.room}
                             </span>
                           )}
                         </div>
