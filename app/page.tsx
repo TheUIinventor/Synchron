@@ -13,24 +13,13 @@ export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
   // Use currentMomentPeriodInfo for the header status
-  const {
-    timetableData,
-    originalTimetableData,
-    currentMomentPeriodInfo,
-    selectedDay,
-    selectedDateObject,
-    isShowingNextDay,
-  } = useTimetable()
+  const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable()
 
   // Memoize current day for the main timetable display
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay])
   const todaysTimetable = useMemo(
     () => timetableData[mainTimetableDisplayDay] || [],
     [timetableData, mainTimetableDisplayDay],
-  )
-  const originalTodaysTimetable = useMemo(
-    () => originalTimetableData[mainTimetableDisplayDay] || [],
-    [originalTimetableData, mainTimetableDisplayDay],
   )
 
   // Get display name for period (memoized)
@@ -70,11 +59,6 @@ export default function Home() {
         !currentMomentPeriodInfo.isCurrentlyInClass &&
         currentMomentPeriodInfo.nextPeriod?.id === period.id
 
-      // Find the original period to compare for changes
-      const originalPeriod = originalTodaysTimetable.find((p) => p.id === period.id)
-      const isTeacherChanged = originalPeriod && originalPeriod.teacher !== period.teacher
-      const isRoomChanged = originalPeriod && originalPeriod.room !== period.room
-
       return (
         <div
           key={period.id}
@@ -89,19 +73,14 @@ export default function Home() {
           }`}
         >
           <div className="flex items-center justify-between gap-2">
+            {/* Removed Time on the left as per request */}
             {/* Subject */}
             <span className="font-semibold text-sm flex-1 min-w-0 truncate">{getDisplaySubject(period)}</span>
 
             {/* Teacher and Room (only for non-break periods) */}
             {period.subject !== "Break" && (
               <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto">
-                <span className={isTeacherChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}>
-                  {period.teacher}
-                </span>{" "}
-                •{" "}
-                <span className={isRoomChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}>
-                  {period.room}
-                </span>
+                {period.teacher} • {period.room}
               </span>
             )}
 
@@ -126,7 +105,7 @@ export default function Home() {
         </div>
       )
     })
-  }, [todaysTimetable, originalTodaysTimetable, currentMomentPeriodInfo, getDisplaySubject, isShowingNextDay])
+  }, [todaysTimetable, currentMomentPeriodInfo, getDisplaySubject, isShowingNextDay])
 
   if (!mounted) {
     return (
@@ -157,13 +136,15 @@ export default function Home() {
             <h2 className="text-2xl font-bold theme-gradient">Welcome!</h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {formatDate()} • {getCurrentDay()}{" "}
+              {formatDate()} • {getCurrentDay()} {/* Always show current date/day here */}
             </p>
           </div>
           <div className="text-right mt-4 sm:mt-0 w-full sm:w-auto">
             {" "}
+            {/* Added w-full for mobile stacking */}
             <div className="flex items-center gap-2 card-optimized px-3 py-2 rounded-xl mb-2 justify-end">
               {" "}
+              {/* Added justify-end for alignment */}
               <div className="icon-optimized rounded-full p-1">
                 <Clock className="h-4 w-4 text-theme-primary" />
               </div>

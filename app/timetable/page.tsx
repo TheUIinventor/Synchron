@@ -13,7 +13,7 @@ export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, setCurrentWeek, timetableData, originalTimetableData } = useTimetable()
+  const { currentWeek, setCurrentWeek, timetableData } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -98,7 +98,6 @@ export default function TimetablePage() {
   const selectedDayName = getSelectedDayName()
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
   const todaysTimetable = timetableData[selectedDayName] || []
-  const originalTodaysTimetable = originalTimetableData[selectedDayName] || []
 
   if (!mounted) return null
 
@@ -195,47 +194,33 @@ export default function TimetablePage() {
                 </div>
               ) : todaysTimetable.length > 0 ? (
                 <div className="space-y-1.5">
-                  {todaysTimetable.map((period) => {
-                    const originalPeriod = originalTodaysTimetable.find((p) => p.id === period.id)
-                    const isTeacherChanged = originalPeriod && originalPeriod.teacher !== period.teacher
-                    const isRoomChanged = originalPeriod && originalPeriod.room !== period.room
+                  {todaysTimetable.map((period) => (
+                    <div
+                      key={period.id}
+                      className={`rounded-xl p-2 transition-all duration-200 ease-in-out ${
+                        period.subject === "Break" ? "glass-card" : "bg-theme-secondary"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Time on the left */}
+                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0 w-[4.5rem] text-left">
+                          {period.time.split(" - ")[0]} {/* Only show start time */}
+                        </span>
 
-                    return (
-                      <div
-                        key={period.id}
-                        className={`rounded-xl p-2 transition-all duration-200 ease-in-out ${
-                          period.subject === "Break" ? "glass-card" : "bg-theme-secondary"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          {/* Time on the left */}
-                          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0 w-[4.5rem] text-left">
-                            {period.time.split(" - ")[0]} {/* Only show start time */}
+                        {/* Subject */}
+                        <span className="font-semibold text-sm flex-1 min-w-0 truncate">
+                          {getDisplaySubject(period)}
+                        </span>
+
+                        {/* Teacher and Room (only for non-break periods) */}
+                        {period.subject !== "Break" && (
+                          <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto">
+                            {period.teacher} • {period.room}
                           </span>
-
-                          {/* Subject */}
-                          <span className="font-semibold text-sm flex-1 min-w-0 truncate">
-                            {getDisplaySubject(period)}
-                          </span>
-
-                          {/* Teacher and Room (only for non-break periods) */}
-                          {period.subject !== "Break" && (
-                            <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto">
-                              <span
-                                className={isTeacherChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}
-                              >
-                                {period.teacher}
-                              </span>{" "}
-                              •{" "}
-                              <span className={isRoomChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}>
-                                {period.room}
-                              </span>
-                            </span>
-                          )}
-                        </div>
+                        )}
                       </div>
-                    )
-                  })}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="py-8 text-center text-gray-500 dark:text-gray-400 glass-card rounded-xl">
