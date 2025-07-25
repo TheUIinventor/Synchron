@@ -1,1 +1,1 @@
-# Synchorn for Sydney Boys High
+# Synchron for Sydney Boys High
