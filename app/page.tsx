@@ -8,10 +8,13 @@ import ThemeToggle from "@/components/theme-toggle"
 import SettingsMenu from "@/components/settings-menu"
 import { useTimetable } from "@/contexts/timetable-context"
 import { Calendar, Clock, ArrowRight } from "lucide-react"
+import { useAuth } from "@/lib/api/hooks" // Import useAuth
+import { Button } from "@/components/ui/button"
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
+  const { isAuthenticated } = useAuth() // Use the authentication hook
   // Use currentMomentPeriodInfo for the header status
   const {
     timetableData,
@@ -146,6 +149,17 @@ export default function Home() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full h-10 px-4 text-sm glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
+              onClick={() => {
+                // Placeholder for login/logout action
+                console.log(isAuthenticated ? "Logging out..." : "Logging in...")
+              }}
+            >
+              {isAuthenticated ? "Logout" : "Login"}
+            </Button>
             <SettingsMenu />
             <ThemeToggle />
           </div>
