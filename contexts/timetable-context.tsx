@@ -27,6 +27,7 @@ type TimetableContextType = {
   selectedDateObject: Date // The actual Date object for the selectedDay
   setSelectedDay: (day: string) => void
   timetableData: Record<string, Period[]>
+  originalTimetableData: Record<string, Period[]> // Added for change detection
   currentMomentPeriodInfo: {
     nextPeriod: Period | null
     timeUntil: string
@@ -77,8 +78,8 @@ const bellTimesData = {
   ],
 }
 
-// Mock data for the timetable (Week A)
-const timetableWeekA = {
+// Mock data for the original timetable (Week A)
+const originalTimetableWeekA = {
   Monday: [
     { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
     { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
@@ -131,8 +132,8 @@ const timetableWeekA = {
   ],
 }
 
-// Mock data for the timetable (Week B)
-const timetableWeekB = {
+// Mock data for the original timetable (Week B)
+const originalTimetableWeekB = {
   Monday: [
     { id: 1, period: "1", time: "9:00 - 10:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
     { id: 2, period: "2", time: "10:05 - 11:05", subject: "Art", teacher: "Ms. Wilson", room: "103" },
@@ -185,6 +186,25 @@ const timetableWeekB = {
   ],
 }
 
+// Deep copy function to ensure immutability
+const deepCopyTimetable = (data: Record<string, Period[]>) => {
+  const copy: Record<string, Period[]> = {}
+  for (const day in data) {
+    copy[day] = data[day].map((period) => ({ ...period }))
+  }
+  return copy
+}
+
+// Mock data for the active timetable (Week A) - will be modified for changes
+const activeTimetableWeekA = deepCopyTimetable(originalTimetableWeekA)
+// Simulate a change for Monday, Period 1: Teacher and Room change
+if (activeTimetableWeekA.Monday && activeTimetableWeekA.Monday[0]) {
+  activeTimetableWeekA.Monday[0].teacher = "Mr. Jones (Sub)"
+  activeTimetableWeekA.Monday[0].room = "302"
+}
+
+const activeTimetableWeekB = deepCopyTimetable(originalTimetableWeekB)
+
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
   const [currentWeek, setCurrentWeek] = useState<"A" | "B">("A")
@@ -201,7 +221,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Memoize the current timetable based on selected week
   const timetableData = useMemo(() => {
-    return currentWeek === "A" ? timetableWeekA : timetableWeekB
+    return currentWeek === "A" ? activeTimetableWeekA : activeTimetableWeekB
+  }, [currentWeek])
+
+  // Memoize the original timetable based on selected week
+  const originalTimetableData = useMemo(() => {
+    return currentWeek === "A" ? originalTimetableWeekA : originalTimetableWeekB
   }, [currentWeek])
 
   // Function to update all relevant time-based states
@@ -255,6 +280,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         selectedDateObject,
         setSelectedDay,
         timetableData,
+        originalTimetableData, // Provide original timetable data
         currentMomentPeriodInfo,
         bellTimes: bellTimesData,
         isShowingNextDay,

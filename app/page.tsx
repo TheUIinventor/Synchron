@@ -8,20 +8,29 @@ import ThemeToggle from "@/components/theme-toggle"
 import SettingsMenu from "@/components/settings-menu"
 import { useTimetable } from "@/contexts/timetable-context"
 import { Calendar, Clock, ArrowRight } from "lucide-react"
-import { useAuth } from "@/lib/api/hooks" // Import useAuth
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
-  const { isAuthenticated } = useAuth() // Use the authentication hook
   // Use currentMomentPeriodInfo for the header status
-  const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable()
+  const {
+    timetableData,
+    originalTimetableData,
+    currentMomentPeriodInfo,
+    selectedDay,
+    selectedDateObject,
+    isShowingNextDay,
+  } = useTimetable()
 
   // Memoize current day for the main timetable display
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay])
   const todaysTimetable = useMemo(
     () => timetableData[mainTimetableDisplayDay] || [],
     [timetableData, mainTimetableDisplayDay],
+  )
+  const originalTodaysTimetable = useMemo(
+    () => originalTimetableData[mainTimetableDisplayDay] || [],
+    [originalTimetableData, mainTimetableDisplayDay],
   )
 
   // Get display name for period (memoized)
@@ -50,6 +59,7 @@ export default function Home() {
   // Memoize period rendering for the main timetable
   const renderedPeriods = useMemo(() => {
     return todaysTimetable.map((period) => {
+      // These highlights are for the *displayed* timetable, not the current moment's
       // Only highlight current/next if we are showing the current day's timetable
       const isCurrentPeriod =
         !isShowingNextDay &&
@@ -59,6 +69,11 @@ export default function Home() {
         !isShowingNextDay &&
         !currentMomentPeriodInfo.isCurrentlyInClass &&
         currentMomentPeriodInfo.nextPeriod?.id === period.id
+
+      // Find the original period to compare for changes
+      const originalPeriod = originalTodaysTimetable.find((p) => p.id === period.id)
+      const isTeacherChanged = originalPeriod && originalPeriod.teacher !== period.teacher
+      const isRoomChanged = originalPeriod && originalPeriod.room !== period.room
 
       return (
         <div
@@ -80,7 +95,13 @@ export default function Home() {
             {/* Teacher and Room (only for non-break periods) */}
             {period.subject !== "Break" && (
               <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto">
-                {period.teacher} • {period.room}
+                <span className={isTeacherChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}>
+                  {period.teacher}
+                </span>{" "}
+                •{" "}
+                <span className={isRoomChanged ? "text-orange-600 dark:text-orange-400 font-bold" : ""}>
+                  {period.room}
+                </span>
               </span>
             )}
 
@@ -105,7 +126,7 @@ export default function Home() {
         </div>
       )
     })
-  }, [todaysTimetable, currentMomentPeriodInfo, getDisplaySubject, isShowingNextDay])
+  }, [todaysTimetable, originalTodaysTimetable, currentMomentPeriodInfo, getDisplaySubject, isShowingNextDay])
 
   if (!mounted) {
     return (
