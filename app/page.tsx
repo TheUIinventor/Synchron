@@ -7,9 +7,9 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import ThemeToggle from "@/components/theme-toggle"
 import SettingsMenu from "@/components/settings-menu"
 import { useTimetable } from "@/contexts/timetable-context"
-import { Calendar, Clock, ArrowRight, LogIn, LogOut } from "lucide-react" // Add LogIn, LogOut
-import { Button } from "@/components/ui/button" // Import Button
-import { useAuth } from "@/lib/api/hooks" // Import useAuth
+import { Calendar, Clock, ArrowRight, LogIn, LogOut, UserRoundX, MapPinOff } from "lucide-react" // Add UserRoundX, MapPinOff
+import { Button } from "@/components/ui/button"
+import { useAuth } from "@/lib/api/hooks"
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
@@ -62,6 +62,10 @@ export default function Home() {
         !currentMomentPeriodInfo.isCurrentlyInClass &&
         currentMomentPeriodInfo.nextPeriod?.id === period.id
 
+      // Determine highlighting for teacher/room
+      const isSubstitute = period.isSubstitute
+      const isRoomChange = period.isRoomChange
+
       return (
         <div
           key={period.id}
@@ -82,8 +86,16 @@ export default function Home() {
 
             {/* Teacher and Room (only for non-break periods) */}
             {period.subject !== "Break" && (
-              <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto">
-                {period.teacher} • {period.room}
+              <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-1">
+                {isSubstitute && <UserRoundX className="h-3 w-3 text-orange-500" title="Substitute Teacher" />}
+                {isRoomChange && <MapPinOff className="h-3 w-3 text-purple-500" title="Room Change" />}
+                <span className={`${isSubstitute ? "text-orange-600 dark:text-orange-400 font-semibold" : ""}`}>
+                  {period.teacher}
+                </span>{" "}
+                •{" "}
+                <span className={`${isRoomChange ? "text-purple-600 dark:text-purple-400 font-semibold" : ""}`}>
+                  {period.room}
+                </span>
               </span>
             )}
 
