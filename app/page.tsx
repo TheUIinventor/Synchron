@@ -1,14 +1,24 @@
+// app/page.tsx
 "use client"
-import { useRouter } from 'next/router';
+
 import { useState, useEffect, useMemo, useCallback } from "react"
+import { useRouter } from 'next/router'; // Keep this if you plan to use router.push for navigation later
+import { Button } from "@/components/ui/button" // Corrected: Removed duplicate import, kept the first one
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentDay, formatDate, getCurrentTime } from "@/utils/time-utils"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import ThemeToggle from "@/components/theme-toggle"
 import SettingsMenu from "@/components/settings-menu"
 import { useTimetable } from "@/contexts/timetable-context"
-import { Calendar, Clock, ArrowRight, LogIn, LogOut, UserRoundX, MapPinOff } from "lucide-react" // Add UserRoundX, MapPinOff
-import { Button } from "@/components/ui/button"
+import {
+  Calendar,
+  Clock,
+  ArrowRight,
+  LogIn, // Corrected casing for Lucide icons (from Login)
+  LogOut, // Corrected casing for Lucide icons (from Logout)
+  UserRoundX,
+  MapPinOff,
+} from "lucide-react" // Consolidated all Lucide icon imports here
 import { useAuth } from "@/lib/api/hooks"
 
 export default function Home() {
@@ -16,7 +26,8 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState("")
   // Use currentMomentPeriodInfo for the header status
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable()
-  const { isAuthenticated } = useAuth() // Get authentication status
+  // Ensure useAuth hook provides initiateLogin and logout functions
+  const { isAuthenticated, initiateLogin, logout } = useAuth() 
 
   // Memoize current day for the main timetable display
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay])
@@ -141,33 +152,42 @@ export default function Home() {
           </div>
           <div className="flex gap-2">
             {/* Login/Logout Button */}
-                    <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
-          onClick={() => {
-            // Your new OAuth redirect logic
-            const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID;
-            // Use the local redirect URI for development. Remember to use the Vercel one for deployment!
-            const redirectUri = process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL; // e.g., http://localhost
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
+              onClick={() => {
+                if (isAuthenticated) {
+                  // If already authenticated, call logout function (you'll implement this in useAuth)
+                  logout(); // This assumes a logout function exists in your useAuth hook
+                } else {
+                  // If not authenticated, initiate the login (OAuth) flow
+                  const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID;
 
-            if (!clientId || !redirectUri) {
-              alert("App ID or Redirect URI is not configured. Check your .env.local file.");
-              return;
-            }
+                  // Dynamically choose redirect URI based on environment
+                  // Use the correct redirect URI for your app/auth/callback structure
+                  const redirectUri = process.env.NODE_ENV === 'development'
+                                      ? process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL // e.g., http://localhost/auth/callback
+                                      : process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL; // e.g., https://synchronapp.vercel.app/auth/callback
 
-            const authUrl = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/authorize?` +
-                            `response_type=code&` +
-                            `client_id=${clientId}&` +
-                            `redirect_uri=${encodeURIComponent(redirectUri)}&` + // IMPORTANT: URL-encode the URI!
-                            `scope=all-ro`; // Make sure this matches the scope you selected
+                  if (!clientId || !redirectUri) { // Corrected variable name from onClickredirectUri to redirectUri
+                    alert("App ID or Redirect URI is not configured. Check your .env.local and Vercel environment variables.");
+                    return;
+                  }
 
-            window.location.href = authUrl; // Redirect the user's browser
-          }}
-        >
-            {/* The conditional rendering for Login/Logout icons remains */}
-            {false ? <Logout className="h-4 w-4" /> : <Login className="h-4 w-4" />}
-                    </Button>
+                  const authUrl = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/authorize?` +
+                                  `response_type=code&` +
+                                  `client_id=${clientId}&` +
+                                  `redirect_uri=${encodeURIComponent(redirectUri)}&` + // IMPORTANT: URL-encode the URI!
+                                  `scope=all-ro`; // Make sure this matches the scope you selected
+
+                  window.location.href = authUrl; // Redirect the user's browser
+                }
+              }}
+            >
+              {/* Conditional rendering for Login/Logout icons based on isAuthenticated */}
+              {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+            </Button>
             <SettingsMenu />
             <ThemeToggle />
           </div>
