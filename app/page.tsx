@@ -1,5 +1,5 @@
 "use client"
-
+import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentDay, formatDate, getCurrentTime } from "@/utils/time-utils"
@@ -141,20 +141,33 @@ export default function Home() {
           </div>
           <div className="flex gap-2">
             {/* Login/Logout Button */}
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
-              onClick={() => {
-                // This is a non-functional placeholder.
-                // In a real app, you'd call isAuthenticated ? logout() : initiateLogin()
-                console.log(isAuthenticated ? "Logout clicked (non-functional)" : "Login clicked (non-functional)")
-              }}
-            >
-              <div className="glass-icon-enhanced rounded-full p-1">
-                {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
-              </div>
-            </Button>
+                    <Button
+          variant="outline"
+          size="icon"
+          className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
+          onClick={() => {
+            // Your new OAuth redirect logic
+            const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID;
+            // Use the local redirect URI for development. Remember to use the Vercel one for deployment!
+            const redirectUri = process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL; // e.g., http://localhost
+
+            if (!clientId || !redirectUri) {
+              alert("App ID or Redirect URI is not configured. Check your .env.local file.");
+              return;
+            }
+
+            const authUrl = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/authorize?` +
+                            `response_type=code&` +
+                            `client_id=${clientId}&` +
+                            `redirect_uri=${encodeURIComponent(redirectUri)}&` + // IMPORTANT: URL-encode the URI!
+                            `scope=all-ro`; // Make sure this matches the scope you selected
+
+            window.location.href = authUrl; // Redirect the user's browser
+          }}
+        >
+            {/* The conditional rendering for Login/Logout icons remains */}
+            {false ? <Logout className="h-4 w-4" /> : <Login className="h-4 w-4" />}
+                    </Button>
             <SettingsMenu />
             <ThemeToggle />
           </div>
