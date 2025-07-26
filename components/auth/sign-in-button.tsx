@@ -1,5 +1,9 @@
 "use client"
+// components/ui/sign-in-button.tsx
 
+import { Login, Logout } from 'lucide-react'; // ADD THIS LINE
+
+// ... (rest of your imports and component code)
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
