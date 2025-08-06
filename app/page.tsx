@@ -1,5 +1,6 @@
 // app/page.tsx
-"use client"
+// IMPORTANT: Removed "use client" directive from here.
+// This file is now a Server Component.
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 // Removed unused useRouter import
@@ -10,24 +11,23 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import ThemeToggle from "@/components/theme-toggle"
 import SettingsMenu from "@/components/settings-menu"
 import { useTimetable } from "@/contexts/timetable-context"
+// Removed LogIn, LogOut imports from here as they are now in AuthButton
 import {
   Calendar,
   Clock,
   ArrowRight,
-  LogIn, // Correct casing
-  LogOut, // Correct casing
   UserRoundX,
   MapPinOff,
 } from "lucide-react" // Consolidated all Lucide icon imports here
-import { useAuth } from "@/lib/api/hooks"
+// Removed useAuth import from here as it's now used in AuthButton
+import { AuthButton } from "@/components/auth-button" // <-- NEW: Import the AuthButton component
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
   // Use currentMomentPeriodInfo for the header status
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable()
-  // Ensure useAuth hook provides isAuthenticated, initiateLogin and logout functions
-  const { isAuthenticated, initiateLogin, logout } = useAuth() 
+  // Removed isAuthenticated, initiateLogin, logout from here. They are now in AuthButton.
 
   // Memoize current day for the main timetable display
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay])
@@ -85,7 +85,7 @@ export default function Home() {
               ? "bg-green-100 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700"
               : isNextPeriod
                 ? "bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-700"
-                  : period.subject === "Break"
+                : period.subject === "Break"
                   ? "bg-amber-50 dark:bg-amber-900/20"
                   : "bg-theme-secondary"
           }`}
@@ -151,42 +151,10 @@ export default function Home() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
           </div>
           <div className="flex gap-2">
-            {/* Login/Logout Button */}
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
-              onClick={() => {
-                if (isAuthenticated) {
-                  logout();
-                } else {
-                  // Use typeof window check to avoid SSR issues
-                  if (typeof window === "undefined") return;
-
-                  const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID;
-                  const redirectUri = process.env.NODE_ENV === 'development'
-                    ? process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL
-                    : process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL;
-
-                  if (!clientId || !redirectUri) {
-                    alert("App ID or Redirect URI is not configured. Check your .env.local and Vercel environment variables.");
-                    return;
-                  }
-
-                  const authUrl = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/authorize?` +
-                    `response_type=code&` +
-                    `client_id=${clientId}&` +
-                    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-                    `scope=all-ro`;
-
-                  window.location.href = authUrl;
-                }
-              }}
-            >
-              {/* Only use LogIn and LogOut, not Login */}
-              {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
-            </Button>
+            {/* Login/Logout Button - Now using the new component */}
+            <AuthButton /> {/* <-- NEW: Use the AuthButton component here */}
             <SettingsMenu />
+            <ThemeToggle />
           </div>
         </div>
 
@@ -273,7 +241,7 @@ export default function Home() {
               <div>
                 <h3 className="font-semibold text-lg">
                   {isShowingNextDay ? "Tomorrow's Synchron" : "Today's Synchron"}
-                </h3>
+                </b>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {mainTimetableDisplayDay} • {formatDate(selectedDateObject)}{" "}
                 </p>
