@@ -26,7 +26,7 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState("")
   // Use currentMomentPeriodInfo for the header status
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable()
-  // Ensure useAuth hook provides initiateLogin and logout functions
+  // Ensure useAuth hook provides isAuthenticated, initiateLogin and logout functions
   const { isAuthenticated, initiateLogin, logout } = useAuth() 
 
   // Memoize current day for the main timetable display
@@ -160,7 +160,26 @@ export default function Home() {
                 if (isAuthenticated) {
                   logout();
                 } else {
-                  initiateLogin();
+                  // Use typeof window check to avoid SSR issues
+                  if (typeof window === "undefined") return;
+
+                  const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID;
+                  const redirectUri = process.env.NODE_ENV === 'development'
+                    ? process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL
+                    : process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL;
+
+                  if (!clientId || !redirectUri) {
+                    alert("App ID or Redirect URI is not configured. Check your .env.local and Vercel environment variables.");
+                    return;
+                  }
+
+                  const authUrl = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/authorize?` +
+                    `response_type=code&` +
+                    `client_id=${clientId}&` +
+                    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+                    `scope=all-ro`;
+
+                  window.location.href = authUrl;
                 }
               }}
             >
@@ -168,7 +187,6 @@ export default function Home() {
               {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
             </Button>
             <SettingsMenu />
-            <ThemeToggle />
           </div>
         </div>
 
