@@ -241,7 +241,7 @@ export default function Home() {
               <div>
                 <h3 className="font-semibold text-lg">
                   {isShowingNextDay ? "Tomorrow's Synchron" : "Today's Synchron"}
-                </b>
+                </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {mainTimetableDisplayDay} • {formatDate(selectedDateObject)}{" "}
                 </p>
