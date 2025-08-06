@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { useRouter } from 'next/router'; // Keep this if you plan to use router.push for navigation later
+// Removed unused useRouter import
 import { Button } from "@/components/ui/button" // Corrected: Removed duplicate import, kept the first one
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentDay, formatDate, getCurrentTime } from "@/utils/time-utils"
@@ -14,8 +14,8 @@ import {
   Calendar,
   Clock,
   ArrowRight,
-  LogIn, // Corrected casing for Lucide icons (from Login)
-  LogOut, // Corrected casing for Lucide icons (from Logout)
+  LogIn, // Correct casing
+  LogOut, // Correct casing
   UserRoundX,
   MapPinOff,
 } from "lucide-react" // Consolidated all Lucide icon imports here
@@ -158,34 +158,32 @@ export default function Home() {
               className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
               onClick={() => {
                 if (isAuthenticated) {
-                  // If already authenticated, call logout function (you'll implement this in useAuth)
-                  logout(); // This assumes a logout function exists in your useAuth hook
+                  logout();
                 } else {
-                  // If not authenticated, initiate the login (OAuth) flow
+                  // Use typeof window check to avoid SSR issues
+                  if (typeof window === "undefined") return;
+
                   const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID;
-
-                  // Dynamically choose redirect URI based on environment
-                  // Use the correct redirect URI for your app/auth/callback structure
                   const redirectUri = process.env.NODE_ENV === 'development'
-                                      ? process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL // e.g., http://localhost/auth/callback
-                                      : process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL; // e.g., https://synchronapp.vercel.app/auth/callback
+                    ? process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL
+                    : process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL;
 
-                  if (!clientId || !redirectUri) { // Corrected variable name from onClickredirectUri to redirectUri
+                  if (!clientId || !redirectUri) {
                     alert("App ID or Redirect URI is not configured. Check your .env.local and Vercel environment variables.");
                     return;
                   }
 
                   const authUrl = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/authorize?` +
-                                  `response_type=code&` +
-                                  `client_id=${clientId}&` +
-                                  `redirect_uri=${encodeURIComponent(redirectUri)}&` + // IMPORTANT: URL-encode the URI!
-                                  `scope=all-ro`; // Make sure this matches the scope you selected
+                    `response_type=code&` +
+                    `client_id=${clientId}&` +
+                    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+                    `scope=all-ro`;
 
-                  window.location.href = authUrl; // Redirect the user's browser
+                  window.location.href = authUrl;
                 }
               }}
             >
-              {/* Conditional rendering for Login/Logout icons based on isAuthenticated */}
+              {/* Only use LogIn and LogOut, not Login */}
               {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
             </Button>
             <SettingsMenu />
