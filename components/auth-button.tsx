@@ -23,7 +23,7 @@ export function AuthButton() {
         return
       }
 
-      const authUrl = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/authorize?` +
+      const authUrl = `https://auth.sbhs.net.au/authorize` +
         `response_type=code&` +
         `client_id=${clientId}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
