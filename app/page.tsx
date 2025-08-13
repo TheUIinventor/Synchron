@@ -1,6 +1,7 @@
+
+"use client";
 // app/page.tsx
-// IMPORTANT: Removed "use client" directive from here.
-// This file is now a Server Component.
+// This file is now a Client Component.
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 // Removed unused useRouter import
@@ -98,8 +99,8 @@ export default function Home() {
             {/* Teacher and Room (only for non-break periods) */}
             {period.subject !== "Break" && (
               <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-1">
-                {isSubstitute && <UserRoundX className="h-3 w-3 text-orange-500" title="Substitute Teacher" />}
-                {isRoomChange && <MapPinOff className="h-3 w-3 text-purple-500" title="Room Change" />}
+                {isSubstitute && <UserRoundX className="h-3 w-3 text-orange-500" />}
+                {isRoomChange && <MapPinOff className="h-3 w-3 text-purple-500" />}
                 <span className={`${isSubstitute ? "text-orange-600 dark:text-orange-400 font-semibold" : ""}`}>
                   {period.teacher}
                 </span>{" "}
