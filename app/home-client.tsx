@@ -136,7 +136,8 @@ export default function HomeClient() {
             <ThemeToggle />
           </div>
         </div>
-
+        
+        {/* The main content area now has a single div for the timetable */}
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">Welcome!</h2>
@@ -200,76 +201,39 @@ export default function HomeClient() {
         </div>
       </div>
 
-      {/* This is the new flex container for the main content */}
-      <div className="flex flex-col lg:flex-row px-4 pt-4 gap-4">
-        {/* This div will hold the timetable */}
-        <div className="w-full lg:w-1/2">
-          <Card className="card-optimized-main">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="icon-container-optimized text-theme-primary">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">
-                    {isShowingNextDay ? "Tomorrow's Synchron" : "Today's Synchron"}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {mainTimetableDisplayDay} • {formatDate(selectedDateObject)}{" "}
-                  </p>
-                </div>
+      <div className="p-4 space-y-3">
+        <Card className="card-optimized-main">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="icon-container-optimized text-theme-primary">
+                <Calendar className="h-5 w-5" />
               </div>
+              <div>
+                <h3 className="font-semibold text-lg">
+                  {isShowingNextDay ? "Tomorrow's Synchron" : "Today's Synchron"}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {mainTimetableDisplayDay} • {formatDate(selectedDateObject)}{" "}
+                </p>
+              </div>
+            </div>
 
-              {mainTimetableDisplayDay === "Saturday" || mainTimetableDisplayDay === "Sunday" ? (
-                <div className="card-optimized rounded-xl p-6 text-center">
-                  <p className="text-gray-500 dark:text-gray-400">No classes scheduled for weekends</p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                    Enjoy your {mainTimetableDisplayDay}! 🎉
-                  </p>
-                </div>
-              ) : todaysTimetable.length > 0 ? (
-                <div className="space-y-1.5 contain-layout">{renderedPeriods}</div>
-              ) : (
-                <div className="card-optimized rounded-xl p-6 text-center">
-                  <p className="text-gray-500 dark:text-gray-400">No classes scheduled for this day</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* This div will hold the info cards on the right */}
-        <div className="w-full lg:w-1/2">
-          {/* We'll move the header time and next period info into this new container */}
-           <div className="flex flex-col gap-4">
-              <div className="card-optimized px-4 py-3 rounded-xl">
-                 <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-5 w-5 text-theme-primary" />
-                    <span className="text-lg font-semibold font-mono tracking-wide">{currentTime}</span>
-                 </div>
-                 <p className="text-sm text-gray-500 dark:text-gray-400">Current time</p>
+            {mainTimetableDisplayDay === "Saturday" || mainTimetableDisplayDay === "Sunday" ? (
+              <div className="card-optimized rounded-xl p-6 text-center">
+                <p className="text-gray-500 dark:text-gray-400">No classes scheduled for weekends</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                  Enjoy your {mainTimetableDisplayDay}! 🎉
+                </p>
               </div>
-              <div className="card-optimized px-4 py-3 rounded-xl">
-                 <div className="flex items-center gap-2 mb-2">
-                    <ArrowRight className="h-5 w-5 text-theme-primary" />
-                    <span className="text-lg font-semibold">Next Period</span>
-                 </div>
-                 {currentMomentPeriodInfo.nextPeriod ? (
-                    <div>
-                       <p className="text-sm font-medium">{getDisplaySubject(currentMomentPeriodInfo.nextPeriod)}</p>
-                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                           {currentMomentPeriodInfo.nextPeriod.room} • {currentMomentPeriodInfo.nextPeriod.teacher}
-                       </p>
-                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                           Starts {currentMomentPeriodInfo.timeUntil}
-                       </p>
-                    </div>
-                 ) : (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No more classes today</p>
-                 )}
+            ) : todaysTimetable.length > 0 ? (
+              <div className="space-y-1.5 contain-layout">{renderedPeriods}</div>
+            ) : (
+              <div className="card-optimized rounded-xl p-6 text-center">
+                <p className="text-gray-500 dark:text-gray-400">No classes scheduled for this day</p>
               </div>
-           </div>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </main>
   );
