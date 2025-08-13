@@ -1,4 +1,3 @@
-// components/auth-button.tsx
 "use client"
 
 import { LogIn, LogOut } from "lucide-react"
@@ -6,30 +5,43 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
 
 export function AuthButton() {
-  const { isAuthenticated, initiateLogin, logout } = useAuth()
+  // We're using the hook to get the authentication state and functions
+  const { isAuthenticated, logout } = useAuth()
 
-  // This onClick handler contains the client-side logic
+  // This is the client-side logic to handle both login and logout
   const handleAuth = () => {
+    // If the user is authenticated, we call the logout function from the hook
     if (isAuthenticated) {
       logout()
     } else {
+      // Otherwise, we need to handle the login process.
+      // We get the necessary environment variables for the URL.
       const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID
       const redirectUri = process.env.NODE_ENV === "development"
         ? process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL
         : process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL
 
+      // We check if the required variables are set.
+      // Instead of an alert, which can be disruptive, we log an error to the console.
       if (!clientId || !redirectUri) {
-        alert("App ID or Redirect URI is not configured.")
+        console.error("Authentication configuration error: App ID or Redirect URI is not configured.")
         return
       }
+      
+      // We'll use URLSearchParams to build the URL's query string.
+      // This is safer and more readable than manual string concatenation.
+      const params = new URLSearchParams({
+        response_type: "code",
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scope: "all-ro"
+      });
 
-      const authUrl = `https://auth.sbhs.net.au/authorize` +
-        `response_type=code&` +
-        `client_id=${clientId}&` +
-        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `scope=all-ro`
+      // We construct the final authorization URL with the correct base and parameters.
+      const authUrl = `https://auth.sbhs.net.au/authorize?${params.toString()}`;
 
-      window.location.href = authUrl
+      // This performs the redirect to the authorization server.
+      window.location.href = authUrl;
     }
   }
 
