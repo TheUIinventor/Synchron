@@ -20,23 +20,18 @@ export interface AuthTokens {
 class SBHSPortalClient {
   private baseUrl: string
   private portalUrl: string
-  private sessionId: string | null = null
-  private csrfToken: string | null = null
+  private accessToken: string | null = null
 
   constructor() {
     this.baseUrl = API_BASE_URL
     this.portalUrl = PORTAL_BASE_URL
-    this.loadSessionFromStorage()
+    this.loadAccessTokenFromCookie()
   }
 
-  private loadSessionFromStorage() {
-    if (typeof window !== "undefined") {
-      const sessionId = localStorage.getItem("sbhs_session_id")
-      const csrfToken = localStorage.getItem("sbhs_csrf_token")
-      if (sessionId && csrfToken) {
-        this.sessionId = sessionId
-        this.csrfToken = csrfToken
-      }
+  private loadAccessTokenFromCookie() {
+    if (typeof document !== "undefined") {
+      const match = document.cookie.match(/(?:^|; )sbhs_access_token=([^;]*)/)
+      this.accessToken = match ? decodeURIComponent(match[1]) : null
     }
   }
 
@@ -57,16 +52,10 @@ class SBHSPortalClient {
         ...options.headers,
       }
 
-      // Add session cookies if available
-      if (this.sessionId) {
-        headers.Cookie = `PHPSESSID=${this.sessionId}`
-      }
-
-      // Add CSRF token if available
-      if (this.csrfToken && options.method === "POST") {
-        if (options.body && typeof options.body === "string") {
-          options.body += `&csrf_token=${this.csrfToken}`
-        }
+      // Add access token from cookie if available
+      this.loadAccessTokenFromCookie();
+      if (this.accessToken) {
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
 
       const response = await fetch(url, {
@@ -76,7 +65,7 @@ class SBHSPortalClient {
       })
 
       // Handle session expiration
-      if (response.status === 401 || response.url.includes("/login")) {
+      if (response.status === 401) {
         this.clearSession()
         return {
           success: false,
@@ -270,13 +259,11 @@ class SBHSPortalClient {
   }
 
   private clearSession() {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("sbhs_session_id")
-      localStorage.removeItem("sbhs_csrf_token")
-      localStorage.removeItem("sbhs_session_expires")
+    this.accessToken = null;
+    if (typeof document !== "undefined") {
+      document.cookie = "sbhs_access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "sbhs_refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     }
-    this.sessionId = null
-    this.csrfToken = null
   }
 
   async logout(): Promise<void> {
@@ -325,7 +312,8 @@ class SBHSPortalClient {
   }
 
   isAuthenticated(): boolean {
-    return !!this.sessionId && !!this.csrfToken
+    this.loadAccessTokenFromCookie();
+    return !!this.accessToken;
   }
 }
 

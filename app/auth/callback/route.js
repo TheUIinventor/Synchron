@@ -42,14 +42,26 @@ export async function GET(request) {
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    // In a real application, you would store access_token and refresh_token securely (e.g., in a cookie)
-    // For now, we'll just log them and redirect to the home page.
-    console.log("Successfully obtained Access Token:", access_token);
-    console.log("Refresh Token (if provided):", refresh_token);
-    console.log("Expires In (seconds):", expires_in);
-
-    // Redirect user back to the home page or a success page.
-    return NextResponse.redirect(new URL('/', request.url)); // Redirect to your app's homepage
+    // Set access token in a secure, HTTP-only cookie
+    const response = NextResponse.redirect(new URL('/', request.url));
+    response.cookies.set('sbhs_access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== 'development',
+      sameSite: 'lax',
+      maxAge: expires_in,
+      path: '/',
+    });
+    // Optionally, set refresh token if needed
+    if (refresh_token) {
+      response.cookies.set('sbhs_refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV !== 'development',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: '/',
+      });
+    }
+    return response;
 
   } catch (error) {
     console.error('Error exchanging authorization code for token:', error.message);
