@@ -1,0 +1,4 @@
+SBHS_APP_ID=01k12p2q43ecyaehypsnprcwgm
+SBHS_APP_SECRET=gf682XeT--by2Et8jJoH8OHAaVmN0CelaPkRaLCwnPVXjehVlQNswvWCs8q_YlRADHvGb_8DizAIVI4L
+NEXT_PUBLIC_SBHS_APP_ID=01k12p2q43ecyaehypsnprcwgm
+NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL=https://synchronapp.vercel.app/auth/callback
