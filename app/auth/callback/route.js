@@ -6,6 +6,13 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
 
+  // DEBUG: Log environment variables to help diagnose missing config
+  console.log("SBHS_APP_ID:", process.env.SBHS_APP_ID);
+  console.log("SBHS_APP_SECRET:", process.env.SBHS_APP_SECRET);
+  console.log("NODE_ENV:", process.env.NODE_ENV);
+  console.log("NEXT_PUBLIC_SBHS_APP_ID:", process.env.NEXT_PUBLIC_SBHS_APP_ID);
+  console.log("NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL:", process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL);
+
   // Ensure these environment variables are set in .env.local AND Vercel Dashboard
   const clientId = process.env.SBHS_APP_ID;
   const clientSecret = process.env.SBHS_APP_SECRET;
