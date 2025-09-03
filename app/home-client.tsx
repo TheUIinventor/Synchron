@@ -8,6 +8,7 @@ import { trackSectionUsage } from "@/utils/usage-tracker";
 import ThemeToggle from "@/components/theme-toggle";
 import SettingsMenu from "@/components/settings-menu";
 import { useTimetable } from "@/contexts/timetable-context";
+import { useStudentProfile } from "@/lib/api/hooks";
 import {
   Calendar,
   Clock,
@@ -21,7 +22,7 @@ export default function HomeClient() {
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable();
-  const { data: studentProfile } = require("@/lib/api/hooks").useStudentProfile();
+  const { data: studentProfile } = useStudentProfile();
 
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay]);
   const todaysTimetable = useMemo(
