@@ -34,14 +34,14 @@ export async function GET(request) {
   const tokenEndpoint = process.env.SBHS_TOKEN_ENDPOINT || "https://auth.sbhs.net.au/token";
 
   try {
-    const tokenResponse = await axios.post(tokenEndpoint, null, {
-      params: {
-        grant_type: 'authorization_code',
-        code: code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-      },
+    const params = new URLSearchParams();
+    params.append('grant_type', 'authorization_code');
+    params.append('code', code);
+    params.append('client_id', clientId);
+    params.append('client_secret', clientSecret);
+    params.append('redirect_uri', redirectUri);
+
+    const tokenResponse = await axios.post(tokenEndpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
