@@ -25,8 +25,6 @@ export default function HomeClient() {
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable();
-  const { data: studentProfile } = useStudentProfile();
-  console.log("Student profile:", studentProfile);
 
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay]);
   const todaysTimetable = useMemo(
