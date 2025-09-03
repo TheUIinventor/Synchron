@@ -132,50 +132,7 @@ export default function HomeClient() {
               </div>
               <span className="text-lg font-semibold font-mono tracking-wide">{currentTime}</span>
             </div>
-            {currentMomentPeriodInfo.isCurrentlyInClass && currentMomentPeriodInfo.currentPeriod ? (
-              <div className="card-optimized px-3 py-2 rounded-xl min-w-[180px] ml-auto">
-                <div className="flex items-center gap-2 mb-1 justify-end">
-                  <span className="text-xs font-semibold">Current:</span>
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                </div>
-                <div className="text-xs font-medium mb-1 text-right">
-                  {getDisplaySubject(currentMomentPeriodInfo.currentPeriod)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1 text-right">
-                  {currentMomentPeriodInfo.timeUntil}
-                </div>
-                {currentMomentPeriodInfo.nextPeriod && (
-                  <div className="border-t border-gray-200 dark:border-gray-600 pt-1 mt-1 text-right">
-                    <div className="flex items-center gap-1 mb-1 justify-end">
-                      <ArrowRight className="h-2 w-2 text-blue-600 dark:text-blue-400" />
-                      <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Next:</span>
-                    </div>
-                    <div className="text-xs font-medium">{getDisplaySubject(currentMomentPeriodInfo.nextPeriod)}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {currentMomentPeriodInfo.nextPeriod.room} • {currentMomentPeriodInfo.nextPeriod.teacher}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : currentMomentPeriodInfo.nextPeriod ? (
-              <div className="card-optimized px-3 py-2 rounded-xl min-w-[180px] ml-auto">
-                <div className="flex items-center gap-2 mb-1 justify-end">
-                  <span className="text-xs font-semibold">Next:</span>
-                  <ArrowRight className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div className="text-xs font-medium mb-1 text-right">
-                  {getDisplaySubject(currentMomentPeriodInfo.nextPeriod)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1 text-right">
-                  {currentMomentPeriodInfo.timeUntil}
-                </div>
-              </div>
-            ) : (
-              <div className="card-optimized px-3 py-2 rounded-xl ml-auto">
-                <p className="text-xs font-medium">No more classes today</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Enjoy your day! 🎉</p>
-              </div>
-            )}
+          </div>
           </div>
         </div>
       </div>
@@ -188,12 +145,8 @@ export default function HomeClient() {
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">
-                  {isShowingNextDay ? "Tomorrow's Synchron" : "Today's Synchron"}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {mainTimetableDisplayDay} • {formatDate(selectedDateObject)}{" "}
-                </p>
+                <h3 className="font-semibold text-lg">Today's Synchron</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate()} • {getCurrentDay()}</p>
               </div>
             </div>
 
