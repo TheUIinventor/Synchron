@@ -21,6 +21,7 @@ export default function HomeClient() {
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable();
+  const { data: studentProfile } = require("@/lib/api/hooks").useStudentProfile();
 
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay]);
   const todaysTimetable = useMemo(
@@ -140,7 +141,9 @@ export default function HomeClient() {
         {/* The main content area now has a single div for the timetable */}
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold theme-gradient">Welcome!</h2>
+            <h2 className="text-2xl font-bold theme-gradient">
+              Welcome{studentProfile?.name ? `, ${studentProfile.name}` : ""}!
+            </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {formatDate()} • {getCurrentDay()}
