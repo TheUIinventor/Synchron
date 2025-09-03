@@ -31,7 +31,7 @@ export async function GET(request) {
     );
   }
 
-  const tokenEndpoint = `https://studentportal.sydneyboys-h.schools.nsw.edu.au/oauth/token`;
+  const tokenEndpoint = process.env.SBHS_TOKEN_ENDPOINT || "https://auth.sbhs.net.au/token";
 
   try {
     const tokenResponse = await axios.post(tokenEndpoint, null, {
