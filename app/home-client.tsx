@@ -19,10 +19,14 @@ import {
 import { AuthButton } from "@/components/auth-button";
 
 export default function HomeClient() {
+  const { data: studentProfile } = useStudentProfile();
+  // Debug: log student profile to check available fields
+  console.log("Student profile:", studentProfile);
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable();
   const { data: studentProfile } = useStudentProfile();
+  console.log("Student profile:", studentProfile);
 
   const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay]);
   const todaysTimetable = useMemo(
@@ -143,7 +147,7 @@ export default function HomeClient() {
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
-              Welcome{studentProfile?.givenName ? `, ${studentProfile.givenName}${studentProfile.surname ? ` ${studentProfile.surname}` : ""}` : ""}!
+              Welcome{studentProfile?.givenName || studentProfile?.surname ? `, ${[studentProfile?.givenName, studentProfile?.surname].filter(Boolean).join(" ")}` : ""}!
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
