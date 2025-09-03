@@ -19,9 +19,15 @@ import {
 import { AuthButton } from "@/components/auth-button";
 
 export default function HomeClient() {
-  const { data: studentProfile } = useStudentProfile();
-  // Debug: log student profile to check available fields
-  console.log("Student profile:", studentProfile);
+  const { data: studentProfile, error: studentProfileError, loading: studentProfileLoading } = useStudentProfile();
+  // Debug: log student profile to check available fields and errors
+  useEffect(() => {
+    console.log("Student profile:", studentProfile);
+    if (studentProfileError) {
+      console.error("Student profile error:", studentProfileError);
+    }
+  }, [studentProfile, studentProfileError]);
+  // ...existing code...
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable();
@@ -140,17 +146,19 @@ export default function HomeClient() {
             <ThemeToggle />
           </div>
         </div>
-        
         {/* The main content area now has a single div for the timetable */}
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
-              Welcome{studentProfile?.givenName || studentProfile?.surname ? `, ${[studentProfile?.givenName, studentProfile?.surname].filter(Boolean).join(" ")}` : ""}!
+              Welcome{studentProfileLoading ? "..." : studentProfile && studentProfile.givenName ? `, ${studentProfile.givenName} ${studentProfile.surname}` : "!"}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {formatDate()} • {getCurrentDay()}
             </p>
+            {studentProfileError && (
+              <div className="mb-2 text-red-500">Error loading profile: {studentProfileError}</div>
+            )}
           </div>
           <div className="text-right mt-4 sm:mt-0 w-full sm:w-auto">
             <div className="flex items-center gap-2 card-optimized px-3 py-2 rounded-xl mb-2 justify-end">
