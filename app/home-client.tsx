@@ -30,19 +30,37 @@ export default function HomeClient() {
   // ...existing code...
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
-  const { timetableData, currentMomentPeriodInfo, selectedDay, selectedDateObject, isShowingNextDay } = useTimetable();
+  // Timetable API integration
+  const [timetable, setTimetable] = useState<any[]>([]);
+  const [timetableLoading, setTimetableLoading] = useState(true);
+  const [timetableError, setTimetableError] = useState<string | null>(null);
 
-  const mainTimetableDisplayDay = useMemo(() => selectedDay, [selectedDay]);
-  const todaysTimetable = useMemo(
-    () => timetableData[mainTimetableDisplayDay] || [],
-    [timetableData, mainTimetableDisplayDay],
-  );
-
-  const getDisplaySubject = useCallback((period: any) => {
-    if (period.subject === "Break") {
-      return period.period;
+  useEffect(() => {
+    async function fetchTimetable() {
+      setTimetableLoading(true);
+      setTimetableError(null);
+      try {
+        const response = await fetch("https://student.sbhs.net.au/api/timetable/timetable.json", {
+          credentials: "include"
+        });
+        if (!response.ok) throw new Error("Failed to fetch timetable");
+        const data = await response.json();
+        setTimetable(data.timetable || []);
+      } catch (err: any) {
+        setTimetableError(err.message || "Unknown error");
+      } finally {
+        setTimetableLoading(false);
+      }
     }
-    return period.subject;
+    fetchTimetable();
+  }, []);
+
+  // Helper for timetable subject display
+  const getDisplaySubject = useCallback((period: any) => {
+    if (period.type === "break") {
+      return period.name || period.period;
+    }
+    return period.subject || period.name;
   }, []);
 
   useEffect(() => {
@@ -58,71 +76,27 @@ export default function HomeClient() {
     return () => clearInterval(interval);
   }, []);
 
+  // Render timetable periods from API
   const renderedPeriods = useMemo(() => {
-    return todaysTimetable.map((period) => {
-      const isCurrentPeriod =
-        !isShowingNextDay &&
-        currentMomentPeriodInfo.isCurrentlyInClass &&
-        currentMomentPeriodInfo.currentPeriod?.id === period.id;
-      const isNextPeriod =
-        !isShowingNextDay &&
-        !currentMomentPeriodInfo.isCurrentlyInClass &&
-        currentMomentPeriodInfo.nextPeriod?.id === period.id;
-
-      const isSubstitute = period.isSubstitute;
-      const isRoomChange = period.isRoomChange;
-
-      return (
-        <div
-          key={period.id}
-          className={`rounded-xl p-2 transition-colors duration-200 will-change-auto ${
-            isCurrentPeriod
-              ? "bg-green-100 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700"
-              : isNextPeriod
-                ? "bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-700"
-                : period.subject === "Break"
-                  ? "bg-amber-50 dark:bg-amber-900/20"
-                  : "bg-theme-secondary"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-sm flex-1 min-w-0 truncate">{getDisplaySubject(period)}</span>
-
-            {period.subject !== "Break" && (
-              <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-1">
-                {isSubstitute && <UserRoundX className="h-3 w-3 text-orange-500" />}
-                {isRoomChange && <MapPinOff className="h-3 w-3 text-purple-500" />}
-                <span className={`${isSubstitute ? "text-orange-600 dark:text-orange-400 font-semibold" : ""}`}>
-                  {period.teacher}
-                </span>{" "}
-                •{" "}
-                <span className={`${isRoomChange ? "text-purple-600 dark:text-purple-400 font-semibold" : ""}`}>
-                  {period.room}
-                </span>
-              </span>
-            )}
-
-            {period.subject !== "Break" && (isCurrentPeriod || isNextPeriod) && (
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {isCurrentPeriod && (
-                  <div className="flex items-center gap-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-medium">Now</span>
-                  </div>
-                )}
-                {isNextPeriod && (
-                  <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full">
-                    <ArrowRight className="h-3 w-3" />
-                    <span className="text-xs font-medium">Next</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+    return timetable.map((period, idx) => (
+      <div
+        key={period.id || idx}
+        className={`rounded-xl p-2 transition-colors duration-200 will-change-auto ${
+          period.type === "break"
+            ? "bg-amber-50 dark:bg-amber-900/20"
+            : "bg-theme-secondary"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold text-sm flex-1 min-w-0 truncate">{getDisplaySubject(period)}</span>
+          <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-1">
+            {period.teacher && <span>{period.teacher}</span>}
+            {period.room && <span>• {period.room}</span>}
+          </span>
         </div>
-      );
-    });
-  }, [todaysTimetable, currentMomentPeriodInfo, getDisplaySubject, isShowingNextDay]);
+      </div>
+    ));
+  }, [timetable, getDisplaySubject]);
 
   if (!mounted) {
     return (
@@ -232,14 +206,15 @@ export default function HomeClient() {
               </div>
             </div>
 
-            {mainTimetableDisplayDay === "Saturday" || mainTimetableDisplayDay === "Sunday" ? (
+            {timetableLoading ? (
               <div className="card-optimized rounded-xl p-6 text-center">
-                <p className="text-gray-500 dark:text-gray-400">No classes scheduled for weekends</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                  Enjoy your {mainTimetableDisplayDay}! 🎉
-                </p>
+                <p className="text-gray-500 dark:text-gray-400">Loading timetable...</p>
               </div>
-            ) : todaysTimetable.length > 0 ? (
+            ) : timetableError ? (
+              <div className="card-optimized rounded-xl p-6 text-center">
+                <p className="text-red-500">Error loading timetable: {timetableError}</p>
+              </div>
+            ) : timetable.length > 0 ? (
               <div className="space-y-1.5 contain-layout">{renderedPeriods}</div>
             ) : (
               <div className="card-optimized rounded-xl p-6 text-center">
