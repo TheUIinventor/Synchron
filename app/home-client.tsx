@@ -143,7 +143,7 @@ export default function HomeClient() {
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
-              Welcome{studentProfile?.name ? `, ${studentProfile.name}` : ""}!
+              Welcome{studentProfile?.givenName ? `, ${studentProfile.givenName}${studentProfile.surname ? ` ${studentProfile.surname}` : ""}` : ""}!
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

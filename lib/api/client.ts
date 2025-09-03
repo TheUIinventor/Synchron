@@ -277,7 +277,7 @@ class SBHSPortalClient {
 
   // Student Profile - scrape from main portal page
   async getStudentProfile(): Promise<ApiResponse<StudentProfile>> {
-    return this.makePortalRequest<StudentProfile>("/")
+    return this.makePortalRequest<StudentProfile>("/details/userinfo.json")
   }
 
   // Timetable - scrape from timetable page
@@ -322,15 +322,19 @@ export const sbhsPortal = new SBHSPortalClient()
 
 // Type definitions remain the same
 export interface StudentProfile {
-  id: string
-  studentId: string
-  firstName: string
-  lastName: string
-  preferredName?: string
-  year: number
-  house: string
-  email: string
-  photoUrl?: string
+  username: string;
+  studentId: string;
+  givenName: string;
+  surname: string;
+  rollclass: string;
+  yearGroup: string;
+  role: string;
+  department: string;
+  office: string;
+  email: string;
+  emailAliases: string[];
+  decEmail: string;
+  groups: string[];
 }
 
 export interface TimetableEntry {
