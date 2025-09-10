@@ -48,9 +48,11 @@ export default function HomeClient() {
         });
         if (!response.ok) throw new Error("Failed to fetch timetable");
         const data = await response.json();
+        console.log("Timetable API response:", data); // Debug log
         setTimetable(data.timetable || []);
         // Extract student name from API response
         if (data.student) {
+          console.log("Student object:", data.student); // Debug log
           if (data.student.name) {
             setStudentName(data.student.name);
           } else if (data.student.givenName && data.student.surname) {
