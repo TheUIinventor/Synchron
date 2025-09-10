@@ -43,7 +43,7 @@ export default function HomeClient() {
       setTimetableLoading(true);
       setTimetableError(null);
       try {
-        const response = await fetch("https://student.sbhs.net.au/api/timetable/timetable.json", {
+        const response = await fetch("/api/timetable", {
           credentials: "include"
         });
         if (!response.ok) throw new Error("Failed to fetch timetable");
