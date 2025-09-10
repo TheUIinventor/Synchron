@@ -5,6 +5,7 @@ export async function GET(req: NextRequest) {
   const apiUrl = 'https://student.sbhs.net.au/api/timetable/v1/info.json';
   // Forward cookies from the incoming request
   const cookie = req.headers.get('cookie');
+  console.log('Incoming cookie header:', cookie); // Debug log
 
   try {
     const response = await fetch(apiUrl, {
@@ -17,12 +18,12 @@ export async function GET(req: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to fetch timetable', status: response.status }, { status: response.status });
+      return NextResponse.json({ error: 'Failed to fetch timetable', status: response.status, cookieReceived: cookie }, { status: response.status });
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json({ error: 'Proxy error', details: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Proxy error', details: String(error), cookieReceived: cookie }, { status: 500 });
   }
 }
