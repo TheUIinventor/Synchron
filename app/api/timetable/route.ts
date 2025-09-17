@@ -3,25 +3,28 @@ import { NextRequest, NextResponse } from 'next/server';
 // This route proxies requests to the SBHS Timetable API, including cookies for authentication.
 export async function GET(req: NextRequest) {
   const apiUrl = 'https://student.sbhs.net.au/api/timetable/v1/info.json';
-  // Forward cookies from the incoming request
-  const cookie = req.headers.get('cookie');
-  console.log('Incoming cookie header:', cookie); // Debug log
+  // Get OAuth access token from cookie
+  const accessToken = req.cookies.get('sbhs_access_token')?.value;
+  console.log('Incoming access token:', accessToken); // Debug log
+
+  if (!accessToken) {
+    return NextResponse.json({ error: 'Missing SBHS access token' }, { status: 401 });
+  }
 
   try {
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'Cookie': cookie || '',
+        'Authorization': `Bearer ${accessToken}`,
         'Accept': 'application/json',
       },
-      credentials: 'include',
     });
     console.log('SBHS API response status:', response.status);
     const text = await response.text();
     console.log('SBHS API response body:', text);
 
     if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to fetch timetable', status: response.status, cookieReceived: cookie, responseBody: text }, { status: response.status });
+      return NextResponse.json({ error: 'Failed to fetch timetable', status: response.status, accessTokenUsed: accessToken, responseBody: text }, { status: response.status });
     }
 
     let data;
@@ -32,6 +35,6 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json({ error: 'Proxy error', details: String(error), cookieReceived: cookie }, { status: 500 });
+    return NextResponse.json({ error: 'Proxy error', details: String(error), accessTokenUsed: accessToken }, { status: 500 });
   }
 }
