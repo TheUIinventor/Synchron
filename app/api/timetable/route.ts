@@ -16,12 +16,20 @@ export async function GET(req: NextRequest) {
       },
       credentials: 'include',
     });
+    console.log('SBHS API response status:', response.status);
+    const text = await response.text();
+    console.log('SBHS API response body:', text);
 
     if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to fetch timetable', status: response.status, cookieReceived: cookie }, { status: response.status });
+      return NextResponse.json({ error: 'Failed to fetch timetable', status: response.status, cookieReceived: cookie, responseBody: text }, { status: response.status });
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON from SBHS API', responseBody: text }, { status: 500 });
+    }
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: 'Proxy error', details: String(error), cookieReceived: cookie }, { status: 500 });
