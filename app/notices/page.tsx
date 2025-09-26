@@ -9,35 +9,27 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 
 export default function NoticesPage() {
-  useEffect(() => {
-    // Track notices usage
-    trackSectionUsage("notices")
-  }, [])
-
-  // Mock data
-  const categories = ["All", "Year 7", "Year 8", "Year 9", "Year 10", "Year 11", "Year 12"]
-  const currentDate = "May 11, 2025"
-
-  const notices = [
-    {
-      id: 1,
-      title: "School Assembly",
-      content: "There will be a whole school assembly on Monday at 9:00 AM in the Great Hall.",
-      category: "All",
-      date: "May 11, 2025",
-      isPinned: true,
-    },
-    {
-      id: 2,
-      title: "Year 12 Trial Exams",
-      content: "Year 12 trial exams will commence on June 1st. Please check the exam timetable on the school website.",
-      category: "Year 12",
-      date: "May 10, 2025",
-      isPinned: true,
-    },
-    {
-      id: 3,
-      title: "Basketball Trials",
+  return (
+    <>
+      <PageTransition>
+        <Link href="/" className="inline-flex items-center gap-2 mb-4 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <ChevronLeft size={18} /> Back to Home
+        </Link>
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList>
+            <TabsTrigger value="all">All Notices</TabsTrigger>
+          </TabsList>
+          <TabsContent value="all">
+            {/* Live notices client */}
+            <div className="mt-4">
+              {/* @ts-expect-error Server Component */}
+              <import('./notices-client').then(m => <m.default />)
+            </div>
+          </TabsContent>
+        </Tabs>
+      </PageTransition>
+    </>
+  );
       content: "Basketball trials for the school team will be held on Wednesday after school in the gym.",
       category: "All",
       date: "May 9, 2025",
