@@ -43,7 +43,7 @@ export default function NoticesClient() {
           ))}
         </ul>
       ) : (
-        <p>No notices for today.</p>
+        <p className="text-center text-gray-500">No Notices Available At This Time</p>
       )}
     </main>
   );
