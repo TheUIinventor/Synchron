@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import NoticesClient from "./notices-client"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { ChevronLeft, Pin } from "lucide-react"
@@ -20,10 +21,8 @@ export default function NoticesPage() {
             <TabsTrigger value="all">All Notices</TabsTrigger>
           </TabsList>
           <TabsContent value="all">
-            {/* Live notices client */}
             <div className="mt-4">
-              {/* @ts-expect-error Server Component */}
-              <import('./notices-client').then(m => <m.default />)
+              <NoticesClient />
             </div>
           </TabsContent>
         </Tabs>
