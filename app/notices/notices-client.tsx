@@ -28,7 +28,6 @@ export default function NoticesClient() {
           if (cached) {
             data = JSON.parse(cached);
           }
-// Removed stray JSX line that caused syntax error
         if (!data) {
           const response = await fetch("/api/notices");
           if (!response.ok) throw new Error("Failed to fetch notices");
