@@ -13,8 +13,11 @@ export default function NoticesPage() {
   return (
     <>
       <PageTransition>
-        <div className="mt-4">
-          <NoticesClient />
+        <div className="flex flex-col items-center w-full mt-4">
+          <h1 className="text-2xl font-bold mb-6 text-center">Notices</h1>
+          <div className="w-full flex justify-center">
+            <NoticesClient />
+          </div>
         </div>
       </PageTransition>
     </>
