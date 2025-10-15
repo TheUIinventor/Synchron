@@ -69,13 +69,20 @@ export default function NoticesClient() {
   // Filter notices by displayYears
   const filteredNotices = selectedYear === "All"
     ? notices
-    : notices.filter(n =>
-        n.displayYears && n.displayYears.split(',').map((y: string) => y.trim()).includes(selectedYear)
-      );
+    : notices.filter(n => {
+        if (!n.displayYears) return false;
+        const tags = n.displayYears.split(',').map((y: string) => y.trim());
+        // Show if matches selected year
+        if (tags.includes(selectedYear)) return true;
+        // Show if 'All Students and Staff' for any filter
+        if (tags.some(t => t.toLowerCase() === 'all students and staff')) return true;
+        // Show if 'Staff' and selectedYear is 'Staff'
+        if (tags.includes('Staff') && selectedYear === 'Staff') return true;
+        return false;
+      });
 
   return (
-  <main className="min-h-screen p-4" style={{ transform: 'scale(0.8)', transformOrigin: 'top left' }}>
-      <h1 className="text-2xl font-bold mb-4">Daily Notices</h1>
+  <main className="notices-main min-h-screen flex flex-col items-center w-full" style={{ transform: 'scale(0.8)', transformOrigin: 'top left' }}>
       <div className="mb-6 flex gap-2 items-center">
         <div className="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex-wrap">
           <button
@@ -100,18 +107,19 @@ export default function NoticesClient() {
       ) : error ? (
         <p className="text-red-500">Error: {error}</p>
       ) : filteredNotices.length > 0 ? (
-        <ul className="space-y-6">
+  <ul className="space-y-6 w-full max-w-2xl mx-auto px-2 sm:px-0">
           {filteredNotices.map((notice, idx) => (
-            <li key={idx} className="rounded-xl bg-white dark:bg-gray-900 shadow p-6 flex flex-col gap-2">
+            <li key={idx} className="notices-card rounded-2xl bg-white dark:bg-gray-900 shadow-lg p-4 sm:p-8 flex flex-col gap-2 w-full border border-gray-100 dark:border-gray-800 transition-all">
               <div className="text-2xl font-bold mb-1">{notice.title || notice.type}</div>
-              <div className="text-lg text-gray-700 dark:text-gray-200 mb-2">
-                {(() => {
-                  let msg = notice.text || notice.details || notice.content || notice.message || "";
-                  // Remove <p> and </p> from start/end
-                  msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
-                  return msg;
-                })()}
-              </div>
+              <div className="text-lg text-gray-700 dark:text-gray-200 mb-2"
+                dangerouslySetInnerHTML={{
+                  __html: (() => {
+                    let msg = notice.text || notice.details || notice.content || notice.message || "";
+                    msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
+                    return msg;
+                  })()
+                }}
+              />
               <div className="flex items-center gap-3 mt-2">
                 {/* Author avatar */}
                 {notice.authorName && (
@@ -123,12 +131,90 @@ export default function NoticesClient() {
                   <span className="font-semibold text-lg">{notice.authorName}</span>
                 )}
                 {notice.displayYears && (
-                  <span className="ml-2 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">{notice.displayYears}</span>
+                  <span
+                    className="ml-2 px-3 py-1 rounded-full text-xs font-medium"
+                    style={{
+                      background: 'var(--theme-primary-bg, #dbeafe)',
+                      color: 'var(--theme-primary-fg, #2563eb)'
+                    }}
+                  >
+                    {notice.displayYears}
+                  </span>
                 )}
               </div>
             </li>
           ))}
         </ul>
+        {/* Install App Button */}
+        <div className="w-full flex justify-center mt-10">
+          <InstallAppButton />
+        </div>
+// InstallAppButton component for PWA install prompt
+import React, { useEffect, useState } from "react";
+
+function InstallAppButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showButton, setShowButton] = useState(false);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    // Listen for beforeinstallprompt event (Chrome, Edge, Android)
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowButton(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Listen for appinstalled event
+    window.addEventListener('appinstalled', () => {
+      setInstalled(true);
+      setShowButton(false);
+    });
+
+    // iOS Safari: check for standalone mode
+    if (window.navigator.standalone === false || window.navigator.standalone === undefined) {
+      // Show button for iOS Safari if not installed
+      const isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
+      if (isIOS && isSafari) {
+        setShowButton(true);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowButton(false);
+      }
+    } else {
+      // iOS Safari instructions
+      alert('To install this app, tap the Share button in Safari and select "Add to Home Screen".');
+    }
+  };
+
+  if (!showButton || installed) return null;
+
+  return (
+    <button
+      onClick={handleInstall}
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full font-semibold shadow-lg bg-blue-600 text-white hover:bg-blue-700 transition-all text-base sm:text-lg"
+      style={{
+        background: 'var(--theme-primary-fg, #2563eb)',
+        color: 'var(--theme-primary-bg, #dbeafe)',
+      }}
+    >
+      <span role="img" aria-label="install">📲</span> Install App
+    </button>
+  );
+}
       ) : (
         <p className="text-center text-gray-500">No Notices Available At This Time</p>
       )}

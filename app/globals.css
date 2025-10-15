@@ -1,3 +1,34 @@
+/* Responsive tweaks for notices page */
+.notices-main {
+  width: 100%;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem;
+}
+
+@media (max-width: 640px) {
+  .notices-main {
+    padding: 0.5rem;
+    max-width: 100vw;
+  }
+  .notices-card {
+    padding: 1rem !important;
+    border-radius: 1rem !important;
+  }
+}
+/* Theme color variables for year markers */
+:root {
+  --theme-primary-bg: #dbeafe; /* Tailwind blue-100 */
+  --theme-primary-fg: #2563eb; /* Tailwind blue-700 */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --theme-primary-bg: #1e293b; /* Tailwind slate-800 */
+    --theme-primary-fg: #60a5fa; /* Tailwind blue-400 */
+  }
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
