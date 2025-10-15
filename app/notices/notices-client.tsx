@@ -28,7 +28,7 @@ export default function NoticesClient() {
           if (cached) {
             data = JSON.parse(cached);
           }
-        }
+              <main className="notices-main min-h-screen flex flex-col items-center w-full">
         if (!data) {
           const response = await fetch("/api/notices");
           if (!response.ok) throw new Error("Failed to fetch notices");
@@ -63,11 +63,37 @@ export default function NoticesClient() {
     "Staff"
   ];
 
+  function expandYearTags(displayYears: string) {
+    const tags = displayYears.split(',').map((y: string) => y.trim());
+    let expanded: string[] = [];
+    tags.forEach(tag => {
+      // Match 'Years 8-11' or 'Year 8-11'
+      const rangeMatch = tag.match(/^Years? (\d+)-(\d+)$/i);
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1], 10);
+        const end = parseInt(rangeMatch[2], 10);
+        for (let y = start; y <= end; y++) {
+          expanded.push(`Year ${y}`);
+        }
+        return;
+      }
+      // Match 'Year 8'
+      const singleMatch = tag.match(/^Year (\d+)$/i);
+      if (singleMatch) {
+        expanded.push(`Year ${singleMatch[1]}`);
+        return;
+      }
+      // Pass through Staff, All Students and Staff, etc.
+      expanded.push(tag);
+    });
+    return expanded;
+  }
+
   const filteredNotices = selectedYear === "All"
     ? notices
     : notices.filter(n => {
         if (!n.displayYears) return false;
-        const tags = n.displayYears.split(',').map((y: string) => y.trim());
+        const tags = expandYearTags(n.displayYears);
         if (tags.includes(selectedYear)) return true;
         if (tags.some((t: string) => t.toLowerCase() === 'all students and staff')) return true;
         if (tags.includes('Staff') && selectedYear === 'Staff') return true;
