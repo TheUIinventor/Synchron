@@ -5,11 +5,10 @@ import ThemeToggle from "@/components/theme-toggle";
 
 export default function TopRightActionIcons() {
   return (
-    <div
-      className="fixed top-6 right-8 z-50 flex gap-4"
-      style={{ pointerEvents: "none" }}
-    >
+    <div className="absolute top-6 right-8 z-40 flex gap-2">
+      <AuthButton />
+      <SettingsMenu />
+      <ThemeToggle />
     </div>
   );
 }
-// TopRightActionIcons component removed as requested.
