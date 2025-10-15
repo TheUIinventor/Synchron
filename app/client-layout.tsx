@@ -1,5 +1,6 @@
+
+"use client";
 import TopRightActionIcons from "@/components/top-right-action-icons";
-"use client"
 
 import type { ReactNode } from "react"
 import BottomNav from "@/components/bottom-nav"
