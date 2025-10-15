@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useEffect, useState } from "react";
 
 // Prefetch notices in the background and cache in sessionStorage
 function prefetchNotices() {
