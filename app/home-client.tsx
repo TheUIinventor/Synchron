@@ -130,6 +130,7 @@ export default function HomeClient() {
           <div>
             <h1 className="text-xl font-bold">Synchron β</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Still in development. Issues are expected.</p>
           </div>
           <div className="flex gap-2">
             <AuthButton />
