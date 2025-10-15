@@ -101,7 +101,7 @@ export default function NoticesClient() {
       });
 
   return (
-    <main className="notices-main min-h-screen flex flex-col items-center w-full" style={{ transform: 'scale(0.8)', transformOrigin: 'top left' }}>
+    <main className="notices-main min-h-screen flex flex-col items-center w-full">
       <div className="mb-6 flex gap-2 items-center">
         <div className="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex-wrap">
           <button
