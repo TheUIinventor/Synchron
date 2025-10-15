@@ -1,6 +1,6 @@
 "use client";
-
 import { useEffect, useState } from "react";
+import InstallAppButton from "@/components/install-app-button";
 
 const yearColors: Record<string, string> = {
   "7": "bg-blue-100 text-blue-700",
@@ -22,7 +22,6 @@ export default function NoticesClient() {
       setLoading(true);
       setError(null);
       try {
-        // Try to use prefetched data from sessionStorage first
         let data = null;
         if (typeof window !== "undefined") {
           const cached = sessionStorage.getItem("notices-data");
@@ -53,8 +52,6 @@ export default function NoticesClient() {
     fetchNotices();
   }, []);
 
-  // Extract unique years from notices
-  // Use a fixed year order for selector
   const fixedYears = [
     "All",
     "Year 7",
@@ -66,23 +63,19 @@ export default function NoticesClient() {
     "Staff"
   ];
 
-  // Filter notices by displayYears
   const filteredNotices = selectedYear === "All"
     ? notices
     : notices.filter(n => {
         if (!n.displayYears) return false;
         const tags = n.displayYears.split(',').map((y: string) => y.trim());
-        // Show if matches selected year
         if (tags.includes(selectedYear)) return true;
-        // Show if 'All Students and Staff' for any filter
-        if (tags.some(t => t.toLowerCase() === 'all students and staff')) return true;
-        // Show if 'Staff' and selectedYear is 'Staff'
+        if (tags.some((t: string) => t.toLowerCase() === 'all students and staff')) return true;
         if (tags.includes('Staff') && selectedYear === 'Staff') return true;
         return false;
       });
 
   return (
-  <main className="notices-main min-h-screen flex flex-col items-center w-full" style={{ transform: 'scale(0.8)', transformOrigin: 'top left' }}>
+    <main className="notices-main min-h-screen flex flex-col items-center w-full" style={{ transform: 'scale(0.8)', transformOrigin: 'top left' }}>
       <div className="mb-6 flex gap-2 items-center">
         <div className="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex-wrap">
           <button
@@ -91,7 +84,7 @@ export default function NoticesClient() {
           >
             All
           </button>
-          {fixedYears.slice(1).map(year => (
+          {fixedYears.slice(1).map((year: string) => (
             <button
               key={year}
               className={`ml-1 px-4 py-1 rounded-full text-sm font-medium transition-colors duration-150 ${selectedYear === year ? "bg-blue-600 text-white shadow" : (yearColors[year.replace(/\D/g,"")] || "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200")}`}
@@ -107,114 +100,48 @@ export default function NoticesClient() {
       ) : error ? (
         <p className="text-red-500">Error: {error}</p>
       ) : filteredNotices.length > 0 ? (
-  <ul className="space-y-6 w-full max-w-2xl mx-auto px-2 sm:px-0">
-          {filteredNotices.map((notice, idx) => (
-            <li key={idx} className="notices-card rounded-2xl bg-white dark:bg-gray-900 shadow-lg p-4 sm:p-8 flex flex-col gap-2 w-full border border-gray-100 dark:border-gray-800 transition-all">
-              <div className="text-2xl font-bold mb-1">{notice.title || notice.type}</div>
-              <div className="text-lg text-gray-700 dark:text-gray-200 mb-2"
-                dangerouslySetInnerHTML={{
-                  __html: (() => {
-                    let msg = notice.text || notice.details || notice.content || notice.message || "";
-                    msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
-                    return msg;
-                  })()
-                }}
-              />
-              <div className="flex items-center gap-3 mt-2">
-                {/* Author avatar */}
-                {notice.authorName && (
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg" style={{ background: '#06b6d4' }}>
-                    {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
-                  </div>
-                )}
-                {notice.authorName && (
-                  <span className="font-semibold text-lg">{notice.authorName}</span>
-                )}
-                {notice.displayYears && (
-                  <span
-                    className="ml-2 px-3 py-1 rounded-full text-xs font-medium"
-                    style={{
-                      background: 'var(--theme-primary-bg, #dbeafe)',
-                      color: 'var(--theme-primary-fg, #2563eb)'
-                    }}
-                  >
-                    {notice.displayYears}
-                  </span>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-        {/* Install App Button */}
-        <div className="w-full flex justify-center mt-10">
-          <InstallAppButton />
+        <div>
+          <ul className="space-y-6 w-full max-w-2xl mx-auto px-2 sm:px-0">
+            {filteredNotices.map((notice, idx) => (
+              <li key={idx} className="notices-card rounded-2xl bg-white dark:bg-gray-900 shadow-lg p-4 sm:p-8 flex flex-col gap-2 w-full border border-gray-100 dark:border-gray-800 transition-all">
+                <div className="text-2xl font-bold mb-1">{notice.title || notice.type}</div>
+                <div className="text-lg text-gray-700 dark:text-gray-200 mb-2"
+                  dangerouslySetInnerHTML={{
+                    __html: (() => {
+                      let msg = notice.text || notice.details || notice.content || notice.message || "";
+                      msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
+                      return msg;
+                    })()
+                  }}
+                />
+                <div className="flex items-center gap-3 mt-2">
+                  {notice.authorName && (
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg" style={{ background: '#06b6d4' }}>
+                      {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
+                    </div>
+                  )}
+                  {notice.authorName && (
+                    <span className="font-semibold text-lg">{notice.authorName}</span>
+                  )}
+                  {notice.displayYears && (
+                    <span
+                      className="ml-2 px-3 py-1 rounded-full text-xs font-medium"
+                      style={{
+                        background: 'var(--theme-primary-bg, #dbeafe)',
+                        color: 'var(--theme-primary-fg, #2563eb)'
+                      }}
+                    >
+                      {notice.displayYears}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="w-full flex justify-center mt-10">
+            <InstallAppButton />
+          </div>
         </div>
-// InstallAppButton component for PWA install prompt
-import React, { useEffect, useState } from "react";
-
-function InstallAppButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showButton, setShowButton] = useState(false);
-  const [installed, setInstalled] = useState(false);
-
-  useEffect(() => {
-    // Listen for beforeinstallprompt event (Chrome, Edge, Android)
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowButton(true);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-
-    // Listen for appinstalled event
-    window.addEventListener('appinstalled', () => {
-      setInstalled(true);
-      setShowButton(false);
-    });
-
-    // iOS Safari: check for standalone mode
-    if (window.navigator.standalone === false || window.navigator.standalone === undefined) {
-      // Show button for iOS Safari if not installed
-      const isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-      const isSafari = /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
-      if (isIOS && isSafari) {
-        setShowButton(true);
-      }
-    }
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-    };
-  }, []);
-
-  const handleInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setShowButton(false);
-      }
-    } else {
-      // iOS Safari instructions
-      alert('To install this app, tap the Share button in Safari and select "Add to Home Screen".');
-    }
-  };
-
-  if (!showButton || installed) return null;
-
-  return (
-    <button
-      onClick={handleInstall}
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full font-semibold shadow-lg bg-blue-600 text-white hover:bg-blue-700 transition-all text-base sm:text-lg"
-      style={{
-        background: 'var(--theme-primary-fg, #2563eb)',
-        color: 'var(--theme-primary-bg, #dbeafe)',
-      }}
-    >
-      <span role="img" aria-label="install">📲</span> Install App
-    </button>
-  );
-}
       ) : (
         <p className="text-center text-gray-500">No Notices Available At This Time</p>
       )}
