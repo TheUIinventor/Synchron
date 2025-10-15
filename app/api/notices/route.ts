@@ -2,15 +2,22 @@ import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {
   const apiUrl = "https://student.sbhs.net.au/api/dailynews/list.json";
-  // TODO: Add authentication (access token/cookie) if required by SBHS API
+  // Use OAuth access token from cookie for authentication
+  const accessToken = req.cookies.get('sbhs_access_token')?.value;
+  if (!accessToken) {
+    return new Response(JSON.stringify({ error: "Missing SBHS access token" }), { status: 401 });
+  }
   try {
     const response = await fetch(apiUrl, {
-      // Add headers/cookies if needed for authentication
-      credentials: "include",
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+      },
     });
     if (!response.ok) {
+      const text = await response.text();
       return new Response(
-        JSON.stringify({ error: "Failed to fetch notices" }),
+        JSON.stringify({ error: "Failed to fetch notices", status: response.status, responseBody: text }),
         { status: response.status }
       );
     }
@@ -18,7 +25,7 @@ export async function GET(req: NextRequest) {
     return new Response(JSON.stringify(data), { status: 200 });
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: "Error fetching notices" }),
+      JSON.stringify({ error: "Error fetching notices", details: String(err) }),
       { status: 500 }
     );
   }
