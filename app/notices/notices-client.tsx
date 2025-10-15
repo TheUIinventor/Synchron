@@ -74,7 +74,7 @@ export default function NoticesClient() {
       );
 
   return (
-    <main className="min-h-screen p-4">
+  <main className="min-h-screen p-4" style={{ transform: 'scale(0.8)', transformOrigin: 'top left' }}>
       <h1 className="text-2xl font-bold mb-4">Daily Notices</h1>
       <div className="mb-6 flex gap-2 items-center">
         <div className="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex-wrap">
@@ -104,7 +104,14 @@ export default function NoticesClient() {
           {filteredNotices.map((notice, idx) => (
             <li key={idx} className="rounded-xl bg-white dark:bg-gray-900 shadow p-6 flex flex-col gap-2">
               <div className="text-2xl font-bold mb-1">{notice.title || notice.type}</div>
-              <div className="text-lg text-gray-700 dark:text-gray-200 mb-2">{notice.text || notice.details || notice.content || notice.message}</div>
+              <div className="text-lg text-gray-700 dark:text-gray-200 mb-2">
+                {(() => {
+                  let msg = notice.text || notice.details || notice.content || notice.message || "";
+                  // Remove <p> and </p> from start/end
+                  msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
+                  return msg;
+                })()}
+              </div>
               <div className="flex items-center gap-3 mt-2">
                 {/* Author avatar */}
                 {notice.authorName && (
