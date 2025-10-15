@@ -1,6 +1,22 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useEffect, useState } from "react";
+
+// Prefetch notices in the background and cache in sessionStorage
+function prefetchNotices() {
+  if (typeof window === "undefined") return;
+  if (sessionStorage.getItem("notices-prefetched")) return;
+  fetch("/api/notices")
+    .then(res => res.ok ? res.json() : null)
+    .then(data => {
+      if (data) {
+        sessionStorage.setItem("notices-data", JSON.stringify(data));
+        sessionStorage.setItem("notices-prefetched", "1");
+      }
+    })
+    .catch(() => {});
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getCurrentDay, formatDate, getCurrentTime } from "@/utils/time-utils";
@@ -19,6 +35,10 @@ import {
 import { AuthButton } from "@/components/auth-button";
 
 export default function HomeClient() {
+  // Prefetch notices on home page mount
+  useEffect(() => {
+    prefetchNotices();
+  }, []);
   // Timetable API integration
   const [timetable, setTimetable] = useState<any[]>([]);
   const [studentName, setStudentName] = useState<string>("");
