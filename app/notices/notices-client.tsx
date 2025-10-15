@@ -15,7 +15,17 @@ export default function NoticesClient() {
         const response = await fetch("/api/notices");
         if (!response.ok) throw new Error("Failed to fetch notices");
         const data = await response.json();
-        setNotices(data.items || []);
+        // SBHS API returns an array or an object with a property like 'notices' or 'news'.
+        // Try to find the correct property, fallback to data if it's an array.
+        if (Array.isArray(data)) {
+          setNotices(data);
+        } else if (Array.isArray(data.notices)) {
+          setNotices(data.notices);
+        } else if (Array.isArray(data.news)) {
+          setNotices(data.news);
+        } else {
+          setNotices([]);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
