@@ -28,6 +28,7 @@ export default function NoticesClient() {
           if (cached) {
             data = JSON.parse(cached);
           }
+        }
         if (!data) {
           const response = await fetch("/api/notices");
           if (!response.ok) throw new Error("Failed to fetch notices");
