@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useUserSettings } from "@/components/theme-provider" // Import useUserSettings
+import { useParticipation, useAwardPoints } from "@/lib/api/hooks"
 
 export default function AwardsPage() {
   useEffect(() => {
@@ -19,21 +20,6 @@ export default function AwardsPage() {
   }, [])
 
   const { colorTheme } = useUserSettings() // Get the current color theme
-
-  // SBHS Student Recognition and Awards Scheme - category-based nominations
-  const categoryData = {
-    Academic: { points: 85, nominations: 2 }, // 85 points = 2 nominations (30+30+25 remaining)
-    Sports: { points: 45, nominations: 1 }, // 45 points = 1 nomination (30+15 remaining)
-    "Co-Curricular Teams": { points: 50, nominations: 1 }, // 50 points = 1 nomination (30+20 remaining)
-    "Performing Arts": { points: 22, nominations: 0 }, // 22 points = 0 nominations (need 8 more)
-    "High Spirit": { points: 35, nominations: 1 }, // 35 points = 1 nomination (30+5 remaining)
-    Service: { points: 45, nominations: 1 }, // 45 points = 1 nomination (30+15 remaining)
-    Leadership: { points: 60, nominations: 2 }, // 60 points = 2 nominations (30+30)
-  }
-
-  // Calculate total nominations across all categories
-  const totalNominations = Object.values(categoryData).reduce((sum, cat) => sum + cat.nominations, 0)
-  const totalPoints = Object.values(categoryData).reduce((sum, cat) => sum + cat.points, 0)
 
   // SBHS Award categories from the official scheme
   const categories = [
@@ -46,6 +32,54 @@ export default function AwardsPage() {
     "Service",
     "Leadership",
   ]
+
+
+  // Sample fallback category data (used when portal API is not available)
+  const sampleCategoryData: Record<string, { points: number; nominations: number }> = {
+    Academic: { points: 85, nominations: 2 }, // 85 points = 2 nominations
+    Sports: { points: 45, nominations: 1 },
+    "Co-Curricular Teams": { points: 50, nominations: 1 },
+    "Performing Arts": { points: 22, nominations: 0 },
+    "High Spirit": { points: 35, nominations: 1 },
+    Service: { points: 45, nominations: 1 },
+    Leadership: { points: 60, nominations: 2 },
+  }
+
+  // Award points data from portal
+  const awardPoints = useAwardPoints()
+
+  // If awardPoints.data is available, derive per-category totals and nominations
+  const categoryTotalsFromApi: Record<string, { points: number; nominations: number }> = {}
+  if (awardPoints.data && Array.isArray(awardPoints.data.awards)) {
+    awardPoints.data.awards.forEach((a: any) => {
+      const cat = a.category || "Other"
+      const pts = Number(a.points) || 0
+      if (!categoryTotalsFromApi[cat]) categoryTotalsFromApi[cat] = { points: 0, nominations: 0 }
+      categoryTotalsFromApi[cat].points += pts
+    })
+    Object.keys(categoryTotalsFromApi).forEach((cat) => {
+      categoryTotalsFromApi[cat].nominations = Math.floor(categoryTotalsFromApi[cat].points / 30)
+    })
+  }
+
+  // Build final category data: prefer API-derived totals, otherwise fall back to samples
+  const categoryData: Record<string, { points: number; nominations: number }> = {}
+  categories.forEach((cat) => {
+    if (cat === "All") return
+    if (categoryTotalsFromApi[cat]) {
+      categoryData[cat] = categoryTotalsFromApi[cat]
+    } else if (sampleCategoryData[cat]) {
+      categoryData[cat] = sampleCategoryData[cat]
+    } else {
+      categoryData[cat] = { points: 0, nominations: 0 }
+    }
+  })
+
+  // Calculate total nominations across all categories (computed from final categoryData)
+  const totalNominations = Object.values(categoryData).reduce((sum, cat) => sum + cat.nominations, 0)
+  const totalPoints = Object.values(categoryData).reduce((sum, cat) => sum + cat.points, 0)
+
+
 
   // Recent points earned (realistic SBHS activities) - organized by category
   const recentPoints = [
@@ -219,6 +253,20 @@ export default function AwardsPage() {
   }
 
   const { current: currentLevel, next: nextLevel } = getCurrentLevel()
+
+  const participation = useParticipation()
+
+  // If participation data is available, adapt it for display
+  const participationList: any[] = participation.data && Array.isArray(participation.data)
+    ? participation.data.map((p: any, i: number) => ({
+        id: i,
+        year: p.year,
+        activity: p.activity,
+        category: p.categoryName || p.category,
+        points: Number.isFinite(Number(p.points)) ? Number(p.points) : p.points,
+        pointsCap: p.pointsCap || undefined,
+      }))
+    : []
 
   return (
     <PageTransition>
@@ -394,55 +442,130 @@ export default function AwardsPage() {
 
         <h2 className="text-xl font-semibold mb-4">Recent Points Earned</h2>
 
-        <Tabs defaultValue="All" className="mb-6">
-          <div className="overflow-x-auto pb-2">
-            <TabsList className="inline-flex min-w-full mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-full">
-              {categories.map((category) => (
-                <TabsTrigger
-                  key={category}
-                  value={category}
-                  className="text-xs whitespace-nowrap rounded-full data-[state=active]:bg-theme-primary data-[state=active]:text-white dark:data-[state=active]:bg-theme-primary data-[state=active]:shadow-sm transition-all duration-200"
-                >
-                  {category === "Co-Curricular Teams" ? "Teams" : category === "Performing Arts" ? "Arts" : category}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
+        {/* Participation list from portal (if authenticated) */}
+        {participation.loading && <p className="text-sm text-gray-500">Loading participation...</p>}
+        {participation.error && <p className="text-sm text-red-500">{participation.error}</p>}
 
-          {categories.map((category) => (
-            <TabsContent key={category} value={category}>
-              <div className="space-y-2">
-                {recentPoints
-                  .filter((point) => category === "All" || point.category === category)
-                  .slice(0, 6)
-                  .map((point) => (
-                    <Card
-                      key={point.id}
-                      className="rounded-xl bg-white dark:bg-gray-900 shadow-sm p-3 border border-gray-100 dark:border-gray-800 hover-scale"
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="flex-1 pr-2">
-                          <h3 className="font-semibold text-sm leading-tight">{point.title}</h3>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{point.date}</p>
-                        </div>
-                        <div className="flex items-center gap-1 bg-theme-secondary text-theme-primary px-2 py-1 rounded-full flex-shrink-0">
-                          <TrendingUp className="h-3 w-3" />
-                          <span className="text-xs font-medium">+{point.points}</span>
-                        </div>
+        {!participation.loading && !participation.error && (
+          participationList.length > 0 ? (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-2">Participation Entries</h3>
+              <div className="space-y-3">
+                {participationList.map((p) => (
+                  <Card key={p.id} className="rounded-xl p-3 border border-gray-100 dark:border-gray-800">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-semibold">{p.activity}</div>
+                        <div className="text-xs text-gray-500">{p.category} • Year {p.year}</div>
                       </div>
-                      <p className="text-xs mb-2 text-gray-600 dark:text-gray-300 line-clamp-2">{point.description}</p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
-                          {point.category}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">→ {point.category}</span>
+                      <div className="text-sm font-medium">
+                        {p.points}{p.pointsCap ? ` / ${p.pointsCap}` : " pts"}
                       </div>
-                    </Card>
-                  ))}
+                    </div>
+                  </Card>
+                ))}
               </div>
-            </TabsContent>
-          ))}
-        </Tabs>
+            </div>
+          ) : (
+            <Tabs defaultValue="All" className="mb-6">
+              <div className="overflow-x-auto pb-2">
+                <TabsList className="inline-flex min-w-full mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-full">
+                  {categories.map((category) => (
+                    <TabsTrigger
+                      key={category}
+                      value={category}
+                      className="text-xs whitespace-nowrap rounded-full data-[state=active]:bg-theme-primary data-[state=active]:text-white dark:data-[state=active]:bg-theme-primary data-[state=active]:shadow-sm transition-all duration-200"
+                    >
+                      {category === "Co-Curricular Teams" ? "Teams" : category === "Performing Arts" ? "Arts" : category}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+
+              {categories.map((category) => (
+                <TabsContent key={category} value={category}>
+                  <div className="space-y-2">
+                    {recentPoints
+                      .filter((point) => category === "All" || point.category === category)
+                      .slice(0, 6)
+                      .map((point) => (
+                        <Card
+                          key={point.id}
+                          className="rounded-xl bg-white dark:bg-gray-900 shadow-sm p-3 border border-gray-100 dark:border-gray-800 hover-scale"
+                        >
+                          <div className="flex justify-between items-start mb-1">
+                            <div className="flex-1 pr-2">
+                              <h3 className="font-semibold text-sm leading-tight">{point.title}</h3>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{point.date}</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-theme-secondary text-theme-primary px-2 py-1 rounded-full flex-shrink-0">
+                              <TrendingUp className="h-3 w-3" />
+                              <span className="text-xs font-medium">+{point.points}</span>
+                            </div>
+                          </div>
+                          <p className="text-xs mb-2 text-gray-600 dark:text-gray-300 line-clamp-2">{point.description}</p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
+                              {point.category}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">→ {point.category}</span>
+                          </div>
+                        </Card>
+                      ))}
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          )
+        )}
+
+        {/* Awards summary (API-driven when available) */}
+        {awardPoints.loading ? (
+          <p className="text-sm text-gray-500">Loading awards data...</p>
+        ) : awardPoints.error ? (
+          <p className="text-sm text-red-500">{awardPoints.error}</p>
+        ) : awardPoints.data && Array.isArray(awardPoints.data.awards) && awardPoints.data.awards.length > 0 ? (
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3">Award Breakdown</h3>
+
+            {/* Per-category summary grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+              {Object.entries(categoryData).map(([cat, stats]) => (
+                <Card key={cat} className="rounded-xl p-3 border border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{cat}</p>
+                      <p className="text-xs text-gray-500">{stats.points} pts</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold theme-gradient">{stats.nominations}</div>
+                      <div className="text-xs text-gray-500">nominations</div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <h3 className="text-lg font-medium mb-2">Individual Awards</h3>
+            <div className="space-y-3">
+              {awardPoints.data.awards.map((a: any, idx: number) => (
+                <Card key={a.id ?? idx} className="rounded-xl p-3 border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1">
+                      <div className="font-semibold">{a.title || a.activity || a.category}</div>
+                      {a.description && <p className="text-xs text-gray-500">{a.description}</p>}
+                      <div className="text-xs text-gray-400 mt-1">{a.awardedDate ? a.awardedDate : a.date}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{a.points} pts</div>
+                      {a.awardedBy && <div className="text-xs text-gray-500">by {a.awardedBy}</div>}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Information Cards */}
         <div className="space-y-4">

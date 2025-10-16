@@ -21,6 +21,8 @@ class SBHSPortalClient {
   private baseUrl: string
   private portalUrl: string
   private accessToken: string | null = null
+  private sessionId: string | null = null
+  private csrfToken: string | null = null
 
   constructor() {
     this.baseUrl = API_BASE_URL
@@ -46,10 +48,10 @@ class SBHSPortalClient {
   private async makePortalRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
       const url = endpoint.startsWith("http") ? endpoint : `${this.portalUrl}${endpoint}`
-      const headers: HeadersInit = {
+      const headers: Record<string, string> = {
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "Schedul-App/1.0",
-        ...options.headers,
+        ...(options.headers as Record<string, string> || {}),
       }
 
       // Add access token from cookie if available
@@ -259,10 +261,17 @@ class SBHSPortalClient {
   }
 
   private clearSession() {
-    this.accessToken = null;
+    this.accessToken = null
+    this.sessionId = null
+    this.csrfToken = null
     if (typeof document !== "undefined") {
       document.cookie = "sbhs_access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "sbhs_refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("sbhs_session_id")
+      localStorage.removeItem("sbhs_csrf_token")
+      localStorage.removeItem("sbhs_session_expires")
     }
   }
 
@@ -300,6 +309,11 @@ class SBHSPortalClient {
   // Award Points - scrape from awards/points page
   async getAwardPoints(): Promise<ApiResponse<AwardPointsResponse>> {
     return this.makePortalRequest<AwardPointsResponse>("/awards")
+  }
+
+  // Participation - returns list of participation entries for awards scheme
+  async getParticipation(): Promise<ApiResponse<ParticipationEntry[]>> {
+    return this.makePortalRequest<ParticipationEntry[]>("/details/participation.json")
   }
 
   // Calendar Events - scrape from calendar page
@@ -404,6 +418,16 @@ export interface AwardPointsResponse {
   awards: AwardPoint[]
   lastUpdated: string
 }
+
+export interface ParticipationEntry {
+  year: string
+  activity: string
+  category: string
+  categoryName?: string
+  points: number | string
+  pointsCap?: number
+}
+
 
 export interface CalendarEvent {
   id: string

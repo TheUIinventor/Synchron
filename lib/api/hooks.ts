@@ -61,6 +61,11 @@ export function useAwardPoints() {
   return usePortalData(() => sbhsPortal.getAwardPoints())
 }
 
+// Participation Hook
+export function useParticipation() {
+  return usePortalData(() => sbhsPortal.getParticipation())
+}
+
 // Calendar Events Hook
 export function useCalendarEvents(startDate?: string, endDate?: string) {
   return usePortalData(() => sbhsPortal.getCalendarEvents(startDate, endDate), [startDate, endDate])
