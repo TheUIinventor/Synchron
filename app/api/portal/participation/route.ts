@@ -1,25 +1,27 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 
 const PORTAL_PARTICIPATION = "https://student.sbhs.net.au/details/participation.json"
 
-function getSbhsTokenFromCookie(cookieHeader: string | null) {
-  if (!cookieHeader) return null
-  const match = cookieHeader.match(/(?:^|; )sbhs_access_token=([^;]+)/)
-  return match ? decodeURIComponent(match[1]) : null
-}
-
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const cookieHeader = req.headers.get("cookie")
-    const token = getSbhsTokenFromCookie(cookieHeader)
+    const token = req.cookies.get('sbhs_access_token')?.value || null
+
+    // Debug: log whether token present
+    try { console.debug('Proxy /api/portal/participation - token present:', !!token) } catch (e) {}
+
+    if (!token) {
+      return NextResponse.json({ success: false, error: 'No sbhs_access_token cookie present on this app domain. Please sign in via the app to enable portal access.' }, { status: 401 })
+    }
 
     const headers: Record<string, string> = {}
-    if (token) headers["Authorization"] = `Bearer ${token}`
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+      headers["Accept"] = "application/json"
+    }
 
     const res = await fetch(PORTAL_PARTICIPATION, {
       method: "GET",
       headers,
-      // server-to-server; portal will set cookies on its domain as needed
     })
 
     const contentType = res.headers.get("content-type") || "text/plain"
