@@ -68,6 +68,17 @@ class SBHSPortalClient {
         }
       }
 
+      // Debug: log request metadata (do not print sensitive tokens)
+      try {
+        console.debug("SBHS Portal Request:", {
+          method: (options.method || "GET").toUpperCase(),
+          url,
+          hasAuthorization: !!headers["Authorization"],
+        })
+      } catch (e) {
+        /* ignore logging errors */
+      }
+
       const response = await fetch(url, {
         ...options,
         headers,
@@ -86,10 +97,23 @@ class SBHSPortalClient {
       // Try to parse response as JSON, fallback to text
       let data: any
       const contentType = response.headers.get("content-type")
+      // Debug: log response status and contentType
+      try {
+        console.debug("SBHS Portal Response:", { status: response.status, contentType })
+      } catch (e) {
+        /* ignore */
+      }
+
       if (contentType && contentType.includes("application/json")) {
         data = await response.json()
       } else {
         const text = await response.text()
+        // Debug: show a short preview of returned HTML/text to diagnose failures
+        try {
+          console.debug("SBHS Portal Response Preview:", text.slice(0, 1000))
+        } catch (e) {
+          /* ignore */
+        }
         // Parse HTML response for data extraction
         data = this.parseHtmlResponse(text)
       }
@@ -316,12 +340,18 @@ class SBHSPortalClient {
 
   // Award Points - scrape from awards/points page
   async getAwardPoints(): Promise<ApiResponse<AwardPointsResponse>> {
+    if (typeof window !== "undefined") {
+      return this.makePortalRequest<AwardPointsResponse>("/api/portal/awards")
+    }
     return this.makePortalRequest<AwardPointsResponse>("/awards")
   }
 
   // Participation - returns list of participation entries for awards scheme
   async getParticipation(): Promise<ApiResponse<ParticipationEntry[]>> {
-    return this.makePortalRequest<ParticipationEntry[]>("/details/participation.json")
+    if (typeof window !== "undefined") {
+      return this.makePortalRequest<ParticipationEntry[]>('/api/portal/participation')
+    }
+    return this.makePortalRequest<ParticipationEntry[]>('/details/participation.json')
   }
 
   // Calendar Events - scrape from calendar page
