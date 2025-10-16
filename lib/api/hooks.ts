@@ -28,8 +28,13 @@ function usePortalData<T>(dataFetcher: () => Promise<ApiResponse<T>>, dependenci
   }, dependencies)
 
   useEffect(() => {
-    if (immediate && sbhsPortal.isAuthenticated()) {
-      execute()
+    if (immediate) {
+      if (sbhsPortal.isAuthenticated()) {
+        execute()
+      } else {
+        // Not authenticated — don't stay stuck in loading state. Components can show fallback UI.
+        setLoading(false)
+      }
     }
   }, [execute, immediate])
 

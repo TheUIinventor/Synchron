@@ -49,15 +49,23 @@ class SBHSPortalClient {
     try {
       const url = endpoint.startsWith("http") ? endpoint : `${this.portalUrl}${endpoint}`
       const headers: Record<string, string> = {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Schedul-App/1.0",
         ...(options.headers as Record<string, string> || {}),
       }
 
       // Add access token from cookie if available
-      this.loadAccessTokenFromCookie();
+      this.loadAccessTokenFromCookie()
       if (this.accessToken) {
-        headers["Authorization"] = `Bearer ${this.accessToken}`;
+        headers["Authorization"] = `Bearer ${this.accessToken}`
+      }
+
+      // Only set Content-Type if a body is present and no Content-Type provided
+      if (options.body && !headers["Content-Type"]) {
+        // If body is a plain object, assume JSON; otherwise leave to caller
+        if (typeof options.body === "string") {
+          headers["Content-Type"] = "application/x-www-form-urlencoded"
+        } else {
+          headers["Content-Type"] = "application/json"
+        }
       }
 
       const response = await fetch(url, {
