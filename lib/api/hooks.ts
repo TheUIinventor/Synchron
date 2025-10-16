@@ -29,12 +29,8 @@ function usePortalData<T>(dataFetcher: () => Promise<ApiResponse<T>>, dependenci
 
   useEffect(() => {
     if (immediate) {
-      if (sbhsPortal.isAuthenticated()) {
-        execute()
-      } else {
-        // Not authenticated — don't stay stuck in loading state. Components can show fallback UI.
-        setLoading(false)
-      }
+      // Always attempt fetch when immediate; allow the portal client to return 401/empty data if unauthenticated.
+      execute()
     }
   }, [execute, immediate])
 
