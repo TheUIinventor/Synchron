@@ -27,7 +27,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${vt323.variable}`}>
       <head>
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/favicon.png" />
       </head>
       <body className={inter.className}>
         <ClientLayout>{children}</ClientLayout>
