@@ -3,48 +3,96 @@
 import { AuthButton } from "@/components/auth-button";
 import SettingsMenu from "@/components/settings-menu";
 import ThemeToggle from "@/components/theme-toggle";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Menu, X } from "lucide-react";
 
-// Always-render fixed circular buttons in the top-right corner.
-// They are visible on all viewports and remain fixed while scrolling.
+// Mobile-only floating action button that expands into a small rounded menu.
 export default function TopRightActionIcons() {
-  // Restore original circular size and only show on mobile (hide on md+)
-  // Make mobile fixed buttons smaller to avoid overlapping; desktop is unaffected.
-  const size = "w-8";
+  const size = "w-8"; // closed FAB size (mobile only)
 
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [open, setOpen] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function update() {
-      setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+      setIsMobile(typeof window !== "undefined" ? window.innerWidth < 768 : false);
     }
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
-  // If not mobile, do not render (this prevents duplicates on desktop)
+  // Close on Escape and click outside
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    function onDocClick(e: MouseEvent) {
+      if (!containerRef.current) return;
+      if (e.target instanceof Node && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("click", onDocClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onDocClick);
+    };
+  }, []);
+
   if (!isMobile) return null;
 
-  // Small fixed icons, mobile-only to avoid duplicating the desktop header icons
-  // Use aspect-square to guarantee perfect circles and overflow-hidden to crop
-  // any inner padding from child components.
   return (
-    <div className="fixed top-6 right-6 z-50 flex items-center gap-3">
-      <div className={`${size} aspect-square rounded-full overflow-hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow flex items-center justify-center border border-gray-200 dark:border-gray-800`}>
-        <div className="w-full h-full flex items-center justify-center">
-          <AuthButton />
-        </div>
-      </div>
-      <div className={`${size} aspect-square rounded-full overflow-hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow flex items-center justify-center border border-gray-200 dark:border-gray-800`}>
-        <div className="w-full h-full flex items-center justify-center">
-          <SettingsMenu />
-        </div>
-      </div>
-      <div className={`${size} aspect-square rounded-full overflow-hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow flex items-center justify-center border border-gray-200 dark:border-gray-800`}>
-        <div className="w-full h-full flex items-center justify-center">
-          <ThemeToggle />
-        </div>
+    <div ref={containerRef} className="fixed top-6 right-6 z-50">
+      <div className="relative">
+        {/* FAB button (closed) */}
+        <button
+          aria-expanded={open}
+          aria-label={open ? "Close menu" : "Open menu"}
+          className={`${size} aspect-square rounded-full overflow-hidden bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow flex items-center justify-center border border-gray-200 dark:border-gray-800`}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <div className="w-full h-full flex items-center justify-center">
+            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </div>
+        </button>
+
+        {/* Expanded menu */}
+        {open && (
+          <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-900/95 backdrop-blur-sm border border-gray-200 dark:border-gray-800 rounded-xl shadow-lg overflow-hidden">
+            <div className="p-2 space-y-1">
+              <div className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-white/5">
+                <div className="w-8 h-8 rounded-full bg-theme-secondary/10 dark:bg-theme-secondary/10 flex items-center justify-center">
+                  <div className="icon-optimized text-theme-primary">
+                    {/* ThemeToggle may render its own button; render as-is */}
+                    <ThemeToggle />
+                  </div>
+                </div>
+                <div className="flex-1 text-sm">Theme</div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-white/5">
+                <div className="w-8 h-8 rounded-full bg-theme-secondary/10 dark:bg-theme-secondary/10 flex items-center justify-center">
+                  <div className="glass-icon-enhanced rounded-full p-1">
+                    <SettingsMenu />
+                  </div>
+                </div>
+                <div className="flex-1 text-sm">Settings</div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-white/5">
+                <div className="w-8 h-8 rounded-full bg-theme-secondary/10 dark:bg-theme-secondary/10 flex items-center justify-center">
+                  <div className="rounded-full p-1">
+                    <AuthButton />
+                  </div>
+                </div>
+                <div className="flex-1 text-sm">Account</div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

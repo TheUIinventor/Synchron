@@ -125,9 +125,9 @@ export default function HomeClient() {
 
   return (
     <main className="min-h-screen pb-20 relative">
-      <div className="px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
+      <header className="px-4 pt-3 pb-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="pt-1">
             <h1 className="text-lg font-bold">Synchron β</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
           </div>
@@ -137,7 +137,10 @@ export default function HomeClient() {
             <ThemeToggle />
           </div>
         </div>
-  <div className="flex flex-col sm:flex-row items-start sm:justify-between mt-2">
+      </header>
+
+      <div className="px-4 pt-3">
+        <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
               {studentName ? `Welcome, ${studentName}!` : "Welcome!"}
@@ -145,7 +148,7 @@ export default function HomeClient() {
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDate()} • {getCurrentDay()}</p>
           </div>
-          <div className="text-right mt-4 sm:mt-0 w-full sm:w-auto">
+          <div className="text-right sm:mt-0 w-full sm:w-auto">
             <div className="flex items-center gap-2 card-optimized px-3 py-2 rounded-xl mb-2 justify-end">
               <div className="icon-optimized rounded-full p-1">
                 <Clock className="h-4 w-4 text-theme-primary" />
