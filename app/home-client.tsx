@@ -61,6 +61,64 @@ export default function HomeClient() {
   // Portal profile (preferred source for display name)
   const { data: profileData, loading: profileLoading } = useStudentProfile();
 
+  const displayName = (() => {
+    const p: any = profileData || {}
+    const inner = p.data || {}
+    // try a few common keys and casings
+    const candidates = [
+      // top-level fields
+      p.givenName,
+      p.givenname,
+      p.given_name,
+      p.firstName,
+      p.first_name,
+      p.name,
+      p.username,
+      p.email,
+      // nested under `student` (HTML-scraped)
+      p.student?.givenName,
+      p.student?.givenname,
+      p.student?.name,
+      p.student?.username,
+      p.student?.email,
+      // ApiResponse wrapper: { success, data: { ... } }
+      inner.givenName,
+      inner.givenname,
+      inner.given_name,
+      inner.firstName,
+      inner.first_name,
+      inner.name,
+      inner.username,
+      inner.email,
+      inner.student?.givenName,
+      inner.student?.name,
+      inner.student?.email,
+    ]
+
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 0) return c.trim()
+    }
+
+    // As a last resort, extract local-part of email if present
+    const email = p.email || p.student?.email
+    if (typeof email === "string" && email.includes("@")) {
+      return email.split("@")[0]
+    }
+
+    return null
+  })()
+
+  // Helpful debug: if profile payload exists but no displayName was resolved, log it so we can inspect shape
+  useEffect(() => {
+    if (profileData && !displayName) {
+      try {
+        console.debug("profileData from portal (no resolved name):", profileData)
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  }, [profileData, displayName])
+
   useEffect(() => {
     async function fetchTimetable() {
       setTimetableLoading(true);
@@ -149,17 +207,40 @@ export default function HomeClient() {
             <h2 className="text-2xl font-bold theme-gradient">
               {profileLoading ? (
                 <Skeleton className="h-8 w-48 rounded-lg" />
-              ) : profileData?.givenName ? (
-                `Welcome, ${profileData.givenName}!`
-              ) : studentName ? (
-                `Welcome, ${studentName}!`
-              ) : (
-                "Welcome!"
-              )}
+              ) : (() => {
+                // Resolve name from a few possible response shapes returned by the portal client
+                const maybeGiven =
+                  // direct JSON shape: { givenName }
+                  (profileData as any)?.givenName ||
+                  // scraped HTML shape: { student: { givenName } }
+                  (profileData as any)?.student?.givenName ||
+                  // scraped HTML fallback: { student: { name } }
+                  (profileData as any)?.student?.name ||
+                  // another possible top-level name field
+                  (profileData as any)?.name ||
+                  null
+
+                if (maybeGiven && typeof maybeGiven === "string" && maybeGiven.trim().length > 0) {
+                  const first = maybeGiven.trim().split(/\s+/)[0]
+                  return `Welcome, ${first}!`
+                }
+
+                if (studentName) return `Welcome, ${studentName}!`
+                return "Welcome!"
+              })()}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDate()} • {getCurrentDay()}</p>
           </div>
+          {/* Developer debug: if profile payload exists but we couldn't resolve a display name, show payload in dev */}
+          {process.env.NODE_ENV !== "production" && profileData && !displayName ? (
+            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <details className="bg-gray-50 dark:bg-gray-800 p-2 rounded-md">
+                <summary className="cursor-pointer">profile payload (debug)</summary>
+                <pre className="whitespace-pre-wrap max-h-48 overflow-auto text-[11px] mt-2">{JSON.stringify(profileData, null, 2)}</pre>
+              </details>
+            </div>
+          ) : null}
           <div className="text-right sm:mt-0 w-full sm:w-auto">
             <div className="flex items-center gap-2 card-optimized px-3 py-2 rounded-xl mb-2 justify-end">
               <div className="icon-optimized rounded-full p-1">
