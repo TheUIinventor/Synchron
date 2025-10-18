@@ -104,14 +104,14 @@ export default function TimetablePage() {
   return (
     <PageTransition>
       <div className="container max-w-6xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6 fade-in">
+        <div className="flex items-center justify-between mb-4 md:mb-6 fade-in">
           <Link
             href="/"
-            className="text-gray-500 dark:text-gray-400 transition-all duration-200 hover:text-gray-700 dark:hover:text-gray-300"
+            className="hidden md:flex text-gray-500 dark:text-gray-400 transition-all duration-200 hover:text-gray-700 dark:hover:text-gray-300"
           >
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-2xl font-bold">My Synchron</h1>
+          <h1 className="text-xl font-bold md:text-2xl text-left md:text-center md:flex-1">My Synchron</h1>
           <div className="w-6"></div>
         </div>
 

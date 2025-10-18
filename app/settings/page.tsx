@@ -119,11 +119,11 @@ export default function SettingsPage() {
   return (
     <PageTransition>
       <div className="container max-w-lg mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <Link href="/" className="text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-between mb-4 md:mb-6">
+          <Link href="/" className="hidden md:flex text-gray-500 dark:text-gray-400">
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <h1 className="text-xl font-bold md:text-2xl text-left md:text-center md:flex-1">Settings</h1>
           <div className="w-6"></div>
         </div>
 
