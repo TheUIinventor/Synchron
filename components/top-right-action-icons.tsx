@@ -5,21 +5,38 @@ import SettingsMenu from "@/components/settings-menu";
 import ThemeToggle from "@/components/theme-toggle";
 import { usePathname } from "next/navigation";
 
+export function HeaderActionIconsMobile() {
+  // Small inline group for mobile headers: visible on md:hidden
+  return (
+    <div className="md:hidden flex items-center gap-2">
+      <div className="w-8 h-8 flex items-center justify-center">
+        <AuthButton />
+      </div>
+      <div className="w-8 h-8 flex items-center justify-center">
+        <SettingsMenu />
+      </div>
+      <div className="w-8 h-8 flex items-center justify-center">
+        <ThemeToggle />
+      </div>
+    </div>
+  );
+}
+
 export default function TopRightActionIcons() {
   const pathname = usePathname();
   // On the home page or clipboard page, do not render the fixed icons (let the header handle them)
   if (pathname === "/" || pathname === "/home" || pathname.startsWith("/clipboard")) return null;
   return (
-    <div className="fixed top-6 right-8 z-40 flex gap-2">
-      {/* Desktop: original size. Mobile: smaller, tighter, and nudged left to avoid overlapping content */}
-      <div className="flex gap-2 items-center md:scale-100 md:gap-2 scale-90 -mr-2 md:-mr-0">
-        <div className="md:w-auto w-8 h-8 md:h-auto md:w-auto">
+    <div className="hidden md:fixed md:top-6 md:right-8 md:z-40 md:flex md:gap-2">
+      {/* Desktop fixed icons */}
+      <div className="flex gap-2 items-center md:scale-100 md:gap-2">
+        <div className="md:w-auto md:h-auto">
           <AuthButton />
         </div>
-        <div className="md:w-auto w-8 h-8 md:h-auto md:w-auto">
+        <div className="md:w-auto md:h-auto">
           <SettingsMenu />
         </div>
-        <div className="md:w-auto w-8 h-8 md:h-auto md:w-auto">
+        <div className="md:w-auto md:h-auto">
           <ThemeToggle />
         </div>
       </div>

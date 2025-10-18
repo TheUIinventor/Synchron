@@ -6,6 +6,7 @@ import { useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { ChevronLeft, Award, TrendingUp, Medal, Trophy, Star, Download } from "lucide-react"
+import { HeaderActionIconsMobile } from "@/components/top-right-action-icons"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { trackSectionUsage } from "@/utils/usage-tracker"
@@ -279,6 +280,7 @@ export default function AwardsPage() {
 
           {/* Heading: left-aligned on mobile, centered on md+; smaller on mobile */}
           <h1 className="text-xl font-bold md:text-2xl text-left md:text-center md:flex-1">Student Awards</h1>
+          <HeaderActionIconsMobile />
 
           <div className="w-6"></div>
         </div>

@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
+import { HeaderActionIconsMobile } from "@/components/top-right-action-icons"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 
@@ -21,6 +22,7 @@ export default function ClipboardPage() {
             <ChevronLeft className="h-6 w-6" />
           </Link>
           <h1 className="text-lg md:text-xl font-bold text-left md:text-center md:flex-1">Clipboard</h1>
+          <HeaderActionIconsMobile />
           <div className="w-6"></div> {/* Empty div for spacing */}
         </div>
 

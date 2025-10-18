@@ -22,6 +22,7 @@ import { getCurrentDay, formatDate, getCurrentTime } from "@/utils/time-utils";
 import { trackSectionUsage } from "@/utils/usage-tracker";
 import ThemeToggle from "@/components/theme-toggle";
 import SettingsMenu from "@/components/settings-menu";
+import { HeaderActionIconsMobile } from "@/components/top-right-action-icons";
 import { useTimetable } from "@/contexts/timetable-context";
 import { useStudentProfile } from "@/lib/api/hooks";
 import {
@@ -127,15 +128,18 @@ export default function HomeClient() {
     <main className="min-h-screen pb-20 relative">
       <div className="header-optimized px-4 py-4 relative">
         <div className="flex justify-between items-center mb-3">
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Synchron β</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">Still in development. Issues are expected.</p>
           </div>
-          <div className="flex gap-2">
-            <AuthButton />
-            <SettingsMenu />
-            <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <HeaderActionIconsMobile />
+            <div className="hidden md:flex items-center gap-2">
+              <AuthButton />
+              <SettingsMenu />
+              <ThemeToggle />
+            </div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
