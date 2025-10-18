@@ -233,7 +233,7 @@ export default function HomeClient() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDate()} • {getCurrentDay()}</p>
           </div>
           {/* Developer debug: if profile payload exists but we couldn't resolve a display name, show payload in dev */}
-          {process.env.NODE_ENV !== "production" && profileData && !displayName ? (
+          {profileData && !displayName ? (
             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               <details className="bg-gray-50 dark:bg-gray-800 p-2 rounded-md">
                 <summary className="cursor-pointer">profile payload (debug)</summary>
