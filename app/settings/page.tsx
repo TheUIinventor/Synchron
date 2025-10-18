@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Send, Type, Home, ChevronLeft } from "lucide-react"
-import { HeaderActionIconsMobile } from "@/components/top-right-action-icons"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Calendar, Bell, Clipboard, Award } from "lucide-react"
@@ -125,7 +124,6 @@ export default function SettingsPage() {
             <ChevronLeft className="h-6 w-6" />
           </Link>
           <h1 className="text-xl font-bold md:text-2xl text-left md:text-center md:flex-1">Settings</h1>
-          <HeaderActionIconsMobile />
           <div className="w-6"></div>
         </div>
 

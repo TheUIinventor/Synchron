@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { ChevronLeft, Calendar } from "lucide-react"
-import { HeaderActionIconsMobile } from "@/components/top-right-action-icons"
 import { Button } from "@/components/ui/button"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
@@ -113,7 +112,6 @@ export default function TimetablePage() {
             <ChevronLeft className="h-6 w-6" />
           </Link>
           <h1 className="text-xl font-bold md:text-2xl text-left md:text-center md:flex-1">My Synchron</h1>
-          <HeaderActionIconsMobile />
           <div className="w-6"></div>
         </div>
 

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { ChevronLeft, Leaf } from "lucide-react"
-import { HeaderActionIconsMobile } from "@/components/top-right-action-icons"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import PageTransition from "@/components/page-transition"
@@ -69,7 +68,6 @@ export default function EasterEggPage() {
             <ChevronLeft className="h-6 w-6" />
           </Link>
           <h1 className="text-xl font-bold md:text-2xl text-left md:text-center md:flex-1">Easter Egg</h1>
-          <HeaderActionIconsMobile />
           <div className="w-6"></div>
         </div>
 

@@ -22,7 +22,6 @@ import { getCurrentDay, formatDate, getCurrentTime } from "@/utils/time-utils";
 import { trackSectionUsage } from "@/utils/usage-tracker";
 import ThemeToggle from "@/components/theme-toggle";
 import SettingsMenu from "@/components/settings-menu";
-import { HeaderActionIconsMobile } from "@/components/top-right-action-icons";
 import { useTimetable } from "@/contexts/timetable-context";
 import { useStudentProfile } from "@/lib/api/hooks";
 import {
@@ -134,7 +133,6 @@ export default function HomeClient() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Still in development. Issues are expected.</p>
           </div>
           <div className="flex items-center gap-2">
-            <HeaderActionIconsMobile />
             <div className="hidden md:flex items-center gap-2">
               <AuthButton />
               <SettingsMenu />
