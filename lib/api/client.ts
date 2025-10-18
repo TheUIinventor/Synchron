@@ -318,6 +318,30 @@ class SBHSPortalClient {
 
   // Student Profile - scrape from main portal page
   async getStudentProfile(): Promise<ApiResponse<StudentProfile>> {
+    // If running in the browser, prefer our server-side proxy to avoid CORS and cookie issues
+    try {
+      if (typeof window !== "undefined") {
+        const res = await fetch(`/api/portal/userinfo`, { credentials: 'include' })
+        if (!res.ok) {
+          // fall back to direct portal request if proxy fails
+          return this.makePortalRequest<StudentProfile>("/details/userinfo.json")
+        }
+        const payload = await res.json()
+        // If proxy returns success wrapper, normalize it
+        if (payload && payload.success && payload.data) {
+          return { success: true, data: payload.data }
+        }
+        if (payload && payload.data) {
+          return { success: true, data: payload.data }
+        }
+        // If payload itself looks like profile, return it
+        return { success: true, data: payload }
+      }
+    } catch (err) {
+      // ignore and fall back to portal request
+    }
+
+    // Server or fallback
     return this.makePortalRequest<StudentProfile>("/details/userinfo.json")
   }
 
