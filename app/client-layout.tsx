@@ -1,6 +1,7 @@
 
 "use client";
 import TopRightActionIcons from "@/components/top-right-action-icons";
+import { useEffect } from 'react'
 
 import type { ReactNode } from "react"
 import BottomNav from "@/components/bottom-nav"
@@ -8,6 +9,13 @@ import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider
 import { TimetableProvider } from "@/contexts/timetable-context"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    // Attempt a silent server-side refresh on initial load to restore session if possible
+    fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
+      .then(res => res.json())
+      .then(data => { if (!data.success) console.debug('auth refresh failed', data) })
+      .catch(err => console.debug('auth refresh error', err))
+  }, [])
   return (
     <ThemeProvider
       attribute="class"
