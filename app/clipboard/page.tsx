@@ -20,7 +20,7 @@ export default function ClipboardPage() {
           <Link href="/" className="hidden md:flex text-gray-500 dark:text-gray-400">
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-lg md:text-xl font-bold text-left md:text-center md:flex-1">Clipboard</h1>
+          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">Clipboard</h1>
           <div className="w-6"></div> {/* Empty div for spacing */}
         </div>
 

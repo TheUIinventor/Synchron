@@ -271,14 +271,14 @@ export default function AwardsPage() {
   return (
     <PageTransition>
       <div className="container max-w-6xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-4 md:mb-6">
+        <div className="flex items-center justify-between mb-4 md:mb-6 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full">
           {/* Back button hidden on mobile (show on md+) */}
           <Link href="/" className="hidden md:flex text-gray-500 dark:text-gray-400">
             <ChevronLeft className="h-6 w-6" />
           </Link>
 
           {/* Heading: left-aligned on mobile, centered on md+; smaller on mobile */}
-          <h1 className="text-xl font-bold md:text-2xl text-left md:text-center md:flex-1">Student Awards</h1>
+          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">Student Awards</h1>
 
           <div className="w-6"></div>
         </div>

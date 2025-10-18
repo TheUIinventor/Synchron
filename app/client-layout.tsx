@@ -2,6 +2,7 @@
 "use client";
 import TopRightActionIcons from "@/components/top-right-action-icons";
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 
 import type { ReactNode } from "react"
 import BottomNav from "@/components/bottom-nav"
@@ -27,11 +28,20 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       <UserSettingsProvider>
         <TimetableProvider>
           {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
-          <TopRightActionIcons />
+          {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
+          <ConditionalTopRightIcons />
           <div className="pb-20 md:pb-0 md:pl-24">{children}</div>
           <BottomNav />
         </TimetableProvider>
       </UserSettingsProvider>
     </ThemeProvider>
   )
+}
+
+function ConditionalTopRightIcons() {
+  // usePathname is client-only and returns the current pathname. Only show the
+  // global fixed icons on the home page ("/") per user request.
+  const pathname = usePathname();
+  if (!pathname) return null;
+  return pathname === "/" ? <TopRightActionIcons /> : null;
 }

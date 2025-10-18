@@ -125,22 +125,19 @@ export default function HomeClient() {
 
   return (
     <main className="min-h-screen pb-20 relative">
-      <div className="header-optimized px-4 py-4 relative">
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex-1">
-            <h1 className="text-xl font-bold">Synchron β</h1>
+      <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold">Synchron β</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">Built For Sydney Boys High School</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Still in development. Issues are expected.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-2">
-              <AuthButton />
-              <SettingsMenu />
-              <ThemeToggle />
-            </div>
+          <div className="hidden md:flex items-center gap-2">
+            <AuthButton />
+            <SettingsMenu />
+            <ThemeToggle />
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:justify-between mt-3">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
               {studentName ? `Welcome, ${studentName}!` : "Welcome!"}
@@ -158,7 +155,7 @@ export default function HomeClient() {
           </div>
         </div>
       </div>
-      <div className="p-4 space-y-3">
+  <div className="p-4 space-y-3">
         <Card className="card-optimized-main">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-4">
