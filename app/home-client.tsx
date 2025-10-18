@@ -24,6 +24,7 @@ import ThemeToggle from "@/components/theme-toggle";
 import SettingsMenu from "@/components/settings-menu";
 import { useTimetable } from "@/contexts/timetable-context";
 import { useStudentProfile } from "@/lib/api/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Calendar,
   Clock,
@@ -56,6 +57,9 @@ export default function HomeClient() {
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Portal profile (preferred source for display name)
+  const { data: profileData, loading: profileLoading } = useStudentProfile();
 
   useEffect(() => {
     async function fetchTimetable() {
@@ -143,7 +147,15 @@ export default function HomeClient() {
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
-              {studentName ? `Welcome, ${studentName}!` : "Welcome!"}
+              {profileLoading ? (
+                <Skeleton className="h-8 w-48 rounded-lg" />
+              ) : profileData?.givenName ? (
+                `Welcome, ${profileData.givenName}!`
+              ) : studentName ? (
+                `Welcome, ${studentName}!`
+              ) : (
+                "Welcome!"
+              )}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDate()} • {getCurrentDay()}</p>
