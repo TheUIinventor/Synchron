@@ -73,32 +73,28 @@ async function main() {
     for (const s of sizes) {
       const outPath = path.join(outDir, s.name)
 
-      // Resize the cropped content to fill most of the canvas (90% of target) and composite onto transparent square
+    // Resize the cropped content to overscale (e.g. 120%) so the visible logo is larger and may crop at edges
       const target = s.size
-      const inner = Math.round(target * 0.9)
+      const OVERSCALE = 1.2
+      const inner = Math.round(target * OVERSCALE)
 
-      const resizedBuf = await img
+      // Produce an overscaled buffer, then center-crop to the target size so it fills and is cropped
+      const overscaledBuf = await img
         .clone()
-        .resize(inner, inner, { fit: 'inside', kernel: 'lanczos3' })
+        .resize(inner, inner, { fit: 'cover', position: 'centre', kernel: 'lanczos3' })
         .png()
         .toBuffer()
 
-      // Create square transparent canvas and composite the resized content centered
-      const canvas = sharp({
-        create: {
-          width: target,
-          height: target,
-          channels: 4,
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        },
-      })
+      // If the overscaled image is bigger than target, extract a centered region of size target
+      const overscaledMeta = await sharp(overscaledBuf).metadata()
+      let finalBuf = overscaledBuf
+      if (overscaledMeta.width > target || overscaledMeta.height > target) {
+        const left = Math.max(0, Math.floor((overscaledMeta.width - target) / 2))
+        const top = Math.max(0, Math.floor((overscaledMeta.height - target) / 2))
+        finalBuf = await sharp(overscaledBuf).extract({ left, top, width: target, height: target }).png().toBuffer()
+      }
 
-      const compositeBuf = await canvas
-        .composite([{ input: resizedBuf, gravity: 'centre' }])
-        .png()
-        .toBuffer()
-
-      fs.writeFileSync(outPath, compositeBuf)
+  fs.writeFileSync(outPath, finalBuf)
       console.log('Wrote', outPath)
 
       if ([16, 32, 48, 64, 128, 256].includes(s.size)) pngPaths.push(outPath)
