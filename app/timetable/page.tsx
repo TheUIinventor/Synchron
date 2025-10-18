@@ -289,7 +289,12 @@ export default function TimetablePage() {
                               {getSubjectAbbr(period.subject)}
                             </div>
                             <div className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">
-                              {period.room}
+                              {/* Desktop: keep room inline. Mobile: show subject name with room underneath */}
+                              <div className="hidden md:block">{period.room}</div>
+                              <div className="md:hidden flex flex-col">
+                                <span className="font-semibold text-sm truncate">{period.subject}</span>
+                                <span className="text-xs text-gray-600 dark:text-gray-300 truncate">{period.room}</span>
+                              </div>
                             </div>
                           </div>
                         ))}

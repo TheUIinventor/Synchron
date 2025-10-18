@@ -102,8 +102,22 @@ export default function NoticesClient() {
 
   return (
     <main className="notices-main min-h-screen flex flex-col items-center w-full">
-      <div className="mb-6 flex gap-2 items-center">
-        <div className="inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex-wrap">
+      <div className="mb-6 flex gap-2 items-center w-full justify-center">
+        {/* Mobile: use a select dropdown for filters */}
+        <div className="w-full max-w-md md:hidden px-4">
+          <select
+            className="w-full p-2 rounded-md border bg-white dark:bg-gray-800"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+          >
+            {fixedYears.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Desktop: keep pill buttons */}
+        <div className="hidden md:inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex-wrap">
           <button
             className={`px-4 py-1 rounded-full text-sm font-medium transition-colors duration-150 ${selectedYear === "All" ? "bg-blue-600 text-white shadow" : "text-gray-700 dark:text-gray-200"}`}
             onClick={() => setSelectedYear("All")}
