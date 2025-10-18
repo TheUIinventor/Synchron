@@ -15,7 +15,7 @@ export default function NoticesPage() {
       <PageTransition>
         <div className="flex flex-col items-start w-full mt-4">
           <div className="container max-w-2xl mx-auto px-4">
-            <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full mb-4">
+            <div className="px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full mb-4">
               <h1 className="text-lg font-bold text-left md:text-center w-full">Notices</h1>
             </div>
             <div className="w-full flex flex-col items-center">

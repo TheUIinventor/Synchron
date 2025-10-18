@@ -9,7 +9,8 @@ import { useState, useEffect } from "react";
 // They are visible on all viewports and remain fixed while scrolling.
 export default function TopRightActionIcons() {
   // Restore original circular size and only show on mobile (hide on md+)
-  const size = "w-10";
+  // Make mobile fixed buttons smaller to avoid overlapping; desktop is unaffected.
+  const size = "w-8";
 
   const [isMobile, setIsMobile] = useState<boolean>(false);
 

@@ -16,7 +16,7 @@ export default function ClipboardPage() {
     <PageTransition>
       <div className="h-screen flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-3 md:p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
+  <div className="flex items-center justify-between px-4 py-2 md:p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
           <Link href="/" className="hidden md:flex text-gray-500 dark:text-gray-400">
             <ChevronLeft className="h-6 w-6" />
           </Link>

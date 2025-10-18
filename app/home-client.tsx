@@ -125,7 +125,7 @@ export default function HomeClient() {
 
   return (
     <main className="min-h-screen pb-20 relative">
-      <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
+      <div className="px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold">Synchron β</h1>
@@ -137,7 +137,7 @@ export default function HomeClient() {
             <ThemeToggle />
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:justify-between mt-3">
+  <div className="flex flex-col sm:flex-row items-start sm:justify-between mt-2">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
               {studentName ? `Welcome, ${studentName}!` : "Welcome!"}
