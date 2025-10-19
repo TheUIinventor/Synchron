@@ -59,12 +59,15 @@ export default function HomeClient() {
   }, []);
 
   // Portal profile (preferred source for display name)
-  const { data: profileData, loading: profileLoading } = useStudentProfile();
+  const { data: profileData, loading: profileLoading, refetch: refetchProfile } = useStudentProfile();
+  const [profileOverride, setProfileOverride] = useState<any | null>(null)
 
   // Diagnostic: try server-side proxy endpoint directly and show result (helps when profileData is empty)
   const [portalDebug, setPortalDebug] = useState<any>(null)
   const [showPortalDebugDetails, setShowPortalDebugDetails] = useState(false)
   const [attemptingRefresh, setAttemptingRefresh] = useState(false)
+  const [refreshAttempts, setRefreshAttempts] = useState(0)
+  const MAX_REFRESH_ATTEMPTS = 2
   useEffect(() => {
     let cancelled = false
     async function probe() {
@@ -93,22 +96,37 @@ export default function HomeClient() {
       payload?.error?.includes("Portal returned HTML") ||
       portalDebug.status === 401 && typeof payload?.responseBody === "string" && payload.responseBody.trim().startsWith("<")
 
-    if (isHtmlLogin && !attemptingRefresh) {
-      // try a single silent refresh to restore session
+    if (isHtmlLogin && refreshAttempts < MAX_REFRESH_ATTEMPTS && !attemptingRefresh) {
+      // try a short retry loop to restore session via /api/auth/refresh
       setAttemptingRefresh(true)
+      setRefreshAttempts((n) => n + 1)
+
       ;(async () => {
         try {
-          // Call refresh endpoint (server may rotate token via cookie)
+          // attempt refresh
           const r = await fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
-          // ignore response body; re-probe portal userinfo after a short delay
-          await new Promise(res => setTimeout(res, 400))
+          // small delay to allow cookies to be set by the server
+          await new Promise((res) => setTimeout(res, 500 * refreshAttempts + 200))
+
+          // re-probe portal userinfo
           const rp = await fetch('/api/portal/userinfo', { credentials: 'include' })
           let payload2: any
-          try { payload2 = await rp.json() } catch (e) { payload2 = { error: 'Invalid JSON', status: rp.status, text: await rp.text() } }
+          try {
+            payload2 = await rp.json()
+          } catch (e) {
+            payload2 = { error: 'Invalid JSON', status: rp.status, text: await rp.text() }
+          }
+
           setPortalDebug({ ok: rp.ok, status: rp.status, payload: payload2 })
+
+          // If portal returned JSON profile, use it as an override so greeting updates immediately
+          if (payload2 && payload2.success && payload2.data) {
+            setProfileOverride(payload2.data)
+            // also trigger the hook to refetch and update global profile state
+            try { await refetchProfile() } catch (e) { /* ignore */ }
+          }
         } catch (e) {
-          // keep original portalDebug but mark that we attempted refresh
-          setPortalDebug((prev: any) => ({ ...prev, refreshAttempted: true, refreshError: String(e) }))
+          setPortalDebug((prev: any) => ({ ...(prev || {}), refreshAttempted: true, refreshError: String(e) }))
         } finally {
           setAttemptingRefresh(false)
         }
@@ -260,29 +278,50 @@ export default function HomeClient() {
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold theme-gradient">
-              {profileLoading ? (
-                <Skeleton className="h-8 w-48 rounded-lg" />
-              ) : (() => {
-                // Resolve name from a few possible response shapes returned by the portal client
-                const maybeGiven =
-                  // direct JSON shape: { givenName }
-                  (profileData as any)?.givenName ||
-                  // scraped HTML shape: { student: { givenName } }
-                  (profileData as any)?.student?.givenName ||
-                  // scraped HTML fallback: { student: { name } }
-                  (profileData as any)?.student?.name ||
-                  // another possible top-level name field
-                  (profileData as any)?.name ||
-                  null
+              {(profileLoading && !profileOverride && !attemptingRefresh) ? (
+                  <Skeleton className="h-8 w-48 rounded-lg" />
+                ) : (() => {
+                  // prefer any override (freshly fetched via refresh probe), then profileData
+                  const source = profileOverride || profileData || {}
+                  const inner = (source as any).data || {}
 
-                if (maybeGiven && typeof maybeGiven === "string" && maybeGiven.trim().length > 0) {
-                  const first = maybeGiven.trim().split(/\s+/)[0]
-                  return `Welcome Back, ${first}!`
-                }
+                  const candidates = [
+                    (source as any)?.givenName,
+                    (source as any)?.givenname,
+                    (source as any)?.given_name,
+                    (source as any)?.firstName,
+                    (source as any)?.first_name,
+                    (source as any)?.name,
+                    (source as any)?.username,
+                    inner.givenName,
+                    inner.givenname,
+                    inner.firstName,
+                    inner.first_name,
+                    inner.name,
+                    (source as any)?.student?.givenName,
+                    (source as any)?.student?.name,
+                  ]
 
-                if (studentName) return `Welcome, ${studentName}!`
-                return "Welcome!"
-              })()}
+                  let maybeGiven: string | null = null
+                  for (const c of candidates) {
+                    if (typeof c === 'string' && c.trim().length > 0) { maybeGiven = c.trim(); break }
+                  }
+
+                  if (maybeGiven) {
+                    const first = maybeGiven.split(/\s+/)[0]
+                    return `Welcome Back, ${first}!`
+                  }
+
+                  if (studentName) return `Welcome, ${studentName}!`
+
+                  if (attemptingRefresh) {
+                    return (
+                      <>Refreshing session… <span className="inline-block align-middle ml-2"><span className="animate-spin inline-block w-4 h-4 border-b-2 border-theme-primary rounded-full" /></span></>
+                    )
+                  }
+
+                  return "Welcome!"
+                })()}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDate()} • {getCurrentDay()}</p>
