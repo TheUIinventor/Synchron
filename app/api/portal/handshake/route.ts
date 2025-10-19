@@ -77,13 +77,47 @@ export async function POST(req: Request) {
       probeResults,
     }
 
-    const options: any = { status: 200 }
-    // If we have any cookies to forward, set them on the response so the browser stores them
-    if (forwardedCookies.length > 0) {
-      options.headers = { 'set-cookie': forwardedCookies.join('\n') }
+    // Build response and set cookies via the NextResponse cookies API (one-by-one)
+    const res = NextResponse.json(respBody, { status: 200 })
+    try {
+      for (const c of forwardedCookies) {
+        // c is like 'NAME=VALUE; HttpOnly; SameSite=None; Secure; Path=/; Max-Age=3600; Expires=...'
+        const parts = c.split(/;\s*/)
+        const [nameValue, ...attrs] = parts
+        const eq = nameValue.indexOf('=')
+        if (eq === -1) continue
+        const name = nameValue.slice(0, eq)
+        const value = nameValue.slice(eq + 1)
+        const opts: any = { path: '/' }
+        for (const a of attrs) {
+          const la = a.toLowerCase()
+          if (la === 'httponly') opts.httpOnly = true
+          else if (la === 'secure') opts.secure = true
+          else if (la.startsWith('samesite=')) opts.sameSite = a.split('=')[1]
+          else if (la.startsWith('path=')) opts.path = a.split('=')[1]
+          else if (la.startsWith('max-age=')) opts.maxAge = parseInt(a.split('=')[1], 10)
+          else if (la.startsWith('expires=')) {
+            const dt = new Date(a.split('=')[1])
+            if (!isNaN(dt.getTime())) opts.expires = dt.toUTCString()
+          }
+        }
+        try {
+          // Some runtimes expose res.cookies.set(name, value, opts)
+          // Use that API to set the cookie on the response
+          // @ts-ignore allow dynamic call
+          if (typeof (res as any).cookies?.set === 'function') {
+            ;(res as any).cookies.set(name, value, opts)
+          }
+        } catch (e) {
+          // ignore cookie set errors; still return diagnostic info
+          console.warn('Failed to set forwarded cookie', name, e)
+        }
+      }
+    } catch (e) {
+      // swallow
     }
 
-    return NextResponse.json(respBody, options)
+    return res
   } catch (err) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
