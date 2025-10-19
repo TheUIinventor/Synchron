@@ -68,6 +68,12 @@ export default function HomeClient() {
   const [cookieDebug, setCookieDebug] = useState<any | null>(null)
   const [cookieLoading, setCookieLoading] = useState(false)
   const [cookieError, setCookieError] = useState<string | null>(null)
+  const [handshakeLoading, setHandshakeLoading] = useState(false)
+  const [handshakeResult, setHandshakeResult] = useState<any | null>(null)
+  const [handshakeError, setHandshakeError] = useState<string | null>(null)
+  const [investigateLoading, setInvestigateLoading] = useState(false)
+  const [investigateResult, setInvestigateResult] = useState<any | null>(null)
+  const [investigateError, setInvestigateError] = useState<string | null>(null)
   const [attemptingRefresh, setAttemptingRefresh] = useState(false)
   const [refreshAttempts, setRefreshAttempts] = useState(0)
   const MAX_REFRESH_ATTEMPTS = 2
@@ -434,6 +440,69 @@ export default function HomeClient() {
                                         <pre className="whitespace-pre-wrap">{JSON.stringify(cookieDebug, null, 2)}</pre>
                                       </div>
                                     )}
+
+                                    <div className="mt-3">
+                                      <div className="font-medium mb-1">Investigate session (handshake)</div>
+                                      <div className="mt-2">
+                                        <button
+                                          className="text-xs underline text-gray-600 dark:text-gray-300"
+                                          onClick={async () => {
+                                            if (handshakeLoading) return
+                                            setHandshakeLoading(true)
+                                            setHandshakeError(null)
+                                            try {
+                                              const r = await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
+                                              const j = await r.json()
+                                              setHandshakeResult(j)
+                                            } catch (e) {
+                                              setHandshakeError(String(e))
+                                            } finally {
+                                              setHandshakeLoading(false)
+                                            }
+                                          }}
+                                        >
+                                          {handshakeLoading ? 'Running handshake…' : (handshakeResult ? 'Re-run handshake' : 'Run handshake')}
+                                        </button>
+                                      </div>
+
+                                      {handshakeError && <div className="text-red-500 mt-2 text-xs">{handshakeError}</div>}
+
+                                      {handshakeResult && (
+                                        <div className="mt-2 bg-white/50 dark:bg-black/20 p-2 rounded text-[12px] max-h-60 overflow-auto">
+                                          <pre className="whitespace-pre-wrap">{JSON.stringify(handshakeResult, null, 2)}</pre>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="mt-3">
+                                      <div className="font-medium mb-1">Deep investigation (verbose)</div>
+                                      <div className="mt-2">
+                                        <button
+                                          className="text-xs underline text-gray-600 dark:text-gray-300"
+                                          onClick={async () => {
+                                            if (investigateLoading) return
+                                            setInvestigateLoading(true)
+                                            setInvestigateError(null)
+                                            try {
+                                              const r = await fetch('/api/portal/investigate', { credentials: 'include' })
+                                              const j = await r.json()
+                                              setInvestigateResult(j)
+                                            } catch (e) {
+                                              setInvestigateError(String(e))
+                                            } finally {
+                                              setInvestigateLoading(false)
+                                            }
+                                          }}
+                                        >{investigateLoading ? 'Investigating…' : (investigateResult ? 'Re-run investigation' : 'Run deep investigation')}</button>
+                                      </div>
+
+                                      {investigateError && <div className="text-red-500 mt-2 text-xs">{investigateError}</div>}
+
+                                      {investigateResult && (
+                                        <div className="mt-2 bg-white/40 dark:bg-black/20 p-2 rounded max-h-72 overflow-auto">
+                                          <pre className="whitespace-pre-wrap text-[11px]">{JSON.stringify(investigateResult, null, 2)}</pre>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               )}
