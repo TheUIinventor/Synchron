@@ -65,6 +65,9 @@ export default function HomeClient() {
   // Diagnostic: try server-side proxy endpoint directly and show result (helps when profileData is empty)
   const [portalDebug, setPortalDebug] = useState<any>(null)
   const [showPortalDebugDetails, setShowPortalDebugDetails] = useState(false)
+  const [cookieDebug, setCookieDebug] = useState<any | null>(null)
+  const [cookieLoading, setCookieLoading] = useState(false)
+  const [cookieError, setCookieError] = useState<string | null>(null)
   const [attemptingRefresh, setAttemptingRefresh] = useState(false)
   const [refreshAttempts, setRefreshAttempts] = useState(0)
   const MAX_REFRESH_ATTEMPTS = 2
@@ -376,6 +379,40 @@ export default function HomeClient() {
                                   <div>Status: {portalDebug.status}</div>
                                   <div className="mt-2 whitespace-pre-wrap max-h-48 overflow-auto bg-white/50 dark:bg-black/20 p-2 rounded text-[11px]">
                                     {truncated ?? "(no response body)"}
+                                  </div>
+
+                                  <div className="mt-3">
+                                    <div className="font-medium mb-1">Server cookies (masked)</div>
+                                    <div className="text-[12px] text-gray-600 dark:text-gray-300">This shows the cookies the server sees when handling requests (masked for safety).</div>
+                                    <div className="mt-2">
+                                      <button
+                                        className="text-xs underline text-gray-600 dark:text-gray-300"
+                                        onClick={async () => {
+                                          if (cookieDebug || cookieLoading) return
+                                          setCookieLoading(true)
+                                          setCookieError(null)
+                                          try {
+                                            const r = await fetch('/api/debug/cookies', { credentials: 'include' })
+                                            const j = await r.json()
+                                            setCookieDebug(j)
+                                          } catch (e) {
+                                            setCookieError(String(e))
+                                          } finally {
+                                            setCookieLoading(false)
+                                          }
+                                        }}
+                                      >
+                                        {cookieLoading ? 'Fetching cookies…' : (cookieDebug ? 'Refresh cookies' : 'Show cookies')}
+                                      </button>
+                                    </div>
+
+                                    {cookieError && <div className="text-red-500 mt-2 text-xs">{cookieError}</div>}
+
+                                    {cookieDebug && (
+                                      <div className="mt-2 bg-white/50 dark:bg-black/20 p-2 rounded text-[12px] max-h-40 overflow-auto">
+                                        <pre className="whitespace-pre-wrap">{JSON.stringify(cookieDebug, null, 2)}</pre>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               )}
