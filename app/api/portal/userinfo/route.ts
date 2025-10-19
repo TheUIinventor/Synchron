@@ -41,6 +41,14 @@ export async function GET(req: NextRequest) {
         const v = hdr(h)
         if (v) respHeaders[h] = v
       }
+
+      // If the portal set cookies, prepare a forwarded Set-Cookie for the client.
+      // We strip any Domain attribute so the browser stores the cookie for our origin.
+      const rawSetCookie = response.headers.get('set-cookie')
+      let forwardedSetCookie: string | null = null
+      if (rawSetCookie) {
+        forwardedSetCookie = rawSetCookie.replace(/;\s*Domain=[^;]+/gi, '')
+      }
     if (!response.ok) {
       return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status })
     }
@@ -73,7 +81,7 @@ export async function GET(req: NextRequest) {
             responseBody: truncated,
             responseHeaders: maskedHeaders,
           },
-          { status: 401 },
+          forwardedSetCookie ? { status: 401, headers: { 'set-cookie': forwardedSetCookie } } : { status: 401 },
         )
       }
 
@@ -86,6 +94,11 @@ export async function GET(req: NextRequest) {
     if (okHeaders['set-cookie']) {
       okHeaders['set-cookie'] = okHeaders['set-cookie'].split(',').map(s => s.replace(/=([^;\s]+)/g, (m, v) => `=${v.slice(0,4)}…${v.slice(-4)}`)).join(',')
     }
+
+    if (forwardedSetCookie) {
+      return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: { 'set-cookie': forwardedSetCookie } })
+    }
+
     return NextResponse.json({ success: true, data, responseHeaders: okHeaders })
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Proxy error', details: String(error) }, { status: 500 })
