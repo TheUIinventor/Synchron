@@ -381,6 +381,13 @@ export default function HomeClient() {
                                     {truncated ?? "(no response body)"}
                                   </div>
 
+                                  {portalDebug.payload?.responseHeaders && (
+                                    <div className="mt-3">
+                                      <div className="font-medium">Proxy response headers</div>
+                                      <pre className="whitespace-pre-wrap max-h-36 overflow-auto text-[11px] mt-2 bg-white/40 dark:bg-black/20 p-2 rounded">{JSON.stringify(portalDebug.payload.responseHeaders, null, 2)}</pre>
+                                    </div>
+                                  )}
+
                                   <div className="mt-3">
                                     <div className="font-medium mb-1">Server cookies (masked)</div>
                                     <div className="text-[12px] text-gray-600 dark:text-gray-300">This shows the cookies the server sees when handling requests (masked for safety).</div>

@@ -14,6 +14,11 @@ export async function GET(req: NextRequest) {
     // Build headers: include Authorization when we have a bearer token and also forward cookies
     const headers: Record<string,string> = {
       'Accept': 'application/json',
+      // Add common browser headers to avoid portal returning HTML for programmatic requests
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://student.sbhs.net.au/',
+      'Origin': 'https://student.sbhs.net.au',
+      'Accept-Language': 'en-AU,en;q=0.9',
     }
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
@@ -28,6 +33,14 @@ export async function GET(req: NextRequest) {
     })
 
     const text = await response.text()
+      // Collect a small set of response headers for diagnostics
+      const hdr = (name: string) => response.headers.get(name)
+      const respHeaders: Record<string,string> = {}
+      const interesting = ['content-type', 'set-cookie', 'location', 'www-authenticate', 'cache-control']
+      for (const h of interesting) {
+        const v = hdr(h)
+        if (v) respHeaders[h] = v
+      }
     if (!response.ok) {
       return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status })
     }
@@ -44,11 +57,21 @@ export async function GET(req: NextRequest) {
       if (looksLikeHtml) {
         // Truncate the HTML for the response body to avoid huge payloads in logs
         const truncated = text.slice(0, 2048)
+        // Mask set-cookie values if present
+        const maskedHeaders = { ...respHeaders }
+        if (maskedHeaders['set-cookie']) {
+          maskedHeaders['set-cookie'] = maskedHeaders['set-cookie'].split(',').map(s => {
+            // mask cookie value parts
+            return s.replace(/=([^;\s]+)/g, (m, v) => `=${v.slice(0,4)}…${v.slice(-4)}`)
+          }).join(',')
+        }
+
         return NextResponse.json(
           {
             success: false,
             error: "Portal returned HTML (likely login page). SBHS session may be missing or expired.",
             responseBody: truncated,
+            responseHeaders: maskedHeaders,
           },
           { status: 401 },
         )
@@ -58,7 +81,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    // Also include a small headers object for debugging (mask set-cookie)
+    const okHeaders = { ...respHeaders }
+    if (okHeaders['set-cookie']) {
+      okHeaders['set-cookie'] = okHeaders['set-cookie'].split(',').map(s => s.replace(/=([^;\s]+)/g, (m, v) => `=${v.slice(0,4)}…${v.slice(-4)}`)).join(',')
+    }
+    return NextResponse.json({ success: true, data, responseHeaders: okHeaders })
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Proxy error', details: String(error) }, { status: 500 })
   }
