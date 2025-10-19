@@ -63,6 +63,8 @@ export default function HomeClient() {
 
   // Diagnostic: try server-side proxy endpoint directly and show result (helps when profileData is empty)
   const [portalDebug, setPortalDebug] = useState<any>(null)
+  const [showPortalDebugDetails, setShowPortalDebugDetails] = useState(false)
+  const [attemptingRefresh, setAttemptingRefresh] = useState(false)
   useEffect(() => {
     let cancelled = false
     async function probe() {
@@ -82,6 +84,37 @@ export default function HomeClient() {
     probe()
     return () => { cancelled = true }
   }, [])
+
+  // If proxy reports 401 with HTML (login page), attempt a silent refresh once then re-probe
+  useEffect(() => {
+    if (!portalDebug) return
+    const payload = portalDebug.payload || {}
+    const isHtmlLogin =
+      payload?.error?.includes("Portal returned HTML") ||
+      portalDebug.status === 401 && typeof payload?.responseBody === "string" && payload.responseBody.trim().startsWith("<")
+
+    if (isHtmlLogin && !attemptingRefresh) {
+      // try a single silent refresh to restore session
+      setAttemptingRefresh(true)
+      ;(async () => {
+        try {
+          // Call refresh endpoint (server may rotate token via cookie)
+          const r = await fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
+          // ignore response body; re-probe portal userinfo after a short delay
+          await new Promise(res => setTimeout(res, 400))
+          const rp = await fetch('/api/portal/userinfo', { credentials: 'include' })
+          let payload2: any
+          try { payload2 = await rp.json() } catch (e) { payload2 = { error: 'Invalid JSON', status: rp.status, text: await rp.text() } }
+          setPortalDebug({ ok: rp.ok, status: rp.status, payload: payload2 })
+        } catch (e) {
+          // keep original portalDebug but mark that we attempted refresh
+          setPortalDebug((prev: any) => ({ ...prev, refreshAttempted: true, refreshError: String(e) }))
+        } finally {
+          setAttemptingRefresh(false)
+        }
+      })()
+    }
+  }, [portalDebug])
 
   const displayName = (() => {
     const p: any = profileData || {}
@@ -244,7 +277,7 @@ export default function HomeClient() {
 
                 if (maybeGiven && typeof maybeGiven === "string" && maybeGiven.trim().length > 0) {
                   const first = maybeGiven.trim().split(/\s+/)[0]
-                  return `Welcome, ${first}!`
+                  return `Welcome Back, ${first}!`
                 }
 
                 if (studentName) return `Welcome, ${studentName}!`
@@ -265,14 +298,68 @@ export default function HomeClient() {
           ) : null}
 
           {/* Always-show diagnostic of the proxy endpoint so we can see why profileData may be empty */}
-          {portalDebug ? (
-            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              <details open className="bg-yellow-50 dark:bg-yellow-900 p-2 rounded-md border border-yellow-200 dark:border-yellow-800">
-                <summary className="cursor-pointer">/api/portal/userinfo (diagnostic)</summary>
-                <pre className="whitespace-pre-wrap max-h-60 overflow-auto text-[11px] mt-2">{JSON.stringify(portalDebug, null, 2)}</pre>
-              </details>
-            </div>
-          ) : null}
+                  {portalDebug ? (
+                    // If the proxy returned an HTML login page (401), show a friendly sign-in prompt
+                    (() => {
+                      const payload = portalDebug.payload || {}
+                      const isHtmlLogin =
+                        payload?.error?.includes("Portal returned HTML") ||
+                        portalDebug.status === 401 && typeof payload?.responseBody === "string" && payload.responseBody.trim().startsWith("<")
+
+                      if (isHtmlLogin) {
+                        const truncated = (typeof payload.responseBody === "string" && payload.responseBody.length > 0)
+                          ? payload.responseBody.slice(0, 2048)
+                          : null
+
+                        return (
+                          <div className="mt-2 text-xs text-gray-700 dark:text-gray-300 w-full sm:w-auto">
+                            <div className="bg-yellow-50 dark:bg-yellow-900/40 p-3 rounded-md border border-yellow-200 dark:border-yellow-800">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-medium">Not signed in to SBHS Portal</div>
+                                  <div className="text-[13px] text-gray-600 dark:text-gray-400 mt-1">Sign in to view your profile details and personalised greeting.</div>
+                                  <div className="mt-3">
+                                    <AuthButton />
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <button
+                                    className="text-xs underline text-gray-500 dark:text-gray-400"
+                                    onClick={() => setShowPortalDebugDetails(v => !v)}
+                                  >
+                                    {showPortalDebugDetails ? "Hide debug" : "Show diagnostic"}
+                                  </button>
+                                </div>
+                              </div>
+                              {showPortalDebugDetails && (
+                                <div className="mt-3 text-[11px] text-gray-700 dark:text-gray-300">
+                                  <div className="font-medium mb-1">Proxy diagnostic</div>
+                                  <div>Status: {portalDebug.status}</div>
+                                  <div className="mt-2 whitespace-pre-wrap max-h-48 overflow-auto bg-white/50 dark:bg-black/20 p-2 rounded text-[11px]">
+                                    {truncated ?? "(no response body)"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // Fallback: non-HTML diagnostic (show compact JSON, not raw HTML)
+                      return (
+                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <details className="bg-yellow-50 dark:bg-yellow-900 p-2 rounded-md border border-yellow-200 dark:border-yellow-800">
+                            <summary className="cursor-pointer">/api/portal/userinfo (diagnostic)</summary>
+                            <pre className="whitespace-pre-wrap max-h-60 overflow-auto text-[11px] mt-2">{JSON.stringify(portalDebug, (k, v) => {
+                              // avoid dumping huge HTML bodies accidentally
+                              if (k === 'responseBody' && typeof v === 'string') return v.slice(0, 2048)
+                              return v
+                            }, 2)}</pre>
+                          </details>
+                        </div>
+                      )
+                    })()
+                  ) : null}
           <div className="text-right sm:mt-0 w-full sm:w-auto">
             <div className="flex items-center gap-2 card-optimized px-3 py-2 rounded-xl mb-2 justify-end">
               <div className="icon-optimized rounded-full p-1">
