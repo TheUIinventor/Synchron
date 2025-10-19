@@ -106,18 +106,24 @@ export default function HomeClient() {
       portalDebug.status === 401 && typeof payload?.responseBody === "string" && payload.responseBody.trim().startsWith("<")
 
     if (isHtmlLogin && refreshAttempts < MAX_REFRESH_ATTEMPTS && !attemptingRefresh) {
-      // try a short retry loop to restore session via /api/auth/refresh
+      // try a short retry loop to restore session via server-side handshake
       setAttemptingRefresh(true)
       setRefreshAttempts((n) => n + 1)
 
       ;(async () => {
         try {
-          // attempt refresh
-          const r = await fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
-          // small delay to allow cookies to be set by the server
-          await new Promise((res) => setTimeout(res, 500 * refreshAttempts + 200))
+          // POST to handshake which attempts to perform the minimal portal login flow and forward cookies
+          const h = await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
+          let handshakeJson: any
+          try { handshakeJson = await h.json() } catch (e) { handshakeJson = { ok: false, error: 'Invalid JSON from handshake', status: h.status } }
 
-          // re-probe portal userinfo
+          // Save handshake diagnostic into portalDebug so user can inspect
+          setPortalDebug((prev: any) => ({ ...(prev || {}), handshake: handshakeJson }))
+
+          // Allow cookies a moment to be set in the browser
+          await new Promise((res) => setTimeout(res, 400))
+
+          // Re-probe portal userinfo (server proxy will now include forwarded cookies)
           const rp = await fetch('/api/portal/userinfo', { credentials: 'include' })
           let payload2: any
           try {
@@ -125,15 +131,29 @@ export default function HomeClient() {
           } catch (e) {
             payload2 = { error: 'Invalid JSON', status: rp.status, text: await rp.text() }
           }
-
-          setPortalDebug({ ok: rp.ok, status: rp.status, payload: payload2 })
+          setPortalDebug({ ok: rp.ok, status: rp.status, payload: payload2, handshake: handshakeJson })
 
           // If portal returned JSON profile, use it as an override so greeting updates immediately
           if (payload2 && payload2.success && payload2.data) {
             setProfileOverride(payload2.data)
-            // also trigger the hook to refetch and update global profile state
             try { await refetchProfile() } catch (e) { /* ignore */ }
           }
+
+          // Also re-fetch timetable so the UI updates if handshake restored session
+          try {
+            const rt = await fetch('/api/timetable', { credentials: 'include' })
+            if (rt.ok) {
+              const td = await rt.json()
+              setTimetable(td.timetable || [])
+              if (td.student) {
+                if (td.student.name) setStudentName(td.student.name)
+                else if (td.student.givenName && td.student.surname) setStudentName(`${td.student.givenName} ${td.student.surname}`)
+              }
+            }
+          } catch (e) {
+            // ignore timetable re-fetch errors here
+          }
+
         } catch (e) {
           setPortalDebug((prev: any) => ({ ...(prev || {}), refreshAttempted: true, refreshError: String(e) }))
         } finally {
