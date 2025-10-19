@@ -74,12 +74,40 @@ export async function GET(req: NextRequest) {
           }).join(',')
         }
 
+        // Additionally probe a few other endpoints to see which ones accept the session
+        const probePaths = ['/notices', '/awards', '/timetable']
+        const probeResults: Record<string, any> = {}
+        await Promise.all(probePaths.map(async (pp) => {
+          try {
+            const url = `https://student.sbhs.net.au${pp}`
+            const cookieHeader = response.headers.get('set-cookie') ?? headers['Cookie'] ?? ''
+            const r2 = await fetch(url, { headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0',
+              'Referer': 'https://student.sbhs.net.au/',
+              'Cookie': cookieHeader,
+            } })
+            const ct2 = r2.headers.get('content-type') || ''
+            let snippet: string | null = null
+            try {
+              const t2 = await r2.text()
+              snippet = t2.slice(0, 2048)
+            } catch (e) {
+              snippet = null
+            }
+            probeResults[pp] = { ok: r2.ok, status: r2.status, contentType: ct2, snippet }
+          } catch (e) {
+            probeResults[pp] = { error: String(e) }
+          }
+        }))
+
         return NextResponse.json(
           {
             success: false,
             error: "Portal returned HTML (likely login page). SBHS session may be missing or expired.",
             responseBody: truncated,
             responseHeaders: maskedHeaders,
+            probeResults,
           },
           forwardedSetCookie ? { status: 401, headers: { 'set-cookie': forwardedSetCookie } } : { status: 401 },
         )
