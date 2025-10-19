@@ -387,7 +387,23 @@ export default function HomeClient() {
                                   <div className="font-medium">Not signed in to SBHS Portal</div>
                                   <div className="text-[13px] text-gray-600 dark:text-gray-400 mt-1">Sign in to view your profile details and personalised greeting.</div>
                                   <div className="mt-3">
-                                    <AuthButton />
+                                    <div className="flex items-center gap-2">
+                                      <AuthButton />
+                                      <button
+                                        className="text-xs underline text-gray-600 dark:text-gray-300"
+                                        onClick={() => {
+                                          // open the portal login which will redirect into the IdP
+                                          try {
+                                            window.open('https://student.sbhs.net.au/auth/login', '_blank')
+                                          } catch (e) {
+                                            // fallback to location change if popup blocked
+                                            window.location.href = 'https://student.sbhs.net.au/auth/login'
+                                          }
+                                        }}
+                                      >
+                                        Open portal login
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="text-right">
