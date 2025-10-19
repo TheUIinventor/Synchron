@@ -388,6 +388,20 @@ export default function HomeClient() {
                                     </div>
                                   )}
 
+                                  {portalDebug.payload?.probeResults && (
+                                    <div className="mt-3">
+                                      <div className="font-medium">Probe results</div>
+                                      <div className="mt-2 text-[11px] text-gray-700 dark:text-gray-300">
+                                        {Object.entries(portalDebug.payload.probeResults).map(([path, info]: any) => (
+                                          <div key={path} className="mb-2">
+                                            <div className="font-semibold">{path} — {info.ok ? 'OK' : `Status ${info.status ?? 'ERR'}`}</div>
+                                            <div className="text-[11px] mt-1 whitespace-pre-wrap max-h-28 overflow-auto bg-white/40 dark:bg-black/20 p-2 rounded">{info.snippet ?? JSON.stringify(info)}</div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
                                   <div className="mt-3">
                                     <div className="font-medium mb-1">Server cookies (masked)</div>
                                     <div className="text-[12px] text-gray-600 dark:text-gray-300">This shows the cookies the server sees when handling requests (masked for safety).</div>
