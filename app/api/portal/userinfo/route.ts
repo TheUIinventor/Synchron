@@ -4,17 +4,27 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(req: NextRequest) {
   const apiUrl = 'https://student.sbhs.net.au/details/userinfo.json'
   const accessToken = req.cookies.get('sbhs_access_token')?.value
-  if (!accessToken) {
+  const refreshToken = req.cookies.get('sbhs_refresh_token')?.value
+
+  // If no access token, return 401 to signal signed-out; client will attempt refresh
+  if (!accessToken && !refreshToken) {
     return NextResponse.json({ success: false, error: 'Missing SBHS access token' }, { status: 401 })
   }
-
   try {
+    // Build headers: include Authorization when we have a bearer token and also forward cookies
+    const headers: Record<string,string> = {
+      'Accept': 'application/json',
+    }
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+
+    // Forward SBHS cookies as a Cookie header so endpoints expecting cookie-based sessions work
+    const cookieParts: string[] = []
+    if (accessToken) cookieParts.push(`sbhs_access_token=${accessToken}`)
+    if (refreshToken) cookieParts.push(`sbhs_refresh_token=${refreshToken}`)
+    if (cookieParts.length > 0) headers['Cookie'] = cookieParts.join('; ')
+
     const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json',
-      },
-      // server-side fetch does not need credentials: include because we set Authorization header
+      headers,
     })
 
     const text = await response.text()
