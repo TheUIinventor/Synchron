@@ -26,7 +26,25 @@ export async function GET(req: NextRequest) {
     try {
       data = JSON.parse(text)
     } catch (e) {
-      // If portal returned HTML or non-JSON, return it for debugging
+      // Portal sometimes returns an HTML login page (when not authenticated) instead of JSON.
+      // Detect HTML and return 401 so the client can prompt for re-authentication.
+      const contentType = response.headers.get("content-type") || ""
+      const looksLikeHtml = contentType.includes("text/html") || text.trim().startsWith("<!DOCTYPE html") || /<html/i.test(text)
+
+      if (looksLikeHtml) {
+        // Truncate the HTML for the response body to avoid huge payloads in logs
+        const truncated = text.slice(0, 2048)
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Portal returned HTML (likely login page). SBHS session may be missing or expired.",
+            responseBody: truncated,
+          },
+          { status: 401 },
+        )
+      }
+
+      // Otherwise return a 500 with the raw body for debugging
       return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500 })
     }
 
