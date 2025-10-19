@@ -5,7 +5,7 @@ import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDa
 
 // Define the period type
 export type Period = {
-  id: number
+  id?: number
   period: string
   time: string
   subject: string
@@ -31,6 +31,13 @@ type TimetableContextType = {
   timetableData: Record<string, Period[]>
   currentMomentPeriodInfo: {
     // Renamed from nextPeriodInfo to be clearer
+    nextPeriod: Period | null
+    timeUntil: string
+    isCurrentlyInClass: boolean
+    currentPeriod: Period | null
+  }
+  // Backwards-compatible alias name used across older components
+  nextPeriodInfo?: {
     nextPeriod: Period | null
     timeUntil: string
     isCurrentlyInClass: boolean
@@ -210,7 +217,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   })
 
   // Memoize the current timetable based on selected week
-  const timetableData = useMemo(() => {
+  const timetableData: Record<string, Period[]> = useMemo(() => {
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
   }, [currentWeek])
 
@@ -266,6 +273,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         setSelectedDay,
         timetableData,
         currentMomentPeriodInfo, // Provide the new state
+        // Backwards-compatible alias for older components
+        nextPeriodInfo: currentMomentPeriodInfo,
         bellTimes: bellTimesData,
         isShowingNextDay,
       }}

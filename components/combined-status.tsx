@@ -7,7 +7,12 @@ import { Clock, ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 export default function CombinedStatus() {
-  const { timetableData, nextPeriodInfo } = useTimetable()
+  const timetable = useTimetable()
+  const { timetableData } = timetable
+  // Support both new and legacy naming
+  const nextPeriodInfo = (timetable.nextPeriodInfo ?? timetable.currentMomentPeriodInfo) as NonNullable<
+    typeof timetable.currentMomentPeriodInfo
+  >
   const [currentTime, setCurrentTime] = useState("")
 
   // Memoize current day and timetable

@@ -1,14 +1,15 @@
 "use client"
 // components/ui/sign-in-button.tsx
 
-import { Login, Logout } from 'lucide-react'; // ADD THIS LINE
+// lucide-react exports LogIn / LogOut (camel-case). Use those names and consolidate imports below.
+import { LogIn, LogOut, School, ExternalLink, Wifi, WifiOff, ArrowLeft, Calendar, Bell, Award } from 'lucide-react'
 
 // ... (rest of your imports and component code)
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
-import { School, ExternalLink, Wifi, WifiOff, ArrowLeft, Calendar, Bell, Award } from "lucide-react"
+// icons already imported above (LogIn/LogOut + list); avoid duplicate imports
 import Link from "next/link"
 
 interface SignInButtonProps {

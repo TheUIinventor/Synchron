@@ -5,13 +5,24 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import type { ThemeProviderProps } from "next-themes"
+import type { PropsWithChildren } from 'react'
 
 export type ColorTheme = "blue" | "purple" | "green" | "red" | "orange"
 export type FontTheme = "default" | "minecraft" | "comic" | "impact" | "papyrus" | "courier" | "times"
-export type NavItem = "home" | "timetable" | "notices" | "clipboard" | "awards"
+export type NavItem =
+  | "home"
+  | "timetable"
+  | "notices"
+  | "clipboard"
+  | "awards"
+  | "calendar"
+  | "bell-times"
+  | "library"
+  | "canteen"
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+export function ThemeProvider(props: PropsWithChildren<ThemeProviderProps>) {
+  const { children, ...rest } = props
+  return <NextThemesProvider {...(rest as ThemeProviderProps)}>{children}</NextThemesProvider>
 }
 
 // Create a context for user settings

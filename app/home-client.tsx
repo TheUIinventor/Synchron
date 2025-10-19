@@ -61,6 +61,28 @@ export default function HomeClient() {
   // Portal profile (preferred source for display name)
   const { data: profileData, loading: profileLoading } = useStudentProfile();
 
+  // Diagnostic: try server-side proxy endpoint directly and show result (helps when profileData is empty)
+  const [portalDebug, setPortalDebug] = useState<any>(null)
+  useEffect(() => {
+    let cancelled = false
+    async function probe() {
+      try {
+        const res = await fetch('/api/portal/userinfo', { credentials: 'include' })
+        let payload: any
+        try {
+          payload = await res.json()
+        } catch (e) {
+          payload = { error: 'Invalid JSON', status: res.status, text: await res.text() }
+        }
+        if (!cancelled) setPortalDebug({ ok: res.ok, status: res.status, payload })
+      } catch (err) {
+        if (!cancelled) setPortalDebug({ ok: false, error: String(err) })
+      }
+    }
+    probe()
+    return () => { cancelled = true }
+  }, [])
+
   const displayName = (() => {
     const p: any = profileData || {}
     const inner = p.data || {}
@@ -238,6 +260,16 @@ export default function HomeClient() {
               <details className="bg-gray-50 dark:bg-gray-800 p-2 rounded-md">
                 <summary className="cursor-pointer">profile payload (debug)</summary>
                 <pre className="whitespace-pre-wrap max-h-48 overflow-auto text-[11px] mt-2">{JSON.stringify(profileData, null, 2)}</pre>
+              </details>
+            </div>
+          ) : null}
+
+          {/* Always-show diagnostic of the proxy endpoint so we can see why profileData may be empty */}
+          {portalDebug ? (
+            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <details open className="bg-yellow-50 dark:bg-yellow-900 p-2 rounded-md border border-yellow-200 dark:border-yellow-800">
+                <summary className="cursor-pointer">/api/portal/userinfo (diagnostic)</summary>
+                <pre className="whitespace-pre-wrap max-h-60 overflow-auto text-[11px] mt-2">{JSON.stringify(portalDebug, null, 2)}</pre>
               </details>
             </div>
           ) : null}

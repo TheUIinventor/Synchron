@@ -70,7 +70,7 @@ export const getTimeUntilNextPeriod = (
   const now = new Date()
 
   // Find current period
-  let currentPeriod = null
+  let currentPeriod: { period: string; time: string; subject: string; teacher: string; room: string } | null = null
   for (const period of currentPeriods) {
     const { start, end } = parseTimeRange(period.time)
     if (now >= start && now <= end) {
@@ -91,7 +91,7 @@ export const getTimeUntilNextPeriod = (
     const diffMs = end.getTime() - now.getTime()
 
     // Find the next period after current
-    const currentIndex = currentPeriods.findIndex((p) => p.period === currentPeriod?.period)
+  const currentIndex = currentPeriods.findIndex((p) => p.period === currentPeriod?.period)
     if (currentIndex < currentPeriods.length - 1) {
       nextPeriod = currentPeriods[currentIndex + 1]
     }
