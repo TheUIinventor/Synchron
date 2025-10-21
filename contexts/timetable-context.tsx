@@ -45,6 +45,7 @@ type TimetableContextType = {
   }
   bellTimes: Record<string, BellTime[]>
   isShowingNextDay: boolean // Indicates if the main timetable is showing next day
+  timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
 }
 
 // Create the context
@@ -217,9 +218,52 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   })
 
   // Memoize the current timetable based on selected week
+  const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
+  const [timetableSource, setTimetableSource] = useState<string | null>(null)
+
   const timetableData: Record<string, Period[]> = useMemo(() => {
+    if (externalTimetable) return externalTimetable
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
-  }, [currentWeek])
+  }, [currentWeek, externalTimetable])
+
+  // Try to fetch external timetable on mount
+  useEffect(() => {
+    let cancelled = false
+    async function loadExternal() {
+      try {
+        const r = await fetch('/api/timetable', { credentials: 'include' })
+        if (!r.ok) return
+        const j = await r.json()
+        // Expect j.timetable as either an array or a per-day map
+        if (j == null) return
+        // If j.timetable is an object keyed by day, use it directly
+        if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+          if (!cancelled) {
+            setExternalTimetable(j.timetable)
+            setTimetableSource(j.source ?? 'external')
+          }
+          return
+        }
+        // If j.timetable is an array, try to convert it into per-day buckets by 'day' or 'date' field
+        if (Array.isArray(j.timetable)) {
+          const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+          for (const p of j.timetable) {
+            const day = p.day || p.weekday || 'Monday'
+            if (!byDay[day]) byDay[day] = []
+            byDay[day].push(p)
+          }
+          if (!cancelled) {
+            setExternalTimetable(byDay)
+            setTimetableSource(j.source ?? 'external')
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    loadExternal()
+    return () => { cancelled = true }
+  }, [])
 
   // Function to update all relevant time-based states
   const updateAllTimeStates = useCallback(() => {

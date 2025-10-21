@@ -1,0 +1,27 @@
+{
+  "student": {
+    "name": "Sample Student",
+    "givenName": "Sample",
+    "surname": "Student"
+  },
+  "timetable": {
+    "Monday": [
+      { "id": "m1", "period": "1", "time": "09:00 - 10:05", "subject": "English", "teacher": "Ms. Smith", "room": "301" },
+      { "id": "m2", "period": "2", "time": "10:05 - 11:05", "subject": "Mathematics", "teacher": "Mr. Johnson", "room": "304" },
+      { "id": "m3", "period": "Recess", "time": "11:05 - 11:25", "subject": "Break" }
+    ],
+    "Tuesday": [
+      { "id": "t1", "period": "1", "time": "09:00 - 10:05", "subject": "Mathematics", "teacher": "Mr. Johnson", "room": "304" }
+    ],
+    "Wednesday": [
+      { "id": "w1", "period": "1", "time": "09:00 - 10:05", "subject": "History", "teacher": "Mr. Brown", "room": "205" }
+    ],
+    "Thursday": [
+      { "id": "th1", "period": "1", "time": "09:00 - 10:05", "subject": "Science", "teacher": "Dr. Williams", "room": "Lab 2" }
+    ],
+    "Friday": [
+      { "id": "f1", "period": "1", "time": "09:25 - 10:20", "subject": "PE", "teacher": "Mr. Davis", "room": "101" }
+    ]
+  },
+  "source": "fallback-sample"
+}
