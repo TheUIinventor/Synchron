@@ -480,25 +480,75 @@ export default function HomeClient() {
                                     <div className="mt-3">
                                       <div className="font-medium mb-1">Investigate session (handshake)</div>
                                       <div className="mt-2">
-                                        <button
-                                          className="text-xs underline text-gray-600 dark:text-gray-300"
-                                          onClick={async () => {
-                                            if (handshakeLoading) return
-                                            setHandshakeLoading(true)
-                                            setHandshakeError(null)
-                                            try {
-                                              const r = await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
-                                              const j = await r.json()
-                                              setHandshakeResult(j)
-                                            } catch (e) {
-                                              setHandshakeError(String(e))
-                                            } finally {
-                                              setHandshakeLoading(false)
-                                            }
-                                          }}
-                                        >
-                                          {handshakeLoading ? 'Running handshake…' : (handshakeResult ? 'Re-run handshake' : 'Run handshake')}
-                                        </button>
+                                        <div className="flex items-center gap-3">
+                                          <button
+                                            className="text-xs underline text-gray-600 dark:text-gray-300"
+                                            onClick={async () => {
+                                              if (handshakeLoading) return
+                                              setHandshakeLoading(true)
+                                              setHandshakeError(null)
+                                              try {
+                                                const r = await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
+                                                const j = await r.json()
+                                                setHandshakeResult(j)
+                                              } catch (e) {
+                                                setHandshakeError(String(e))
+                                              } finally {
+                                                setHandshakeLoading(false)
+                                              }
+                                            }}
+                                          >
+                                            {handshakeLoading ? 'Running handshake…' : (handshakeResult ? 'Re-run handshake' : 'Run handshake')}
+                                          </button>
+
+                                          {/* Open IdP redirect (prefer captured location if present) */}
+                                          <button
+                                            className="text-xs underline text-gray-600 dark:text-gray-300"
+                                            onClick={() => {
+                                              // prefer the handshakeResult or portalDebug handshake locations if available
+                                              const url = (handshakeResult?.locations?.[0]) || (portalDebug?.handshake?.locations?.[0]) || 'https://student.sbhs.net.au/auth/login'
+                                              try { window.open(url, '_blank') } catch (e) { window.location.href = url }
+
+                                              // start a short poll to auto-detect successful sign-in
+                                              let attempts = 0
+                                              const max = 15 // ~30s with 2s interval
+                                              const iv = setInterval(async () => {
+                                                attempts++
+                                                try {
+                                                  const ck = await fetch('/api/debug/cookies', { credentials: 'include' })
+                                                  const cjson = await ck.json()
+                                                  if (cjson && cjson.ok && Object.keys(cjson.cookies || {}).length > 0) {
+                                                    // try userinfo now
+                                                    const ui = await fetch('/api/portal/userinfo', { credentials: 'include' })
+                                                    if (ui.ok) {
+                                                      try { const uj = await ui.json(); setPortalDebug({ ok: true, status: ui.status, payload: uj }) } catch (e) {}
+                                                      // refresh page state
+                                                      try { await refetchProfile() } catch (e) {}
+                                                      try {
+                                                        const rt = await fetch('/api/timetable', { credentials: 'include' })
+                                                        if (rt.ok) {
+                                                          const td = await rt.json()
+                                                          setTimetable(td.timetable || [])
+                                                          if (td.student) {
+                                                            if (td.student.name) setStudentName(td.student.name)
+                                                            else if (td.student.givenName) setStudentName(`${td.student.givenName} ${td.student.surname || ''}`)
+                                                          }
+                                                        }
+                                                      } catch (e) {}
+                                                      clearInterval(iv)
+                                                      return
+                                                    }
+                                                  }
+                                                } catch (e) {
+                                                  // ignore
+                                                }
+                                                if (attempts >= max) clearInterval(iv)
+                                              }, 2000)
+                                            }}
+                                          >
+                                            Open IdP login
+                                          </button>
+                                        </div>
                                       </div>
 
                                       {handshakeError && <div className="text-red-500 mt-2 text-xs">{handshakeError}</div>}

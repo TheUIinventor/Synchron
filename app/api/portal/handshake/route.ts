@@ -60,7 +60,37 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2) Prepare forwarded Set-Cookie values (strip Domain) and compute combined Cookie header
+    // 2) As a follow-up, try fetching any captured redirect locations (resume links)
+    //    using the cookies we collected so far — some SPs finish the session only
+    //    after the browser hits the resume URL. Collect any additional Set-Cookie
+    //    headers produced by these requests.
+    try {
+      let followCookieHeader = collectedSetCookies.map(stripDomain).map(s => s.split(/;\s*/)[0]).filter(Boolean).join('; ')
+      for (const loc of locations) {
+        try {
+          const url = new URL(loc, loginUrl).toString()
+          const r = await fetch(url, { headers: { ...HEADERS, Cookie: [followCookieHeader, incomingCookies].filter(Boolean).join('; ') }, redirect: 'manual' })
+          const sc = r.headers.get('set-cookie')
+          if (sc) {
+            const parts: string[] = sc.split(/,(?=[^ ;]+=)/g).map((s: string) => s.trim()).filter(Boolean)
+            for (const p of parts) collectedSetCookies.push(p)
+          }
+          const nxt = r.headers.get('location')
+          if (nxt) {
+            // add to locations so we can attempt that as well
+            locations.push(nxt)
+          }
+          // update followCookieHeader for next iteration
+          followCookieHeader = collectedSetCookies.map(stripDomain).map((s: string) => s.split(/;\s*/)[0]).filter(Boolean).join('; ')
+        } catch (e) {
+          // ignore per-location errors
+        }
+      }
+    } catch (e) {
+      // swallow follow-up errors
+    }
+
+    // 3) Prepare forwarded Set-Cookie values (strip Domain) and compute combined Cookie header
     const forwardedCookies: string[] = collectedSetCookies.map(stripDomain)
     const combinedCookieHeader = forwardedCookies.map(s => s.split(/;\s*/)[0]).filter(Boolean).concat(incomingCookies ? [incomingCookies] : []).join('; ')
     const probePaths = ['/details/userinfo.json', '/notices', '/awards', '/timetable']
