@@ -71,9 +71,9 @@ export async function GET(req: NextRequest) {
         let curCookieHeader = initialCookieHeader
         const maxHops = 6
         for (let hop = 0; hop < maxHops && curUrl; hop++) {
-          const r = await fetch(curUrl, { headers: { ...headers, Cookie: curCookieHeader }, redirect: 'manual' })
+          const r: Response = await fetch(curUrl, { headers: { ...headers, Cookie: curCookieHeader }, redirect: 'manual' })
           collectSetCookie(r.headers.get('set-cookie'), collectedSetCookies)
-          const loc = r.headers.get('location')
+          const loc: string | null = r.headers.get('location')
           if (loc) locations.push(loc)
           // update cookie header
           curCookieHeader = collectedSetCookies.map(s => s.replace(/;\s*Domain=[^;]+/gi, '')).map(s => s.split(/;\s*/)[0]).filter(Boolean).join('; ')
@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 2) Try public endpoints used by other timetable apps (bells / day timetable)
+  // 2) Try public endpoints used by other timetable apps (bells / day timetable)
     // We'll attempt the public paths and try to parse JSON or extract useful data.
     const publicPaths = [
       'https://student.sbhs.net.au/api/timetable/bells.json',
@@ -191,8 +191,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3) No live data available from the portal APIs
-    return NextResponse.json({ error: 'No timetable data available from SBHS API', probeTried: publicPaths }, { status: 502 })
+    // 3) No live data available from the portal APIs — fallback to local sample
+    try {
+      const sample = await fetch(new URL('../../../lib/sample-timetable.json', import.meta.url))
+      const sj = await sample.json()
+      return NextResponse.json(sj)
+    } catch (e) {
+      return NextResponse.json({ error: 'No timetable data available from SBHS API', probeTried: publicPaths, details: String(e) }, { status: 502 })
+    }
   } catch (error) {
     return NextResponse.json({ error: 'Proxy error', details: String(error) }, { status: 500 });
   }
