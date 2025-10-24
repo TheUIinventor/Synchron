@@ -229,36 +229,161 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Try to fetch external timetable on mount
   useEffect(() => {
     let cancelled = false
-    async function loadExternal() {
+    // Helper: attempt to parse timetable HTML into per-day map
+    function parseTimetableHtml(html: string): Record<string, Period[]> {
+      const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
       try {
-        const r = await fetch('/api/timetable', { credentials: 'include' })
-        if (!r.ok) return
-        const j = await r.json()
-        // Expect j.timetable as either an array or a per-day map
-        if (j == null) return
-        // If j.timetable is an object keyed by day, use it directly
-        if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
-          if (!cancelled) {
-            setExternalTimetable(j.timetable)
-            setTimetableSource(j.source ?? 'external')
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(html, 'text/html')
+
+        // 1) Look for sections with day headings followed by a table
+        const headings = Array.from(doc.querySelectorAll('h2, h3, h4'))
+        const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        for (const h of headings) {
+          const text = (h.textContent || '').trim()
+          const matched = dayNames.find((d) => text.toLowerCase().includes(d.toLowerCase()))
+          if (matched) {
+            // try to find next table sibling
+            let next: Element | null = h.nextElementSibling
+            while (next && next.tagName.toLowerCase() !== 'table') next = next.nextElementSibling
+            if (next && next.tagName.toLowerCase() === 'table') {
+              const rows = Array.from(next.querySelectorAll('tr'))
+              for (let i = 0; i < rows.length; i++) {
+                const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
+                if (cols.length >= 3) {
+                  byDay[matched].push({ period: cols[0] || '', time: cols[1] || '', subject: cols[2] || '', teacher: cols[3] || '' , room: cols[4] || '' })
+                }
+              }
+            }
           }
-          return
         }
-        // If j.timetable is an array, try to convert it into per-day buckets by 'day' or 'date' field
-        if (Array.isArray(j.timetable)) {
-          const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-          for (const p of j.timetable) {
-            const day = p.day || p.weekday || 'Monday'
-            if (!byDay[day]) byDay[day] = []
-            byDay[day].push(p)
-          }
-          if (!cancelled) {
-            setExternalTimetable(byDay)
-            setTimetableSource(j.source ?? 'external')
+
+        // 2) If no per-day tables found, look for a table with class 'timetable' or first table and attempt to parse rows
+        const anyHasData = Object.values(byDay).some((arr) => arr.length > 0)
+        if (!anyHasData) {
+          const table = doc.querySelector('table.timetable, table[class*=timetable], .timetable table, table')
+          if (table) {
+            const rows = Array.from(table.querySelectorAll('tr'))
+            // Try to detect a day column in the table header
+            const headerCols = Array.from(table.querySelectorAll('tr:first-child th, tr:first-child td')).map((h) => (h.textContent || '').toLowerCase())
+            const hasDayCol = headerCols.some((h) => /day|weekday|date/.test(h))
+            for (let i = 1; i < rows.length; i++) {
+              const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
+              if (cols.length >= 3) {
+                let day = 'Monday'
+                if (hasDayCol) {
+                  const dayCell = cols[0]
+                  const matched = dayNames.find((d) => dayCell.toLowerCase().includes(d.toLowerCase()))
+                  if (matched) day = matched
+                } else {
+                  // Best-effort: assign to current day
+                  day = getCurrentDay()
+                }
+                byDay[day].push({ period: cols[0] || '', time: cols[1] || '', subject: cols[2] || '', teacher: cols[3] || '' , room: cols[4] || '' })
+              }
+            }
           }
         }
       } catch (e) {
-        // ignore
+        // parsing failed; return empty map
+      }
+      return byDay
+    }
+
+    async function loadExternal() {
+      try {
+        const maxAttempts = 3
+        let attempt = 0
+        const wait = (ms: number) => new Promise((res) => setTimeout(res, ms))
+
+        while (attempt < maxAttempts && !cancelled) {
+          // Probe userinfo to check if session is authenticated
+          let userinfoOk = false
+          try {
+            const ui = await fetch('/api/portal/userinfo', { credentials: 'include' })
+            const ctype = ui.headers.get('content-type') || ''
+            if (ui.ok && ctype.includes('application/json')) {
+              userinfoOk = true
+            }
+          } catch (e) {
+            // ignore and proceed to handshake
+          }
+
+          // Try to fetch timetable if userinfo looked good
+          if (userinfoOk) {
+            try {
+              const r = await fetch('/api/timetable', { credentials: 'include' })
+              const rctype = r.headers.get('content-type') || ''
+
+              // If timetable endpoint returned JSON, use it
+              if (r.ok && rctype.includes('application/json')) {
+                const j = await r.json()
+                if (j == null) return
+                // If j.timetable is an object keyed by day, use it directly
+                if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+                  if (!cancelled) {
+                    setExternalTimetable(j.timetable)
+                    setTimetableSource(j.source ?? 'external')
+                  }
+                  return
+                }
+                // If j.timetable is an array, convert into per-day buckets
+                if (Array.isArray(j.timetable)) {
+                  const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                  for (const p of j.timetable) {
+                    const day = p.day || p.weekday || 'Monday'
+                    if (!byDay[day]) byDay[day] = []
+                    byDay[day].push(p)
+                  }
+                  if (!cancelled) {
+                    setExternalTimetable(byDay)
+                    setTimetableSource(j.source ?? 'external')
+                  }
+                  return
+                }
+              }
+
+              // If response is HTML (login page or scraped timetable), try to parse it client-side
+              if (r.ok && rctype.includes('text/html')) {
+                const text = await r.text()
+                const parsed = parseTimetableHtml(text)
+                const hasData = Object.values(parsed).some((arr) => arr.length > 0)
+                if (hasData && !cancelled) {
+                  setExternalTimetable(parsed)
+                  setTimetableSource('external-scraped')
+                  return
+                }
+              }
+            } catch (e) {
+              // fallthrough to handshake below
+            }
+          }
+
+          // If we reach here, either userinfo wasn't authenticated or timetable returned non-json (likely HTML login)
+          // Run server-side handshake to try to set cookies for this browser session, then wait and retry
+          try {
+            // POST initiates a handshake which attempts to set cookies on the response
+            await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
+          } catch (e) {
+            // ignore handshake errors
+          }
+
+          attempt += 1
+          // Wait briefly for cookies to be persisted by browser, then retry
+          await wait(1200)
+        }
+
+        // After attempts exhausted, fall back to bundled sample data
+        if (!cancelled) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+        }
+      } catch (e) {
+        // Ensure we still fall back if something unexpected happens
+        if (!cancelled) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+        }
       }
     }
     loadExternal()
@@ -321,6 +446,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         nextPeriodInfo: currentMomentPeriodInfo,
         bellTimes: bellTimesData,
         isShowingNextDay,
+        timetableSource,
       }}
     >
       {children}
@@ -336,3 +462,4 @@ export function useTimetable() {
   }
   return context
 }
+

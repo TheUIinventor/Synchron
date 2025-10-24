@@ -13,7 +13,7 @@ export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, setCurrentWeek, timetableData } = useTimetable()
+  const { currentWeek, setCurrentWeek, timetableData, timetableSource } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -112,6 +112,32 @@ export default function TimetablePage() {
             <ChevronLeft className="h-6 w-6" />
           </Link>
           <h1 className="text-lg font-bold text-left md:text-center md:flex-1">My Synchron</h1>
+          {/* Data source badge and manual refresh */}
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+              {timetableSource === 'fallback-sample' ? (
+                <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">Using sample data</span>
+              ) : timetableSource ? (
+                <span className="px-2 py-1 rounded-full bg-green-100 text-green-800">Live data</span>
+              ) : null}
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  // Trigger server handshake to attempt to establish session cookies, then reload the page so provider retries
+                  await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
+                } catch (e) {
+                  // ignore
+                }
+                // Reload so TimetableProvider re-runs its loadExternal flow
+                window.location.reload()
+              }}
+              className="hidden md:inline-flex px-3 py-1 rounded-full glass-card text-sm"
+              title="Try to refresh live timetable (will attempt handshake then reload)"
+            >
+              Refresh
+            </button>
+          </div>
           <div className="w-6"></div>
         </div>
 
