@@ -13,7 +13,7 @@ export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, setCurrentWeek, timetableData, timetableSource } = useTimetable()
+  const { currentWeek, setCurrentWeek, timetableData, timetableSource, refreshExternal } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -124,16 +124,13 @@ export default function TimetablePage() {
             <button
               onClick={async () => {
                 try {
-                  // Trigger server handshake to attempt to establish session cookies, then reload the page so provider retries
-                  await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
+                  if (refreshExternal) await refreshExternal()
                 } catch (e) {
-                  // ignore
+                  // ignore user-facing errors here — provider will fall back to sample if needed
                 }
-                // Reload so TimetableProvider re-runs its loadExternal flow
-                window.location.reload()
               }}
               className="hidden md:inline-flex px-3 py-1 rounded-full glass-card text-sm"
-              title="Try to refresh live timetable (will attempt handshake then reload)"
+              title="Retry loading live timetable"
             >
               Refresh
             </button>

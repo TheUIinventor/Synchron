@@ -35,6 +35,10 @@ export async function GET(req: NextRequest) {
           }
           return NextResponse.json(data)
         } catch (e) {
+          // If the endpoint returned HTML (login page or an HTML timetable), forward the HTML
+          if (text && text.trim().startsWith('<')) {
+            return new NextResponse(text, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+          }
           // fallthrough to other strategies
         }
       }
@@ -57,8 +61,11 @@ export async function GET(req: NextRequest) {
           const data = JSON.parse(t)
           return NextResponse.json({ ...data, source: 'public:' + p })
         } catch (e) {
-          // if text looks like HTML, skip
-          if (t && t.trim().startsWith('<')) continue
+          // If the public path returned JSON-like text but couldn't parse, skip
+          // If the public path returned HTML (possibly the portal login or an HTML timetable), forward the HTML so the client can attempt to scrape it
+          if (t && t.trim().startsWith('<')) {
+            return new NextResponse(t, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+          }
         }
       } catch (e) {
         // ignore and try next

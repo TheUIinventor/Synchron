@@ -229,23 +229,72 @@ export default function HomeClient() {
         const response = await fetch("/api/timetable", {
           credentials: "include"
         });
-        if (!response.ok) throw new Error("Failed to fetch timetable");
-        const data = await response.json();
-        console.log("Timetable API response:", data); // Debug log
-        setTimetable(data.timetable || []);
-        // Extract student name from API response
-        if (data.student) {
-          console.log("Student object:", data.student); // Debug log
-          if (data.student.name) {
-            setStudentName(data.student.name);
-          } else if (data.student.givenName && data.student.surname) {
-            setStudentName(`${data.student.givenName} ${data.student.surname}`);
+
+        const ctype = response.headers.get('content-type') || ''
+
+        if (!response.ok) {
+          // If server returned HTML but with non-OK status, try to read text and attempt to parse
+          if (ctype.includes('text/html')) {
+            const text = await response.text()
+            // Attempt to parse timetable HTML client-side
+            try {
+              const parser = new DOMParser()
+              const doc = parser.parseFromString(text, 'text/html')
+              const table = doc.querySelector('table.timetable, table[class*=timetable], .timetable table, table')
+              if (table) {
+                const rows = Array.from(table.querySelectorAll('tr'))
+                const parsed: any[] = []
+                for (let i = 1; i < rows.length; i++) {
+                  const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
+                  if (cols.length >= 3) {
+                    parsed.push({ period: cols[0], time: cols[1], subject: cols[2], teacher: cols[3] || '', room: cols[4] || '' })
+                  }
+                }
+                setTimetable(parsed)
+                setTimetableLoading(false)
+                return
+              }
+            } catch (e) {
+              // fallthrough to error
+            }
           }
+          throw new Error("Failed to fetch timetable")
+        }
+
+        if (ctype.includes('application/json')) {
+          const data = await response.json()
+          console.log("Timetable API response:", data)
+          setTimetable(data.timetable || [])
+          if (data.student) {
+            if (data.student.name) setStudentName(data.student.name)
+            else if (data.student.givenName && data.student.surname) setStudentName(`${data.student.givenName} ${data.student.surname}`)
+          }
+        } else if (ctype.includes('text/html')) {
+          const text = await response.text()
+          // Attempt to parse timetable HTML client-side
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(text, 'text/html')
+          const table = doc.querySelector('table.timetable, table[class*=timetable], .timetable table, table')
+          if (table) {
+            const rows = Array.from(table.querySelectorAll('tr'))
+            const parsed: any[] = []
+            for (let i = 1; i < rows.length; i++) {
+              const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
+              if (cols.length >= 3) {
+                parsed.push({ period: cols[0], time: cols[1], subject: cols[2], teacher: cols[3] || '', room: cols[4] || '' })
+              }
+            }
+            setTimetable(parsed)
+          } else {
+            throw new Error('No timetable table found in HTML')
+          }
+        } else {
+          throw new Error('Unexpected timetable response type')
         }
       } catch (err) {
-        setTimetableError(err instanceof Error ? err.message : "Unknown error");
+        setTimetableError(err instanceof Error ? err.message : "Unknown error")
       } finally {
-        setTimetableLoading(false);
+        setTimetableLoading(false)
       }
     }
     fetchTimetable();
