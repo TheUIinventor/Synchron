@@ -137,6 +137,41 @@ export default function TimetablePage() {
           </div>
           <div className="w-6"></div>
         </div>
+        {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
+        {timetableSource === 'fallback-sample' && (
+          <div className="w-full px-4 mt-4">
+            <Card className="one-ui-card p-3 mb-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium">Can't load your live timetable</div>
+                  <div className="text-sm text-gray-500">Sign in to the SBHS Portal and then click Retry to load your live timetable.</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => window.open('https://student.sbhs.net.au/auth/login', '_blank')}
+                    className="rounded-full"
+                  >
+                    Sign in to portal
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        if (refreshExternal) await refreshExternal()
+                      } catch (e) {
+                        // ignore — provider will fall back to sample if needed
+                      }
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* View Mode Toggle */}
         <div className="flex justify-center mb-6">
