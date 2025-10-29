@@ -32,20 +32,34 @@ export async function GET(req: NextRequest) {
   if (incomingCookie) baseHeaders['Cookie'] = incomingCookie
   if (accessToken) baseHeaders['Authorization'] = `Bearer ${accessToken}`
 
-  // Helper to fetch JSON or detect HTML
+  // Helper: follow a small chain of redirects to get a final body we can inspect (HTML login or JSON)
   async function getJson(path: string) {
     const sep = path.includes('?') ? '&' : '?'
-    const full = dateParam ? `${path}${sep}date=${encodeURIComponent(dateParam)}` : path
-    const r = await fetch(full, { headers: baseHeaders, redirect: 'manual' })
-    const text = await r.text()
-    const ctype = r.headers.get('content-type') || ''
+    let nextUrl = dateParam ? `${path}${sep}date=${encodeURIComponent(dateParam)}` : path
+    let response: Response | null = null
+    for (let i = 0; i < 5; i++) {
+      response = await fetch(nextUrl, { headers: baseHeaders, redirect: 'manual' })
+      const code = response.status
+      if ([301, 302, 303, 307, 308].includes(code)) {
+        const loc = response.headers.get('location')
+        if (loc) {
+          // resolve relative redirects
+          try { nextUrl = new URL(loc, nextUrl).toString() } catch { nextUrl = loc }
+          continue
+        }
+      }
+      break
+    }
+    if (!response) return { ok: false, status: 0, text: '' }
+    const text = await response.text()
+    const ctype = response.headers.get('content-type') || ''
     if (ctype.includes('application/json')) {
-      try { return { ok: r.ok, json: JSON.parse(text), status: r.status } } catch { /* fallthrough */ }
+      try { return { ok: response.ok, json: JSON.parse(text), status: response.status } } catch { /* fallthrough */ }
     }
     if (text && text.trim().startsWith('<')) {
-      return { ok: false, html: text, status: r.status }
+      return { ok: false, html: text, status: response.status }
     }
-    return { ok: r.ok, text, status: r.status }
+    return { ok: response.ok, text, status: response.status }
   }
 
   try {
