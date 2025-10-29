@@ -39,11 +39,7 @@ export default function HomeClient() {
   useEffect(() => {
     prefetchNotices();
   }, []);
-  // Timetable API integration
-  const [timetable, setTimetable] = useState<any[]>([]);
-  const [studentName, setStudentName] = useState<string>("");
-  const [timetableLoading, setTimetableLoading] = useState(true);
-  const [timetableError, setTimetableError] = useState<string | null>(null);
+  // Timetable preview derives from TimetableContext; no direct API calls here
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
 
@@ -139,20 +135,7 @@ export default function HomeClient() {
             try { await refetchProfile() } catch (e) { /* ignore */ }
           }
 
-          // Also re-fetch timetable so the UI updates if handshake restored session
-          try {
-            const rt = await fetch('/api/timetable', { credentials: 'include' })
-            if (rt.ok) {
-              const td = await rt.json()
-              setTimetable(td.timetable || [])
-              if (td.student) {
-                if (td.student.name) setStudentName(td.student.name)
-                else if (td.student.givenName && td.student.surname) setStudentName(`${td.student.givenName} ${td.student.surname}`)
-              }
-            }
-          } catch (e) {
-            // ignore timetable re-fetch errors here
-          }
+          // Note: Timetable preview on home now derives from TimetableContext; no direct fetch here
 
         } catch (e) {
           setPortalDebug((prev: any) => ({ ...(prev || {}), refreshAttempted: true, refreshError: String(e) }))
@@ -221,84 +204,12 @@ export default function HomeClient() {
     }
   }, [profileData, displayName])
 
-  useEffect(() => {
-    async function fetchTimetable() {
-      setTimetableLoading(true);
-      setTimetableError(null);
-      try {
-        const response = await fetch("/api/timetable", {
-          credentials: "include"
-        });
-
-        const ctype = response.headers.get('content-type') || ''
-
-        if (!response.ok) {
-          // If server returned HTML but with non-OK status, try to read text and attempt to parse
-          if (ctype.includes('text/html')) {
-            const text = await response.text()
-            // Attempt to parse timetable HTML client-side
-            try {
-              const parser = new DOMParser()
-              const doc = parser.parseFromString(text, 'text/html')
-              const table = doc.querySelector('table.timetable, table[class*=timetable], .timetable table, table')
-              if (table) {
-                const rows = Array.from(table.querySelectorAll('tr'))
-                const parsed: any[] = []
-                for (let i = 1; i < rows.length; i++) {
-                  const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
-                  if (cols.length >= 3) {
-                    parsed.push({ period: cols[0], time: cols[1], subject: cols[2], teacher: cols[3] || '', room: cols[4] || '' })
-                  }
-                }
-                setTimetable(parsed)
-                setTimetableLoading(false)
-                return
-              }
-            } catch (e) {
-              // fallthrough to error
-            }
-          }
-          throw new Error("Failed to fetch timetable")
-        }
-
-        if (ctype.includes('application/json')) {
-          const data = await response.json()
-          console.log("Timetable API response:", data)
-          setTimetable(data.timetable || [])
-          if (data.student) {
-            if (data.student.name) setStudentName(data.student.name)
-            else if (data.student.givenName && data.student.surname) setStudentName(`${data.student.givenName} ${data.student.surname}`)
-          }
-        } else if (ctype.includes('text/html')) {
-          const text = await response.text()
-          // Attempt to parse timetable HTML client-side
-          const parser = new DOMParser()
-          const doc = parser.parseFromString(text, 'text/html')
-          const table = doc.querySelector('table.timetable, table[class*=timetable], .timetable table, table')
-          if (table) {
-            const rows = Array.from(table.querySelectorAll('tr'))
-            const parsed: any[] = []
-            for (let i = 1; i < rows.length; i++) {
-              const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
-              if (cols.length >= 3) {
-                parsed.push({ period: cols[0], time: cols[1], subject: cols[2], teacher: cols[3] || '', room: cols[4] || '' })
-              }
-            }
-            setTimetable(parsed)
-          } else {
-            throw new Error('No timetable table found in HTML')
-          }
-        } else {
-          throw new Error('Unexpected timetable response type')
-        }
-      } catch (err) {
-        setTimetableError(err instanceof Error ? err.message : "Unknown error")
-      } finally {
-        setTimetableLoading(false)
-      }
-    }
-    fetchTimetable();
-  }, []);
+  // Timetable: derive today's periods from context (no API calls in this component)
+  const { selectedDay, timetableData } = useTimetable()
+  const todaysPeriods = useMemo(() => {
+    const day = selectedDay || getCurrentDay()
+    return (timetableData?.[day] ?? []) as any[]
+  }, [selectedDay, timetableData])
 
   const getDisplaySubject = useCallback((period: any) => {
     if (period.type === "break") {
@@ -308,7 +219,7 @@ export default function HomeClient() {
   }, []);
 
   const renderedPeriods = useMemo(() => {
-    return timetable.map((period, idx) => (
+    return todaysPeriods.map((period, idx) => (
       <div
         key={period.id || idx}
         className={`rounded-xl p-2 transition-colors duration-200 will-change-auto ${
@@ -326,7 +237,7 @@ export default function HomeClient() {
         </div>
       </div>
     ));
-  }, [timetable, getDisplaySubject]);
+  }, [todaysPeriods, getDisplaySubject]);
 
   if (!mounted) {
     return (
@@ -389,8 +300,6 @@ export default function HomeClient() {
                     const first = maybeGiven.split(/\s+/)[0]
                     return `Welcome Back, ${first}!`
                   }
-
-                  if (studentName) return `Welcome, ${studentName}!`
 
                   if (attemptingRefresh) {
                     return (
@@ -573,17 +482,6 @@ export default function HomeClient() {
                                                       try { const uj = await ui.json(); setPortalDebug({ ok: true, status: ui.status, payload: uj }) } catch (e) {}
                                                       // refresh page state
                                                       try { await refetchProfile() } catch (e) {}
-                                                      try {
-                                                        const rt = await fetch('/api/timetable', { credentials: 'include' })
-                                                        if (rt.ok) {
-                                                          const td = await rt.json()
-                                                          setTimetable(td.timetable || [])
-                                                          if (td.student) {
-                                                            if (td.student.name) setStudentName(td.student.name)
-                                                            else if (td.student.givenName) setStudentName(`${td.student.givenName} ${td.student.surname || ''}`)
-                                                          }
-                                                        }
-                                                      } catch (e) {}
                                                       clearInterval(iv)
                                                       return
                                                     }
@@ -683,15 +581,7 @@ export default function HomeClient() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate()} • {getCurrentDay()}</p>
               </div>
             </div>
-            {timetableLoading ? (
-              <div className="card-optimized rounded-xl p-6 text-center">
-                <p className="text-gray-500 dark:text-gray-400">Loading timetable...</p>
-              </div>
-            ) : timetableError ? (
-              <div className="card-optimized rounded-xl p-6 text-center">
-                <p className="text-red-500">Error loading timetable: {timetableError}</p>
-              </div>
-            ) : timetable.length > 0 ? (
+            {todaysPeriods.length > 0 ? (
               <div className="space-y-1.5 contain-layout">{renderedPeriods}</div>
             ) : (
               <div className="card-optimized rounded-xl p-6 text-center">
