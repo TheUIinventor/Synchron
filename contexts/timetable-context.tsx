@@ -299,79 +299,58 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const wait = (ms: number) => new Promise((res) => setTimeout(res, ms))
 
         while (attempt < maxAttempts && !cancelled) {
-          // Probe userinfo to check if session is authenticated
-          let userinfoOk = false
           try {
-            const ui = await fetch('/api/portal/userinfo', { credentials: 'include' })
-            const ctype = ui.headers.get('content-type') || ''
-            if (ui.ok && ctype.includes('application/json')) {
-              userinfoOk = true
+            const r = await fetch('/api/timetable', { credentials: 'include' })
+            const rctype = r.headers.get('content-type') || ''
+
+            // If timetable endpoint returned JSON, use it
+            if (rctype.includes('application/json')) {
+              const j = await r.json()
+              if (j == null) return
+              if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+                if (!cancelled) {
+                  setExternalTimetable(j.timetable)
+                  setTimetableSource(j.source ?? 'external')
+                }
+                return
+              }
+              if (Array.isArray(j.timetable)) {
+                const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                for (const p of j.timetable) {
+                  const day = p.day || p.weekday || 'Monday'
+                  if (!byDay[day]) byDay[day] = []
+                  byDay[day].push(p)
+                }
+                if (!cancelled) {
+                  setExternalTimetable(byDay)
+                  setTimetableSource(j.source ?? 'external')
+                }
+                return
+              }
+            }
+
+            // If response is HTML (login page or HTML timetable), try to parse it client-side — even if status is not OK
+            if (rctype.includes('text/html')) {
+              const text = await r.text()
+              const parsed = parseTimetableHtml(text)
+              const hasData = Object.values(parsed).some((arr) => arr.length > 0)
+              if (hasData && !cancelled) {
+                setExternalTimetable(parsed)
+                setTimetableSource('external-scraped')
+                return
+              }
             }
           } catch (e) {
-            // ignore and proceed to handshake
+            // ignore fetch errors and proceed to handshake
           }
 
-          // Try to fetch timetable if userinfo looked good
-          if (userinfoOk) {
-            try {
-              const r = await fetch('/api/timetable', { credentials: 'include' })
-              const rctype = r.headers.get('content-type') || ''
-
-              // If timetable endpoint returned JSON, use it
-              if (r.ok && rctype.includes('application/json')) {
-                const j = await r.json()
-                if (j == null) return
-                // If j.timetable is an object keyed by day, use it directly
-                if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
-                  if (!cancelled) {
-                    setExternalTimetable(j.timetable)
-                    setTimetableSource(j.source ?? 'external')
-                  }
-                  return
-                }
-                // If j.timetable is an array, convert into per-day buckets
-                if (Array.isArray(j.timetable)) {
-                  const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                  for (const p of j.timetable) {
-                    const day = p.day || p.weekday || 'Monday'
-                    if (!byDay[day]) byDay[day] = []
-                    byDay[day].push(p)
-                  }
-                  if (!cancelled) {
-                    setExternalTimetable(byDay)
-                    setTimetableSource(j.source ?? 'external')
-                  }
-                  return
-                }
-              }
-
-              // If response is HTML (login page or scraped timetable), try to parse it client-side
-              if (r.ok && rctype.includes('text/html')) {
-                const text = await r.text()
-                const parsed = parseTimetableHtml(text)
-                const hasData = Object.values(parsed).some((arr) => arr.length > 0)
-                if (hasData && !cancelled) {
-                  setExternalTimetable(parsed)
-                  setTimetableSource('external-scraped')
-                  return
-                }
-              }
-            } catch (e) {
-              // fallthrough to handshake below
-            }
-          }
-
-          // If we reach here, either userinfo wasn't authenticated or timetable returned non-json (likely HTML login)
-          // Run server-side handshake to try to set cookies for this browser session, then wait and retry
+          // Attempt a handshake to establish session cookies, then retry
           try {
-            // POST initiates a handshake which attempts to set cookies on the response
             await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
           } catch (e) {
             // ignore handshake errors
           }
-
           attempt += 1
-          // Wait briefly for cookies to be persisted by browser, then retry
           await wait(1200)
         }
 
@@ -381,7 +360,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           setTimetableSource('fallback-sample')
         }
       } catch (e) {
-        // Ensure we still fall back if something unexpected happens
         if (!cancelled) {
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
@@ -461,45 +439,43 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // ignore
       }
 
-      if (userinfoOk) {
-        try {
-          const r = await fetch('/api/timetable', { credentials: 'include' })
-          const rctype = r.headers.get('content-type') || ''
-          if (r.ok && rctype.includes('application/json')) {
-            const j = await r.json()
-            if (j && j.timetable) {
-              if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
-                setExternalTimetable(j.timetable)
-                setTimetableSource(j.source ?? 'external')
-                return
-              }
-              if (Array.isArray(j.timetable)) {
-                const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                for (const p of j.timetable) {
-                  const day = p.day || p.weekday || 'Monday'
-                  if (!byDay[day]) byDay[day] = []
-                  byDay[day].push(p)
-                }
-                setExternalTimetable(byDay)
-                setTimetableSource(j.source ?? 'external')
-                return
-              }
+      // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
+      try {
+        const r = await fetch('/api/timetable', { credentials: 'include' })
+        const rctype = r.headers.get('content-type') || ''
+        if (rctype.includes('application/json')) {
+          const j = await r.json()
+          if (j && j.timetable) {
+            if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+              setExternalTimetable(j.timetable)
+              setTimetableSource(j.source ?? 'external')
+              return
             }
-          }
-
-          if (r.ok && rctype.includes('text/html')) {
-            const text = await r.text()
-            const parsed = parseTimetableHtmlLocal(text)
-            const hasData = Object.values(parsed).some((arr) => arr.length > 0)
-            if (hasData) {
-              setExternalTimetable(parsed)
-              setTimetableSource('external-scraped')
+            if (Array.isArray(j.timetable)) {
+              const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+              for (const p of j.timetable) {
+                const day = p.day || p.weekday || 'Monday'
+                if (!byDay[day]) byDay[day] = []
+                byDay[day].push(p)
+              }
+              setExternalTimetable(byDay)
+              setTimetableSource(j.source ?? 'external')
               return
             }
           }
-        } catch (e) {
-          // fallthrough to handshake
         }
+        if (rctype.includes('text/html')) {
+          const text = await r.text()
+          const parsed = parseTimetableHtmlLocal(text)
+          const hasData = Object.values(parsed).some((arr) => arr.length > 0)
+          if (hasData) {
+            setExternalTimetable(parsed)
+            setTimetableSource('external-scraped')
+            return
+          }
+        }
+      } catch (e) {
+        // fallthrough to handshake
       }
 
       // If not authenticated or no usable timetable, try handshake then refetch once
@@ -514,7 +490,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const r2 = await fetch('/api/timetable', { credentials: 'include' })
         const rctype2 = r2.headers.get('content-type') || ''
-        if (r2.ok && rctype2.includes('application/json')) {
+        if (rctype2.includes('application/json')) {
           const j = await r2.json()
           if (j && j.timetable) {
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
@@ -535,8 +511,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-
-        if (r2.ok && rctype2.includes('text/html')) {
+        if (rctype2.includes('text/html')) {
           const text = await r2.text()
           const parsed = parseTimetableHtmlLocal(text)
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
