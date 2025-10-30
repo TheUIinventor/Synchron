@@ -205,7 +205,7 @@ export default function HomeClient() {
   }, [profileData, displayName])
 
   // Timetable: derive today's periods from context (no API calls in this component)
-  const { selectedDay, timetableData } = useTimetable()
+  const { selectedDay, timetableData, timetableSource } = useTimetable() as any
   const todaysPeriods = useMemo(() => {
     const day = selectedDay || getCurrentDay()
     return (timetableData?.[day] ?? []) as any[]
@@ -324,7 +324,7 @@ export default function HomeClient() {
           ) : null}
 
           {/* Always-show diagnostic of the proxy endpoint so we can see why profileData may be empty */}
-                  {portalDebug ? (
+                  {portalDebug && (!timetableSource || timetableSource === 'fallback-sample') ? (
                     // If the proxy returned an HTML login page (401), show a friendly sign-in prompt
                     (() => {
                       const payload = portalDebug.payload || {}

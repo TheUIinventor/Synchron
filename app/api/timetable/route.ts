@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   if (incomingCookie) baseHeaders['Cookie'] = incomingCookie
   if (accessToken) baseHeaders['Authorization'] = `Bearer ${accessToken}`
 
-  // Helper: follow a small chain of redirects to get a final body we can inspect (HTML login or JSON)
+  // Helper: fetch JSON from either student portal or API host, following small redirect chains
   async function getJson(path: string) {
     const sep = path.includes('?') ? '&' : '?'
     let nextUrl = dateParam ? `${path}${sep}date=${encodeURIComponent(dateParam)}` : path
@@ -63,12 +63,29 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 1) Try day timetable first (today or requested date)
-    const dayRes = await getJson('https://student.sbhs.net.au/api/timetable/daytimetable.json')
-    // 2) Try complete timetable next
-    const fullRes = await getJson('https://student.sbhs.net.au/api/timetable/timetable.json')
-    // 3) Optionally get bells for nicer time ranges
-    const bellsRes = await getJson('https://student.sbhs.net.au/api/timetable/bells.json')
+    // Define candidate hosts and paths. If we have a bearer token, prefer the public API host as well.
+    const hosts = [
+      'https://student.sbhs.net.au',
+      'https://api.sbhs.net.au',
+    ]
+
+    let dayRes: any = null
+    let fullRes: any = null
+    let bellsRes: any = null
+
+    // Try each host until we get a JSON response
+    for (const host of hosts) {
+      const dr = await getJson(`${host}/api/timetable/daytimetable.json`)
+      const fr = await getJson(`${host}/api/timetable/timetable.json`)
+      const br = await getJson(`${host}/api/timetable/bells.json`)
+      // If any of these responded with JSON, adopt them and stop trying further hosts
+      if ((dr as any).json || (fr as any).json || (br as any).json) {
+        dayRes = dr; fullRes = fr; bellsRes = br
+        break
+      }
+      // Keep last responses for potential HTML forwarding below
+      dayRes = dr; fullRes = fr; bellsRes = br
+    }
 
     // If any returned HTML (likely login), forward that HTML so the client can handle
     if ((dayRes as any).html) {
