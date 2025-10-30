@@ -205,7 +205,7 @@ export default function HomeClient() {
   }, [profileData, displayName])
 
   // Timetable: derive today's periods from context (no API calls in this component)
-  const { selectedDay, timetableData, timetableSource } = useTimetable() as any
+  const { selectedDay, timetableData, timetableSource } = useTimetable()
   const todaysPeriods = useMemo(() => {
     const day = selectedDay || getCurrentDay()
     return (timetableData?.[day] ?? []) as any[]

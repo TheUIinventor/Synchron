@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Normalize a wide variety of SBHS API item shapes into our Period type
 function toPeriod(item: any) {
-  const start = item.start || item.timeStart || item.startTime || item.from || item.begin || ''
-  const end = item.end || item.timeEnd || item.finish || item.to || item.until || ''
+  const start = item.start || item.startTime || item.timeStart || item.from || item.begin || item.start_time || ''
+  const end = item.end || item.finish || item.timeEnd || item.endTime || item.end_time || item.to || item.until || ''
   const time = [start, end].filter(Boolean).join(' - ')
-  const subject = item.subject || item.class || item.title || item.name || 'Class'
-  const teacher = item.teacher || item.classTeacher || item.staff || item.teacherName || ''
-  const room = item.room || item.venue || item.location || ''
-  const period = String(item.period || item.p || item.block || item.name || '')
+  const subject = item.subject || item.subjectName || item.subject_name || item.class || item.title || item.name || 'Class'
+  const teacher = item.teacher || item.teacherName || item.teacher_name || item.classTeacher || item.staff || item.staffName || ''
+  const room = item.room || item.roomName || item.room_name || item.venue || item.location || ''
+  const period = String(item.period || item.p || item.block || item.lesson || item.lessonNumber || item.lesson_number || item.name || item.title || '')
   return { period, time, subject, teacher, room }
 }
 
@@ -25,9 +25,12 @@ export async function GET(req: NextRequest) {
   const incomingCookie = req.headers.get('cookie') || ''
 
   const baseHeaders: Record<string, string> = {
-    'Accept': 'application/json',
-    'User-Agent': 'Mozilla/5.0',
+    'Accept': 'application/json, text/javascript, */*; q=0.9',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Referer': 'https://student.sbhs.net.au/',
+    'Origin': 'https://student.sbhs.net.au',
+    'Accept-Language': 'en-AU,en;q=0.9',
+    'X-Requested-With': 'XMLHttpRequest',
   }
   if (incomingCookie) baseHeaders['Cookie'] = incomingCookie
   if (accessToken) baseHeaders['Authorization'] = `Bearer ${accessToken}`
@@ -101,17 +104,51 @@ export async function GET(req: NextRequest) {
     // If full timetable exists, prefer it to populate multiple days
     if (fullRes && (fullRes as any).json) {
       const j = (fullRes as any).json
-      // Attempt common shapes: j.days = { Monday: [...], ... } or j.timetable = {...}
-      const daysObj = j.days || j.timetable || j.week || null
-      if (daysObj && typeof daysObj === 'object') {
-        for (const key of Object.keys(byDay)) {
-          const arr = (daysObj[key] || daysObj[key.toLowerCase()] || []) as any[]
-          if (Array.isArray(arr)) byDay[key] = arr.map(toPeriod)
+      const dayNames = Object.keys(byDay)
+      const resolveDayKey = (input: any): string => {
+        if (!input) return dayNames[new Date().getDay()] || 'Monday'
+        const raw = typeof input === 'string' ? input : input.name || input.label || ''
+        if (!raw) return dayNames[new Date().getDay()] || 'Monday'
+        const lower = raw.toLowerCase()
+        const exact = dayNames.find(d => d.toLowerCase() === lower)
+        if (exact) return exact
+        const contains = dayNames.find(d => lower.includes(d.toLowerCase()))
+        if (contains) return contains
+        const asDate = new Date(raw)
+        if (!Number.isNaN(asDate.getTime())) {
+          const fromDate = asDate.toLocaleDateString('en-US', { weekday: 'long' })
+          if (dayNames.includes(fromDate)) return fromDate
         }
-      } else if (Array.isArray(j)) {
-        // If it is just an array, assume it is for today
-        const dow = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-        byDay[dow] = j.map(toPeriod)
+        return dayNames[new Date().getDay()] || 'Monday'
+      }
+
+      const assign = (dayKey: any, items: any[]) => {
+        if (!Array.isArray(items)) return
+        const normalizedKey = resolveDayKey(dayKey)
+        if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+        byDay[normalizedKey] = items.map(toPeriod)
+      }
+
+      const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
+      for (const obj of candidateObjects) {
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+          for (const [k, v] of Object.entries(obj)) {
+            if (Array.isArray(v)) assign(k, v)
+            else if (v && typeof v === 'object' && Array.isArray((v as any).periods)) assign(k, (v as any).periods)
+          }
+        }
+      }
+
+      const candidateArrays = [j.periods, j.entries, j.lessons, j.items, j.data, j.timetable, j.days, Array.isArray(j) ? j : null]
+      for (const arr of candidateArrays) {
+        if (Array.isArray(arr)) {
+          for (const item of arr) {
+            const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
+            const normalizedKey = resolveDayKey(dayField)
+            if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+            byDay[normalizedKey].push(toPeriod(item))
+          }
+        }
       }
     }
 
@@ -119,10 +156,12 @@ export async function GET(req: NextRequest) {
     if (dayRes && (dayRes as any).json) {
       const dj = (dayRes as any).json
       let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
+      if (!Array.isArray(arr) && dj?.day?.periods) arr = dj.day.periods
       if (!Array.isArray(arr)) arr = []
-      const dow = dateParam
-        ? new Date(dateParam).toLocaleDateString('en-US', { weekday: 'long' })
-        : new Date().toLocaleDateString('en-US', { weekday: 'long' })
+      const dowDate = dateParam ? new Date(dateParam) : new Date()
+      const dow = Number.isNaN(dowDate.getTime())
+        ? new Date().toLocaleDateString('en-US', { weekday: 'long' })
+        : dowDate.toLocaleDateString('en-US', { weekday: 'long' })
       byDay[dow] = arr.map(toPeriod)
     }
 

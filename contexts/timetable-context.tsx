@@ -361,6 +361,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
 
             const r = await fetch('/api/timetable', { credentials: 'include' })
+            if (r.status === 401) {
+              try {
+                await fetch('/api/auth/refresh', { credentials: 'include' })
+              } catch (e) {
+                // ignore refresh errors and continue to handshake fallback
+              }
+              attempt += 1
+              await wait(800)
+              continue
+            }
             const rctype = r.headers.get('content-type') || ''
 
             // If timetable endpoint returned JSON, use it
@@ -431,7 +441,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Expose a refresh function so UI can trigger a retry without reloading the page
-  async function refreshExternal() {
+  async function refreshExternal(attemptedRefresh = false): Promise<void> {
     // First try the server-scraped homepage endpoint
     try {
       const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
@@ -527,6 +537,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
       try {
         const r = await fetch('/api/timetable', { credentials: 'include' })
+        if (r.status === 401) {
+          if (!attemptedRefresh) {
+            try {
+              await fetch('/api/auth/refresh', { credentials: 'include' })
+            } catch (e) {
+              // ignore
+            }
+              return refreshExternal(true)
+          }
+        }
         const rctype = r.headers.get('content-type') || ''
         if (rctype.includes('application/json')) {
           const j = await r.json()
@@ -574,6 +594,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
       try {
         const r2 = await fetch('/api/timetable', { credentials: 'include' })
+        if (r2.status === 401) {
+          if (!attemptedRefresh) {
+            try {
+              await fetch('/api/auth/refresh', { credentials: 'include' })
+            } catch (e) {
+              // ignore
+            }
+              return refreshExternal(true)
+          }
+        }
         const rctype2 = r2.headers.get('content-type') || ''
         if (rctype2.includes('application/json')) {
           const j = await r2.json()
@@ -676,7 +706,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         bellTimes: bellTimesData,
         isShowingNextDay,
         timetableSource,
-        refreshExternal,
+  refreshExternal,
       }}
     >
       {children}
