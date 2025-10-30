@@ -45,7 +45,9 @@ export async function GET(req: NextRequest) {
     const access = data.access_token
     const refresh = data.refresh_token
     const expiresIn = data.expires_in || 3600
-    const res = NextResponse.redirect('/')
+  // Redirect back to app home with an absolute URL (relative URLs can throw in some runtimes)
+  const homeUrl = new URL('/', req.nextUrl.origin)
+  const res = NextResponse.redirect(homeUrl.toString())
     res.cookies.set('sbhs_access_token', access, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== 'development',
