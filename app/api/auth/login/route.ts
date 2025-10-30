@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
   // Prefer configured redirect; fallback to current origin + /auth/callback to ensure exact match
   const effectiveRedirect = redirectUri || `${req.nextUrl.origin}/auth/callback`
   url.searchParams.set('redirect_uri', effectiveRedirect)
-  // request refresh capability if supported; harmless if ignored by provider
-  url.searchParams.set('scope', 'read')
+  // SBHS commonly uses 'all-ro' scope for read-only access
+  url.searchParams.set('scope', 'all-ro')
   url.searchParams.set('state', state)
 
   const res = NextResponse.redirect(url.toString())

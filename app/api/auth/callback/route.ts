@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state')
   const savedState = req.cookies.get('sbhs_oauth_state')?.value
 
-  if (!code) return NextResponse.json({ error: 'Missing authorization code' }, { status: 400 })
+  if (!code) {
+    // If we got here without a code, bounce back to login to restart the flow (avoids blank JSON error page)
+    return NextResponse.redirect('/api/auth/login')
+  }
   if (savedState && state && state !== savedState) return NextResponse.json({ error: 'Invalid state' }, { status: 400 })
 
   const body = new URLSearchParams()
