@@ -228,68 +228,13 @@ class SBHSPortalClient {
   }
 
   async initiateLogin(): Promise<string> {
-    // Generate a state parameter for security
-    const state = Math.random().toString(36).substring(2, 15)
-    localStorage.setItem("sbhs_auth_state", state)
-
-    // Redirect URL back to our app
-    const redirectUri = `${window.location.origin}/auth/callback`
-
-    // Construct the portal login URL with redirect
-    const loginUrl = `${this.portalUrl}/login?redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
-
-    return loginUrl
+    // Delegate login to our server route which constructs the correct OAuth authorize URL
+    return '/api/auth/login'
   }
 
   async handleAuthCallback(code: string, state: string): Promise<ApiResponse<AuthTokens>> {
-    try {
-      // Verify state parameter
-      const storedState = localStorage.getItem("sbhs_auth_state")
-      if (state !== storedState) {
-        return {
-          success: false,
-          error: "Invalid authentication state",
-        }
-      }
-
-      // Exchange code for session
-      const response = await fetch(`${this.baseUrl}/auth/callback`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ code, state }),
-        credentials: "include",
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const tokens: AuthTokens = {
-          sessionId: data.sessionId,
-          csrfToken: data.csrfToken,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
-        }
-
-        this.sessionId = tokens.sessionId
-        this.csrfToken = tokens.csrfToken
-        this.saveSessionToStorage(tokens)
-
-        return {
-          success: true,
-          data: tokens,
-        }
-      }
-
-      return {
-        success: false,
-        error: "Authentication failed",
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Authentication error",
-      }
-    }
+    // No-op: server-side /auth/callback route handles token exchange and sets cookies
+    return { success: true, data: { sessionId: '', csrfToken: '', expiresAt: Date.now() } as any }
   }
 
   private clearSession() {

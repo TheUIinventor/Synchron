@@ -149,7 +149,9 @@ export default function TimetablePage() {
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    onClick={() => window.open('https://student.sbhs.net.au/auth/login', '_blank')}
+                    onClick={() => {
+                      try { window.location.href = '/api/auth/login' } catch { window.location.assign('/api/auth/login') }
+                    }}
                     className="rounded-full"
                   >
                     Sign in to portal

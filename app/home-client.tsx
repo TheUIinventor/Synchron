@@ -350,13 +350,7 @@ export default function HomeClient() {
                                       <button
                                         className="text-xs underline text-gray-600 dark:text-gray-300"
                                         onClick={() => {
-                                          // open the portal login which will redirect into the IdP
-                                          try {
-                                            window.open('https://student.sbhs.net.au/auth/login', '_blank')
-                                          } catch (e) {
-                                            // fallback to location change if popup blocked
-                                            window.location.href = 'https://student.sbhs.net.au/auth/login'
-                                          }
+                                          try { window.location.href = '/api/auth/login' } catch { window.location.assign('/api/auth/login') }
                                         }}
                                       >
                                         Open portal login

@@ -14,34 +14,8 @@ export function AuthButton() {
     if (isAuthenticated) {
       logout()
     } else {
-      // Otherwise, we need to handle the login process.
-      // We get the necessary environment variables for the URL.
-      const clientId = process.env.NEXT_PUBLIC_SBHS_APP_ID
-      const redirectUri = process.env.NODE_ENV === "development"
-        ? process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_LOCAL
-        : process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL
-
-      // We check if the required variables are set.
-      // Instead of an alert, which can be disruptive, we log an error to the console.
-      if (!clientId || !redirectUri) {
-        console.error("Authentication configuration error: App ID or Redirect URI is not configured.")
-        return
-      }
-      
-      // We'll use URLSearchParams to build the URL's query string.
-      // This is safer and more readable than manual string concatenation.
-      const params = new URLSearchParams({
-        response_type: "code",
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        scope: "all-ro"
-      });
-
-      // We construct the final authorization URL with the correct base and parameters.
-      const authUrl = `https://auth.sbhs.net.au/authorize?${params.toString()}`;
-
-      // This performs the redirect to the authorization server.
-      window.location.href = authUrl;
+      // Delegate to server route that builds the correct authorize URL and manages state cookie
+      window.location.href = '/api/auth/login'
     }
   }
 
