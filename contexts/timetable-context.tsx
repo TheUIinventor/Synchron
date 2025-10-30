@@ -300,6 +300,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
         while (attempt < maxAttempts && !cancelled) {
           try {
+            // Try the portal homepage first — many students have a timetable embedded on the homepage
+            try {
+              const hp = await fetch('/api/portal/homepage', { credentials: 'include' })
+              const hctype = hp.headers.get('content-type') || ''
+              if (hp.ok && hctype.includes('text/html')) {
+                const html = await hp.text()
+                const parsedHp = parseTimetableHtml(html)
+                const hasHp = Object.values(parsedHp).some((arr) => arr.length > 0)
+                if (hasHp && !cancelled) {
+                  setExternalTimetable(parsedHp)
+                  setTimetableSource('external-homepage')
+                  return
+                }
+              } else if (hctype.includes('application/json') && hp.ok) {
+                try {
+                  const jhp = await hp.json()
+                  if (jhp && jhp.timetable) {
+                    if (typeof jhp.timetable === 'object' && !Array.isArray(jhp.timetable)) {
+                      if (!cancelled) {
+                        setExternalTimetable(jhp.timetable)
+                        setTimetableSource(jhp.source ?? 'external-homepage')
+                      }
+                      return
+                    }
+                  }
+                } catch (e) {
+                  // ignore JSON parse errors
+                }
+              }
+            } catch (e) {
+              // ignore homepage fetch errors and fall back to /api/timetable below
+            }
+
             const r = await fetch('/api/timetable', { credentials: 'include' })
             const rctype = r.headers.get('content-type') || ''
 
