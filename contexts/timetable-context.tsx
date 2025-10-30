@@ -300,7 +300,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
         while (attempt < maxAttempts && !cancelled) {
           try {
-            // Try the portal homepage first — many students have a timetable embedded on the homepage
+            // Try the portal homepage server-scraped endpoint first for most reliable HTML parsing
+            try {
+              const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
+              const htctype = ht.headers.get('content-type') || ''
+              if (ht.ok && htctype.includes('application/json')) {
+                const jht = await ht.json()
+                if (jht && jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
+                  if (!cancelled) {
+                    setExternalTimetable(jht.timetable)
+                    setTimetableSource(jht.source ?? 'external-homepage')
+                  }
+                  return
+                }
+              } else if (htctype.includes('text/html')) {
+                const html = await ht.text()
+                const parsedHt = parseTimetableHtml(html)
+                const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
+                if (hasHt && !cancelled) {
+                  setExternalTimetable(parsedHt)
+                  setTimetableSource('external-homepage')
+                  return
+                }
+              }
+            } catch (e) {
+              // ignore home-timetable fetch errors and fall back to homepage or /api/timetable below
+            }
+
+            // Try the raw portal homepage as a secondary HTML source
             try {
               const hp = await fetch('/api/portal/homepage', { credentials: 'include' })
               const hctype = hp.headers.get('content-type') || ''
@@ -405,6 +432,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Expose a refresh function so UI can trigger a retry without reloading the page
   async function refreshExternal() {
+    // First try the server-scraped homepage endpoint
+    try {
+      const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
+      const htctype = ht.headers.get('content-type') || ''
+      if (ht.ok && htctype.includes('application/json')) {
+        const jht = await ht.json()
+        if (jht && jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
+          setExternalTimetable(jht.timetable)
+          setTimetableSource(jht.source ?? 'external-homepage')
+          return
+        }
+      } else if (htctype.includes('text/html')) {
+        const html = await ht.text()
+        const parsedHt = parseTimetableHtmlLocal(html)
+        const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
+        if (hasHt) {
+          setExternalTimetable(parsedHt)
+          setTimetableSource('external-homepage')
+          return
+        }
+      }
+    } catch (e) {
+      // ignore and continue to next strategies
+    }
+
     // Reuse the parsing logic from above by creating a DOMParser here as well
     function parseTimetableHtmlLocal(html: string): Record<string, Period[]> {
       const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
@@ -624,6 +676,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         bellTimes: bellTimesData,
         isShowingNextDay,
         timetableSource,
+        refreshExternal,
       }}
     >
       {children}
