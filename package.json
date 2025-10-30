@@ -1,9 +1,5 @@
 {
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
+  "packageManager": "pnpm@10.13.1",
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
     "@radix-ui/react-accordion": "^1.2.12",
