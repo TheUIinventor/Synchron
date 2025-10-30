@@ -1,58 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const clientId = process.env.SBHS_CLIENT_ID;
-const clientSecret = process.env.SBHS_CLIENT_SECRET;
-const redirectUri = process.env.SBHS_REDIRECT_URI;
+const clientId = process.env.SBHS_APP_ID || process.env.SBHS_CLIENT_ID || ''
+const clientSecret = process.env.SBHS_APP_SECRET || process.env.SBHS_CLIENT_SECRET || ''
+const redirectUri = process.env.SBHS_REDIRECT_URI || process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL || ''
+const TOKEN_ENDPOINT = process.env.SBHS_TOKEN_ENDPOINT || 'https://auth.sbhs.net.au/token'
 
-// Exchange authorization code for access token
+// Exchange authorization code for access/refresh tokens
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const code = searchParams.get('code');
-  console.log('OAuth callback: received code:', code);
-  if (!code) {
-    console.error('OAuth callback: missing authorization code');
-    return NextResponse.json({ error: 'Missing authorization code' }, { status: 400 });
-  }
+  const { searchParams } = new URL(req.url)
+  const code = searchParams.get('code')
+  const state = searchParams.get('state')
+  const savedState = req.cookies.get('sbhs_oauth_state')?.value
 
-  const tokenUrl = 'https://student.sbhs.net.au/api/auth/token';
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: redirectUri || '',
-    client_id: clientId || '',
-    client_secret: clientSecret || '',
-  });
-  console.log('OAuth callback: token request body:', body.toString());
+  if (!code) return NextResponse.json({ error: 'Missing authorization code' }, { status: 400 })
+  if (savedState && state && state !== savedState) return NextResponse.json({ error: 'Invalid state' }, { status: 400 })
+
+  const body = new URLSearchParams()
+  body.set('grant_type', 'authorization_code')
+  body.set('code', code)
+  if (redirectUri) body.set('redirect_uri', redirectUri)
+  body.set('client_id', clientId)
+  body.set('client_secret', clientSecret)
 
   try {
-    const response = await fetch(tokenUrl, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body,
-    });
-    const text = await response.text();
-    console.log('OAuth callback: token response status:', response.status);
-    console.log('OAuth callback: token response body:', text);
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error('OAuth callback: invalid JSON from token endpoint', text);
-      return NextResponse.json({ error: 'Invalid JSON from token endpoint', responseBody: text }, { status: 500 });
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+    const text = await response.text()
+    let data: any
+    try { data = JSON.parse(text) } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON from token endpoint', responseBody: text }, { status: 500 })
     }
     if (!response.ok) {
-      console.error('OAuth callback: failed to fetch access token', data);
-      return NextResponse.json({ error: 'Failed to fetch access token', details: data }, { status: response.status });
+      return NextResponse.json({ error: 'Failed to fetch tokens', details: data }, { status: response.status })
     }
-    // Store access token in a secure cookie
-    const res = NextResponse.redirect('/');
-    res.cookies.set('sbhs_access_token', data.access_token, { httpOnly: true, secure: true, path: '/' });
-    console.log('OAuth callback: set sbhs_access_token cookie:', data.access_token);
-    return res;
+
+    const access = data.access_token
+    const refresh = data.refresh_token
+    const expiresIn = data.expires_in || 3600
+    const res = NextResponse.redirect('/')
+    res.cookies.set('sbhs_access_token', access, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== 'development',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: Number(expiresIn),
+    })
+    if (refresh) {
+      res.cookies.set('sbhs_refresh_token', refresh, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV !== 'development',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30,
+      })
+    }
+    // Clear state cookie
+    res.cookies.set('sbhs_oauth_state', '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV !== 'development', path: '/', maxAge: 0 })
+    return res
   } catch (error) {
-    console.error('OAuth callback: token exchange error', String(error));
-    return NextResponse.json({ error: 'Token exchange error', details: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Token exchange error', details: String(error) }, { status: 500 })
   }
 }
