@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const url = new URL(AUTH_ENDPOINT)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('client_id', clientId)
-  if (redirectUri) url.searchParams.set('redirect_uri', redirectUri)
+  // Prefer configured redirect; fallback to current origin + /auth/callback to ensure exact match
+  const effectiveRedirect = redirectUri || `${req.nextUrl.origin}/auth/callback`
+  url.searchParams.set('redirect_uri', effectiveRedirect)
   // request refresh capability if supported; harmless if ignored by provider
   url.searchParams.set('scope', 'read')
   url.searchParams.set('state', state)

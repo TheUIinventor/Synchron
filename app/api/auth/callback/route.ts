@@ -18,7 +18,9 @@ export async function GET(req: NextRequest) {
   const body = new URLSearchParams()
   body.set('grant_type', 'authorization_code')
   body.set('code', code)
-  if (redirectUri) body.set('redirect_uri', redirectUri)
+  // Use configured redirect URI or fall back to current origin + /auth/callback to exactly match the authorize step
+  const effectiveRedirect = redirectUri || `${req.nextUrl.origin}/auth/callback`
+  body.set('redirect_uri', effectiveRedirect)
   body.set('client_id', clientId)
   body.set('client_secret', clientSecret)
 
