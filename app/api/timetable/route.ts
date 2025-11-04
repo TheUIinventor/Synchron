@@ -90,6 +90,46 @@ export async function GET(req: NextRequest) {
       dayRes = dr; fullRes = fr; bellsRes = br
     }
 
+    const responses = [dayRes, fullRes, bellsRes]
+    const authError = responses.find((r: any) => r && (r.status === 401 || r.status === 403))
+    if (authError) {
+      const payload = authError.json ?? authError.text ?? authError.html ?? null
+      return NextResponse.json(
+        {
+          error: 'Unauthorized from SBHS timetable API',
+          details: payload,
+          diagnostics: {
+            hasAccessToken: !!accessToken,
+            forwardedCookies: incomingCookie ? true : false,
+            hostTried: responses.map((r: any) => r?.status ?? null),
+          },
+        },
+        { status: authError.status },
+      )
+    }
+
+    const explicitError = responses.find((r: any) => {
+      if (!r || !r.json) return false
+      const data = r.json
+      const message = (data?.error || data?.message || data?.status_message || '').toString().toLowerCase()
+      if (!message) return false
+      return message.includes('unauth') || message.includes('token') || message.includes('expired')
+    })
+    if (explicitError) {
+      return NextResponse.json(
+        {
+          error: 'SBHS timetable API reported an authorization problem',
+          details: explicitError.json,
+          diagnostics: {
+            hasAccessToken: !!accessToken,
+            forwardedCookies: incomingCookie ? true : false,
+            hostTried: responses.map((r: any) => r?.status ?? null),
+          },
+        },
+        { status: 401 },
+      )
+    }
+
     // If any returned HTML (likely login), forward that HTML so the client can handle
     if ((dayRes as any).html) {
       return new NextResponse((dayRes as any).html, { headers: { 'content-type': 'text/html; charset=utf-8' }, status: (dayRes as any).status || 401 })
@@ -196,7 +236,26 @@ export async function GET(req: NextRequest) {
     const hasAny = Object.values(byDay).some(a => a.length)
     if (hasAny) return NextResponse.json({ timetable: byDay, source: 'sbhs-api' })
 
-    return NextResponse.json({ error: 'No timetable data available from SBHS API' }, { status: 502 })
+    return NextResponse.json(
+      {
+        error: 'No timetable data available from SBHS API',
+        upstream: {
+          day: dayRes?.json ?? dayRes?.text ?? null,
+          full: fullRes?.json ?? fullRes?.text ?? null,
+          bells: bellsRes?.json ?? bellsRes?.text ?? null,
+          statuses: {
+            day: dayRes?.status ?? null,
+            full: fullRes?.status ?? null,
+            bells: bellsRes?.status ?? null,
+          },
+        },
+        diagnostics: {
+          hasAccessToken: !!accessToken,
+          forwardedCookies: incomingCookie ? true : false,
+        },
+      },
+      { status: 502 },
+    )
   } catch (error) {
     return NextResponse.json({ error: 'Proxy error', details: String(error) }, { status: 500 })
   }
