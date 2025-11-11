@@ -335,11 +335,13 @@ export async function GET(req: NextRequest) {
         return dayNames[new Date().getDay()] || 'Monday'
       }
 
-      const assign = (dayKey: any, items: any[]) => {
+      const assign = (dayKey: any, items: any[], source?: any) => {
         if (!Array.isArray(items)) return
         const normalizedKey = resolveDayKey(dayKey)
         if (!byDay[normalizedKey]) byDay[normalizedKey] = []
-        byDay[normalizedKey] = items.map(toPeriod)
+        const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
+        if (!detectedWeekType && inferred) detectedWeekType = inferred
+        byDay[normalizedKey] = items.map((entry: any) => toPeriod(entry, inferred))
       }
 
       const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
@@ -347,10 +349,10 @@ export async function GET(req: NextRequest) {
         if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
           for (const [k, v] of Object.entries(obj)) {
             const derivedKey = deriveDayCandidate(k, v)
-            if (Array.isArray(v)) assign(derivedKey, v)
+            if (Array.isArray(v)) assign(derivedKey, v, v)
             else if (v && typeof v === 'object') {
               const extracted = extractPeriods(v)
-              if (extracted) assign(derivedKey, extracted)
+              if (extracted) assign(derivedKey, extracted, v)
             }
           }
         }

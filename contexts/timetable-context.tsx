@@ -225,7 +225,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
-    if (externalTimetable) return externalTimetable
+    if (externalTimetable) {
+      const filtered: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+      for (const [day, periods] of Object.entries(externalTimetable)) {
+        const list = Array.isArray(periods) ? periods : []
+        filtered[day as keyof typeof filtered] = list.filter((p) => !p.weekType || p.weekType === currentWeek)
+      }
+      return filtered
+    }
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
   }, [currentWeek, externalTimetable])
 
