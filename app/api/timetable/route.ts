@@ -210,7 +210,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Normalize into per-day buckets
-  const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
     // If full timetable exists, prefer it to populate multiple days
     if (fullRes && (fullRes as any).json) {
@@ -238,14 +238,14 @@ export async function GET(req: NextRequest) {
         return dayNames[new Date().getDay()] || 'Monday'
       }
 
-      const assign = (dayKey: any, items: any[], source?: any) => {
-        if (!Array.isArray(items)) return
-        const normalizedKey = resolveDayKey(dayKey)
-        if (!byDay[normalizedKey]) byDay[normalizedKey] = []
-  const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
-        if (!detectedWeekType && inferred) detectedWeekType = inferred
-  byDay[normalizedKey] = items.map((entry: any) => toPeriod(entry, inferred))
-      }
+  const assign = (dayKey: any, items: any[], source?: any) => {
+    if (!Array.isArray(items)) return
+    const normalizedKey = resolveDayKey(dayKey)
+    if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+    const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
+    if (inferred) detectedWeekType = inferred
+    byDay[normalizedKey] = items.map((entry: any) => toPeriod(entry, inferred))
+  }
 
       const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
       for (const obj of candidateObjects) {
@@ -269,7 +269,7 @@ export async function GET(req: NextRequest) {
             const normalizedKey = resolveDayKey(dayField)
             if (!byDay[normalizedKey]) byDay[normalizedKey] = []
             const inferred: WeekType | null = inferWeekType(dayField, item) || detectedWeekType
-            if (!detectedWeekType && inferred) detectedWeekType = inferred
+            if (inferred) detectedWeekType = inferred
             byDay[normalizedKey].push(toPeriod(item, inferred))
           }
         } else {
@@ -280,7 +280,7 @@ export async function GET(req: NextRequest) {
               const normalizedKey = resolveDayKey(dayField)
               if (!byDay[normalizedKey]) byDay[normalizedKey] = []
               const inferred: WeekType | null = inferWeekType(dayField, item) || detectedWeekType
-              if (!detectedWeekType && inferred) detectedWeekType = inferred
+              if (inferred) detectedWeekType = inferred
               byDay[normalizedKey].push(toPeriod(item, inferred))
             }
           }
@@ -304,9 +304,9 @@ export async function GET(req: NextRequest) {
       const dow = Number.isNaN(dowDate.getTime())
         ? new Date().toLocaleDateString('en-US', { weekday: 'long' })
         : dowDate.toLocaleDateString('en-US', { weekday: 'long' })
-  const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
-      if (!detectedWeekType && inferred) detectedWeekType = inferred
-  byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
+      const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
+      if (inferred) detectedWeekType = inferred
+      byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
     }
 
     // Optionally refine times using bells
@@ -340,7 +340,7 @@ export async function GET(req: NextRequest) {
         const normalizedKey = resolveDayKey(dayKey)
         if (!byDay[normalizedKey]) byDay[normalizedKey] = []
         const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
-        if (!detectedWeekType && inferred) detectedWeekType = inferred
+        if (inferred) detectedWeekType = inferred
         byDay[normalizedKey] = items.map((entry: any) => toPeriod(entry, inferred))
       }
 
@@ -390,7 +390,7 @@ export async function GET(req: NextRequest) {
           const normalizedKey = resolveDayKey(derivedKey || rawKey)
           if (!byDay[normalizedKey] || byDay[normalizedKey].length === 0) {
             const inferred: WeekType | null = inferWeekType(derivedKey || rawKey, value) || detectedWeekType
-            if (!detectedWeekType && inferred) detectedWeekType = inferred
+            if (inferred) detectedWeekType = inferred
             byDay[normalizedKey] = periods.map((entry: any) => toPeriod(entry, inferred))
           }
         }
@@ -410,7 +410,7 @@ export async function GET(req: NextRequest) {
           if (label && (bs || be)) mapTime[label] = { start: bs || '', end: be || '' }
         }
         for (const day of Object.keys(byDay)) {
-            byDay[day] = byDay[day].map((p: any) => {
+          byDay[day] = byDay[day].map((p: any) => {
             if (!p.time || p.time.indexOf('-') === -1) {
               const t = mapTime[p.period] || mapTime[p.subject]
               if (t && (t.start || t.end)) {
@@ -436,7 +436,25 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const weekType = detectedWeekType || inferWeekType(undefined, {
+    const weekTally: Record<WeekType, number> = { A: 0, B: 0 }
+    for (const periods of Object.values(byDay)) {
+      for (const period of periods) {
+        if (period.weekType === 'A') weekTally.A += 1
+        if (period.weekType === 'B') weekTally.B += 1
+      }
+    }
+
+    let dominantWeekType: WeekType | null = null
+    const taggedTotal = weekTally.A + weekTally.B
+    if (taggedTotal > 0) {
+      if (weekTally.A === weekTally.B) {
+        dominantWeekType = detectedWeekType
+      } else {
+        dominantWeekType = weekTally.A > weekTally.B ? 'A' : 'B'
+      }
+    }
+
+    const weekType = dominantWeekType || detectedWeekType || inferWeekType(undefined, {
       bells: bellsRes?.json,
       day: dayRes?.json,
       full: fullRes?.json,
