@@ -94,7 +94,7 @@ export default function TopRightActionIcons() {
         <button
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
-          className={`${size} aspect-square rounded-full overflow-hidden bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow flex items-center justify-center border border-gray-200 dark:border-gray-800 liquid-glass liquid-bob transition-transform duration-100 ease-out`}
+          className={`${size} aspect-square rounded-full overflow-hidden glass glass-border shadow flex items-center justify-center transition-transform duration-100 ease-out`}
           onPointerDown={(e) => { e.preventDefault(); setOpen((v) => !v); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v); } }}
         >
@@ -105,7 +105,7 @@ export default function TopRightActionIcons() {
 
         {/* Expanded menu */}
         {open && (
-          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900/95 backdrop-blur-sm border border-gray-200 dark:border-gray-800 rounded-xl shadow-lg overflow-hidden liquid-glass transition-transform duration-150 ease-out transform scale-95">
+          <div className="absolute right-0 mt-2 w-48 glass glass-border rounded-xl shadow-lg overflow-hidden transition-transform duration-150 ease-out transform scale-95">
             <div className="p-2 space-y-1">
               <div className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors duration-100">
                 <div className="w-9 h-9 rounded-full bg-theme-secondary/10 dark:bg-theme-secondary/10 flex items-center justify-center">

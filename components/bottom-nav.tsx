@@ -68,7 +68,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
   return (
     <>
       {/* Mobile Navigation (Bottom) */}
-      <div className="fixed bottom-0 left-0 right-0 glass-nav px-2 py-2 z-50 flex justify-around items-center md:hidden">
+  <div className="fixed bottom-0 left-0 right-0 glass-nav glass-border px-2 py-2 z-50 flex justify-around items-center md:hidden">
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
           const IconComponent = item.icon
@@ -99,7 +99,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
       </div>
 
       {/* Desktop Navigation (Left Vertical) */}
-      <div className="hidden md:flex fixed left-0 top-0 bottom-0 w-24 flex-col justify-center items-center p-4 glass-nav z-50">
+  <div className="hidden md:flex fixed left-0 top-0 bottom-0 w-24 flex-col justify-center items-center p-4 glass-nav glass-border z-50">
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
           const IconComponent = item.icon
