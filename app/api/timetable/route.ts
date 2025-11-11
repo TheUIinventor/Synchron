@@ -263,6 +263,89 @@ export async function GET(req: NextRequest) {
     }
 
     // Optionally refine times using bells
+    if (fullRes && (fullRes as any).json) {
+      const j = (fullRes as any).json
+      const dayNames = Object.keys(byDay)
+      const resolveDayKey = (input: any): string => {
+        if (!input) return dayNames[new Date().getDay()] || 'Monday'
+        const raw = typeof input === 'string' ? input : input.name || input.label || ''
+        if (!raw) return dayNames[new Date().getDay()] || 'Monday'
+        const lower = raw.toLowerCase()
+        const lettersOnly = lower.replace(/[^a-z]/g, '')
+        const exact = dayNames.find(d => d.toLowerCase() === lower)
+        if (exact) return exact
+        const contains = dayNames.find(d => lower.includes(d.toLowerCase()))
+        if (contains) return contains
+        if (lettersOnly) {
+          const prefix = dayNames.find(d => lettersOnly.startsWith(d.slice(0, 3).toLowerCase()))
+          if (prefix) return prefix
+        }
+        const asDate = new Date(raw)
+        if (!Number.isNaN(asDate.getTime())) {
+          const fromDate = asDate.toLocaleDateString('en-US', { weekday: 'long' })
+          if (dayNames.includes(fromDate)) return fromDate
+        }
+        return dayNames[new Date().getDay()] || 'Monday'
+      }
+
+      const assign = (dayKey: any, items: any[]) => {
+        if (!Array.isArray(items)) return
+        const normalizedKey = resolveDayKey(dayKey)
+        if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+        byDay[normalizedKey] = items.map(toPeriod)
+      }
+
+      const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
+      for (const obj of candidateObjects) {
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+          for (const [k, v] of Object.entries(obj)) {
+            const derivedKey = deriveDayCandidate(k, v)
+            if (Array.isArray(v)) assign(derivedKey, v)
+            else if (v && typeof v === 'object') {
+              const extracted = extractPeriods(v)
+              if (extracted) assign(derivedKey, extracted)
+            }
+          }
+        }
+      }
+
+      const candidateArrays = [j.periods, j.entries, j.lessons, j.items, j.data, j.timetable, j.days, Array.isArray(j) ? j : null]
+      for (const arr of candidateArrays) {
+        if (Array.isArray(arr)) {
+          for (const item of arr) {
+            const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
+            const normalizedKey = resolveDayKey(dayField)
+            if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+            byDay[normalizedKey].push(toPeriod(item))
+          }
+        } else {
+          const extracted = extractPeriods(arr)
+          if (Array.isArray(extracted)) {
+            for (const item of extracted) {
+              const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
+              const normalizedKey = resolveDayKey(dayField)
+              if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+              byDay[normalizedKey].push(toPeriod(item))
+            }
+          }
+        }
+      }
+
+      // Backfill days that are still empty using the structured `days` object
+      if (j.days && typeof j.days === 'object') {
+        for (const [rawKey, value] of Object.entries(j.days)) {
+          if (!value || typeof value !== 'object') continue
+          const derivedKey = deriveDayCandidate(rawKey, value)
+          const periods = extractPeriods((value as any).periods ? { periods: (value as any).periods } : value)
+          if (!periods || !periods.length) continue
+          const normalizedKey = resolveDayKey(derivedKey || rawKey)
+          if (!byDay[normalizedKey] || byDay[normalizedKey].length === 0) {
+            byDay[normalizedKey] = periods.map(toPeriod)
+          }
+        }
+      }
+    }
+
     if (bellsRes && (bellsRes as any).json) {
       const bj = (bellsRes as any).json
       // Expect bj contains a collection of bell times with period names and start/end
@@ -271,8 +354,8 @@ export async function GET(req: NextRequest) {
         const mapTime: Record<string, { start: string, end: string }> = {}
         for (const b of bells) {
           const label = String(b.period || b.name || b.title || '').trim()
-          const bs = b.start || b.timeStart || b.from
-          const be = b.end || b.timeEnd || b.to
+          const bs = b.start || b.startTime || b.timeStart || b.from
+          const be = b.end || b.endTime || b.timeEnd || b.to
           if (label && (bs || be)) mapTime[label] = { start: bs || '', end: be || '' }
         }
         for (const day of Object.keys(byDay)) {
@@ -288,6 +371,18 @@ export async function GET(req: NextRequest) {
           })
         }
       }
+    }
+
+    // If some weekdays remain empty but the full timetable has entries, backfill from the detailed days object
+    // Remove obvious placeholder entries with no useful information
+    for (const dayName of Object.keys(byDay)) {
+      byDay[dayName] = byDay[dayName].filter(p => {
+        const hasSubject = p.subject && p.subject.toLowerCase() !== 'class'
+        const hasTeacher = p.teacher && p.teacher.trim().length > 0
+        const hasRoom = p.room && p.room.trim().length > 0
+        const hasTimeRange = typeof p.time === 'string' && p.time.includes('-')
+        return hasTimeRange && (hasSubject || hasTeacher || hasRoom)
+      })
     }
 
     const hasAny = Object.values(byDay).some(a => a.length)
