@@ -66,9 +66,8 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
   }
 
   return (
-    <>
-      {/* Mobile Navigation (Bottom) */}
-  <div className="fixed bottom-0 left-0 right-0 glass-nav glass-border px-2 py-2 z-50 flex justify-around items-center md:hidden">
+    <nav className="fixed left-0 top-0 bottom-0 z-50 flex w-16 flex-col items-center gap-3 overflow-y-auto px-3 py-6 glass-nav glass-border sm:w-20 lg:w-24">
+      <div className="flex w-full flex-col gap-2">
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
           const IconComponent = item.icon
@@ -77,7 +76,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 ease-in-out relative ${
+              className={`group flex w-full flex-col items-center gap-1 rounded-lg px-2 py-2 text-center text-[0.7rem] font-medium transition-all duration-200 ease-in-out ${
                 isActive
                   ? "text-theme-primary"
                   : "text-gray-500 dark:text-gray-400 hover:bg-white/15 dark:hover:bg-white/8"
@@ -85,49 +84,20 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
               onClick={() => handleClick(item.name)}
             >
               <div
-                className={`p-1 rounded-full transition-all duration-200 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon"}`}
+                className={`flex size-8 items-center justify-center rounded-full transition-all duration-200 ${
+                  isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon"
+                }`}
               >
-                <IconComponent className="h-5 w-5" /> {/* Mobile icon size */}
+                <IconComponent className="h-4 w-4" />
               </div>
-              <span className="text-xs mt-1">{item.label}</span>
+              <span className="leading-tight">{item.label}</span>
               {isActive && (
-                <div className="absolute -bottom-2 w-1 h-1 bg-theme-primary rounded-full shadow-lg shadow-theme-primary/50" />
+                <span className="mt-1 h-1 w-full rounded-full bg-theme-primary shadow-lg shadow-theme-primary/40" />
               )}
             </Link>
           )
         })}
       </div>
-
-      {/* Desktop Navigation (Left Vertical) */}
-  <div className="hidden md:flex fixed left-0 top-0 bottom-0 w-24 flex-col justify-center items-center p-4 glass-nav glass-border z-50">
-        {navItems.map((item) => {
-          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-          const IconComponent = item.icon
-
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 ease-in-out relative w-full my-1 ${
-                isActive
-                  ? "text-theme-primary"
-                  : "text-gray-500 dark:text-gray-400 hover:bg-white/15 dark:hover:bg-white/8"
-              }`}
-              onClick={() => handleClick(item.name)}
-            >
-              <div
-                className={`p-1 rounded-full transition-all duration-200 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon"}`}
-              >
-                <IconComponent className="h-4 w-4" /> {/* Desktop icon size */}
-              </div>
-              <span className="text-xs mt-1 text-center">{item.label}</span>
-              {isActive && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-theme-primary rounded-full shadow-lg shadow-theme-primary/50" />
-              )}
-            </Link>
-          )
-        })}
-      </div>
-    </>
+    </nav>
   )
 }

@@ -30,7 +30,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
           {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
           {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
           <ConditionalTopRightIcons />
-          <div className="pb-20 md:pb-0 md:pl-24">{children}</div>
+          <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
           <BottomNav />
         </TimetableProvider>
       </UserSettingsProvider>
