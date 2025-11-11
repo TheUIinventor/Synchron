@@ -1,4 +1,5 @@
 "use client"
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Calendar, Bell, Clipboard, Award, Home } from "lucide-react"
@@ -68,7 +69,10 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
   return (
     <>
       {/* Mobile Navigation (Bottom) */}
-  <div className="fixed bottom-0 left-0 right-0 glass-nav glass-border px-2 py-2 z-50 flex justify-around items-center md:hidden">
+  <nav
+        aria-label="Primary navigation"
+        className="fixed bottom-0 left-0 right-0 glass-nav glass-border px-3 py-2 z-50 flex justify-between items-stretch md:hidden rounded-t-2xl backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-slate-900/50"
+      >
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
           const IconComponent = item.icon
@@ -77,29 +81,37 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 ease-in-out relative ${
+              aria-label={item.label}
+              aria-current={isActive ? "page" : undefined}
+              className={`group flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all duration-300 ease-out relative min-w-[3.75rem] ${
                 isActive
                   ? "text-theme-primary"
-                  : "text-gray-500 dark:text-gray-400 hover:bg-white/15 dark:hover:bg-white/8"
+                  : "text-gray-500 dark:text-gray-400 hover:text-theme-primary"
               }`}
               onClick={() => handleClick(item.name)}
             >
-              <div
-                className={`p-1 rounded-full transition-all duration-200 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon"}`}
-              >
-                <IconComponent className="h-5 w-5" /> {/* Mobile icon size */}
+              <div className={`relative p-1 rounded-full transition-all duration-300 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover:shadow-md"}`}>
+                <IconComponent className="h-5 w-5 drop-shadow-sm" />
+                {isActive && (
+                  <span className="absolute inset-0 rounded-full ring-2 ring-theme-primary/50 animate-pulse-slow" />
+                )}
               </div>
-              <span className="text-xs mt-1">{item.label}</span>
+              <span className="text-[10px] mt-1 tracking-wide font-medium opacity-90 group-hover:opacity-100 transition-opacity">
+                {item.label}
+              </span>
               {isActive && (
-                <div className="absolute -bottom-2 w-1 h-1 bg-theme-primary rounded-full shadow-lg shadow-theme-primary/50" />
+                <div className="absolute -bottom-1.5 w-1 h-1 bg-theme-primary rounded-full shadow-md shadow-theme-primary/40" />
               )}
             </Link>
           )
         })}
-      </div>
+      </nav>
 
       {/* Desktop Navigation (Left Vertical) */}
-  <div className="hidden md:flex fixed left-0 top-0 bottom-0 w-24 flex-col justify-center items-center p-4 glass-nav glass-border z-50">
+  <nav
+        aria-label="Primary navigation"
+        className="hidden md:flex fixed left-0 top-0 bottom-0 w-24 flex-col justify-center items-center p-4 glass-nav glass-border z-50 rounded-r-2xl backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-slate-900/40"
+      >
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
           const IconComponent = item.icon
@@ -108,26 +120,29 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 ease-in-out relative w-full my-1 ${
+              aria-label={item.label}
+              aria-current={isActive ? "page" : undefined}
+              className={`group flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-300 ease-out relative w-full my-1 ${
                 isActive
                   ? "text-theme-primary"
-                  : "text-gray-500 dark:text-gray-400 hover:bg-white/15 dark:hover:bg-white/8"
+                  : "text-gray-500 dark:text-gray-400 hover:text-theme-primary"
               }`}
               onClick={() => handleClick(item.name)}
             >
-              <div
-                className={`p-1 rounded-full transition-all duration-200 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon"}`}
-              >
-                <IconComponent className="h-4 w-4" /> {/* Desktop icon size */}
+              <div className={`relative p-1 rounded-full transition-all duration-300 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover:shadow-md"}`}>
+                <IconComponent className="h-4 w-4 drop-shadow-sm" />
+                {isActive && (
+                  <span className="absolute inset-0 rounded-full ring-2 ring-theme-primary/50 animate-pulse-slow" />
+                )}
               </div>
-              <span className="text-xs mt-1 text-center">{item.label}</span>
+              <span className="text-[10px] mt-1 text-center tracking-wide font-medium opacity-90 group-hover:opacity-100 transition-opacity">{item.label}</span>
               {isActive && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-theme-primary rounded-full shadow-lg shadow-theme-primary/50" />
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-theme-primary rounded-full shadow-md shadow-theme-primary/40" />
               )}
             </Link>
           )
         })}
-      </div>
+      </nav>
     </>
   )
 }
