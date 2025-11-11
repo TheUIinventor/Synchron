@@ -381,6 +381,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (!cancelled) {
                   setExternalTimetable(j.timetable)
                   setTimetableSource(j.source ?? 'external')
+                  if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
                 }
                 return
               }
@@ -394,6 +395,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (!cancelled) {
                   setExternalTimetable(byDay)
                   setTimetableSource(j.source ?? 'external')
+                  if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
                 }
                 return
               }
@@ -451,6 +453,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (jht && jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
           setExternalTimetable(jht.timetable)
           setTimetableSource(jht.source ?? 'external-homepage')
+          if (jht.weekType === 'A' || jht.weekType === 'B') setCurrentWeek(jht.weekType)
           return
         }
       } else if (htctype.includes('text/html')) {
@@ -554,6 +557,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
               setExternalTimetable(j.timetable)
               setTimetableSource(j.source ?? 'external')
+              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -565,6 +569,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               setExternalTimetable(byDay)
               setTimetableSource(j.source ?? 'external')
+              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
               return
             }
           }
@@ -611,6 +616,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
               setExternalTimetable(j.timetable)
               setTimetableSource(j.source ?? 'external')
+              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -622,6 +628,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               setExternalTimetable(byDay)
               setTimetableSource(j.source ?? 'external')
+              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
               return
             }
           }

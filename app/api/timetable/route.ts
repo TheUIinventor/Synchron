@@ -98,6 +98,29 @@ export async function GET(req: NextRequest) {
       return fallback
     }
 
+    const deriveWeekType = (): string | null => {
+      const candidates: Array<string | null | undefined> = [
+        bellsRes?.json?.weekType,
+        bellsRes?.json?.week_type,
+        fullRes?.json?.weekType,
+        fullRes?.json?.week_type,
+        dayRes?.json?.dayInfo?.weekType,
+        dayRes?.json?.day?.weekType,
+        dayRes?.json?.timetable?.dayname,
+        fullRes?.json?.timetable?.dayname,
+      ]
+      for (const raw of candidates) {
+        if (!raw) continue
+        const str = String(raw).trim()
+        if (!str) continue
+        const upper = str.toUpperCase()
+        if (upper === 'A' || upper === 'B') return upper as 'A' | 'B'
+        const suffix = upper.slice(-1)
+        if (suffix === 'A' || suffix === 'B') return suffix as 'A' | 'B'
+      }
+      return null
+    }
+
     // Define candidate hosts and paths. If we have a bearer token, prefer the public API host as well.
     const hosts = [
       'https://student.sbhs.net.au',
@@ -385,8 +408,10 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    const weekType = deriveWeekType()
+
     const hasAny = Object.values(byDay).some(a => a.length)
-    if (hasAny) return NextResponse.json({ timetable: byDay, source: 'sbhs-api' })
+    if (hasAny) return NextResponse.json({ timetable: byDay, source: 'sbhs-api', weekType })
 
     return NextResponse.json(
       {
