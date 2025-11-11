@@ -66,6 +66,38 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Helper to coerce various SBHS JSON shapes into an array of period-like entries
+    const extractPeriods = (value: any): any[] | null => {
+      if (!value) return null
+      if (Array.isArray(value)) return value
+      if (value && typeof value === 'object') {
+        if (Array.isArray((value as any).periods)) return (value as any).periods
+        const periodsObj = (value as any).periods
+        if (periodsObj && typeof periodsObj === 'object') {
+          return Object.entries(periodsObj).map(([key, val]) => {
+            if (val && typeof val === 'object') return { period: key, ...(val as any) }
+            return { period: key, title: val }
+          })
+        }
+      }
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        // Sometimes the value itself is an object keyed by period numbers
+        const entries = Object.entries(value)
+        if (entries.length && entries.every(([, v]) => v && typeof v === 'object')) {
+          return entries.map(([key, val]) => ({ period: key, ...(val as any) }))
+        }
+      }
+      return null
+    }
+
+    const deriveDayCandidate = (fallback: any, source?: any) => {
+      if (source && typeof source === 'object') {
+        const obj = source as any
+        return obj.dayname || obj.dayName || obj.day || obj.day_label || obj.title || obj.name || fallback
+      }
+      return fallback
+    }
+
     // Define candidate hosts and paths. If we have a bearer token, prefer the public API host as well.
     const hosts = [
       'https://student.sbhs.net.au',
@@ -150,10 +182,15 @@ export async function GET(req: NextRequest) {
         const raw = typeof input === 'string' ? input : input.name || input.label || ''
         if (!raw) return dayNames[new Date().getDay()] || 'Monday'
         const lower = raw.toLowerCase()
+        const lettersOnly = lower.replace(/[^a-z]/g, '')
         const exact = dayNames.find(d => d.toLowerCase() === lower)
         if (exact) return exact
         const contains = dayNames.find(d => lower.includes(d.toLowerCase()))
         if (contains) return contains
+        if (lettersOnly) {
+          const prefix = dayNames.find(d => lettersOnly.startsWith(d.slice(0, 3).toLowerCase()))
+          if (prefix) return prefix
+        }
         const asDate = new Date(raw)
         if (!Number.isNaN(asDate.getTime())) {
           const fromDate = asDate.toLocaleDateString('en-US', { weekday: 'long' })
@@ -173,8 +210,12 @@ export async function GET(req: NextRequest) {
       for (const obj of candidateObjects) {
         if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
           for (const [k, v] of Object.entries(obj)) {
-            if (Array.isArray(v)) assign(k, v)
-            else if (v && typeof v === 'object' && Array.isArray((v as any).periods)) assign(k, (v as any).periods)
+            const derivedKey = deriveDayCandidate(k, v)
+            if (Array.isArray(v)) assign(derivedKey, v)
+            else if (v && typeof v === 'object') {
+              const extracted = extractPeriods(v)
+              if (extracted) assign(derivedKey, extracted)
+            }
           }
         }
       }
@@ -188,6 +229,16 @@ export async function GET(req: NextRequest) {
             if (!byDay[normalizedKey]) byDay[normalizedKey] = []
             byDay[normalizedKey].push(toPeriod(item))
           }
+        } else {
+          const extracted = extractPeriods(arr)
+          if (Array.isArray(extracted)) {
+            for (const item of extracted) {
+              const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
+              const normalizedKey = resolveDayKey(dayField)
+              if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+              byDay[normalizedKey].push(toPeriod(item))
+            }
+          }
         }
       }
     }
@@ -196,7 +247,13 @@ export async function GET(req: NextRequest) {
     if (dayRes && (dayRes as any).json) {
       const dj = (dayRes as any).json
       let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
-      if (!Array.isArray(arr) && dj?.day?.periods) arr = dj.day.periods
+      if (!Array.isArray(arr) && dj?.day?.periods) {
+        arr = Array.isArray(dj.day.periods) ? dj.day.periods : extractPeriods(dj.day.periods) || []
+      }
+      if (!Array.isArray(arr) && dj?.timetable?.periods) {
+        const extracted = extractPeriods(dj.timetable)
+        if (extracted) arr = extracted
+      }
       if (!Array.isArray(arr)) arr = []
       const dowDate = dateParam ? new Date(dateParam) : new Date()
       const dow = Number.isNaN(dowDate.getTime())
