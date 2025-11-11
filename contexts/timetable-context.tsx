@@ -11,6 +11,7 @@ export type Period = {
   subject: string
   teacher: string
   room: string
+  weekType?: "A" | "B"
   isSubstitute?: boolean // New: Indicates a substitute teacher
   isRoomChange?: boolean // New: Indicates a room change
 }

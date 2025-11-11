@@ -1,7 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+type WeekType = 'A' | 'B'
+
+function normalizeWeekType(value: any): WeekType | null {
+  if (value == null) return null
+  const str = String(value).trim().toUpperCase()
+  if (!str) return null
+  if (str === 'A' || str === 'B') return str as WeekType
+  // Accept strings containing Week A / Week B / TueA etc.
+  const match = str.match(/([AB])(?:[^A-Z]|$)/)
+  if (match) return match[1] as WeekType
+  const suffix = str.slice(-1)
+  if (suffix === 'A' || suffix === 'B') return suffix as WeekType
+  return null
+}
+
+function inferWeekType(dayKey?: any, source?: any): WeekType | null {
+  const candidates = [
+    source?.weekType,
+    source?.week_type,
+    source?.week,
+    source?.weekLabel,
+    source?.week_label,
+    source?.cycle,
+    source?.rotation,
+    source?.dayname,
+    source?.dayName,
+    dayKey,
+  ]
+  for (const c of candidates) {
+    const normalized = normalizeWeekType(c)
+    if (normalized) return normalized
+  }
+  return null
+}
+
 // Normalize a wide variety of SBHS API item shapes into our Period type
-function toPeriod(item: any) {
+function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
   const start = item.start || item.startTime || item.timeStart || item.from || item.begin || item.start_time || ''
   const end = item.end || item.finish || item.timeEnd || item.endTime || item.end_time || item.to || item.until || ''
   const time = [start, end].filter(Boolean).join(' - ')
@@ -9,7 +44,10 @@ function toPeriod(item: any) {
   const teacher = item.teacher || item.teacherName || item.teacher_name || item.classTeacher || item.staff || item.staffName || ''
   const room = item.room || item.roomName || item.room_name || item.venue || item.location || ''
   const period = String(item.period || item.p || item.block || item.lesson || item.lessonNumber || item.lesson_number || item.name || item.title || '')
-  return { period, time, subject, teacher, room }
+  const weekType = normalizeWeekType(
+    item.weekType || item.week_type || item.week || item.rotation || item.cycle || item.dayname || item.dayName || item.day
+  ) || fallbackWeekType
+  return { period, time, subject, teacher, room, weekType: weekType ?? undefined }
 }
 
 // This route proxies SBHS Timetable API endpoints shown in the portal docs:
@@ -97,29 +135,7 @@ export async function GET(req: NextRequest) {
       }
       return fallback
     }
-
-    const deriveWeekType = (): string | null => {
-      const candidates: Array<string | null | undefined> = [
-        bellsRes?.json?.weekType,
-        bellsRes?.json?.week_type,
-        fullRes?.json?.weekType,
-        fullRes?.json?.week_type,
-        dayRes?.json?.dayInfo?.weekType,
-        dayRes?.json?.day?.weekType,
-        dayRes?.json?.timetable?.dayname,
-        fullRes?.json?.timetable?.dayname,
-      ]
-      for (const raw of candidates) {
-        if (!raw) continue
-        const str = String(raw).trim()
-        if (!str) continue
-        const upper = str.toUpperCase()
-        if (upper === 'A' || upper === 'B') return upper as 'A' | 'B'
-        const suffix = upper.slice(-1)
-        if (suffix === 'A' || suffix === 'B') return suffix as 'A' | 'B'
-      }
-      return null
-    }
+    let detectedWeekType: WeekType | null = null
 
     // Define candidate hosts and paths. If we have a bearer token, prefer the public API host as well.
     const hosts = [
@@ -194,7 +210,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Normalize into per-day buckets
-    const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+  const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
     // If full timetable exists, prefer it to populate multiple days
     if (fullRes && (fullRes as any).json) {
@@ -222,11 +238,13 @@ export async function GET(req: NextRequest) {
         return dayNames[new Date().getDay()] || 'Monday'
       }
 
-      const assign = (dayKey: any, items: any[]) => {
+      const assign = (dayKey: any, items: any[], source?: any) => {
         if (!Array.isArray(items)) return
         const normalizedKey = resolveDayKey(dayKey)
         if (!byDay[normalizedKey]) byDay[normalizedKey] = []
-        byDay[normalizedKey] = items.map(toPeriod)
+  const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
+        if (!detectedWeekType && inferred) detectedWeekType = inferred
+  byDay[normalizedKey] = items.map((entry: any) => toPeriod(entry, inferred))
       }
 
       const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
@@ -234,10 +252,10 @@ export async function GET(req: NextRequest) {
         if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
           for (const [k, v] of Object.entries(obj)) {
             const derivedKey = deriveDayCandidate(k, v)
-            if (Array.isArray(v)) assign(derivedKey, v)
+            if (Array.isArray(v)) assign(derivedKey, v, v)
             else if (v && typeof v === 'object') {
               const extracted = extractPeriods(v)
-              if (extracted) assign(derivedKey, extracted)
+              if (extracted) assign(derivedKey, extracted, v)
             }
           }
         }
@@ -250,7 +268,9 @@ export async function GET(req: NextRequest) {
             const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
             const normalizedKey = resolveDayKey(dayField)
             if (!byDay[normalizedKey]) byDay[normalizedKey] = []
-            byDay[normalizedKey].push(toPeriod(item))
+            const inferred: WeekType | null = inferWeekType(dayField, item) || detectedWeekType
+            if (!detectedWeekType && inferred) detectedWeekType = inferred
+            byDay[normalizedKey].push(toPeriod(item, inferred))
           }
         } else {
           const extracted = extractPeriods(arr)
@@ -259,7 +279,9 @@ export async function GET(req: NextRequest) {
               const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
               const normalizedKey = resolveDayKey(dayField)
               if (!byDay[normalizedKey]) byDay[normalizedKey] = []
-              byDay[normalizedKey].push(toPeriod(item))
+              const inferred: WeekType | null = inferWeekType(dayField, item) || detectedWeekType
+              if (!detectedWeekType && inferred) detectedWeekType = inferred
+              byDay[normalizedKey].push(toPeriod(item, inferred))
             }
           }
         }
@@ -282,7 +304,9 @@ export async function GET(req: NextRequest) {
       const dow = Number.isNaN(dowDate.getTime())
         ? new Date().toLocaleDateString('en-US', { weekday: 'long' })
         : dowDate.toLocaleDateString('en-US', { weekday: 'long' })
-      byDay[dow] = arr.map(toPeriod)
+  const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
+      if (!detectedWeekType && inferred) detectedWeekType = inferred
+  byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
     }
 
     // Optionally refine times using bells
@@ -363,7 +387,9 @@ export async function GET(req: NextRequest) {
           if (!periods || !periods.length) continue
           const normalizedKey = resolveDayKey(derivedKey || rawKey)
           if (!byDay[normalizedKey] || byDay[normalizedKey].length === 0) {
-            byDay[normalizedKey] = periods.map(toPeriod)
+            const inferred: WeekType | null = inferWeekType(derivedKey || rawKey, value) || detectedWeekType
+            if (!detectedWeekType && inferred) detectedWeekType = inferred
+            byDay[normalizedKey] = periods.map((entry: any) => toPeriod(entry, inferred))
           }
         }
       }
@@ -382,7 +408,7 @@ export async function GET(req: NextRequest) {
           if (label && (bs || be)) mapTime[label] = { start: bs || '', end: be || '' }
         }
         for (const day of Object.keys(byDay)) {
-          byDay[day] = byDay[day].map(p => {
+            byDay[day] = byDay[day].map((p: any) => {
             if (!p.time || p.time.indexOf('-') === -1) {
               const t = mapTime[p.period] || mapTime[p.subject]
               if (t && (t.start || t.end)) {
@@ -408,7 +434,11 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const weekType = deriveWeekType()
+    const weekType = detectedWeekType || inferWeekType(undefined, {
+      bells: bellsRes?.json,
+      day: dayRes?.json,
+      full: fullRes?.json,
+    })
 
     const hasAny = Object.values(byDay).some(a => a.length)
     if (hasAny) return NextResponse.json({ timetable: byDay, source: 'sbhs-api', weekType })
