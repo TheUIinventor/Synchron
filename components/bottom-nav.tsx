@@ -107,53 +107,62 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
         })}
       </nav>
 
-      {/* Desktop: Compact Navigation Rail (md+) */}
+      {/* Desktop: Material 3 - Expressive Navigation Rail (md+) */}
       <nav
         aria-label="Primary navigation"
-        className="hidden md:flex fixed left-0 top-0 bottom-0 w-14 flex-col items-center pt-4 pb-4 glass-nav glass-border z-50 rounded-r-2xl backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-slate-900/40"
+        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-14 group-hover:w-48 hover:w-48 transition-all duration-200 ease-out flex-col items-start pt-4 pb-4 glass-nav glass-border z-50 rounded-r-2xl backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-slate-900/40 overflow-visible"
       >
-        {navItems.map((item) => {
-          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-          const IconComponent = item.icon
+        {/* Optional top spacer / menu slot */}
+        <div className="w-full flex items-center justify-center group-hover:justify-start px-2">
+          {/* Could add a hamburger or app logo here in future */}
+        </div>
 
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              aria-label={item.label}
-              aria-current={isActive ? "page" : undefined}
-              className={`group relative flex items-center justify-center w-full my-1 p-1 rounded-lg transition-colors duration-200 ease-out ${
-                isActive
-                  ? "text-theme-primary"
-                  : "text-gray-500 dark:text-gray-400 hover:text-theme-primary"
-              }`}
-              onClick={() => handleClick(item.name)}
-            >
-              {/* Icon container */}
-              <div className={`relative p-2 rounded-full transition-all duration-200 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover:shadow-md"}`}>
-                <IconComponent className="h-5 w-5 drop-shadow-sm" />
-                {isActive && (
-                  <span className="absolute inset-0 rounded-full ring-2 ring-theme-primary/50 animate-pulse-slow" />
-                )}
-              </div>
+        <div className="w-full mt-2 flex-1 flex flex-col items-start px-1">
+          {navItems.map((item) => {
+            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+            const IconComponent = item.icon
 
-              {/* Label: appears on hover or when active (rail behavior) */}
-              <span
-                className={`absolute left-full ml-3 whitespace-nowrap px-3 py-1 rounded-md text-sm font-medium transition-all duration-150 shadow-sm bg-white/90 dark:bg-slate-800/90 text-slate-900 dark:text-slate-100 opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 ${
-                  isActive ? "opacity-100 translate-x-0" : ""
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                aria-label={item.label}
+                aria-current={isActive ? "page" : undefined}
+                className={`group/item relative flex items-center w-full my-2 transition-all duration-200 ease-out ${
+                  isActive
+                    ? "text-theme-primary"
+                    : "text-gray-500 dark:text-gray-400 hover:text-theme-primary"
                 }`}
-                aria-hidden={isActive ? "false" : "true"}
+                onClick={() => handleClick(item.name)}
               >
-                {item.label}
-              </span>
+                {/* Icon */}
+                <div
+                  className={`flex items-center justify-center ml-1 mr-1 p-2 rounded-md transition-all duration-200 ${
+                    isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover/item:shadow-md"
+                  }`}
+                >
+                  <IconComponent className={`drop-shadow-sm ${isActive ? "h-5 w-5" : "h-5 w-5"}`} />
+                </div>
 
-              {/* Active indicator rail dot/pill */}
-              {isActive && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-theme-primary rounded-full shadow-md shadow-theme-primary/40" />
-              )}
-            </Link>
-          )
-        })}
+                {/* Label: shows when rail is expanded (hover) or always for active */}
+                <span
+                  className={`${
+                    isActive
+                      ? "ml-3 pr-3 py-2 rounded-full bg-theme-secondary/10 dark:bg-theme-secondary/20 text-sm font-medium"
+                      : "ml-3 pr-3 py-2 rounded-full text-sm font-medium hidden"
+                  } group-hover:inline-flex transition-all duration-150 items-center`}
+                >
+                  {item.label}
+                </span>
+
+                {/* Active indicator (edge pill) */}
+                {isActive && (
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-theme-primary rounded-full shadow-md shadow-theme-primary/40" />
+                )}
+              </Link>
+            )
+          })}
+        </div>
       </nav>
     </>
   )
