@@ -2,8 +2,16 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Calendar, Bell, Clipboard, Award, Home } from "lucide-react"
 import { useUserSettings } from "@/components/theme-provider"
+
+// Material Symbols mapping for core nav icons (Material 3 expressive style)
+const ICON_MAP: Record<string, string> = {
+  home: "home",
+  timetable: "calendar_month",
+  notices: "notifications",
+  clipboard: "content_paste",
+  awards: "emoji_events",
+}
 
 export type NavItem =
   | "home"
@@ -27,31 +35,31 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
   const allNavItems = [
     {
       name: "home" as NavItem,
-      icon: Home, // Use component directly
+      icon: ICON_MAP.home,
       label: "Home",
       href: "/",
     },
     {
       name: "timetable" as NavItem,
-      icon: Calendar,
+      icon: ICON_MAP.timetable,
       label: "My Synchron",
       href: "/timetable",
     },
     {
       name: "notices" as NavItem,
-      icon: Bell,
+      icon: ICON_MAP.notices,
       label: "Notices",
       href: "/notices",
     },
     {
       name: "clipboard" as NavItem,
-      icon: Clipboard,
+      icon: ICON_MAP.clipboard,
       label: "Clipboard",
       href: "/clipboard",
     },
     {
       name: "awards" as NavItem,
-      icon: Award,
+      icon: ICON_MAP.awards,
       label: "Awards",
       href: "/awards",
     },
@@ -75,7 +83,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
       >
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-          const IconComponent = item.icon
+          const IconName = item.icon as string
 
           return (
             <Link
@@ -91,7 +99,9 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
               onClick={() => handleClick(item.name)}
             >
               <div className={`relative p-1 rounded-full transition-all duration-300 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover:shadow-md"}`}>
-                <IconComponent className="h-5 w-5 drop-shadow-sm" />
+                <span className="material-symbols-rounded icon-optimized drop-shadow-sm" style={{ fontSize: 20 }} aria-hidden>
+                  {IconName}
+                </span>
                 {isActive && (
                   <span className="absolute inset-0 rounded-full ring-2 ring-theme-primary/50 animate-pulse-slow" />
                 )}
@@ -118,9 +128,9 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
         </div>
 
         <div className="w-full mt-2 flex-1 flex flex-col items-start px-1">
-          {navItems.map((item) => {
-            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-            const IconComponent = item.icon
+      {navItems.map((item) => {
+        const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+        const IconName = item.icon as string
 
             return (
               <Link
@@ -141,7 +151,9 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                     isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover/item:shadow-md"
                   }`}
                 >
-                  <IconComponent className={`drop-shadow-sm ${isActive ? "h-5 w-5" : "h-5 w-5"}`} />
+                  <span className="material-symbols-rounded drop-shadow-sm" style={{ fontSize: 20 }} aria-hidden>
+                    {IconName}
+                  </span>
                 </div>
 
                 {/* Label: shows when rail is expanded (hover) or always for active */}

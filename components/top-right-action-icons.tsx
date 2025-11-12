@@ -99,7 +99,11 @@ export default function TopRightActionIcons() {
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v); } }}
         >
           <div className="w-full h-full flex items-center justify-center">
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {open ? (
+              <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>close</span>
+            ) : (
+              <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>menu</span>
+            )}
           </div>
         </button>
 
