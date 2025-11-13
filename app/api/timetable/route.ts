@@ -465,8 +465,30 @@ export async function GET(req: NextRequest) {
       full: fullRes?.json,
     })
 
+    // Build per-day week tag counts for diagnostics
+    const perDayWeekCounts: Record<string, { A: number; B: number; unknown: number }> = {}
+    for (const [dayName, periods] of Object.entries(byDay)) {
+      let a = 0, b = 0, u = 0
+      for (const p of periods) {
+        if (p.weekType === 'A') a += 1
+        else if (p.weekType === 'B') b += 1
+        else u += 1
+      }
+      perDayWeekCounts[dayName] = { A: a, B: b, unknown: u }
+    }
+
     const hasAny = Object.values(byDay).some(a => a.length)
-    if (hasAny) return NextResponse.json({ timetable: byDay, source: 'sbhs-api', weekType })
+    if (hasAny) return NextResponse.json({
+      timetable: byDay,
+      source: 'sbhs-api',
+      weekType,
+      diagnostics: {
+        detectedWeekType: detectedWeekType ?? null,
+        dominantWeekType: dominantWeekType ?? null,
+        weekTally,
+        perDayWeekCounts,
+      }
+    })
 
     return NextResponse.json(
       {
