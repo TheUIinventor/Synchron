@@ -120,7 +120,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
       {/* Desktop: Material 3 - Expressive Navigation Rail (md+) */}
       <nav
         aria-label="Primary navigation"
-        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-14 group-hover:w-56 group-focus-within:w-56 hover:w-56 transition-all duration-200 ease-out flex-col items-start pt-4 pb-4 bg-white/95 dark:bg-slate-900/95 shadow-lg ring-1 ring-slate-100/60 dark:ring-slate-800/60 z-50 rounded-r-2xl overflow-visible"
+        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-14 group-hover:w-56 group-focus-within:w-56 hover:w-56 transition-all duration-200 ease-out flex-col items-start pt-4 pb-4 pl-1 group-hover:pl-4 bg-white/95 dark:bg-slate-900/95 shadow-lg ring-1 ring-slate-100/60 dark:ring-slate-800/60 z-50 rounded-r-2xl overflow-visible"
       >
         {/* Optional top spacer / menu slot */}
         <div className="w-full flex items-center justify-center group-hover:justify-start px-2">
@@ -138,7 +138,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                 href={item.href}
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
-                className={`group/item relative flex items-center w-full my-2 transition-all duration-200 ease-out ${
+                className={`group/item relative flex items-center justify-center group-hover:justify-start w-full my-2 transition-all duration-200 ease-out px-1 ${
                   isActive
                     ? "text-theme-primary"
                     : "text-gray-500 dark:text-gray-400 hover:text-theme-primary"
@@ -147,8 +147,10 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
               >
                 {/* Icon */}
                 <div
-                  className={`flex items-center justify-center ml-1 mr-1 p-2 rounded-md transition-all duration-200 ${
-                    isActive ? "bg-theme-secondary/20 text-theme-primary shadow-md" : "group-hover/item:shadow-sm"
+                  className={`flex items-center justify-center ml-0 mr-0 transition-all duration-200 ${
+                    isActive
+                      ? "p-3 rounded-xl bg-theme-secondary text-theme-primary shadow-md"
+                      : "p-2 rounded-md group-hover/item:shadow-sm"
                   }`}
                 >
                   <span className="material-symbols-rounded drop-shadow-sm" style={{ fontSize: 20 }} aria-hidden>
@@ -160,7 +162,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                 <span
                   className={`${
                     isActive
-                      ? "ml-3 pr-3 py-2 rounded-full bg-theme-secondary/20 dark:bg-theme-secondary/30 text-sm font-medium text-theme-primary"
+                      ? "ml-3 pr-3 py-2 rounded-full bg-theme-secondary text-sm font-medium text-theme-primary"
                       : "ml-3 pr-3 py-2 rounded-full text-sm font-medium hidden"
                   } group-hover:inline-flex group-focus-within:inline-flex transition-all duration-150 items-center`}
                 >
