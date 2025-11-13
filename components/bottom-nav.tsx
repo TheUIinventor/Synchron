@@ -31,6 +31,7 @@ interface BottomNavProps {
 export default function BottomNav({ onNavItemClick }: BottomNavProps) {
   const pathname = usePathname()
   const { navigationTabs } = useUserSettings()
+  const [expanded, setExpanded] = React.useState(false)
 
   const allNavItems = [
     {
@@ -77,7 +78,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
   return (
     <>
       {/* Mobile Navigation (Bottom) */}
-  <nav
+      <nav
         aria-label="Primary navigation"
         className="fixed bottom-0 left-0 right-0 px-3 py-2 z-50 flex justify-between items-stretch md:hidden rounded-t-2xl bg-white/95 dark:bg-slate-900/95 shadow-lg ring-1 ring-slate-100/60 dark:ring-slate-800/60"
       >
@@ -120,17 +121,28 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
       {/* Desktop: Material 3 - Expressive Navigation Rail (md+) */}
       <nav
         aria-label="Primary navigation"
-        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-16 group-hover:w-64 group-focus-within:w-64 hover:w-64 transition-width duration-300 ease-out flex-col items-start pt-3 pb-4 pl-0 group-hover:pl-4 bg-surface-light dark:bg-surface-dark shadow-md ring-1 ring-slate-100/60 dark:ring-slate-800/60 z-50 rounded-r-2xl overflow-hidden"
+        className={`hidden md:flex fixed left-0 top-0 bottom-0 transition-all duration-300 ease-out flex-col items-start pt-3 pb-4 bg-white/95 dark:bg-slate-900/95 shadow-md ring-1 ring-slate-100/60 dark:ring-slate-800/60 z-50 rounded-r-2xl overflow-hidden ${
+          expanded ? "w-64 pl-4" : "w-16 pl-0"
+        }`}
       >
-        {/* Optional top spacer / menu slot */}
-        <div className="w-full flex items-center justify-center group-hover:justify-start px-2">
-          {/* Could add a hamburger or app logo here in future */}
+        {/* Toggle button to expand/collapse the rail */}
+        <div className="w-full flex items-center justify-center">
+          <button
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
+            onClick={() => setExpanded((s) => !s)}
+            className="m-2 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>
+              menu
+            </span>
+          </button>
         </div>
 
         <div className="w-full mt-2 flex-1 flex flex-col items-start px-1">
-      {navItems.map((item) => {
-        const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-        const IconName = item.icon as string
+          {navItems.map((item) => {
+            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+            const IconName = item.icon as string
 
             return (
               <Link
@@ -138,40 +150,43 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                 href={item.href}
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
-                className={`group/item relative flex items-center justify-center group-hover:justify-start w-full my-2 transition-all duration-300 ease-out px-2 ${
+                className={`group/item relative flex items-center ${expanded ? "justify-start px-2" : "justify-center px-0"} w-full my-2 transition-all duration-300 ease-out ${
                   isActive
                     ? "text-theme-primary"
                     : "text-gray-600 dark:text-gray-300 hover:text-theme-primary"
                 }`}
                 onClick={() => handleClick(item.name)}
               >
-                {/* Icon */}
-                <div
-                  className={`flex items-center justify-center ml-0 mr-0 transition-all duration-300 ${
-                    isActive
-                      ? "p-3 rounded-xl bg-theme-secondary text-theme-primary shadow-md"
-                      : "p-2 rounded-md group-hover/item:shadow-sm"
-                  }`}
-                >
-                  <span className="material-symbols-rounded drop-shadow-sm" style={{ fontSize: 20 }} aria-hidden>
-                    {IconName}
-                  </span>
-                </div>
-
-                {/* Label: shows when rail is expanded (hover) or always for active */}
-                <span
-                  className={`ml-3 pr-3 py-2 rounded-full text-sm font-medium transition-all duration-300 items-center transform origin-left ${
-                    isActive
-                      ? "bg-theme-secondary text-theme-primary opacity-100 translate-x-0"
-                      : "opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0"
-                  } group-hover:inline-flex group-focus-within:inline-flex`}
-                >
-                  {item.label}
-                </span>
-
-                {/* Active indicator (edge pill) */}
-                {isActive && (
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-theme-primary rounded-full shadow-md shadow-theme-primary/40" />
+                {/* Render exact pill when expanded and active */}
+                {expanded ? (
+                  isActive ? (
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-2xl bg-theme-secondary/20 text-theme-primary shadow-sm">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-theme-secondary text-theme-primary">
+                        <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>
+                          {IconName}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-600 dark:text-gray-300">
+                        <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>
+                          {IconName}
+                        </span>
+                      </div>
+                      <span className="text-sm text-gray-700 dark:text-gray-200">{item.label}</span>
+                    </div>
+                  )
+                ) : (
+                  // Collapsed: center icons; active item gets filled rounded icon
+                  <div className="flex items-center justify-center w-full">
+                    <div className={isActive ? "p-3 rounded-xl bg-theme-secondary text-theme-primary shadow-md" : "p-2 rounded-md text-gray-600 dark:text-gray-300"}>
+                      <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>
+                        {IconName}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </Link>
             )
