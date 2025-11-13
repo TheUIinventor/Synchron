@@ -144,9 +144,9 @@ export const getTimeUntilNextPeriod = (
 }
 
 // Get day of week
-export const getCurrentDay = (): string => {
+export const getCurrentDay = (date: Date = new Date()): string => {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-  return days[new Date().getDay()]
+  return days[date.getDay()]
 }
 
 // Format date as "Month Day, Year"
