@@ -18,7 +18,7 @@ function prefetchNotices() {
 }
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getCurrentDay, formatDate, getCurrentTime } from "@/utils/time-utils";
+import { getCurrentDay, formatDate, getCurrentTime, isSchoolDayOver } from "@/utils/time-utils";
 import { trackSectionUsage } from "@/utils/usage-tracker";
 import ThemeToggle from "@/components/theme-toggle";
 import SettingsMenu from "@/components/settings-menu";
@@ -571,8 +571,10 @@ export default function HomeClient() {
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Today's Synchron</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate()} • {getCurrentDay()}</p>
+                <h3 className="font-semibold text-lg">{isSchoolDayOver() ? "Your next Synchron" : "Today's Synchron"}</h3>
+                {!isSchoolDayOver() && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate()} • {getCurrentDay()}</p>
+                )}
               </div>
             </div>
             {todaysPeriods.length > 0 ? (
