@@ -6,12 +6,17 @@ function normalizeWeekType(value: any): WeekType | null {
   if (value == null) return null
   const str = String(value).trim().toUpperCase()
   if (!str) return null
+  // Exact single-letter values are valid
   if (str === 'A' || str === 'B') return str as WeekType
-  // Accept strings containing Week A / Week B / TueA etc.
-  const match = str.match(/([AB])(?:[^A-Z]|$)/)
-  if (match) return match[1] as WeekType
-  const suffix = str.slice(-1)
-  if (suffix === 'A' || suffix === 'B') return suffix as WeekType
+
+  // Prefer explicit mentions like "WEEK A", "WEEK: B", "ROTATION A", etc.
+  const explicit = str.match(/\b(?:WEEK|WEEKTYPE|WEEK_LABEL|CYCLE|ROTATION|ROT)\b[^A-Z0-9]*([AB])\b/)
+  if (explicit && explicit[1]) return explicit[1] as WeekType
+
+  // Match a standalone A or B as a whole word (prevents matching parts of room names like "B101")
+  const standalone = str.match(/\b([AB])\b/)
+  if (standalone && standalone[1]) return standalone[1] as WeekType
+
   return null
 }
 
