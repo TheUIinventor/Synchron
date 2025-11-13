@@ -120,7 +120,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
       {/* Desktop: Material 3 - Expressive Navigation Rail (md+) */}
       <nav
         aria-label="Primary navigation"
-        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-14 group-hover:w-56 group-focus-within:w-56 hover:w-56 transition-all duration-200 ease-out flex-col items-start pt-4 pb-4 pl-1 group-hover:pl-4 bg-white/95 dark:bg-slate-900/95 shadow-lg ring-1 ring-slate-100/60 dark:ring-slate-800/60 z-50 rounded-r-2xl overflow-visible"
+        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-16 group-hover:w-64 group-focus-within:w-64 hover:w-64 transition-width duration-300 ease-out flex-col items-start pt-3 pb-4 pl-0 group-hover:pl-4 bg-surface-light dark:bg-surface-dark shadow-md ring-1 ring-slate-100/60 dark:ring-slate-800/60 z-50 rounded-r-2xl overflow-hidden"
       >
         {/* Optional top spacer / menu slot */}
         <div className="w-full flex items-center justify-center group-hover:justify-start px-2">
@@ -138,16 +138,16 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                 href={item.href}
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
-                className={`group/item relative flex items-center justify-center group-hover:justify-start w-full my-2 transition-all duration-200 ease-out px-1 ${
+                className={`group/item relative flex items-center justify-center group-hover:justify-start w-full my-2 transition-all duration-300 ease-out px-2 ${
                   isActive
                     ? "text-theme-primary"
-                    : "text-gray-500 dark:text-gray-400 hover:text-theme-primary"
+                    : "text-gray-600 dark:text-gray-300 hover:text-theme-primary"
                 }`}
                 onClick={() => handleClick(item.name)}
               >
                 {/* Icon */}
                 <div
-                  className={`flex items-center justify-center ml-0 mr-0 transition-all duration-200 ${
+                  className={`flex items-center justify-center ml-0 mr-0 transition-all duration-300 ${
                     isActive
                       ? "p-3 rounded-xl bg-theme-secondary text-theme-primary shadow-md"
                       : "p-2 rounded-md group-hover/item:shadow-sm"
@@ -160,11 +160,11 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
 
                 {/* Label: shows when rail is expanded (hover) or always for active */}
                 <span
-                  className={`${
+                  className={`ml-3 pr-3 py-2 rounded-full text-sm font-medium transition-all duration-300 items-center transform origin-left ${
                     isActive
-                      ? "ml-3 pr-3 py-2 rounded-full bg-theme-secondary text-sm font-medium text-theme-primary"
-                      : "ml-3 pr-3 py-2 rounded-full text-sm font-medium hidden"
-                  } group-hover:inline-flex group-focus-within:inline-flex transition-all duration-150 items-center`}
+                      ? "bg-theme-secondary text-theme-primary opacity-100 translate-x-0"
+                      : "opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0"
+                  } group-hover:inline-flex group-focus-within:inline-flex`}
                 >
                   {item.label}
                 </span>
