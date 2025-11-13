@@ -58,6 +58,28 @@ export default function HomeClient() {
   const { data: profileData, loading: profileLoading, refetch: refetchProfile } = useStudentProfile();
   const [profileOverride, setProfileOverride] = useState<any | null>(null)
 
+  // Try a direct probe of the server-side proxy endpoint on mount to pick up a name
+  // (this helps when the generic hook hasn't resolved yet or returns a wrapped payload)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/portal/userinfo', { credentials: 'include' })
+        if (!res.ok) return
+        const payload = await res.json()
+        // Prefer `data` wrapper if present
+        const candidate = payload?.data ?? payload
+        if (!cancelled && candidate && typeof candidate === 'object') {
+          // only apply if we don't already have an override and candidate looks useful
+          if (!profileOverride) setProfileOverride(candidate)
+        }
+      } catch (e) {
+        // swallow; fallback to existing hook
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   // Diagnostic: try server-side proxy endpoint directly and show result (helps when profileData is empty)
   const [portalDebug, setPortalDebug] = useState<any>(null)
   const [showPortalDebugDetails, setShowPortalDebugDetails] = useState(false)
