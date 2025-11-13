@@ -79,7 +79,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
       {/* Mobile Navigation (Bottom) */}
   <nav
         aria-label="Primary navigation"
-        className="fixed bottom-0 left-0 right-0 glass-nav glass-border px-3 py-2 z-50 flex justify-between items-stretch md:hidden rounded-t-2xl backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-slate-900/50"
+        className="fixed bottom-0 left-0 right-0 px-3 py-2 z-50 flex justify-between items-stretch md:hidden rounded-t-2xl bg-white/95 dark:bg-slate-900/95 shadow-lg ring-1 ring-slate-100/60 dark:ring-slate-800/60"
       >
         {navItems.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
@@ -98,7 +98,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
               }`}
               onClick={() => handleClick(item.name)}
             >
-              <div className={`relative p-1 rounded-full transition-all duration-300 ${isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover:shadow-md"}`}>
+              <div className={`relative p-1 rounded-full transition-all duration-200 ${isActive ? "bg-theme-secondary/20 text-theme-primary shadow-md" : "group-hover:shadow-sm"}`}>
                 <span className="material-symbols-rounded icon-optimized drop-shadow-sm" style={{ fontSize: 20 }} aria-hidden>
                   {IconName}
                 </span>
@@ -120,7 +120,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
       {/* Desktop: Material 3 - Expressive Navigation Rail (md+) */}
       <nav
         aria-label="Primary navigation"
-        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-14 group-hover:w-48 hover:w-48 transition-all duration-200 ease-out flex-col items-start pt-4 pb-4 glass-nav glass-border z-50 rounded-r-2xl backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-slate-900/40 overflow-visible"
+        className="hidden md:flex group fixed left-0 top-0 bottom-0 w-14 group-hover:w-56 group-focus-within:w-56 hover:w-56 transition-all duration-200 ease-out flex-col items-start pt-4 pb-4 bg-white/95 dark:bg-slate-900/95 shadow-lg ring-1 ring-slate-100/60 dark:ring-slate-800/60 z-50 rounded-r-2xl overflow-visible"
       >
         {/* Optional top spacer / menu slot */}
         <div className="w-full flex items-center justify-center group-hover:justify-start px-2">
@@ -148,7 +148,7 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                 {/* Icon */}
                 <div
                   className={`flex items-center justify-center ml-1 mr-1 p-2 rounded-md transition-all duration-200 ${
-                    isActive ? "glass-icon-enhanced bg-theme-secondary" : "glass-icon group-hover/item:shadow-md"
+                    isActive ? "bg-theme-secondary/20 text-theme-primary shadow-md" : "group-hover/item:shadow-sm"
                   }`}
                 >
                   <span className="material-symbols-rounded drop-shadow-sm" style={{ fontSize: 20 }} aria-hidden>
@@ -160,9 +160,9 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                 <span
                   className={`${
                     isActive
-                      ? "ml-3 pr-3 py-2 rounded-full bg-theme-secondary/10 dark:bg-theme-secondary/20 text-sm font-medium"
+                      ? "ml-3 pr-3 py-2 rounded-full bg-theme-secondary/20 dark:bg-theme-secondary/30 text-sm font-medium text-theme-primary"
                       : "ml-3 pr-3 py-2 rounded-full text-sm font-medium hidden"
-                  } group-hover:inline-flex transition-all duration-150 items-center`}
+                  } group-hover:inline-flex group-focus-within:inline-flex transition-all duration-150 items-center`}
                 >
                   {item.label}
                 </span>
