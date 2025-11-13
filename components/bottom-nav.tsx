@@ -179,13 +179,18 @@ export default function BottomNav({ onNavItemClick }: BottomNavProps) {
                     </div>
                   )
                 ) : (
-                  // Collapsed: center icons; active item gets filled rounded icon
-                  <div className="flex items-center justify-center w-full">
-                    <div className={isActive ? "p-3 rounded-xl bg-theme-secondary text-theme-primary shadow-md" : "p-2 rounded-md text-gray-600 dark:text-gray-300"}>
-                      <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>
-                        {IconName}
-                      </span>
+                  // Collapsed: pill behind icon with label beneath (image 2 style)
+                  <div className="w-full flex flex-col items-center">
+                    <div className={`flex items-center justify-center rounded-2xl transition-colors duration-200 ${
+                      isActive ? "px-3 py-3 bg-theme-secondary/30" : "px-2 py-2"
+                    }`}>
+                      <div className={`${isActive ? "w-10 h-10 rounded-lg flex items-center justify-center bg-theme-secondary text-theme-primary shadow-md" : "w-10 h-10 rounded-lg flex items-center justify-center text-gray-600 dark:text-gray-300"}`}>
+                        <span className="material-symbols-rounded" style={{ fontSize: 20 }} aria-hidden>
+                          {IconName}
+                        </span>
+                      </div>
                     </div>
+                    <span className="text-xs mt-2 text-gray-700 dark:text-gray-200">{item.label}</span>
                   </div>
                 )}
               </Link>
