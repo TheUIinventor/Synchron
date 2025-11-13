@@ -298,7 +298,7 @@ export default function HomeClient() {
 
                   if (maybeGiven) {
                     const first = maybeGiven.split(/\s+/)[0]
-                    return `Welcome Back, ${first}!`
+                    return `Hello, ${first}!`
                   }
 
                   if (attemptingRefresh) {
@@ -307,7 +307,7 @@ export default function HomeClient() {
                     )
                   }
 
-                  return "Welcome!"
+                  return "Hello!"
                 })()}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Your school day at a glance</p>
