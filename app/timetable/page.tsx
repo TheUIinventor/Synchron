@@ -281,79 +281,84 @@ export default function TimetablePage() {
                 </div>
               </div>
 
-              {isWeekend ? (
+              {isWeekend && (
                 <div className="py-8 text-center text-gray-500 dark:text-gray-400 glass-card rounded-xl">
                   No classes scheduled for weekends
                 </div>
-              ) : todaysTimetable.length > 0 ? (
-                  <>
-                    {showDiag && (
-                      <div className="w-full px-4 mb-4">
-                        <Card className="one-ui-card p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-medium">Portal Diagnostics</div>
-                            <div>
-                              <button
-                                className="px-2 py-1 text-xs rounded-full glass-card"
-                                onClick={() => {
-                                  setShowDiag(false)
-                                  setDiagResult(null)
-                                }}
-                              >
-                                Close
-                              </button>
-                            </div>
+              )}
+
+              {!isWeekend && todaysTimetable.length > 0 && (
+                <>
+                  {showDiag && (
+                    <div className="w-full px-4 mb-4">
+                      <Card className="one-ui-card p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium">Portal Diagnostics</div>
+                          <div>
+                            <button
+                              className="px-2 py-1 text-xs rounded-full glass-card"
+                              onClick={() => {
+                                setShowDiag(false)
+                                setDiagResult(null)
+                              }}
+                            >
+                              Close
+                            </button>
                           </div>
-                          <div className="text-xs text-gray-600 dark:text-gray-300">
-                            {diagLoading && <div>Running diagnostics…</div>}
-                            {!diagLoading && diagResult && (
-                              <pre className="text-xs overflow-auto max-h-64 bg-gray-50 dark:bg-gray-800 p-2 rounded">{JSON.stringify(diagResult, null, 2)}</pre>
-                            )}
-                            {!diagLoading && !diagResult && (
-                              <div className="text-sm text-gray-500">No diagnostics run yet. Click Diagnostics to probe portal endpoints.</div>
-                            )}
-                          </div>
-                        </Card>
-                      </div>
-                    )}
-
-                <div className="space-y-1.5">
-                  {todaysTimetable.map((period) => (
-                    <div
-                      key={period.id}
-                      className={`rounded-xl p-2 transition-all duration-200 ease-in-out ${
-                        period.subject === "Break" ? "glass-card" : "bg-theme-secondary"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        {/* Time on the left */}
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0 w-[4.5rem] text-left">
-                          {period.time.split(" - ")[0]} {/* Only show start time */}
-                        </span>
-
-                        {/* Subject */}
-                        <span className="font-semibold text-sm flex-1 min-w-0 truncate">
-                          {getDisplaySubject(period)}
-                        </span>
-
-                        {/* Teacher and Room (only for non-break periods) */}
-                        {period.subject !== "Break" && (
-                          <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-2">
-                            <span>{period.teacher} • {period.room}</span>
-                            {/* Substitution / room-change badges */}
-                            {period.isSubstitute && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800">Sub</span>
-                            )}
-                            {period.isRoomChange && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">Room</span>
-                            )}
-                          </span>
-                        )}
-                      </div>
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-300">
+                          {diagLoading && <div>Running diagnostics…</div>}
+                          {!diagLoading && diagResult && (
+                            <pre className="text-xs overflow-auto max-h-64 bg-gray-50 dark:bg-gray-800 p-2 rounded">{JSON.stringify(diagResult, null, 2)}</pre>
+                          )}
+                          {!diagLoading && !diagResult && (
+                            <div className="text-sm text-gray-500">No diagnostics run yet. Click Diagnostics to probe portal endpoints.</div>
+                          )}
+                        </div>
+                      </Card>
                     </div>
-                  ))}
-                </div>
-              ) : (
+                  )}
+
+                  <div className="space-y-1.5">
+                    {todaysTimetable.map((period) => (
+                      <div
+                        key={period.id}
+                        className={`rounded-xl p-2 transition-all duration-200 ease-in-out ${
+                          period.subject === "Break" ? "glass-card" : "bg-theme-secondary"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          {/* Time on the left */}
+                          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0 w-[4.5rem] text-left">
+                            {period.time.split(" - ")[0]} {/* Only show start time */}
+                          </span>
+
+                          {/* Subject */}
+                          <span className="font-semibold text-sm flex-1 min-w-0 truncate">
+                            {getDisplaySubject(period)}
+                          </span>
+
+                          {/* Teacher and Room (only for non-break periods) */}
+                          {period.subject !== "Break" && (
+                            <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-2">
+                              <span>{period.teacher} • {period.room}</span>
+                              {/* Substitution / room-change badges */}
+                              {period.isSubstitute && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800">Sub</span>
+                              )}
+                              {period.isRoomChange && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">Room</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {!isWeekend && todaysTimetable.length === 0 && (
                 <div className="py-8 text-center text-gray-500 dark:text-gray-400 glass-card rounded-xl">
                   No classes scheduled for this day
                 </div>
