@@ -93,7 +93,9 @@ export function applySubstitutionsToTimetable(
     fromRoom?: string
     toRoom?: string
     reason?: string
-  }>
+    room?: string
+  }>,
+  options?: { debug?: boolean }
 ): Record<string, Period[]> {
   // Create shallow copy of timetable structure
   const result: Record<string, Period[]> = {}
@@ -140,22 +142,30 @@ export function applySubstitutionsToTimetable(
         const subjectMatch = sub.subject ? normalize(period.subject).includes(normalize(sub.subject)) || normalize(sub.subject).includes(normalize(period.subject)) : true
 
         if (periodMatch && subjectMatch) {
-          // Replace teacher and room values when substitution provides them
+          // Track whether we changed anything for debug output
+          let changed = false
+
+          // Replace teacher when substitution provides one
           if (sub.substituteTeacher && sub.substituteTeacher !== period.teacher) {
             period.isSubstitute = true
+            const prev = period.teacher
             period.teacher = sub.substituteTeacher
+            changed = true
+            if (options?.debug) console.debug(`Applied substitute teacher: ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`)
           }
-          if (sub.toRoom && sub.toRoom !== period.room) {
+
+          // Prefer explicit toRoom, then room, then fromRoom as replacement
+          const newRoom = sub.toRoom || sub.room || sub.fromRoom
+          if (newRoom && newRoom !== period.room) {
             period.isRoomChange = true
-            period.room = sub.toRoom
+            const prevRoom = period.room
+            period.room = newRoom
+            changed = true
+            if (options?.debug) console.debug(`Applied room change: ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
           }
-          // Also handle cases where only 'room' or 'replacement' fields are present
-          if (!sub.toRoom && (sub.fromRoom || sub.room)) {
-            const newRoom = sub.room || sub.fromRoom
-            if (newRoom && newRoom !== period.room) {
-              period.isRoomChange = true
-              period.room = newRoom
-            }
+
+          if (options?.debug && !changed) {
+            console.debug(`Matched substitution but no field replacements: (day=${day} period=${period.period} subject=${period.subject})`, sub)
           }
         }
       })

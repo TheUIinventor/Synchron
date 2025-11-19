@@ -253,12 +253,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const res = await fetch('/api/portal/substitutions', { credentials: 'include' })
         const ctype = res.headers.get('content-type') || ''
-        if (res.ok && ctype.includes('application/json')) {
+            if (res.ok && ctype.includes('application/json')) {
           const j = await res.json()
           const subs = j.substitutions || []
           if (!cancelled && subs.length > 0) {
             try {
-              const applied = applySubstitutionsToTimetable(externalTimetable, subs)
+              const applied = applySubstitutionsToTimetable(externalTimetable, subs, { debug: true })
               setExternalTimetable(applied)
               subsAppliedRef.current = Date.now()
             } catch (e) {
@@ -362,7 +362,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       const subsCtype = subsRes.headers.get('content-type') || ''
                       if (subsRes.ok && subsCtype.includes('application/json')) {
                         const subsJson = await subsRes.json()
-                        const applied = applySubstitutionsToTimetable(jht.timetable, subsJson.substitutions || [])
+                        const applied = applySubstitutionsToTimetable(jht.timetable, subsJson.substitutions || [], { debug: true })
                         setExternalTimetable(applied)
                       } else {
                         setExternalTimetable(jht.timetable)
@@ -385,7 +385,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       const subsCtype = subsRes.headers.get('content-type') || ''
                       if (subsRes.ok && subsCtype.includes('application/json')) {
                         const subsJson = await subsRes.json()
-                        const applied = applySubstitutionsToTimetable(parsedHt, subsJson.substitutions || [])
+                        const applied = applySubstitutionsToTimetable(parsedHt, subsJson.substitutions || [], { debug: true })
                         setExternalTimetable(applied)
                       } else {
                         setExternalTimetable(parsedHt)
@@ -416,7 +416,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       const subsCtype = subsRes.headers.get('content-type') || ''
                       if (subsRes.ok && subsCtype.includes('application/json')) {
                         const subsJson = await subsRes.json()
-                        const applied = applySubstitutionsToTimetable(parsedHp, subsJson.substitutions || [])
+                        const applied = applySubstitutionsToTimetable(parsedHp, subsJson.substitutions || [], { debug: true })
                         setExternalTimetable(applied)
                       } else {
                         setExternalTimetable(parsedHp)
