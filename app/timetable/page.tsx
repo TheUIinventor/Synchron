@@ -20,6 +20,32 @@ export default function TimetablePage() {
     trackSectionUsage("timetable")
   }, [])
 
+  const [showDiag, setShowDiag] = useState(false)
+  const [diagLoading, setDiagLoading] = useState(false)
+  const [diagResult, setDiagResult] = useState<any | null>(null)
+
+  const fetchDiagnostics = async () => {
+    setShowDiag(true)
+    setDiagLoading(true)
+    try {
+      const res = await fetch('/api/portal/substitutions/debug', { credentials: 'include' })
+      const ctype = res.headers.get('content-type') || ''
+      let payload: any
+      if (res.ok && ctype.includes('application/json')) {
+        payload = await res.json()
+      } else {
+        // try to get text fallback
+        const text = await res.text()
+        payload = { text: text.slice(0, 2000), status: res.status }
+      }
+      setDiagResult(payload)
+    } catch (e) {
+      setDiagResult({ error: String(e) })
+    } finally {
+      setDiagLoading(false)
+    }
+  }
+
   // Get day name from selected date
   const getSelectedDayName = () => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -133,6 +159,13 @@ export default function TimetablePage() {
               title="Retry loading live timetable"
             >
               Refresh
+            </button>
+            <button
+              onClick={() => fetchDiagnostics()}
+              className="hidden md:inline-flex px-3 py-1 rounded-full glass-card text-sm"
+              title="Run portal diagnostics"
+            >
+              {diagLoading ? 'Checking...' : 'Diagnostics'}
             </button>
           </div>
           <div className="w-6"></div>
@@ -253,6 +286,37 @@ export default function TimetablePage() {
                   No classes scheduled for weekends
                 </div>
               ) : todaysTimetable.length > 0 ? (
+                  <>
+                    {showDiag && (
+                      <div className="w-full px-4 mb-4">
+                        <Card className="one-ui-card p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">Portal Diagnostics</div>
+                            <div>
+                              <button
+                                className="px-2 py-1 text-xs rounded-full glass-card"
+                                onClick={() => {
+                                  setShowDiag(false)
+                                  setDiagResult(null)
+                                }}
+                              >
+                                Close
+                              </button>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-300">
+                            {diagLoading && <div>Running diagnostics…</div>}
+                            {!diagLoading && diagResult && (
+                              <pre className="text-xs overflow-auto max-h-64 bg-gray-50 dark:bg-gray-800 p-2 rounded">{JSON.stringify(diagResult, null, 2)}</pre>
+                            )}
+                            {!diagLoading && !diagResult && (
+                              <div className="text-sm text-gray-500">No diagnostics run yet. Click Diagnostics to probe portal endpoints.</div>
+                            )}
+                          </div>
+                        </Card>
+                      </div>
+                    )}
+
                 <div className="space-y-1.5">
                   {todaysTimetable.map((period) => (
                     <div
