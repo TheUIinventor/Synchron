@@ -309,7 +309,19 @@ export default function TimetablePage() {
                         <div className="text-xs text-gray-600 dark:text-gray-300">
                           {diagLoading && <div>Running diagnostics…</div>}
                           {!diagLoading && diagResult && (
-                            <pre className="text-xs overflow-auto max-h-64 bg-gray-50 dark:bg-gray-800 p-2 rounded">{JSON.stringify(diagResult, null, 2)}</pre>
+                            <>
+                              <pre className="text-xs overflow-auto max-h-64 bg-gray-50 dark:bg-gray-800 p-2 rounded">{JSON.stringify(diagResult, null, 2)}</pre>
+                              {/* If the portal returned an HTML login page, surface a Sign in CTA */}
+                              {Array.isArray(diagResult.results) && diagResult.results.some((r: any) => (r.contentType || '').includes('text/html') && (r.snippet || '').toLowerCase().includes('sign in')) && (
+                                <div className="mt-2">
+                                  <div className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">Diagnostics detected the portal login page — please sign in to the SBHS portal to allow Synchron to fetch live JSON.</div>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => { try { window.location.href = '/api/auth/login' } catch { window.location.assign('/api/auth/login') } }}>Sign in to portal</Button>
+                                    <Button size="sm" variant="outline" onClick={() => fetchDiagnostics()}>Re-run diagnostics</Button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           )}
                           {!diagLoading && !diagResult && (
                             <div className="text-sm text-gray-500">No diagnostics run yet. Click Diagnostics to probe portal endpoints.</div>
