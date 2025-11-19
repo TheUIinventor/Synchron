@@ -105,14 +105,42 @@ export function applySubstitutionsToTimetable(
   substitutions.forEach((sub) => {
     if (!sub) return
     // If date is present, try to map to day name; otherwise apply across all days
-    const candidateDays = Object.keys(result)
+    const candidateDays = (() => {
+      if (sub.date) {
+        try {
+          const d = new Date(sub.date)
+          if (!isNaN(d.getTime())) {
+            const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+            const name = names[d.getDay()]
+            return [name]
+          }
+        } catch (e) {
+          // ignore parse errors and fall back to all days
+        }
+        // try to match textual day names
+        const dayNames = Object.keys(result)
+        const found = dayNames.filter((dn) => sub.date && dn.toLowerCase().includes(sub.date.toLowerCase()))
+        if (found.length > 0) return found
+      }
+      return Object.keys(result)
+    })()
+
+    // normalizers for comparison
+    const normalize = (s?: string) => (s || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim()
 
     candidateDays.forEach((day) => {
       result[day].forEach((period) => {
-        const periodMatch = sub.period ? String(sub.period).trim() === String(period.period).trim() : true
-        const subjectMatch = sub.subject ? (period.subject || "").toLowerCase().includes(String(sub.subject).toLowerCase()) : true
+        // Normalize period identifiers: allow matching "1", "Period 1", "p1"
+        const subPeriodNorm = normalize(sub.period)
+        const periodNorm = normalize(period.period)
+
+        const periodMatch = sub.period ? (subPeriodNorm === periodNorm || periodNorm.endsWith(subPeriodNorm) || subPeriodNorm.endsWith(periodNorm)) : true
+
+        // Subject match: fuzzy contains or exact after normalization
+        const subjectMatch = sub.subject ? normalize(period.subject).includes(normalize(sub.subject)) || normalize(sub.subject).includes(normalize(period.subject)) : true
+
         if (periodMatch && subjectMatch) {
-          // Flag and update teacher/room where applicable
+          // Replace teacher and room values when substitution provides them
           if (sub.substituteTeacher && sub.substituteTeacher !== period.teacher) {
             period.isSubstitute = true
             period.teacher = sub.substituteTeacher
@@ -120,6 +148,14 @@ export function applySubstitutionsToTimetable(
           if (sub.toRoom && sub.toRoom !== period.room) {
             period.isRoomChange = true
             period.room = sub.toRoom
+          }
+          // Also handle cases where only 'room' or 'replacement' fields are present
+          if (!sub.toRoom && (sub.fromRoom || sub.room)) {
+            const newRoom = sub.room || sub.fromRoom
+            if (newRoom && newRoom !== period.room) {
+              period.isRoomChange = true
+              period.room = newRoom
+            }
           }
         }
       })
