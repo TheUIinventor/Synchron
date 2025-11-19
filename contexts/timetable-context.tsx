@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useMemo, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay } from "@/utils/time-utils"
 
@@ -236,6 +236,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
   }, [currentWeek, externalTimetable])
+
+  // Track whether substitutions have been applied to the current external timetable
+  const subsAppliedRef = useRef<number | null>(null)
+
+  // When an external timetable is loaded, attempt to fetch live substitutions and apply them once.
+  useEffect(() => {
+    if (!externalTimetable) return
+    if (!timetableSource) return
+    if (timetableSource === 'fallback-sample') return
+    if (subsAppliedRef.current) return
+
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const res = await fetch('/api/portal/substitutions', { credentials: 'include' })
+        const ctype = res.headers.get('content-type') || ''
+        if (res.ok && ctype.includes('application/json')) {
+          const j = await res.json()
+          const subs = j.substitutions || []
+          if (!cancelled && subs.length > 0) {
+            try {
+              const applied = applySubstitutionsToTimetable(externalTimetable, subs)
+              setExternalTimetable(applied)
+              subsAppliedRef.current = Date.now()
+            } catch (e) {
+              // ignore apply errors
+            }
+          } else {
+            subsAppliedRef.current = Date.now()
+          }
+        }
+      } catch (e) {
+        // ignore network errors
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [externalTimetable, timetableSource])
 
   // Try to fetch external timetable on mount
   useEffect(() => {

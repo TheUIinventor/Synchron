@@ -274,8 +274,15 @@ export default function TimetablePage() {
 
                         {/* Teacher and Room (only for non-break periods) */}
                         {period.subject !== "Break" && (
-                          <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto">
-                            {period.teacher} • {period.room}
+                          <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-2">
+                            <span>{period.teacher} • {period.room}</span>
+                            {/* Substitution / room-change badges */}
+                            {period.isSubstitute && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800">Sub</span>
+                            )}
+                            {period.isRoomChange && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">Room</span>
+                            )}
                           </span>
                         )}
                       </div>
@@ -350,7 +357,15 @@ export default function TimetablePage() {
                             </div>
                             <div className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">
                               {/* Desktop: keep room inline. Mobile: show subject name with room underneath */}
-                              <div className="hidden md:block">{period.room}</div>
+                              <div className="hidden md:block flex items-center gap-2">
+                                <span>{period.room}</span>
+                                {period.isRoomChange && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">Room</span>
+                                )}
+                                {period.isSubstitute && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800">Sub</span>
+                                )}
+                              </div>
                               <div className="md:hidden flex flex-col">
                                 <span className="font-semibold text-sm truncate">{period.subject}</span>
                                 <span className="text-xs text-gray-600 dark:text-gray-300 truncate">{period.room}</span>
