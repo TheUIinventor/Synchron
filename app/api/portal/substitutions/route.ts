@@ -54,11 +54,22 @@ function collectFromJson(data: any) {
 export async function GET(req: Request) {
   try {
     const rawCookie = req.headers.get('cookie') || ''
+    // If the app has a stored sbhs_access_token (set by our auth callback), forward it as a Bearer token.
+    // This is necessary because browser cookies for student.sbhs.net.au are not available to the server proxy.
+    const accessToken = (() => {
+      try {
+        // Next.js Request in Edge/Route handler doesn't expose cookies via req.cookies, so parse header as fallback
+        const m = rawCookie.match(/(?:^|; )sbhs_access_token=([^;]+)/)
+        return m ? decodeURIComponent(m[1]) : undefined
+      } catch { return undefined }
+    })()
+
     const headers: Record<string, string> = {
       'Accept': 'application/json, text/html;q=0.9,*/*;q=0.8',
       'User-Agent': 'Mozilla/5.0 (compatible; Synchron/1.0; +https://example.com)'
     }
     if (rawCookie) headers['Cookie'] = rawCookie
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
     // Try JSON endpoints first
     const endpoints = ['/timetable/timetable.json', '/timetable/daytimetable.json']
