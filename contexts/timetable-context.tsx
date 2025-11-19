@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, type ReactNode } from "react"
+import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay } from "@/utils/time-utils"
 
 // Define the period type
@@ -316,8 +317,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const jht = await ht.json()
                 if (jht && jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
                   if (!cancelled) {
-                    setExternalTimetable(jht.timetable)
-                    setTimetableSource(jht.source ?? 'external-homepage')
+                    // apply substitutions if available
+                    try {
+                      const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
+                      const subsCtype = subsRes.headers.get('content-type') || ''
+                      if (subsRes.ok && subsCtype.includes('application/json')) {
+                        const subsJson = await subsRes.json()
+                        const applied = applySubstitutionsToTimetable(jht.timetable, subsJson.substitutions || [])
+                        setExternalTimetable(applied)
+                      } else {
+                        setExternalTimetable(jht.timetable)
+                      }
+                      setTimetableSource(jht.source ?? 'external-homepage')
+                    } catch (e) {
+                      setExternalTimetable(jht.timetable)
+                      setTimetableSource(jht.source ?? 'external-homepage')
+                    }
                   }
                   return
                 }
@@ -325,11 +340,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const html = await ht.text()
                 const parsedHt = parseTimetableHtml(html)
                 const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
-                if (hasHt && !cancelled) {
-                  setExternalTimetable(parsedHt)
-                  setTimetableSource('external-homepage')
-                  return
-                }
+                  if (hasHt && !cancelled) {
+                    try {
+                      const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
+                      const subsCtype = subsRes.headers.get('content-type') || ''
+                      if (subsRes.ok && subsCtype.includes('application/json')) {
+                        const subsJson = await subsRes.json()
+                        const applied = applySubstitutionsToTimetable(parsedHt, subsJson.substitutions || [])
+                        setExternalTimetable(applied)
+                      } else {
+                        setExternalTimetable(parsedHt)
+                      }
+                      setTimetableSource('external-homepage')
+                    } catch (e) {
+                      setExternalTimetable(parsedHt)
+                      setTimetableSource('external-homepage')
+                    }
+                    return
+                  }
               }
             } catch (e) {
               // ignore home-timetable fetch errors and fall back to homepage or /api/timetable below
@@ -343,11 +371,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const html = await hp.text()
                 const parsedHp = parseTimetableHtml(html)
                 const hasHp = Object.values(parsedHp).some((arr) => arr.length > 0)
-                if (hasHp && !cancelled) {
-                  setExternalTimetable(parsedHp)
-                  setTimetableSource('external-homepage')
-                  return
-                }
+                  if (hasHp && !cancelled) {
+                    try {
+                      const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
+                      const subsCtype = subsRes.headers.get('content-type') || ''
+                      if (subsRes.ok && subsCtype.includes('application/json')) {
+                        const subsJson = await subsRes.json()
+                        const applied = applySubstitutionsToTimetable(parsedHp, subsJson.substitutions || [])
+                        setExternalTimetable(applied)
+                      } else {
+                        setExternalTimetable(parsedHp)
+                      }
+                      setTimetableSource('external-homepage')
+                    } catch (e) {
+                      setExternalTimetable(parsedHp)
+                      setTimetableSource('external-homepage')
+                    }
+                    return
+                  }
               } else if (hctype.includes('application/json') && hp.ok) {
                 try {
                   const jhp = await hp.json()

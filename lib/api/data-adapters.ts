@@ -81,6 +81,54 @@ export function adaptNoticesData(notices: Notice[]) {
   }))
 }
 
+// Apply substitutions/variations to an existing timetable (in-place copy)
+export function applySubstitutionsToTimetable(
+  timetable: Record<string, Period[]>,
+  substitutions: Array<{
+    date?: string
+    period?: string
+    subject?: string
+    originalTeacher?: string
+    substituteTeacher?: string
+    fromRoom?: string
+    toRoom?: string
+    reason?: string
+  }>
+): Record<string, Period[]> {
+  // Create shallow copy of timetable structure
+  const result: Record<string, Period[]> = {}
+  Object.keys(timetable).forEach((d) => {
+    result[d] = timetable[d].map((p) => ({ ...p }))
+  })
+
+  // Simple heuristic: match substitution by period string and subject (if provided)
+  substitutions.forEach((sub) => {
+    if (!sub) return
+    // If date is present, try to map to day name; otherwise apply across all days
+    const candidateDays = Object.keys(result)
+
+    candidateDays.forEach((day) => {
+      result[day].forEach((period) => {
+        const periodMatch = sub.period ? String(sub.period).trim() === String(period.period).trim() : true
+        const subjectMatch = sub.subject ? (period.subject || "").toLowerCase().includes(String(sub.subject).toLowerCase()) : true
+        if (periodMatch && subjectMatch) {
+          // Flag and update teacher/room where applicable
+          if (sub.substituteTeacher && sub.substituteTeacher !== period.teacher) {
+            period.isSubstitute = true
+            period.teacher = sub.substituteTeacher
+          }
+          if (sub.toRoom && sub.toRoom !== period.room) {
+            period.isRoomChange = true
+            period.room = sub.toRoom
+          }
+        }
+      })
+    })
+  })
+
+  return result
+}
+
 // Convert API award points to app format
 export function adaptAwardPointsData(awards: AwardPoint[]) {
   return awards.map((award) => ({

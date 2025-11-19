@@ -17,6 +17,8 @@ export interface AuthTokens {
   expiresAt: number
 }
 
+import { PortalScraper } from "./portal-scraper"
+
 class SBHSPortalClient {
   private baseUrl: string
   private portalUrl: string
@@ -296,6 +298,42 @@ class SBHSPortalClient {
     return this.makePortalRequest<TimetableResponse>(`/timetable${weekParam}`)
   }
 
+  // Substitutions / variations - try JSON API endpoints first, then HTML fallback
+  async getSubstitutions(): Promise<ApiResponse<SubstitutionsResponse>> {
+    try {
+      // Try official JSON endpoint(s)
+      const primary = await this.makePortalRequest<any>(`/timetable/timetable.json`)
+      if (primary.success && primary.data) {
+        const subs = PortalScraper.extractVariationsFromJson(primary.data)
+        if (subs && subs.length > 0) {
+          return { success: true, data: { substitutions: subs, lastUpdated: new Date().toISOString() } }
+        }
+      }
+
+      const secondary = await this.makePortalRequest<any>(`/timetable/daytimetable.json`)
+      if (secondary.success && secondary.data) {
+        const subs = PortalScraper.extractVariationsFromJson(secondary.data)
+        if (subs && subs.length > 0) {
+          return { success: true, data: { substitutions: subs, lastUpdated: new Date().toISOString() } }
+        }
+      }
+
+      // HTML fallback: fetch the timetable page and scrape for variations
+      if (typeof window !== "undefined") {
+        const resp = await fetch(`${this.portalUrl}/timetable`, { credentials: "include" })
+        if (resp.ok) {
+          const text = await resp.text()
+          const subs = PortalScraper.extractVariationsFromHtml(text)
+          return { success: true, data: { substitutions: subs, lastUpdated: new Date().toISOString() } }
+        }
+      }
+
+      return { success: true, data: { substitutions: [], lastUpdated: new Date().toISOString() } }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
   // Daily Notices - scrape from notices page
   async getDailyNotices(date?: string): Promise<ApiResponse<NoticesResponse>> {
     const dateParam = date ? `?date=${date}` : ""
@@ -392,6 +430,24 @@ export interface NoticesResponse {
   notices: Notice[]
   totalCount: number
   lastUpdated: string
+}
+
+export interface Substitution {
+  id?: string
+  date?: string
+  period?: string
+  subject?: string
+  originalTeacher?: string
+  substituteTeacher?: string
+  fromRoom?: string
+  toRoom?: string
+  reason?: string
+  raw?: any
+}
+
+export interface SubstitutionsResponse {
+  substitutions: Substitution[]
+  lastUpdated?: string
 }
 
 export interface BellTime {

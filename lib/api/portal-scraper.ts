@@ -116,6 +116,126 @@ export class PortalScraper {
     return student
   }
 
+  // Attempt to extract variations/substitutions from a parsed JSON object
+  static extractVariationsFromJson(data: any): any[] {
+    if (!data) return []
+
+    // Common locations: data.variations, data.classVariations, data.days[].variations
+    const collected: any[] = []
+
+    const pushVariation = (v: any) => {
+      if (!v) return
+      const normalize = (obj: any) => {
+        return {
+          id: obj.id || obj.variationId || obj.vid || undefined,
+          date: obj.date || obj.day || obj.when || undefined,
+          period: obj.period || obj.periodName || obj.t || undefined,
+          subject: obj.subject || obj.class || obj.title || undefined,
+          originalTeacher: obj.teacher || obj.originalTeacher || obj.teacherName || undefined,
+          substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || undefined,
+          fromRoom: obj.fromRoom || obj.from || obj.oldRoom || undefined,
+          toRoom: obj.toRoom || obj.to || obj.room || obj.newRoom || undefined,
+          reason: obj.reason || obj.note || obj.comment || undefined,
+          raw: obj,
+        }
+      }
+
+      if (Array.isArray(v)) {
+        v.forEach((x) => collected.push(normalize(x)))
+      } else if (typeof v === "object") {
+        collected.push(normalize(v))
+      }
+    }
+
+    if (Array.isArray(data.variations)) pushVariation(data.variations)
+    if (Array.isArray(data.classVariations)) pushVariation(data.classVariations)
+
+    // Some APIs nest timetable by days
+    if (Array.isArray(data.days)) {
+      data.days.forEach((d: any) => {
+        if (Array.isArray(d.variations)) pushVariation(d.variations)
+        if (Array.isArray(d.classVariations)) pushVariation(d.classVariations)
+      })
+    }
+
+    // Some endpoints attach variations under timetable or similar
+    if (data.timetable && Array.isArray(data.timetable.variations)) pushVariation(data.timetable.variations)
+
+    // As a last resort, search recursively for arrays that look like variations
+    const searchForArrays = (obj: any) => {
+      if (!obj || typeof obj !== "object") return
+      for (const k of Object.keys(obj)) {
+        const val = obj[k]
+        if (Array.isArray(val) && val.length > 0 && typeof val[0] === "object") {
+          // Heuristic: array items that have keys like 'teacher' or 'substitute' or 'room'
+          const sample = val[0]
+          const keys = Object.keys(sample).join("|").toLowerCase()
+          if (keys.includes("substitute") || keys.includes("variation") || keys.includes("room") || keys.includes("teacher")) {
+            pushVariation(val)
+          }
+        } else if (typeof val === "object") {
+          searchForArrays(val)
+        }
+      }
+    }
+
+    searchForArrays(data)
+
+    return collected
+  }
+
+  // Extract variations/substitutions from an HTML timetable/notice page
+  static extractVariationsFromHtml(html: string): any[] {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, "text/html")
+
+    const keywords = ["variation", "substitute", "substitutions", "relief", "replacement", "room change", "room"]
+    const tables = Array.from(doc.querySelectorAll("table"))
+    const results: any[] = []
+
+    for (const table of tables) {
+      const headerText = table.textContent?.toLowerCase() || ""
+      if (keywords.some((k) => headerText.includes(k))) {
+        // parse rows
+        const rows = Array.from(table.querySelectorAll("tr")).slice(1)
+        rows.forEach((row) => {
+          const cells = Array.from(row.querySelectorAll("td, th"))
+          const textCells = cells.map((c) => c.textContent?.trim() || "")
+          // Map heuristically: period, subject, teacher, substitute, fromRoom, toRoom, reason
+          results.push({
+            period: textCells[0] || undefined,
+            subject: textCells[1] || undefined,
+            originalTeacher: textCells[2] || undefined,
+            substituteTeacher: textCells[3] || undefined,
+            fromRoom: textCells[4] || undefined,
+            toRoom: textCells[5] || textCells[4] || undefined,
+            reason: textCells[6] || undefined,
+            raw: textCells,
+          })
+        })
+      }
+    }
+
+    // Also try notices/lists
+    const noticeAreas = Array.from(doc.querySelectorAll(".notice, .daily-notice, .announcement, li"))
+    noticeAreas.forEach((el) => {
+      const text = el.textContent?.trim() || ""
+      if (keywords.some((k) => text.toLowerCase().includes(k))) {
+        results.push({
+          subject: undefined,
+          originalTeacher: undefined,
+          substituteTeacher: undefined,
+          fromRoom: undefined,
+          toRoom: undefined,
+          reason: text,
+          raw: text,
+        })
+      }
+    })
+
+    return results
+  }
+
   private static parseTable(table: Element): any[] {
     const rows = Array.from(table.querySelectorAll("tr"))
     const data: any[] = []
