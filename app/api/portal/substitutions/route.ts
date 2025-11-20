@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 const PORTAL_BASE = 'https://student.sbhs.net.au'
+const API_BASE = 'https://api.sbhs.net.au'
 
 function normalizeVariation(obj: any) {
   return {
@@ -71,7 +72,25 @@ export async function GET(req: Request) {
     if (rawCookie) headers['Cookie'] = rawCookie
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
-    // Try JSON endpoints first
+    // Try API host first when we have a bearer token (API may accept token where portal web pages require session cookies)
+    const jsonPaths = ['/api/timetable/timetable.json', '/api/timetable/daytimetable.json']
+    if (accessToken) {
+      for (const p of jsonPaths) {
+        try {
+          const res = await fetch(`${API_BASE}${p}`, { headers, redirect: 'follow' })
+          const ct = res.headers.get('content-type') || ''
+          if (res.ok && ct.includes('application/json')) {
+            const j = await res.json()
+            const subs = collectFromJson(j)
+            return NextResponse.json({ substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() })
+          }
+        } catch (e) {
+          // ignore and fall back to portal
+        }
+      }
+    }
+
+    // Try portal JSON endpoints next (may require session cookie)
     const endpoints = ['/timetable/timetable.json', '/timetable/daytimetable.json']
     for (const ep of endpoints) {
       const res = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
@@ -79,7 +98,7 @@ export async function GET(req: Request) {
       if (res.ok && ct.includes('application/json')) {
         const j = await res.json()
         const subs = collectFromJson(j)
-        return NextResponse.json({ substitutions: subs, source: ep, lastUpdated: new Date().toISOString() })
+        return NextResponse.json({ substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() })
       }
     }
 

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 
 const PORTAL_BASE = 'https://student.sbhs.net.au'
+const API_BASE = 'https://api.sbhs.net.au'
 
 async function probeEndpoint(ep: string, headers: Record<string,string>) {
   try {
-    const res = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
+    const url = ep.startsWith('http') ? ep : `${PORTAL_BASE}${ep}`
+    const res = await fetch(url, { headers, redirect: 'follow' })
     const ct = res.headers.get('content-type') || ''
     const text = await res.text()
     let parsedCount = 0
@@ -22,7 +24,7 @@ async function probeEndpoint(ep: string, headers: Record<string,string>) {
     }
 
     return {
-      endpoint: ep,
+      endpoint: url,
       status: res.status,
       ok: res.ok,
       contentType: ct,
@@ -55,7 +57,35 @@ export async function GET(req: Request) {
       results.push(await probeEndpoint(ep, { ...baseHeaders }))
     }
 
-    return NextResponse.json({ ok: true, accessTokenPresent, forwardedHeaders: baseHeaders, results })
+    // Also probe the API host (may accept Bearer tokens even when web host returns login HTML)
+    const apiEndpoints = ['/api/timetable/timetable', '/api/timetable/timetable.json', '/api/timetable/daytimetable']
+    const apiResults: any[] = []
+    for (const ep of apiEndpoints) {
+      const url = `${API_BASE}${ep}`
+      apiResults.push(await probeEndpoint(url, { ...baseHeaders }))
+    }
+
+    // Try to decode JWT payload for visibility (not verified)
+    let accessTokenPayload: any = null
+    if (accessTokenPresent && accessTokenValue) {
+      try {
+        const parts = accessTokenValue.split('.')
+        if (parts.length >= 2) {
+          const payload = parts[1]
+          const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=')
+          const decoded = Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+          accessTokenPayload = JSON.parse(decoded)
+        }
+      } catch (e) {
+        accessTokenPayload = { error: 'unable to decode token payload', message: String(e) }
+      }
+    }
+
+    // Shorten Authorization value for safety
+    const forwardedHeaders = { ...baseHeaders }
+    if (forwardedHeaders['Authorization']) forwardedHeaders['Authorization'] = forwardedHeaders['Authorization'].slice(0, 32) + '...'
+
+    return NextResponse.json({ ok: true, accessTokenPresent, accessTokenPayload, forwardedHeaders, results, apiResults })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
