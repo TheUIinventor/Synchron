@@ -100,6 +100,12 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    background-image: 
+      radial-gradient(at 0% 0%, hsla(var(--primary) / 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(var(--tertiary) / 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(var(--secondary) / 0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(var(--accent) / 0.15) 0px, transparent 50%);
+    background-attachment: fixed;
   }
 }
 

@@ -81,19 +81,21 @@ export default function TimetablePage() {
 
   // Subject color mapping
   const getSubjectColor = (subject: string) => {
-    const colorMap: Record<string, string> = {
-      English: "bg-yellow-400 text-yellow-900",
-      Mathematics: "bg-orange-400 text-orange-900",
-      Science: "bg-teal-400 text-teal-900",
-      History: "bg-orange-300 text-orange-900",
-      Geography: "bg-teal-500 text-teal-100",
-      Computing: "bg-blue-400 text-blue-900",
-      Music: "bg-purple-300 text-purple-900",
-      Art: "bg-purple-500 text-purple-100",
-      PE: "bg-green-400 text-green-900",
-      Break: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
-    }
-    return colorMap[subject] || "bg-gray-300 text-gray-800"
+    const s = subject.toUpperCase();
+    if (s.includes("ENG")) return "bg-yellow-200 text-yellow-900 dark:bg-yellow-900/50 dark:text-yellow-100";
+    if (s.includes("MAT")) return "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-100";
+    if (s.includes("SCI") || s.includes("PHY") || s.includes("CHE") || s.includes("BIO")) return "bg-teal-200 text-teal-900 dark:bg-teal-900/50 dark:text-teal-100";
+    if (s.includes("HIS") || s.includes("GEO") || s.includes("ECO") || s.includes("BUS") || s.includes("LEG")) return "bg-blue-200 text-blue-900 dark:bg-blue-900/50 dark:text-blue-100";
+    if (s.includes("COM") || s.includes("IST") || s.includes("SDD") || s.includes("IPT")) return "bg-cyan-200 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-100";
+    if (s.includes("MUS") || s.includes("ART") || s.includes("VA") || s.includes("DRA")) return "bg-purple-200 text-purple-900 dark:bg-purple-900/50 dark:text-purple-100";
+    if (s.includes("PDH") || s.includes("PE") || s.includes("SP") || s.includes("SPO")) return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-100";
+    if (s.includes("TEC") || s.includes("D&T") || s.includes("TAS") || s.includes("FOO")) return "bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-100";
+    if (s.includes("LAN") || s.includes("FRE") || s.includes("GER") || s.includes("JAP") || s.includes("CHI")) return "bg-pink-200 text-pink-900 dark:bg-pink-900/50 dark:text-pink-100";
+    if (s.includes("REL") || s.includes("SCR") || s.includes("CAT")) return "bg-indigo-200 text-indigo-900 dark:bg-indigo-900/50 dark:text-indigo-100";
+    
+    if (s.includes("BRE") || s.includes("REC") || s.includes("LUN")) return "bg-surface-variant text-on-surface-variant";
+    
+    return "bg-surface-container-high text-on-surface";
   }
 
   // Get subject abbreviation
