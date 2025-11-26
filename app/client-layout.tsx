@@ -5,7 +5,8 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 import type { ReactNode } from "react"
-import BottomNav from "@/components/bottom-nav"
+import { BottomNav } from "@/components/bottom-nav"
+import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider"
 import { TimetableProvider } from "@/contexts/timetable-context"
 
@@ -30,6 +31,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
           {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
           {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
           <ConditionalTopRightIcons />
+          <AppSidebar />
           <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
           <BottomNav />
         </TimetableProvider>

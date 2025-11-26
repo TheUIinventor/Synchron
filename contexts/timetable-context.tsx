@@ -48,6 +48,8 @@ type TimetableContextType = {
   bellTimes: Record<string, BellTime[]>
   isShowingNextDay: boolean // Indicates if the main timetable is showing next day
   timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
+  isLoading: boolean
+  error: string | null
   // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
   refreshExternal?: () => Promise<void>
 }
@@ -224,6 +226,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Memoize the current timetable based on selected week
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
     if (externalTimetable) {
@@ -341,6 +345,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
 
     async function loadExternal() {
+      setIsLoading(true)
+      setError(null)
       try {
         const maxAttempts = 3
         let attempt = 0
@@ -518,12 +524,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
+          setError("Could not connect to school portal. Showing sample data.")
         }
       } catch (e) {
         if (!cancelled) {
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
+          setError("An error occurred while fetching timetable.")
         }
+      } finally {
+        if (!cancelled) setIsLoading(false)
       }
     }
     loadExternal()
@@ -532,6 +542,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Expose a refresh function so UI can trigger a retry without reloading the page
   async function refreshExternal(attemptedRefresh = false): Promise<void> {
+    setIsLoading(true)
+    setError(null)
     // First try the server-scraped homepage endpoint
     try {
       const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
@@ -738,9 +750,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // If we still don't have live data, fall back to sample
       setExternalTimetable(null)
       setTimetableSource('fallback-sample')
+      setError("Could not refresh timetable. Showing sample data.")
     } catch (e) {
       setExternalTimetable(null)
       setTimetableSource('fallback-sample')
+      setError("An error occurred while refreshing timetable.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -801,7 +817,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         bellTimes: bellTimesData,
         isShowingNextDay,
         timetableSource,
-  refreshExternal,
+        isLoading,
+        error,
+        refreshExternal,
       }}
     >
       {children}

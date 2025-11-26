@@ -15,8 +15,12 @@ export default function NoticesPage() {
       <PageTransition>
         <div className="flex flex-col items-start w-full mt-4">
           <div className="container max-w-2xl mx-auto px-4">
-            <div className="px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full mb-4">
-              <h1 className="text-lg font-bold text-left md:text-center w-full">Notices</h1>
+            <div className="flex items-center justify-between mb-6 px-4 py-2 w-full">
+              <Link href="/" className="hidden md:flex text-on-surface-variant hover:text-on-surface transition-colors">
+                <ChevronLeft className="h-6 w-6" />
+              </Link>
+              <h1 className="text-2xl font-bold text-on-surface text-left md:text-center md:flex-1">Notices</h1>
+              <div className="w-6 hidden md:block"></div>
             </div>
             <div className="w-full flex flex-col items-center">
               <NoticesClient />

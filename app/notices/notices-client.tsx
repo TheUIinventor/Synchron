@@ -1,15 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import InstallAppButton from "@/components/install-app-button";
-
-const yearColors: Record<string, string> = {
-  "7": "bg-blue-100 text-blue-700",
-  "8": "bg-green-100 text-green-700",
-  "9": "bg-yellow-100 text-yellow-700",
-  "10": "bg-purple-100 text-purple-700",
-  "11": "bg-pink-100 text-pink-700",
-  "12": "bg-red-100 text-red-700",
-};
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Loader2, AlertCircle, Filter } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function NoticesClient() {
   const [notices, setNotices] = useState<any[]>([]);
@@ -101,90 +98,109 @@ export default function NoticesClient() {
       });
 
   return (
-    <main className="notices-main min-h-screen flex flex-col items-center w-full">
-      <div className="mb-6 flex gap-2 items-center w-full justify-center">
-        {/* Mobile: use a select dropdown for filters */}
-        <div className="w-full max-w-md md:hidden px-4">
-          <select
-            className="w-full p-2 rounded-md border bg-white dark:bg-gray-800"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-          >
-            {fixedYears.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Desktop: keep pill buttons */}
-        <div className="hidden md:inline-flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex-wrap">
-          <button
-            className={`px-4 py-1 rounded-full text-sm font-medium transition-colors duration-150 ${selectedYear === "All" ? "bg-blue-600 text-white shadow" : "text-gray-700 dark:text-gray-200"}`}
-            onClick={() => setSelectedYear("All")}
-          >
-            All
-          </button>
-          {fixedYears.slice(1).map((year: string) => (
-            <button
-              key={year}
-              className={`ml-1 px-4 py-1 rounded-full text-sm font-medium transition-colors duration-150 ${selectedYear === year ? "bg-blue-600 text-white shadow" : (yearColors[year.replace(/\D/g,"")] || "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200")}`}
-              onClick={() => setSelectedYear(year)}
-            >
-              {year}
-            </button>
-          ))}
-        </div>
-      </div>
-      {loading ? (
-        <p>Loading notices...</p>
-      ) : error ? (
-        <p className="text-red-500">Error: {error}</p>
-      ) : filteredNotices.length > 0 ? (
-        <div>
-          <ul className="space-y-6 w-full max-w-2xl mx-auto px-2 sm:px-0">
-            {filteredNotices.map((notice, idx) => (
-              <li key={idx} className="notices-card rounded-2xl bg-white dark:bg-gray-900 shadow-lg p-4 sm:p-8 flex flex-col gap-2 w-full border border-gray-100 dark:border-gray-800 transition-all">
-                <div className="text-2xl font-bold mb-1">{notice.title || notice.type}</div>
-                <div className="text-lg text-gray-700 dark:text-gray-200 mb-2"
-                  dangerouslySetInnerHTML={{
-                    __html: (() => {
-                      let msg = notice.text || notice.details || notice.content || notice.message || "";
-                      msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
-                      return msg;
-                    })()
-                  }}
-                />
-                <div className="flex items-center gap-3 mt-2">
-                  {notice.authorName && (
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg" style={{ background: '#06b6d4' }}>
-                      {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
-                    </div>
-                  )}
-                  {notice.authorName && (
-                    <span className="font-semibold text-lg">{notice.authorName}</span>
-                  )}
-                  {notice.displayYears && (
-                    <span
-                      className="ml-2 px-3 py-1 rounded-full text-xs font-medium"
-                      style={{
-                        background: 'var(--theme-primary-bg, #dbeafe)',
-                        color: 'var(--theme-primary-fg, #2563eb)'
-                      }}
-                    >
-                      {notice.displayYears}
-                    </span>
-                  )}
+    <main className="notices-main min-h-screen flex flex-col items-center w-full pb-24">
+      <div className="w-full max-w-3xl space-y-6">
+        
+        {/* Header & Filters */}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 px-2">
+          <h1 className="text-3xl font-serif font-medium hidden md:block">Notices</h1>
+          
+          {/* Mobile Filter */}
+          <div className="w-full md:hidden">
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-full rounded-full bg-surface-container-high border-none h-12 px-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 opacity-50" />
+                  <SelectValue placeholder="Filter by Year" />
                 </div>
-              </li>
+              </SelectTrigger>
+              <SelectContent>
+                {fixedYears.map((y) => (
+                  <SelectItem key={y} value={y}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop Filter */}
+          <div className="hidden md:flex gap-2 overflow-x-auto pb-2 max-w-full no-scrollbar">
+            {fixedYears.map((year) => (
+              <Button
+                key={year}
+                variant={selectedYear === year ? "default" : "outline"}
+                onClick={() => setSelectedYear(year)}
+                className={cn(
+                  "rounded-full px-6 transition-all",
+                  selectedYear === year ? "shadow-md" : "border-outline hover:bg-surface-variant"
+                )}
+              >
+                {year}
+              </Button>
             ))}
-          </ul>
-          <div className="w-full flex justify-center mt-10">
-            <InstallAppButton />
           </div>
         </div>
-      ) : (
-        <p className="text-center text-gray-500">No Notices Available At This Time</p>
-      )}
+
+        {/* Content */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground animate-pulse">Fetching notices...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-destructive">
+            <AlertCircle className="h-10 w-10" />
+            <p>Error: {error}</p>
+          </div>
+        ) : filteredNotices.length > 0 ? (
+          <div className="space-y-4 px-2 md:px-0">
+            {filteredNotices.map((notice, idx) => (
+              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start gap-4">
+                    <CardTitle className="text-xl font-bold leading-tight">
+                      {notice.title || notice.type}
+                    </CardTitle>
+                    {notice.displayYears && (
+                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20">
+                        {notice.displayYears}
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div 
+                    className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
+                    dangerouslySetInnerHTML={{
+                      __html: (() => {
+                        let msg = notice.text || notice.details || notice.content || notice.message || "";
+                        msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
+                        return msg;
+                      })()
+                    }}
+                  />
+                  
+                  {notice.authorName && (
+                    <div className="mt-4 flex items-center gap-3 pt-4 border-t border-outline-variant/50">
+                      <div className="h-8 w-8 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
+                        {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
+                      </div>
+                      <span className="text-sm font-medium opacity-80">{notice.authorName}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+            
+            <div className="flex justify-center pt-8 pb-4">
+              <InstallAppButton />
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-20 text-muted-foreground">
+            <p>No notices found for {selectedYear}</p>
+          </div>
+        )}
+      </div>
     </main>
   );
 }

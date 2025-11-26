@@ -12,6 +12,7 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useUserSettings } from "@/components/theme-provider" // Import useUserSettings
 import { useParticipation, useAwardPoints } from "@/lib/api/hooks"
+import { cn } from "@/lib/utils"
 
 export default function AwardsPage() {
   useEffect(() => {
@@ -270,37 +271,37 @@ export default function AwardsPage() {
 
   return (
     <PageTransition>
-      <div className="container max-w-6xl mx-auto px-4 py-6">
-  <div className="flex items-center justify-between mb-4 md:mb-6 px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full">
+      <div className="container max-w-6xl mx-auto px-4 py-6 pb-24">
+        <div className="flex items-center justify-between mb-4 md:mb-6 px-4 py-2 bg-surface-container-low border-b border-outline-variant w-full rounded-xl">
           {/* Back button hidden on mobile (show on md+) */}
-          <Link href="/" className="hidden md:flex text-gray-500 dark:text-gray-400">
+          <Link href="/" className="hidden md:flex text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="h-6 w-6" />
           </Link>
 
           {/* Heading: left-aligned on mobile, centered on md+; smaller on mobile */}
-          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">Student Awards</h1>
+          <h1 className="text-lg font-bold text-left md:text-center md:flex-1 font-serif">Student Awards</h1>
 
           <div className="w-6"></div>
         </div>
 
         {/* Overall Progress Card */}
-        <Card className="card-optimized-main mb-6">
+        <Card className="card-optimized-main mb-6 bg-surface-container shadow-elevation-1">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="rounded-full p-2 bg-theme-secondary text-theme-primary">
+                <div className="rounded-full p-2 bg-secondary-container text-secondary-container-foreground">
                   <Award className="h-5 w-5" />
                 </div>
                 <div>
                   <h2 className="font-semibold">Total Nominations</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     {currentLevel ? `${currentLevel.name} achieved` : "Working towards first award"}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold theme-gradient">{totalNominations}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">nominations</div>
+                <div className="text-4xl font-bold text-primary">{totalNominations}</div>
+                <div className="text-sm text-muted-foreground">nominations</div>
               </div>
             </div>
 
@@ -308,20 +309,19 @@ export default function AwardsPage() {
               <>
                 <div className="mb-2">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600 dark:text-gray-300">Progress to {nextLevel.name}</span>
-                    <span className="font-semibold text-theme-primary">
+                    <span className="text-muted-foreground">Progress to {nextLevel.name}</span>
+                    <span className="font-semibold text-primary">
                       {Math.round((totalNominations / nextLevel.nominations) * 100)}%
                     </span>
                   </div>
                   <Progress
                     value={(totalNominations / nextLevel.nominations) * 100}
-                    className="h-2 bg-theme-secondary"
-                    style={{ "--progress-color": `hsl(var(--theme-primary))` } as React.CSSProperties}
+                    className="h-2 bg-surface-variant"
                   />
                 </div>
 
-                <div className="text-sm text-gray-500 dark:text-gray-400 text-center mt-2">
-                  <span className="font-semibold text-theme-primary">{nextLevel.nominations - totalNominations}</span>{" "}
+                <div className="text-sm text-muted-foreground text-center mt-2">
+                  <span className="font-semibold text-primary">{nextLevel.nominations - totalNominations}</span>{" "}
                   more nominations needed for {nextLevel.name}
                 </div>
               </>
@@ -329,11 +329,11 @@ export default function AwardsPage() {
 
             {!nextLevel && (
               <div className="text-center">
-                <div className="flex items-center justify-center gap-2 text-theme-primary mb-2">
+                <div className="flex items-center justify-center gap-2 text-primary mb-2">
                   <Trophy className="h-5 w-5" />
                   <span className="font-semibold">Highest Award Achieved!</span>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Congratulations on reaching the Joseph Coates Award
                 </p>
               </div>
@@ -343,7 +343,7 @@ export default function AwardsPage() {
 
         {/* Category Progress Cards - Enhanced Grid */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Progress by Category</h3>
+          <h3 className="text-lg font-semibold mb-3 font-serif">Progress by Category</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {Object.entries(categoryData).map(([category, data]) => {
               const pointsToNextNomination = 30 - (data.points % 30)
@@ -352,22 +352,21 @@ export default function AwardsPage() {
               return (
                 <Card
                   key={category}
-                  className="rounded-[1.5rem] bg-white dark:bg-gray-900 shadow-md p-4 border border-gray-100 dark:border-gray-800 hover-scale"
+                  className="rounded-m3-xl bg-surface-container-low shadow-sm p-4 border-none hover:shadow-md transition-all hover:scale-[1.02]"
                 >
                   <div className="text-center mb-2">
                     <h4 className="font-semibold text-sm mb-1">{category}</h4>
-                    <div className="text-2xl font-bold theme-gradient">{data.nominations}</div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{data.points} pts</p>
+                    <div className="text-2xl font-bold text-primary">{data.nominations}</div>
+                    <p className="text-xs text-muted-foreground">{data.points} pts</p>
                   </div>
 
                   {data.points % 30 !== 0 && (
                     <div>
                       <Progress
                         value={progressToNext}
-                        className="h-1.5 mb-1 bg-theme-secondary"
-                        style={{ "--progress-color": `hsl(var(--theme-primary))` } as React.CSSProperties}
+                        className="h-1.5 mb-1 bg-surface-variant"
                       />
-                      <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                      <div className="text-xs text-muted-foreground text-center">
                         +{pointsToNextNomination} for next
                       </div>
                     </div>
@@ -385,7 +384,7 @@ export default function AwardsPage() {
 
         {/* Award Levels - Dynamic View */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Award Progress</h3>
+          <h3 className="text-lg font-semibold mb-3 font-serif">Award Progress</h3>
           <div className="space-y-1.5">
             {awardLevels.map((level, index) => {
               const isAchieved = level.achieved
@@ -395,34 +394,39 @@ export default function AwardsPage() {
               return (
                 <Card
                   key={level.name}
-                  className={`rounded-xl shadow-sm p-3 border transition-all duration-200 hover-scale ${
+                  className={cn(
+                    "rounded-xl shadow-sm p-3 border transition-all duration-200 hover:scale-[1.01]",
                     isAchieved
                       ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20"
                       : isCurrent
-                        ? `border-[hsl(var(--theme-primary))] bg-[hsl(var(--theme-secondary))]`
-                        : "border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900"
-                  }`}
+                        ? "border-primary bg-primary-container"
+                        : "border-transparent bg-surface-container-low"
+                  )}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
-                        className={`rounded-full p-1.5 ${
+                        className={cn(
+                          "rounded-full p-1.5",
                           isAchieved
                             ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
                             : isCurrent
-                              ? `bg-[hsl(var(--theme-accent))] text-[hsl(var(--theme-primary))]`
-                              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                        }`}
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-surface-variant text-muted-foreground"
+                        )}
                       >
                         <IconComponent className="h-3 w-3" />
                       </div>
                       <div>
                         <p
-                          className={`font-semibold text-sm ${isAchieved ? "text-green-900 dark:text-green-100" : isCurrent ? "text-theme-primary" : ""}`}
+                          className={cn(
+                            "font-semibold text-sm",
+                            isAchieved ? "text-green-900 dark:text-green-100" : isCurrent ? "text-primary-container-foreground" : ""
+                          )}
                         >
                           {level.name}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{level.nominations} nominations</p>
+                        <p className="text-xs text-muted-foreground">{level.nominations} nominations</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -432,7 +436,7 @@ export default function AwardsPage() {
                         </span>
                       )}
                       {isCurrent && (
-                        <span className="text-xs bg-theme-secondary text-theme-primary px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
                           Next
                         </span>
                       )}
@@ -444,11 +448,11 @@ export default function AwardsPage() {
           </div>
         </div>
 
-        <h2 className="text-xl font-semibold mb-4">Recent Points Earned</h2>
+        <h2 className="text-xl font-semibold mb-4 font-serif">Recent Points Earned</h2>
 
         {/* Participation list from portal (if authenticated) */}
-        {participation.loading && <p className="text-sm text-gray-500">Loading participation...</p>}
-        {participation.error && <p className="text-sm text-red-500">{participation.error}</p>}
+        {participation.loading && <p className="text-sm text-muted-foreground">Loading participation...</p>}
+        {participation.error && <p className="text-sm text-destructive">{participation.error}</p>}
 
         {!participation.loading && !participation.error && (
           participationList.length > 0 ? (
@@ -456,11 +460,11 @@ export default function AwardsPage() {
               <h3 className="text-lg font-medium mb-2">Participation Entries</h3>
               <div className="space-y-3">
                 {participationList.map((p) => (
-                  <Card key={p.id} className="rounded-xl p-3 border border-gray-100 dark:border-gray-800">
+                  <Card key={p.id} className="rounded-xl p-3 border-none bg-surface-container-low shadow-sm">
                     <div className="flex justify-between items-center">
                       <div>
                         <div className="font-semibold">{p.activity}</div>
-                        <div className="text-xs text-gray-500">{p.category} • Year {p.year}</div>
+                        <div className="text-xs text-muted-foreground">{p.category} • Year {p.year}</div>
                       </div>
                       <div className="text-sm font-medium">
                         {p.points}{p.pointsCap ? ` / ${p.pointsCap}` : " pts"}
@@ -472,13 +476,13 @@ export default function AwardsPage() {
             </div>
           ) : (
             <Tabs defaultValue="All" className="mb-6">
-              <div className="overflow-x-auto pb-2">
-                <TabsList className="inline-flex min-w-full mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-full">
+              <div className="overflow-x-auto pb-2 no-scrollbar">
+                <TabsList className="inline-flex min-w-full mb-4 bg-surface-variant/50 p-1 rounded-full h-auto">
                   {categories.map((category) => (
                     <TabsTrigger
                       key={category}
                       value={category}
-                      className="text-xs whitespace-nowrap rounded-full data-[state=active]:bg-theme-primary data-[state=active]:text-white dark:data-[state=active]:bg-theme-primary data-[state=active]:shadow-sm transition-all duration-200"
+                      className="text-xs whitespace-nowrap rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-4 py-2 transition-all duration-200"
                     >
                       {category === "Co-Curricular Teams" ? "Teams" : category === "Performing Arts" ? "Arts" : category}
                     </TabsTrigger>
@@ -495,24 +499,24 @@ export default function AwardsPage() {
                       .map((point) => (
                         <Card
                           key={point.id}
-                          className="rounded-xl bg-white dark:bg-gray-900 shadow-sm p-3 border border-gray-100 dark:border-gray-800 hover-scale"
+                          className="rounded-xl bg-surface-container-low shadow-sm p-3 border-none hover:shadow-md transition-all"
                         >
                           <div className="flex justify-between items-start mb-1">
                             <div className="flex-1 pr-2">
                               <h3 className="font-semibold text-sm leading-tight">{point.title}</h3>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{point.date}</p>
+                              <p className="text-xs text-muted-foreground">{point.date}</p>
                             </div>
-                            <div className="flex items-center gap-1 bg-theme-secondary text-theme-primary px-2 py-1 rounded-full flex-shrink-0">
+                            <div className="flex items-center gap-1 bg-secondary-container text-secondary-container-foreground px-2 py-1 rounded-full flex-shrink-0">
                               <TrendingUp className="h-3 w-3" />
                               <span className="text-xs font-medium">+{point.points}</span>
                             </div>
                           </div>
-                          <p className="text-xs mb-2 text-gray-600 dark:text-gray-300 line-clamp-2">{point.description}</p>
+                          <p className="text-xs mb-2 text-muted-foreground line-clamp-2">{point.description}</p>
                           <div className="flex justify-between items-center">
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant">
                               {point.category}
                             </span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">→ {point.category}</span>
+                            <span className="text-xs text-muted-foreground">→ {point.category}</span>
                           </div>
                         </Card>
                       ))}
@@ -525,9 +529,9 @@ export default function AwardsPage() {
 
         {/* Awards summary (API-driven when available) */}
         {awardPoints.loading ? (
-          <p className="text-sm text-gray-500">Loading awards data...</p>
+          <p className="text-sm text-muted-foreground">Loading awards data...</p>
         ) : awardPoints.error ? (
-          <p className="text-sm text-red-500">{awardPoints.error}</p>
+          <p className="text-sm text-destructive">{awardPoints.error}</p>
         ) : awardPoints.data && Array.isArray(awardPoints.data.awards) && awardPoints.data.awards.length > 0 ? (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3">Award Breakdown</h3>
@@ -535,15 +539,15 @@ export default function AwardsPage() {
             {/* Per-category summary grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
               {Object.entries(categoryData).map(([cat, stats]) => (
-                <Card key={cat} className="rounded-xl p-3 border border-gray-100 dark:border-gray-800">
+                <Card key={cat} className="rounded-xl p-3 border-none bg-surface-container-low shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold">{cat}</p>
-                      <p className="text-xs text-gray-500">{stats.points} pts</p>
+                      <p className="text-xs text-muted-foreground">{stats.points} pts</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold theme-gradient">{stats.nominations}</div>
-                      <div className="text-xs text-gray-500">nominations</div>
+                      <div className="text-lg font-bold text-primary">{stats.nominations}</div>
+                      <div className="text-xs text-muted-foreground">nominations</div>
                     </div>
                   </div>
                 </Card>
@@ -553,16 +557,16 @@ export default function AwardsPage() {
             <h3 className="text-lg font-medium mb-2">Individual Awards</h3>
             <div className="space-y-3">
               {awardPoints.data.awards.map((a: any, idx: number) => (
-                <Card key={a.id ?? idx} className="rounded-xl p-3 border border-gray-100 dark:border-gray-800">
+                <Card key={a.id ?? idx} className="rounded-xl p-3 border-none bg-surface-container-low shadow-sm">
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1">
                       <div className="font-semibold">{a.title || a.activity || a.category}</div>
-                      {a.description && <p className="text-xs text-gray-500">{a.description}</p>}
-                      <div className="text-xs text-gray-400 mt-1">{a.awardedDate ? a.awardedDate : a.date}</div>
+                      {a.description && <p className="text-xs text-muted-foreground">{a.description}</p>}
+                      <div className="text-xs text-muted-foreground mt-1">{a.awardedDate ? a.awardedDate : a.date}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium">{a.points} pts</div>
-                      {a.awardedBy && <div className="text-xs text-gray-500">by {a.awardedBy}</div>}
+                      {a.awardedBy && <div className="text-xs text-muted-foreground">by {a.awardedBy}</div>}
                     </div>
                   </div>
                 </Card>
@@ -573,14 +577,14 @@ export default function AwardsPage() {
 
         {/* Information Cards */}
         <div className="space-y-4">
-          <Card className="rounded-[1.5rem] bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
+          <Card className="rounded-m3-xl bg-primary-container/50 border-none p-4">
             <div className="flex items-start gap-3">
-              <div className="rounded-full p-1 bg-blue-100 dark:bg-blue-900/30">
-                <Award className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <div className="rounded-full p-1 bg-primary/10 text-primary">
+                <Award className="h-4 w-4" />
               </div>
               <div className="flex-1">
-                <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-1">How It Works</h3>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+                <h3 className="font-medium text-primary-container-foreground mb-1">How It Works</h3>
+                <p className="text-sm text-primary-container-foreground/80">
                   Earn points in each category separately. Every 30 points in a category = 1 nomination for that
                   category. Awards are based on your total nominations across all categories.
                 </p>
@@ -588,21 +592,21 @@ export default function AwardsPage() {
             </div>
           </Card>
 
-          <Card className="rounded-[1.5rem] bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4">
+          <Card className="rounded-m3-xl bg-tertiary-container/50 border-none p-4">
             <div className="flex items-start gap-3">
-              <div className="rounded-full p-1 bg-green-100 dark:bg-green-900/30">
-                <Download className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <div className="rounded-full p-1 bg-tertiary/10 text-tertiary">
+                <Download className="h-4 w-4" />
               </div>
               <div className="flex-1">
-                <h3 className="font-medium text-green-900 dark:text-green-100 mb-1">Points Schedule</h3>
-                <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                <h3 className="font-medium text-tertiary-container-foreground mb-1">Points Schedule</h3>
+                <p className="text-sm text-tertiary-container-foreground/80 mb-2">
                   View the complete points schedule for all activities in each category.
                 </p>
                 <a
                   href="https://sydneyhigh.school/wellbeing/award-scheme"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex items-center gap-1"
+                  className="text-sm text-tertiary hover:underline flex items-center gap-1"
                 >
                   <Download className="h-3 w-3" />
                   Download Points Schedule

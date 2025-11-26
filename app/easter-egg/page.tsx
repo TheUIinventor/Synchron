@@ -63,37 +63,37 @@ export default function EasterEggPage() {
   return (
     <PageTransition>
       <div className="container max-w-lg mx-auto px-4 py-6">
-  <div className="flex items-center justify-between mb-4 md:mb-6 px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full">
-          <Link href="/settings" className="hidden md:flex text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/settings" className="hidden md:flex text-on-surface-variant hover:text-on-surface transition-colors">
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">Easter Egg</h1>
-          <div className="w-6"></div>
+          <h1 className="text-2xl font-bold text-on-surface md:text-center md:flex-1">Easter Egg</h1>
+          <div className="w-6 hidden md:block"></div>
         </div>
 
-        <Card className="card-optimized-main text-center p-6">
+        <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 text-center p-6">
           <CardContent className="p-0">
             <div className="flex flex-col items-center justify-center mb-6">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
-                <Leaf className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <div className="w-20 h-20 bg-tertiary-container rounded-full flex items-center justify-center mb-4">
+                <Leaf className="h-10 w-10 text-on-tertiary-container" />
               </div>
-              <h2 className="text-3xl font-bold theme-gradient mb-2">Touched Grass Lately?</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Keep track of your outdoor adventures!</p>
+              <h2 className="text-3xl font-bold text-primary mb-2">Touched Grass Lately?</h2>
+              <p className="text-sm text-on-surface-variant">Keep track of your outdoor adventures!</p>
             </div>
 
-            <div className="mb-6">
-              <p className="text-lg text-gray-600 dark:text-gray-300 mb-2">You've touched grass</p>
-              <p className="text-6xl font-bold theme-gradient tabular-nums">{grassTouchedCount}</p>
-              <p className="text-lg text-gray-600 dark:text-gray-300 mt-2">
+            <div className="mb-8">
+              <p className="text-lg text-on-surface mb-2">You've touched grass</p>
+              <p className="text-7xl font-bold text-primary tabular-nums">{grassTouchedCount}</p>
+              <p className="text-lg text-on-surface mt-2">
                 time{grassTouchedCount !== 1 ? "s" : ""} today!
               </p>
             </div>
 
-            <Button onClick={handleTouchGrass} className="w-full one-ui-button">
+            <Button onClick={handleTouchGrass} className="w-full rounded-full h-12 text-lg">
               <Leaf className="h-5 w-5 mr-2" />I Touched Grass!
             </Button>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">(Count resets daily)</p>
+            <p className="text-xs text-on-surface-variant mt-6">(Count resets daily)</p>
           </CardContent>
         </Card>
       </div>

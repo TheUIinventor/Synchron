@@ -81,19 +81,21 @@ export default function TimetablePage() {
 
   // Subject color mapping
   const getSubjectColor = (subject: string) => {
-    const colorMap: Record<string, string> = {
-      English: "bg-yellow-400 text-yellow-900",
-      Mathematics: "bg-orange-400 text-orange-900",
-      Science: "bg-teal-400 text-teal-900",
-      History: "bg-orange-300 text-orange-900",
-      Geography: "bg-teal-500 text-teal-100",
-      Computing: "bg-blue-400 text-blue-900",
-      Music: "bg-purple-300 text-purple-900",
-      Art: "bg-purple-500 text-purple-100",
-      PE: "bg-green-400 text-green-900",
-      Break: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
-    }
-    return colorMap[subject] || "bg-gray-300 text-gray-800"
+    const s = subject.toUpperCase();
+    if (s.includes("ENG")) return "bg-yellow-200 text-yellow-900 dark:bg-yellow-900/50 dark:text-yellow-100";
+    if (s.includes("MAT")) return "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-100";
+    if (s.includes("SCI") || s.includes("PHY") || s.includes("CHE") || s.includes("BIO")) return "bg-teal-200 text-teal-900 dark:bg-teal-900/50 dark:text-teal-100";
+    if (s.includes("HIS") || s.includes("GEO") || s.includes("ECO") || s.includes("BUS") || s.includes("LEG")) return "bg-blue-200 text-blue-900 dark:bg-blue-900/50 dark:text-blue-100";
+    if (s.includes("COM") || s.includes("IST") || s.includes("SDD") || s.includes("IPT")) return "bg-cyan-200 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-100";
+    if (s.includes("MUS") || s.includes("ART") || s.includes("VA") || s.includes("DRA")) return "bg-purple-200 text-purple-900 dark:bg-purple-900/50 dark:text-purple-100";
+    if (s.includes("PDH") || s.includes("PE") || s.includes("SP") || s.includes("SPO")) return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-100";
+    if (s.includes("TEC") || s.includes("D&T") || s.includes("TAS") || s.includes("FOO")) return "bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-100";
+    if (s.includes("LAN") || s.includes("FRE") || s.includes("GER") || s.includes("JAP") || s.includes("CHI")) return "bg-pink-200 text-pink-900 dark:bg-pink-900/50 dark:text-pink-100";
+    if (s.includes("REL") || s.includes("SCR") || s.includes("CAT")) return "bg-indigo-200 text-indigo-900 dark:bg-indigo-900/50 dark:text-indigo-100";
+    
+    if (s.includes("BRE") || s.includes("REC") || s.includes("LUN")) return "bg-surface-variant text-on-surface-variant";
+    
+    return "bg-surface-container-high text-on-surface";
   }
 
   // Get subject abbreviation
@@ -129,22 +131,22 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="container max-w-6xl mx-auto px-4 py-6">
-  <div className="flex items-center justify-between mb-4 md:mb-6 fade-in px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full">
+      <div className="container max-w-6xl mx-auto px-4 py-6 pb-24">
+        <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
-            className="hidden md:flex text-gray-500 dark:text-gray-400 transition-all duration-200 hover:text-gray-700 dark:hover:text-gray-300"
+            className="hidden md:flex text-on-surface-variant hover:text-on-surface transition-colors"
           >
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">My Synchron</h1>
+          <h1 className="text-2xl font-bold text-on-surface md:text-center md:flex-1">My Synchron</h1>
           {/* Data source badge and manual refresh */}
           <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+            <div className="text-xs text-on-surface-variant flex items-center">
               {timetableSource === 'fallback-sample' ? (
-                <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">Using sample data</span>
+                <span className="px-2 py-1 rounded-full bg-tertiary-container text-on-tertiary-container">Using sample data</span>
               ) : timetableSource ? (
-                <span className="px-2 py-1 rounded-full bg-green-100 text-green-800">Live data</span>
+                <span className="px-2 py-1 rounded-full bg-primary-container text-on-primary-container">Live data</span>
               ) : null}
             </div>
             <button
@@ -155,29 +157,29 @@ export default function TimetablePage() {
                   // ignore user-facing errors here — provider will fall back to sample if needed
                 }
               }}
-              className="hidden md:inline-flex px-3 py-1 rounded-full glass-card text-sm"
+              className="hidden md:inline-flex px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm hover:bg-surface-container-highest transition-colors"
               title="Retry loading live timetable"
             >
               Refresh
             </button>
             <button
               onClick={() => fetchDiagnostics()}
-              className="hidden md:inline-flex px-3 py-1 rounded-full glass-card text-sm"
+              className="hidden md:inline-flex px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm hover:bg-surface-container-highest transition-colors"
               title="Run portal diagnostics"
             >
               {diagLoading ? 'Checking...' : 'Diagnostics'}
             </button>
           </div>
-          <div className="w-6"></div>
+          <div className="w-6 hidden md:block"></div>
         </div>
         {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
         {timetableSource === 'fallback-sample' && (
-          <div className="w-full px-4 mt-4">
-            <Card className="one-ui-card p-3 mb-4">
-              <div className="flex items-center justify-between gap-4">
+          <div className="w-full mb-6">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
-                  <div className="font-medium">Can't load your live timetable</div>
-                  <div className="text-sm text-gray-500">Sign in to the SBHS Portal and then click Retry to load your live timetable.</div>
+                  <div className="font-medium text-on-surface">Can't load your live timetable</div>
+                  <div className="text-sm text-on-surface-variant">Sign in to the SBHS Portal and then click Retry to load your live timetable.</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -199,6 +201,7 @@ export default function TimetablePage() {
                         // ignore — provider will fall back to sample if needed
                       }
                     }}
+                    className="rounded-full"
                   >
                     Retry
                   </Button>
@@ -210,11 +213,11 @@ export default function TimetablePage() {
 
         {/* View Mode Toggle */}
         <div className="flex justify-center mb-6">
-          <div className="glass-card p-1 rounded-full">
+          <div className="bg-surface-container-high p-1 rounded-full">
             <button
               onClick={() => setViewMode("daily")}
               className={`px-4 py-2 text-sm rounded-full transition-all ${
-                viewMode === "daily" ? "liquid-gradient text-white shadow-lg" : ""
+                viewMode === "daily" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               Daily View
@@ -222,7 +225,7 @@ export default function TimetablePage() {
             <button
               onClick={() => setViewMode("cycle")}
               className={`px-4 py-2 text-sm rounded-full transition-all ${
-                viewMode === "cycle" ? "liquid-gradient text-white shadow-lg" : ""
+                viewMode === "cycle" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               Cycle View
@@ -235,21 +238,21 @@ export default function TimetablePage() {
             {/* Date Navigation */}
             <div className="flex items-center justify-between mb-4 max-w-lg mx-auto">
               <button
-                className="p-2 rounded-full glass-card transition-all duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
                 onClick={goToPreviousDay}
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
 
               <div className="text-center">
-                <h2 className="font-semibold">{selectedDayName}</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <h2 className="font-semibold text-on-surface">{selectedDayName}</h2>
+                <p className="text-sm text-on-surface-variant">
                   {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </p>
               </div>
 
               <button
-                className="p-2 rounded-full glass-card transition-all duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
                 onClick={goToNextDay}
               >
                 <ChevronLeft className="h-5 w-5 rotate-180" />
@@ -262,7 +265,7 @@ export default function TimetablePage() {
                 onClick={goToToday}
                 variant="outline"
                 size="sm"
-                className="rounded-full glass-card border-0 bg-transparent"
+                className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
               >
                 <Calendar className="h-4 w-4 mr-2" />
                 Today
@@ -270,19 +273,19 @@ export default function TimetablePage() {
             </div>
 
             {/* Daily Schedule */}
-            <Card className="one-ui-card max-w-lg mx-auto">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 max-w-lg mx-auto p-4">
               <div className="flex items-center gap-3 mb-4">
-                <div className="one-ui-icon-container text-theme-primary">
+                <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <Calendar className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold">{selectedDayName} Schedule</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{formatSelectedDate()}</p>
+                  <h2 className="text-lg font-semibold text-on-surface">{selectedDayName} Schedule</h2>
+                  <p className="text-sm text-on-surface-variant">{formatSelectedDate()}</p>
                 </div>
               </div>
 
               {isWeekend && (
-                <div className="py-8 text-center text-gray-500 dark:text-gray-400 glass-card rounded-xl">
+                <div className="py-8 text-center text-on-surface-variant bg-surface-container-high/50 rounded-xl">
                   No classes scheduled for weekends
                 </div>
               )}
@@ -290,13 +293,13 @@ export default function TimetablePage() {
               {!isWeekend && todaysTimetable.length > 0 && (
                 <>
                   {showDiag && (
-                    <div className="w-full px-4 mb-4">
-                      <Card className="one-ui-card p-3">
+                    <div className="w-full mb-4">
+                      <Card className="bg-surface-container-high p-3 border-none">
                         <div className="flex items-center justify-between mb-2">
-                          <div className="font-medium">Portal Diagnostics</div>
+                          <div className="font-medium text-on-surface">Portal Diagnostics</div>
                           <div>
                             <button
-                              className="px-2 py-1 text-xs rounded-full glass-card"
+                              className="px-2 py-1 text-xs rounded-full bg-surface-container-highest text-on-surface"
                               onClick={() => {
                                 setShowDiag(false)
                                 setDiagResult(null)
@@ -306,11 +309,11 @@ export default function TimetablePage() {
                             </button>
                           </div>
                         </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-300">
+                        <div className="text-xs text-on-surface-variant">
                           {diagLoading && <div>Running diagnostics…</div>}
                           {!diagLoading && diagResult && (
                             <>
-                              <pre className="text-xs overflow-auto max-h-64 bg-gray-50 dark:bg-gray-800 p-2 rounded">{JSON.stringify(diagResult, null, 2)}</pre>
+                              <pre className="text-xs overflow-auto max-h-64 bg-surface p-2 rounded">{JSON.stringify(diagResult, null, 2)}</pre>
                               {/* If the portal returned an HTML login page, surface a Sign in CTA */}
                               {Array.isArray(diagResult.results) && diagResult.results.some((r: any) => (r.contentType || '').includes('text/html') && (r.snippet || '').toLowerCase().includes('sign in')) && (
                                 <div className="mt-2">
@@ -324,7 +327,7 @@ export default function TimetablePage() {
                             </>
                           )}
                           {!diagLoading && !diagResult && (
-                            <div className="text-sm text-gray-500">No diagnostics run yet. Click Diagnostics to probe portal endpoints.</div>
+                            <div className="text-sm text-on-surface-variant">No diagnostics run yet. Click Diagnostics to probe portal endpoints.</div>
                           )}
                         </div>
                       </Card>
@@ -335,31 +338,31 @@ export default function TimetablePage() {
                     {todaysTimetable.map((period) => (
                       <div
                         key={period.id}
-                        className={`rounded-xl p-2 transition-all duration-200 ease-in-out ${
-                          period.subject === "Break" ? "glass-card" : "bg-theme-secondary"
+                        className={`rounded-xl p-3 transition-all duration-200 ease-in-out ${
+                          period.subject === "Break" ? "bg-surface-container-high/50" : "bg-surface-container-high"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           {/* Time on the left */}
-                          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0 w-[4.5rem] text-left">
+                          <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
                             {period.time.split(" - ")[0]} {/* Only show start time */}
                           </span>
 
                           {/* Subject */}
-                          <span className="font-semibold text-sm flex-1 min-w-0 truncate">
+                          <span className="font-semibold text-sm flex-1 min-w-0 truncate text-on-surface">
                             {getDisplaySubject(period)}
                           </span>
 
                           {/* Teacher and Room (only for non-break periods) */}
                           {period.subject !== "Break" && (
-                            <span className="text-xs text-gray-600 dark:text-gray-300 flex-shrink-0 ml-auto flex items-center gap-2">
+                            <span className="text-xs text-on-surface-variant flex-shrink-0 ml-auto flex items-center gap-2">
                               <span>{period.teacher} • {period.room}</span>
                               {/* Substitution / room-change badges */}
                               {period.isSubstitute && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800">Sub</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                               )}
                               {period.isRoomChange && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">Room</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
                               )}
                             </span>
                           )}
@@ -371,7 +374,7 @@ export default function TimetablePage() {
               )}
 
               {!isWeekend && todaysTimetable.length === 0 && (
-                <div className="py-8 text-center text-gray-500 dark:text-gray-400 glass-card rounded-xl">
+                <div className="py-8 text-center text-on-surface-variant bg-surface-container-high/50 rounded-xl">
                   No classes scheduled for this day
                 </div>
               )}
@@ -383,11 +386,11 @@ export default function TimetablePage() {
           <>
             {/* Week A/B Toggle */}
             <div className="flex justify-center mb-6">
-              <div className="glass-card p-1 rounded-full">
+              <div className="bg-surface-container-high p-1 rounded-full">
                 <button
                   onClick={() => setCurrentWeek("A")}
                   className={`px-4 py-2 text-sm rounded-full transition-all ${
-                    currentWeek === "A" ? "liquid-gradient text-white shadow-lg" : ""
+                    currentWeek === "A" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
                   Week A
@@ -395,7 +398,7 @@ export default function TimetablePage() {
                 <button
                   onClick={() => setCurrentWeek("B")}
                   className={`px-4 py-2 text-sm rounded-full transition-all ${
-                    currentWeek === "B" ? "liquid-gradient text-white shadow-lg" : ""
+                    currentWeek === "B" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
                   Week B
@@ -404,18 +407,18 @@ export default function TimetablePage() {
             </div>
 
             {/* Grid Timetable */}
-            <Card className="one-ui-card">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <div className="p-6">
                 <div className="text-center mb-6">
-                  <h2 className="text-xl font-semibold">Week {currentWeek} Timetable</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Grid View</p>
+                  <h2 className="text-xl font-semibold text-on-surface">Week {currentWeek} Timetable</h2>
+                  <p className="text-sm text-on-surface-variant">Grid View</p>
                 </div>
 
                 {/* Days Header */}
                 <div className="grid grid-cols-5 gap-6 mb-6">
                   {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
                     <div key={day} className="text-center">
-                      <h3 className="font-semibold text-gray-600 dark:text-gray-300 text-base">
+                      <h3 className="font-semibold text-on-surface-variant text-base">
                         {day.substring(0, 3)}
                         {currentWeek}
                       </h3>
@@ -436,20 +439,20 @@ export default function TimetablePage() {
                             >
                               {getSubjectAbbr(period.subject)}
                             </div>
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">
+                            <div className="text-sm font-medium text-on-surface flex-1">
                               {/* Desktop: keep room inline. Mobile: show subject name with room underneath */}
                               <div className="hidden md:block flex items-center gap-2">
                                 <span>{period.room}</span>
                                 {period.isRoomChange && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">Room</span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
                                 )}
                                 {period.isSubstitute && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800">Sub</span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                                 )}
                               </div>
                               <div className="md:hidden flex flex-col">
                                 <span className="font-semibold text-sm truncate">{period.subject}</span>
-                                <span className="text-xs text-gray-600 dark:text-gray-300 truncate">{period.room}</span>
+                                <span className="text-xs text-on-surface-variant truncate">{period.room}</span>
                               </div>
                             </div>
                           </div>
