@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
-import { Roboto_Flex, VT323 } from "next/font/google";
+import { Roboto_Flex, VT323, Bagel_Fat_One } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "./client-layout";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,6 +19,13 @@ const vt323 = VT323({
   variable: "--font-vt323",
 });
 
+const bagel = Bagel_Fat_One({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-bagel-fat-one",
+});
+
 export const metadata: Metadata = {
   title: "Synchron",
   description: "A modern, expressive timetable app for SBHS students.",
@@ -34,7 +41,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${roboto.variable} ${vt323.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${roboto.variable} ${vt323.variable} ${bagel.variable}`}>
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
