@@ -1,4 +1,3 @@
->>>>>>> 5a8fbd17f6f66af4c908daa74515d0c2a0559aa0
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
 import { Roboto_Flex, VT323 } from "next/font/google";

@@ -194,11 +194,8 @@ function getThemeColors(theme: ColorTheme) {
 // Helper function to get font family
 function getFontFamily(theme: FontTheme): string {
   const fontMap = {
-<<<<<<< HEAD
+    // Default site font (uses the CSS variable exposed by next/font)
     default: "var(--font-roboto-flex)",
-=======
-    default: '"Calibri", "sans-serif"',
->>>>>>> 5a8fbd17f6f66af4c908daa74515d0c2a0559aa0
     minecraft: "var(--font-vt323)",
     comic: '"Comic Sans MS", "Comic Sans", cursive, sans-serif',
     impact: '"Impact", "Arial Black", sans-serif',
