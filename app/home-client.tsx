@@ -10,15 +10,15 @@ export default function HomeClient() {
   const pretty = formatDate();
 
   return (
-    <main className="p-8">
+    <main className="p-8 mt-12">
       <header className="mb-6">
-        <h2 className="text-5xl font-semibold">{day}</h2>
+        <h2 className={`${bagel.className} text-6xl font-semibold`}>{day}</h2>
         <p className={`${bagel.className} text-sm text-muted-foreground mt-1`}>{pretty}</p>
       </header>
 
       <h1 className="sr-only">Synchron</h1>
       <p className="text-muted-foreground">Your school day at a glance</p>
     </main>
-  );
+  )
 
 }
