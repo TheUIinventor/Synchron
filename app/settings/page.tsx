@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Send, Type, Home, ChevronLeft } from "lucide-react"
+import { Send, Type, Home, ChevronLeft, Calendar, Bell, Clipboard, Award } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Calendar, Bell, Clipboard, Award } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useUserSettings, type ColorTheme, type FontTheme } from "@/components/theme-provider"
 import { Textarea } from "@/components/ui/textarea"
@@ -24,11 +26,11 @@ export default function SettingsPage() {
 
   // Available navigation tabs
   const availableTabs = [
-    { id: "home" as NavItem, label: "Home", icon: <Home className="h-4 w-4" />, required: true },
-    { id: "timetable" as NavItem, label: "My Synchron", icon: <Calendar className="h-4 w-4" /> },
-    { id: "notices" as NavItem, label: "Daily Notices", icon: <Bell className="h-4 w-4" /> },
-    { id: "clipboard" as NavItem, label: "Clipboard", icon: <Clipboard className="h-4 w-4" /> },
-    { id: "awards" as NavItem, label: "Award Points", icon: <Award className="h-4 w-4" /> },
+    { id: "home" as NavItem, label: "Home", icon: <Home className="h-5 w-5" />, required: true },
+    { id: "timetable" as NavItem, label: "My Synchron", icon: <Calendar className="h-5 w-5" /> },
+    { id: "notices" as NavItem, label: "Daily Notices", icon: <Bell className="h-5 w-5" /> },
+    { id: "clipboard" as NavItem, label: "Clipboard", icon: <Clipboard className="h-5 w-5" /> },
+    { id: "awards" as NavItem, label: "Award Points", icon: <Award className="h-5 w-5" /> },
   ]
 
   const handleTabToggle = (tabId: NavItem) => {
@@ -78,15 +80,19 @@ export default function SettingsPage() {
 
   // Appearance tab easter egg handler
   const handleAppearanceTabClick = () => {
-    setActiveTab("appearance")
-    setAppearanceTabClicks((prev) => {
-      const newCount = prev + 1
-      if (newCount >= 7) {
-        setShowFontSelector(true)
-        return 0
-      }
-      return newCount
-    })
+    // If we're already on appearance tab, count clicks
+    if (activeTab === "appearance") {
+      setAppearanceTabClicks((prev) => {
+        const newCount = prev + 1
+        if (newCount >= 7) {
+          setShowFontSelector(true)
+          return 0
+        }
+        return newCount
+      })
+    } else {
+      setActiveTab("appearance")
+    }
   }
 
   useEffect(() => {
@@ -118,248 +124,236 @@ export default function SettingsPage() {
 
   return (
     <PageTransition>
-      <div className="container max-w-lg mx-auto px-4 py-6">
-  <div className="flex items-center justify-between mb-4 md:mb-6 px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 w-full">
-          <Link href="/" className="hidden md:flex text-gray-500 dark:text-gray-400">
+      <div className="container max-w-lg mx-auto px-4 py-6 pb-24">
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/" className="hidden md:flex text-on-surface-variant hover:text-on-surface transition-colors">
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">Settings</h1>
-          <div className="w-6"></div>
+          <h1 className="text-2xl font-bold text-on-surface md:text-center md:flex-1">Settings</h1>
+          <div className="w-6 hidden md:block"></div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex mb-6 glass-card p-1 rounded-full">
-          <button
-            className={`flex-1 py-2 text-sm rounded-full transition-all ${
-              activeTab === "general" ? "glass-button liquid-gradient text-white shadow-lg" : ""
-            }`}
-            onClick={() => setActiveTab("general")}
-          >
-            General
-          </button>
-          <button
-            className={`flex-1 py-2 text-sm rounded-full transition-all relative ${
-              activeTab === "appearance" ? "glass-button liquid-gradient text-white shadow-lg" : ""
-            }`}
-            onClick={handleAppearanceTabClick}
-          >
-            Appearance
-            {appearanceTabClicks > 0 && appearanceTabClicks < 7 && (
-              <span className="absolute -top-1 -right-1 text-xs">{"🎨".repeat(Math.min(appearanceTabClicks, 3))}</span>
-            )}
-          </button>
-          <button
-            className={`flex-1 py-2 text-sm rounded-full transition-all ${
-              activeTab === "feedback" ? "glass-button liquid-gradient text-white shadow-lg" : ""
-            }`}
-            onClick={() => setActiveTab("feedback")}
-          >
-            Feedback
-          </button>
-        </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
+            <TabsTrigger 
+              value="general" 
+              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+            >
+              General
+            </TabsTrigger>
+            <TabsTrigger 
+              value="appearance" 
+              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2 relative"
+              onClick={handleAppearanceTabClick}
+            >
+              Appearance
+              {appearanceTabClicks > 0 && appearanceTabClicks < 7 && (
+                <span className="absolute -top-1 -right-1 text-xs animate-bounce">
+                  {"🎨".repeat(Math.min(appearanceTabClicks, 3))}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="feedback" 
+              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+            >
+              Feedback
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Tab Content */}
-        <div className="space-y-6">
-          {activeTab === "general" && (
-            <Card className="card-optimized-main">
-              <CardContent className="p-6">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Navigation Tabs</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Customize which tabs appear in your bottom navigation (2-5 tabs)
-                  </p>
+          <TabsContent value="general" className="space-y-6 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Navigation Tabs</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Customize which tabs appear in your bottom navigation (2-5 tabs)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {availableTabs.map((tab) => {
+                  const isVisible = navigationTabs.includes(tab.id)
+                  const isRequired = tab.required
+                  const canRemove = navigationTabs.length > 2 && !isRequired
+                  const canAdd = navigationTabs.length < 5
 
-                  <div className="space-y-3">
-                    {availableTabs.map((tab) => {
-                      const isVisible = navigationTabs.includes(tab.id)
-                      const isRequired = tab.required
-                      const canRemove = navigationTabs.length > 2 && !isRequired
-                      const canAdd = navigationTabs.length < 5
-
-                      return (
-                        <div
-                          key={tab.id}
-                          className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 glass-card ${
-                            isVisible
-                              ? "liquid-gradient text-white shadow-lg"
-                              : "hover:bg-white/10 dark:hover:bg-white/5"
-                          }`}
-                        >
-                          <div className="flex items-center">
-                            <div className="mr-3 glass-icon-enhanced rounded-full p-2">{tab.icon}</div>
-                            <div>
-                              <span className="font-medium">{tab.label}</span>
-                              {isRequired && (
-                                <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">Required</span>
-                              )}
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => handleTabToggle(tab.id)}
-                            disabled={isRequired || (isVisible && !canRemove) || (!isVisible && !canAdd)}
-                            className={`w-12 h-6 rounded-full transition-all duration-200 ${
-                              isVisible ? "bg-white/30 shadow-inner" : "bg-gray-300 dark:bg-gray-600"
-                            } ${
-                              isRequired || (isVisible && !canRemove) || (!isVisible && !canAdd)
-                                ? "opacity-50 cursor-not-allowed"
-                                : "cursor-pointer hover:opacity-80"
-                            }`}
-                          >
-                            <div
-                              className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                isVisible ? "translate-x-7" : "translate-x-1"
-                              }`}
-                            />
-                          </button>
+                  return (
+                    <div
+                      key={tab.id}
+                      className="flex items-center justify-between p-3 rounded-xl bg-surface-container-high/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${isVisible ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
+                          {tab.icon}
                         </div>
-                      )
-                    })}
-                  </div>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-on-surface">{tab.label}</span>
+                          {isRequired && (
+                            <span className="text-xs text-primary font-medium">Required</span>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-center">
-                    {navigationTabs.length}/5 tabs selected • Home is always required
-                  </div>
+                      <Switch
+                        checked={isVisible}
+                        onCheckedChange={() => handleTabToggle(tab.id)}
+                        disabled={isRequired || (isVisible && !canRemove) || (!isVisible && !canAdd)}
+                      />
+                    </div>
+                  )
+                })}
+
+                <div className="pt-2 text-xs text-center text-on-surface-variant">
+                  {navigationTabs.length}/5 tabs selected • Home is always required
                 </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
-          {activeTab === "appearance" && (
-            <div className="space-y-6">
-              <Card className="card-optimized-main">
-                <CardContent className="p-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Color Theme</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Choose the accent color for the app</p>
-
-                    <div className="grid grid-cols-5 gap-3">
-                      {colorThemes.map((theme) => (
-                        <div
-                          key={theme.id}
-                          className={`flex flex-col items-center cursor-pointer p-3 rounded-lg glass-card hover-scale ${
-                            colorTheme === theme.id ? "liquid-gradient shadow-lg" : ""
-                          }`}
-                          onClick={() => handleColorThemeChange(theme.id)}
-                        >
-                          <div
-                            className={`w-10 h-10 rounded-full ${theme.color} mb-2 glass-icon-enhanced ${
-                              colorTheme === theme.id ? "ring-2 ring-white ring-offset-2" : ""
-                            }`}
-                          ></div>
-                          <span className="text-sm font-medium">{theme.label}</span>
-                        </div>
-                      ))}
+          <TabsContent value="appearance" className="space-y-6 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Color Theme</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Choose the accent color for the app
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-5 gap-3">
+                  {colorThemes.map((theme) => (
+                    <div
+                      key={theme.id}
+                      className={`flex flex-col items-center cursor-pointer group`}
+                      onClick={() => handleColorThemeChange(theme.id)}
+                    >
+                      <div
+                        className={`w-12 h-12 rounded-full ${theme.color} mb-2 flex items-center justify-center transition-all duration-200 ${
+                          colorTheme === theme.id 
+                            ? "ring-4 ring-surface ring-offset-2 ring-offset-primary scale-110" 
+                            : "group-hover:scale-105 opacity-80 group-hover:opacity-100"
+                        }`}
+                      >
+                        {colorTheme === theme.id && (
+                          <div className="w-3 h-3 bg-white rounded-full" />
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium ${colorTheme === theme.id ? 'text-primary' : 'text-on-surface-variant'}`}>
+                        {theme.label}
+                      </span>
                     </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Font Theme Section - Hidden until easter egg is discovered */}
+            {showFontSelector && (
+              <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 animate-in fade-in slide-in-from-bottom-4">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Type className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-lg font-semibold text-on-surface">Font Style</CardTitle>
+                    <Badge variant="secondary" className="bg-tertiary-container text-on-tertiary-container hover:bg-tertiary-container">
+                      Easter Egg!
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-on-surface-variant">
+                    Choose your favorite font style
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {fontThemes.map((theme) => (
+                    <div
+                      key={theme.id}
+                      className={`flex items-center p-3 rounded-xl cursor-pointer transition-all duration-200 border ${
+                        fontTheme === theme.id
+                          ? "bg-primary/10 border-primary/20"
+                          : "bg-surface-container-high/50 border-transparent hover:bg-surface-container-highest"
+                      }`}
+                      onClick={() => handleFontThemeChange(theme.id)}
+                    >
+                      <div className="mr-4 text-2xl bg-surface-container-highest p-2 rounded-full w-12 h-12 flex items-center justify-center">
+                        {theme.emoji || "Aa"}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className={`font-medium ${fontTheme === theme.id ? 'text-primary' : 'text-on-surface'}`}>
+                            {theme.label}
+                          </span>
+                          {fontTheme === theme.id && (
+                            <div className="w-2 h-2 rounded-full bg-primary" />
+                          )}
+                        </div>
+                        <p className="text-sm text-on-surface-variant">{theme.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Easter egg progress indicator */}
+            {appearanceTabClicks >= 3 && appearanceTabClicks < 7 && !showFontSelector && (
+              <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+                <CardContent className="p-6 text-center">
+                  <p className="text-sm text-primary animate-pulse mb-3 font-medium">
+                    Keep clicking Appearance... {7 - appearanceTabClicks} more!
+                  </p>
+                  <div className="flex justify-center gap-1">
+                    {Array.from({ length: 7 }, (_, i) => (
+                      <div
+                        key={i}
+                        className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                          i < appearanceTabClicks ? "bg-primary scale-110" : "bg-surface-container-highest"
+                        }`}
+                      />
+                    ))}
                   </div>
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
 
-              {/* Font Theme Section - Hidden until easter egg is discovered */}
-              {showFontSelector && (
-                <Card className="card-optimized-main">
-                  <CardContent className="p-6">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Type className="h-5 w-5 text-theme-primary" />
-                        <h3 className="text-lg font-semibold">Font Style</h3>
-                        <span className="text-xs bg-theme-secondary text-theme-primary px-2 py-0.5 rounded-full">
-                          Easter Egg!
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Choose your favorite font style</p>
+          <TabsContent value="feedback" className="space-y-6 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Send Feedback</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Let us know how we can improve the app
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea
+                  placeholder="Type your feedback here..."
+                  className="min-h-[120px] bg-surface-container-high border-none focus-visible:ring-primary resize-none rounded-xl"
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                />
 
-                      <div className="space-y-3">
-                        {fontThemes.map((theme) => (
-                          <div
-                            key={theme.id}
-                            className={`flex items-center p-4 rounded-xl cursor-pointer transition-all duration-200 glass-card hover-scale ${
-                              fontTheme === theme.id
-                                ? "liquid-gradient text-white shadow-lg"
-                                : "hover:bg-white/10 dark:hover:bg-white/5"
-                            }`}
-                            onClick={() => handleFontThemeChange(theme.id)}
-                          >
-                            <div className="mr-3 glass-icon-enhanced rounded-full p-2 text-lg">
-                              {theme.emoji || "Aa"}
-                            </div>
-                            <div className="flex-1">
-                              <span className="font-medium">{theme.label}</span>
-                              <p className="text-sm opacity-75">{theme.description}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Easter egg progress indicator */}
-              {appearanceTabClicks >= 3 && appearanceTabClicks < 7 && !showFontSelector && (
-                <Card className="card-optimized-main">
-                  <CardContent className="p-6 text-center">
-                    <p className="text-sm text-theme-primary animate-pulse mb-3">
-                      Keep clicking Appearance... {7 - appearanceTabClicks} more!
-                    </p>
-                    <div className="flex justify-center gap-1">
-                      {Array.from({ length: 7 }, (_, i) => (
-                        <div
-                          key={i}
-                          className={`w-2 h-2 rounded-full ${
-                            i < appearanceTabClicks ? "bg-theme-primary" : "bg-gray-300 dark:bg-gray-600"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {activeTab === "feedback" && (
-            <Card className="card-optimized-main">
-              <CardContent className="p-6">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Send Feedback</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Let us know how we can improve the app
-                  </p>
-
-                  <Textarea
-                    placeholder="Type your feedback here..."
-                    className="min-h-[120px] mb-4 glass-card border-0"
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                  />
-
-                  <Button
-                    className="w-full one-ui-button"
-                    onClick={handleFeedbackSubmit}
-                    disabled={!feedbackText.trim() || feedbackSubmitted}
-                  >
-                    {feedbackSubmitted ? (
-                      "Thank you!"
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Feedback
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  className="w-full rounded-full"
+                  onClick={handleFeedbackSubmit}
+                  disabled={!feedbackText.trim() || feedbackSubmitted}
+                >
+                  {feedbackSubmitted ? (
+                    "Thank you!"
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Feedback
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Easter Egg Area - Link to new page */}
-        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-8 pt-6 border-t border-outline-variant">
           <div className="text-center">
             <Link
               href="/easter-egg"
-              className="text-xs text-gray-400 dark:text-gray-500 transition-all duration-200 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400 focus:outline-none select-none"
+              className="text-xs text-on-surface-variant/50 hover:text-primary transition-all duration-200 px-3 py-2 rounded-md hover:bg-surface-container-high focus:outline-none select-none"
             >
               Synchron v2.1.1
             </Link>
@@ -369,3 +363,4 @@ export default function SettingsPage() {
     </PageTransition>
   )
 }
+

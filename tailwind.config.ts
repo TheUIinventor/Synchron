@@ -19,9 +19,9 @@ const config = {
     },
     extend: {
       fontFamily: {
-        // M3 Expressive Typography
-        sans: ["var(--font-roboto-flex)", "sans-serif"],
-        serif: ["var(--font-roboto-serif)", "serif"],
+        // M3 Expressive Typography - Switched to Calibri as requested
+        sans: ["Calibri", "sans-serif"],
+        serif: ["Calibri", "serif"],
       },
       colors: {
         border: "hsl(var(--border) / <alpha-value>)",

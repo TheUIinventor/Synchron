@@ -1,23 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Roboto_Flex, Roboto_Serif } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "./client-layout";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-
-// Removed experimental axes ['GRAD', 'XTRA', 'YOPQ'] to prevent build failures
-// The default variable font configuration is much more stable for deployments
-const robotoFlex = Roboto_Flex({ 
-  subsets: ["latin"],
-  variable: "--font-roboto-flex",
-  display: 'swap',
-});
-
-const robotoSerif = Roboto_Serif({ 
-  subsets: ["latin"],
-  variable: "--font-roboto-serif",
-  display: 'swap'
-});
 
 export const metadata: Metadata = {
   title: "Synchron",
@@ -39,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${robotoFlex.variable} ${robotoSerif.variable} font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
+      <body className={`font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
         <ClientLayout>
           {children}
           <Toaster />
