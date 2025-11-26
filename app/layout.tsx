@@ -1,13 +1,13 @@
 import type { ReactNode } from "react"
 import type { Metadata } from "next"
-import { Inter, VT323 } from "next/font/google"
+import { Roboto_Flex, VT323 } from "next/font/google"
 import "./globals.css"
 import ClientLayout from "./client-layout"
 
-const inter = Inter({
+const roboto = Roboto_Flex({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-roboto-flex",
 })
 
 const vt323 = VT323({
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${vt323.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${roboto.variable} ${vt323.variable}`}>
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body className={inter.className}>
+      <body className={roboto.className}>
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

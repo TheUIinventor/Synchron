@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { Bagel_Fat_One } from "next/font/google";
 
 // Prefetch notices in the background and cache in sessionStorage
 function prefetchNotices() {
@@ -261,6 +262,13 @@ export default function HomeClient() {
     ));
   }, [todaysPeriods, getDisplaySubject]);
 
+  const bagel = Bagel_Fat_One({
+    weight: "400",
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-bagel-fat-one",
+  })
+
   if (!mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -288,7 +296,7 @@ export default function HomeClient() {
       <div className="px-4 pt-3">
         <div className="flex flex-col sm:flex-row items-start sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold theme-gradient">
+            <h2 className={`${bagel.className} text-2xl font-bold theme-gradient`}>
               {(profileLoading && !profileOverride && !attemptingRefresh) ? (
                   <Skeleton className="h-8 w-48 rounded-lg" />
                 ) : (() => {
@@ -593,7 +601,7 @@ export default function HomeClient() {
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">
+                <h3 className={`${bagel.className} font-semibold text-lg`}>
                   {isSchoolDayOver()
                     ? `${getCurrentDay(getNextSchoolDay(new Date()))}'s Synchron`
                     : "Today's Synchron"}

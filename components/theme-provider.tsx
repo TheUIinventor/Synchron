@@ -194,7 +194,7 @@ function getThemeColors(theme: ColorTheme) {
 // Helper function to get font family
 function getFontFamily(theme: FontTheme): string {
   const fontMap = {
-    default: "var(--font-inter)",
+    default: "var(--font-roboto-flex)",
     minecraft: "var(--font-vt323)",
     comic: '"Comic Sans MS", "Comic Sans", cursive, sans-serif',
     impact: '"Impact", "Arial Black", sans-serif',
