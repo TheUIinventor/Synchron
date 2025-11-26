@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Roboto_Flex, Roboto_Serif } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
+import ClientLayout from "./client-layout";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 
@@ -40,16 +40,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${robotoFlex.variable} ${robotoSerif.variable} font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ClientLayout>
           {children}
           <Toaster />
           <SonnerToaster />
-        </ThemeProvider>
+        </ClientLayout>
       </body>
     </html>
   );

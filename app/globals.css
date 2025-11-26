@@ -46,7 +46,7 @@
     --input: 280 10% 85%;
     --ring: 265 50% 50%;
  
-    --radius: 1.5rem; /* M3 Medium (24px) */
+    --radius: 0.5rem; /* Standard radius, overridden by specific components for M3 */
   }
  
   .dark {
@@ -100,5 +100,14 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-opacity-80 backdrop-blur-md;
+  }
+  .glass-border {
+    @apply border border-white/20 dark:border-white/10;
   }
 }

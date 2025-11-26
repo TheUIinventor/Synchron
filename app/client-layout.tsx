@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 import type { ReactNode } from "react"
-import BottomNav from "@/components/bottom-nav"
+import { BottomNav } from "@/components/bottom-nav"
 import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider"
 import { TimetableProvider } from "@/contexts/timetable-context"
 
