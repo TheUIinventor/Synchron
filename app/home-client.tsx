@@ -168,7 +168,7 @@ export default function HomeClient() {
                                 "flex-1 p-3 rounded-xl border transition-all shadow-sm",
                                 period.subject === currentPeriod?.subject 
                                   ? "bg-primary-container border-primary/20" 
-                                  : "bg-surface hover:bg-white dark:hover:bg-zinc-800 border-transparent hover:border-border"
+                                  : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
                               )}>
                                   <p className="font-medium text-sm">{period.subject}</p>
                                   <p className="text-xs text-muted-foreground">{period.room}</p>

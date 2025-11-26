@@ -12,6 +12,7 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useUserSettings } from "@/components/theme-provider" // Import useUserSettings
 import { useParticipation, useAwardPoints } from "@/lib/api/hooks"
+import { cn } from "@/lib/utils"
 
 export default function AwardsPage() {
   useEffect(() => {

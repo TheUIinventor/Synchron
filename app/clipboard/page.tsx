@@ -16,11 +16,11 @@ export default function ClipboardPage() {
     <PageTransition>
       <div className="h-screen flex flex-col">
         {/* Header */}
-  <div className="flex items-center justify-between px-4 py-2 md:p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
-          <Link href="/" className="hidden md:flex text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-between px-4 py-2 md:p-4 bg-surface border-b border-outline-variant z-10">
+          <Link href="/" className="hidden md:flex text-on-surface-variant hover:text-on-surface transition-colors">
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">Clipboard</h1>
+          <h1 className="text-lg font-bold text-on-surface text-left md:text-center md:flex-1">Clipboard</h1>
           <div className="w-6"></div> {/* Empty div for spacing */}
         </div>
 
