@@ -1,183 +1,77 @@
-    --destructive-foreground: 210 40% 98%;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-    --border: 290 20% 20%;
-    --input: 290 20% 20%;
-    --ring: 265 80% 80%;
-  }
+:root {
+  /* Light mode tokens (M3 expressive palette) */
+  --background: 290 50% 98%;
+  --foreground: 290 10% 10%;
+
+  --primary: 265 50% 50%;
+  --primary-foreground: 0 0% 100%;
+  --primary-container: 265 80% 92%;
+  --primary-container-foreground: 265 60% 20%;
+
+  --secondary: 290 20% 40%;
+  --tertiary: 45 90% 45%;
+
+  --muted: 280 10% 90%;
+  --muted-foreground: 280 5% 40%;
+
+  --border: 280 10% 85%;
+  --input: 280 10% 85%;
+  --ring: 265 50% 50%;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* Dark mode tokens */
+  --background: 290 20% 10%;
+  --foreground: 290 10% 95%;
+
+  --primary: 265 80% 80%;
+  --primary-foreground: 265 60% 10%;
+  --primary-container: 265 50% 30%;
+  --primary-container-foreground: 265 80% 90%;
+
+  --border: 290 20% 20%;
+  --input: 290 20% 20%;
+  --ring: 265 80% 80%;
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+
   body {
+    /* Use the Roboto Flex variable set by next/font in layout.tsx */
     font-family: var(--font-roboto-flex);
     @apply bg-background text-foreground antialiased;
     letter-spacing: -0.01em;
-    background-image: 
-      radial-gradient(at 0% 0%, hsla(var(--primary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(var(--tertiary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(var(--secondary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, hsla(var(--accent) / 0.15) 0px, transparent 50%);
+    background-image:
+      radial-gradient(at 0% 0%, hsla(var(--primary)/0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(var(--tertiary)/0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(var(--secondary)/0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(var(--accent)/0.15) 0px, transparent 50%);
     background-attachment: fixed;
     min-height: 100vh;
     transition: font-family 0.3s ease-in-out;
   }
 
-  /* Font-specific adjustments */
-  body[style*="VT323"] {
-    letter-spacing: 0.02em;
-    line-height: 1.3;
-    font-size: 1.1em;
-  }
+  /* Small font tweaks for specialty fonts (runtime-applied via body[style]) */
+  body[style*="VT323"] { letter-spacing: 0.02em; line-height: 1.3; font-size: 1.1em; }
+  body[style*="Comic Sans"] { letter-spacing: 0.02em; line-height: 1.5; }
+  body[style*="Impact"] { letter-spacing: 0.1em; font-weight: 600; text-transform: uppercase; }
+  body[style*="Papyrus"] { letter-spacing: 0.03em; line-height: 1.6; }
+  body[style*="Courier"] { letter-spacing: 0.05em; line-height: 1.4; }
+  body[style*="Times"] { letter-spacing: 0.01em; line-height: 1.6; }
 
-  body[style*="Comic Sans"] {
-    letter-spacing: 0.02em;
-    line-height: 1.5;
-  }
+  h1,h2,h3,h4,h5,h6 { letter-spacing: -0.02em; }
 
-  body[style*="Impact"] {
-    letter-spacing: 0.1em;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  body[style*="Papyrus"] {
-    letter-spacing: 0.03em;
-    line-height: 1.6;
-  }
-
-  body[style*="Courier"] {
-    letter-spacing: 0.05em;
-    line-height: 1.4;
-  }
-
-  body[style*="Times"] {
-    letter-spacing: 0.01em;
-    line-height: 1.6;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    letter-spacing: -0.02em;
-  }
-
-  /* VT323 specific heading adjustments */
-  body[style*="VT323"] h1,
-  body[style*="VT323"] h2,
-  body[style*="VT323"] h3,
-  body[style*="VT323"] h4,
-  body[style*="VT323"] h5,
-  body[style*="VT323"] h6 {
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-
-  /* Optimized transitions - reduce complexity */
-  * {
-    transition-property: color, background-color, border-color;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 200ms;
-  }
-}
-    font-family: var(--font-roboto-flex);
-    letter-spacing: -0.01em;
-    background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--background)) 40%, hsl(var(--muted)) 100%);
-    min-height: 100vh;
-    transition: font-family 0.3s ease-in-out;
-  }
-
-  /* Font-specific adjustments */
-  body[style*="VT323"] {
-    letter-spacing: 0.02em;
-    line-height: 1.3;
-    font-size: 1.1em;
-  }
-
-  body[style*="Comic Sans"] {
-    letter-spacing: 0.02em;
-    line-height: 1.5;
-  }
-
-  body[style*="Impact"] {
-    letter-spacing: 0.1em;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  body[style*="Papyrus"] {
-    letter-spacing: 0.03em;
-    line-height: 1.6;
-  }
-
-  body[style*="Courier"] {
-    letter-spacing: 0.05em;
-    line-height: 1.4;
-  }
-
-  body[style*="Times"] {
-    letter-spacing: 0.01em;
-    line-height: 1.6;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    letter-spacing: -0.02em;
-  }
-
-  /* VT323 specific heading adjustments */
-  body[style*="VT323"] h1,
-  body[style*="VT323"] h2,
-  body[style*="VT323"] h3,
-  body[style*="VT323"] h4,
-  body[style*="VT323"] h5,
-  body[style*="VT323"] h6 {
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-
-  /* Optimized transitions - reduce complexity */
-  * {
-    transition-property: color, background-color, border-color;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 200ms;
-=======
- 
-    --border: 290 20% 20%;
-    --input: 290 20% 20%;
-    --ring: 265 80% 80%;
->>>>>>> 5a8fbd17f6f66af4c908daa74515d0c2a0559aa0
-  }
-}
- 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground font-sans;
-    background-image: 
-      radial-gradient(at 0% 0%, hsla(var(--primary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(var(--tertiary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(var(--secondary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, hsla(var(--accent) / 0.15) 0px, transparent 50%);
-    background-attachment: fixed;
-  }
+  * { transition-property: color, background-color, border-color; transition-timing-function: cubic-bezier(0.4,0,0.2,1); transition-duration: 200ms; }
 }
 
 @layer utilities {
-  .glass-card {
-    @apply bg-opacity-80 backdrop-blur-md;
-  }
-  .glass-border {
-    @apply border border-white/20 dark:border-white/10;
-  }
+  .glass-card { @apply bg-opacity-80 backdrop-blur-md; }
+  .glass-border { @apply border border-white/20 dark:border-white/10; }
 }
