@@ -231,32 +231,43 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[360px] pr-2">
-                    {todaysPeriods.length > 0 ? (
-                        todaysPeriods.map((period, i) => (
+                  {todaysPeriods.length > 0 ? (
+                    todaysPeriods.map((period, i) => {
+                      const startTime = period.time?.split(' - ')[0] ?? ''
+                      const isBreak = period.subject === 'Break'
+                      const link = canvasLinks[period.subject]
+                      const cardClass = cn(
+                        'flex-1 p-2 rounded-xl border transition-all shadow-sm',
+                        period.subject === currentPeriod?.subject
+                          ? 'bg-primary-container border-primary/20'
+                          : 'bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
+                      )
+
+                      return (
                         <div key={period.id ?? i} className="flex gap-3 items-center group cursor-pointer">
                           <div className="flex flex-col items-center min-w-[3rem]">
-                            <span className="text-xs font-bold text-muted-foreground">{period.time.split(' - ')[0]}</span>
+                            <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
                           </div>
 
-                          {period.subject === "Break" ? (
-                            <div className="flex-1 text-sm text-muted-foreground flex items-center">
-                              {period.period}
-                            </div>
+                          {isBreak ? (
+                            <div className="flex-1 text-sm text-muted-foreground flex items-center">{period.period}</div>
+                          ) : link ? (
+                            <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} block`}>
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="font-medium text-sm truncate">{period.subject}</span>
+                                <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{period.room}</span>
+                                  <span>•</span>
+                                  <span>{period.teacher}</span>
+                                </div>
+                              </div>
+                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
+                            </a>
                           ) : (
-                            canvasLinks[period.subject] ? (
-                              <a
-                                href={canvasLinks[period.subject]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={cn(
-                                  "flex-1 p-2 rounded-xl border transition-all shadow-sm block",
-                                  period.subject === currentPeriod?.subject
-                                    ? "bg-primary-container border-primary/20"
-                                    : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
-                                )}
-                              >
+                            <div className={cardClass}>
+                              <div>
                                 <div className="flex items-center justify-between gap-3">
-                                  <span className="font-medium text-sm truncate">{period.subject}</span>
+                                  <p className="font-medium text-sm truncate">{period.subject}</p>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     <span>{period.room}</span>
                                     <span>•</span>
@@ -264,34 +275,15 @@ export default function HomeClient() {
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
-                              </a>
-                            ) : (
-                              <div className={cn(
-                                "flex-1 p-2 rounded-xl border transition-all shadow-sm",
-                                period.subject === currentPeriod?.subject 
-                                  ? "bg-primary-container border-primary/20" 
-                                  : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
-                              )}>
-                                <div>
-                                  <div className="flex items-center justify-between gap-3">
-                                    <p className="font-medium text-sm truncate">{period.subject}</p>
-                                    <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                      <span>{period.room}</span>
-                                      <span>•</span>
-                                      <span>{period.teacher}</span>
-                                    </div>
-                                  </div>
-                                  <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
-                                </div>
                               </div>
-                            )
-                          )
+                            </div>
                           )}
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-muted-foreground text-center py-8">No classes today</p>
-                    )}
+                      )
+                    })
+                  ) : (
+                    <p className="text-muted-foreground text-center py-8">No classes today</p>
+                  )}
                 </div>
             </div>
         </div>
