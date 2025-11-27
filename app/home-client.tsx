@@ -222,10 +222,6 @@ export default function HomeClient() {
                       <p className="text-muted-foreground text-center py-8">No classes today</p>
                     )}
                 </div>
-                
-                <Link href="/timetable" className="mt-6 w-full py-3 rounded-full border border-outline text-center text-sm font-medium hover:bg-surface-variant transition-colors">
-                    View Full Week
-                </Link>
             </div>
         </div>
       </div>
