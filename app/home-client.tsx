@@ -2,7 +2,7 @@
 
 import { useTimetable } from "@/contexts/timetable-context";
 import { format } from "date-fns";
-import { Loader2, Bell, MapPin, Calendar, ArrowRight } from "lucide-react";
+import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { parseTimeRange } from "@/utils/time-utils";
 import { Badge } from "@/components/ui/badge";
@@ -227,18 +227,41 @@ export default function HomeClient() {
               </div>
             </div>
 
-            {/* Next Up Card */}
+            {/* Quick Links (replaces Up Next card) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-m3-xl bg-surface-container-high p-4 flex flex-col justify-between hover:bg-surface-variant transition-colors duration-300">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-4">
-                    <ArrowRight className="h-5 w-5" />
-                    <span className="font-medium">Up Next {timeUntil && `(${timeUntil})`}</span>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold mb-1">{nextPeriod?.subject || "End of Day"}</h3>
-                    <p className="text-muted-foreground">{nextPeriod?.room || "Home"}</p>
-                  </div>
-               </div>
+              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-variant transition-colors duration-300">
+                <div className="flex flex-wrap items-center gap-3">
+                  <a
+                    href="https://mail.google.com/a/student.sbhs.nsw.edu.au"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full shadow-sm border border-transparent hover:border-primary/10 transition-all"
+                  >
+                    <Mail className="h-4 w-4" />
+                    <span className="text-sm font-medium">Mail</span>
+                  </a>
+
+                  <a
+                    href="https://student.sbhs.net.au/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full shadow-sm border border-transparent hover:border-primary/10 transition-all"
+                  >
+                    <Globe className="h-4 w-4" />
+                    <span className="text-sm font-medium">Portal</span>
+                  </a>
+
+                  <a
+                    href="https://sydneyboyshigh.instructure.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full shadow-sm border border-transparent hover:border-primary/10 transition-all"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span className="text-sm font-medium">Canvas</span>
+                  </a>
+                </div>
+              </div>
 
                <Link href="/notices" className="rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex flex-col justify-between hover:brightness-95 transition-all cursor-pointer">
                   <div className="flex items-center gap-2 mb-4 opacity-80">
