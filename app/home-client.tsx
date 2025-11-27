@@ -243,21 +243,20 @@ export default function HomeClient() {
                               {period.period}
                             </div>
                           ) : (
-                            <div className={cn(
-                              "flex-1 p-2 rounded-xl border transition-all shadow-sm",
-                              period.subject === currentPeriod?.subject 
-                                ? "bg-primary-container border-primary/20" 
-                                : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
-                            )}>
-                              <div>
+                            canvasLinks[period.subject] ? (
+                              <a
+                                href={canvasLinks[period.subject]}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={cn(
+                                  "flex-1 p-2 rounded-xl border transition-all shadow-sm block",
+                                  period.subject === currentPeriod?.subject
+                                    ? "bg-primary-container border-primary/20"
+                                    : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
+                                )}
+                              >
                                 <div className="flex items-center justify-between gap-3">
-                                  {canvasLinks[period.subject] ? (
-                                    <a href={canvasLinks[period.subject]} target="_blank" rel="noopener noreferrer" className="font-medium text-sm truncate hover:underline">
-                                      {period.subject}
-                                    </a>
-                                  ) : (
-                                    <p className="font-medium text-sm truncate">{period.subject}</p>
-                                  )}
+                                  <span className="font-medium text-sm truncate">{period.subject}</span>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     <span>{period.room}</span>
                                     <span>•</span>
@@ -265,8 +264,28 @@ export default function HomeClient() {
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
+                              </a>
+                            ) : (
+                              <div className={cn(
+                                "flex-1 p-2 rounded-xl border transition-all shadow-sm",
+                                period.subject === currentPeriod?.subject 
+                                  ? "bg-primary-container border-primary/20" 
+                                  : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
+                              )}>
+                                <div>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="font-medium text-sm truncate">{period.subject}</p>
+                                    <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span>{period.room}</span>
+                                      <span>•</span>
+                                      <span>{period.teacher}</span>
+                                    </div>
+                                  </div>
+                                  <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
+                                </div>
                               </div>
-                            </div>
+                            )
+                          )
                           )}
                         </div>
                       ))
