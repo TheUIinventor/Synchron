@@ -20,9 +20,14 @@ export default function HomeClient() {
   } = useTimetable();
   
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
+  const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({})
 
   useEffect(() => {
     setCurrentDate(new Date());
+    try {
+      const raw = localStorage.getItem('synchron-canvas-links')
+      if (raw) setCanvasLinks(JSON.parse(raw))
+    } catch (e) {}
   }, []);
 
   if (isLoading || !currentDate) {
@@ -131,7 +136,17 @@ export default function HomeClient() {
                 
                 <div className="mt-3">
                   <h2 className="text-4xl md:text-6xl font-serif leading-tight mb-2">
-                    {currentPeriod?.subject || "Free Period"}
+                    {currentPeriod?.subject ? (
+                      canvasLinks[currentPeriod.subject] ? (
+                        <a href={canvasLinks[currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                          {currentPeriod.subject}
+                        </a>
+                      ) : (
+                        currentPeriod.subject
+                      )
+                    ) : (
+                      "Free Period"
+                    )}
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
                     <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
@@ -221,7 +236,13 @@ export default function HomeClient() {
                             )}>
                               <div>
                                 <div className="flex items-center justify-between gap-3">
-                                  <p className="font-medium text-sm truncate">{period.subject}</p>
+                                  {canvasLinks[period.subject] ? (
+                                    <a href={canvasLinks[period.subject]} target="_blank" rel="noopener noreferrer" className="font-medium text-sm truncate hover:underline">
+                                      {period.subject}
+                                    </a>
+                                  ) : (
+                                    <p className="font-medium text-sm truncate">{period.subject}</p>
+                                  )}
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     <span>{period.room}</span>
                                     <span>•</span>

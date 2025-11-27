@@ -10,13 +10,106 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useUserSettings, type ColorTheme, type FontTheme } from "@/components/theme-provider"
+import { useTimetable } from "@/contexts/timetable-context"
 import { Textarea } from "@/components/ui/textarea"
 import type { NavItem } from "@/components/bottom-nav"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 
+const CANVAS_LINKS_KEY = "synchron-canvas-links"
+
+function CanvasLinksEditor() {
+  const { timetableData } = useTimetable()
+  const [links, setLinks] = useState<Record<string, string>>({})
+  const [saved, setSaved] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CANVAS_LINKS_KEY)
+      if (raw) setLinks(JSON.parse(raw))
+    } catch (e) {}
+  }, [])
+
+  const subjects = Array.from(
+    new Set(
+      Object.values(timetableData || {})
+        .flat()
+        .map((p: any) => p.subject)
+        .filter((s: string) => !!s && s.toLowerCase() !== "break")
+    )
+  ).sort()
+
+  function handleChange(subject: string, value: string) {
+    setLinks((prev) => ({ ...prev, [subject]: value }))
+  }
+
+  function handleSave(subject?: string) {
+    try {
+      const toSave = subject ? { ...(JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")), [subject]: links[subject] } : links
+      localStorage.setItem(CANVAS_LINKS_KEY, JSON.stringify(toSave))
+      setSaved(subject ?? "all")
+      setTimeout(() => setSaved(null), 2000)
+    } catch (e) {}
+  }
+
+  function handleClear(subject: string) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")
+      delete raw[subject]
+      localStorage.setItem(CANVAS_LINKS_KEY, JSON.stringify(raw))
+      setLinks((prev) => {
+        const copy = { ...prev }
+        delete copy[subject]
+        return copy
+      })
+      setSaved(subject)
+      setTimeout(() => setSaved(null), 1500)
+    } catch (e) {}
+  }
+
+  return (
+    <div className="space-y-3">
+      {subjects.length === 0 && (
+        <p className="text-sm text-on-surface-variant">No subjects found in timetable yet.</p>
+      )}
+
+      {subjects.map((s) => (
+        <div key={s} className="flex gap-3 items-start">
+          <div className="flex-1">
+            <label className="text-sm font-medium">{s}</label>
+            <input
+              className="w-full mt-1 p-2 rounded-md bg-surface-container-high border border-transparent focus:border-outline-variant"
+              placeholder={`https://canvas.school.edu/courses/...`}
+              value={links[s] ?? ""}
+              onChange={(e) => handleChange(s, e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <button className="px-3 py-2 rounded-md bg-primary text-on-primary" onClick={() => handleSave(s)}>Save</button>
+            <button className="px-3 py-2 rounded-md bg-surface text-on-surface" onClick={() => handleClear(s)}>Clear</button>
+          </div>
+        </div>
+      ))}
+
+      {subjects.length > 0 && (
+        <div className="pt-2 flex items-center justify-between">
+          <div className="text-sm text-on-surface-variant">Links saved locally to your browser.</div>
+          <div className="flex items-center gap-2">
+            <button className="px-4 py-2 rounded-full bg-surface text-on-surface" onClick={() => { setLinks({}); localStorage.removeItem(CANVAS_LINKS_KEY); }}>Clear All</button>
+            <button className="px-4 py-2 rounded-full bg-primary text-on-primary" onClick={() => handleSave()}>Save All</button>
+          </div>
+        </div>
+      )}
+
+      {saved && (
+        <div className="text-sm text-primary">Saved {saved === 'all' ? 'all links' : saved}</div>
+      )}
+    </div>
+  )
+}
+
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "feedback">("general")
+  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "feedback" | "integrations">("general")
   const [feedbackText, setFeedbackText] = useState("")
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [appearanceTabClicks, setAppearanceTabClicks] = useState(0)
@@ -134,7 +227,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
+          <TabsList className="grid w-full grid-cols-4 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
             <TabsTrigger 
               value="general" 
               className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
@@ -158,6 +251,12 @@ export default function SettingsPage() {
               className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
             >
               Feedback
+            </TabsTrigger>
+            <TabsTrigger 
+              value="integrations" 
+              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+            >
+              Integrations
             </TabsTrigger>
           </TabsList>
 
@@ -343,6 +442,21 @@ export default function SettingsPage() {
                     </>
                   )}
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-4 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Canvas Links</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Provide the Canvas (LMS) URL for each subject so the timetable links open the correct class page.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-on-surface-variant">Links are stored locally in your browser.</p>
+                <CanvasLinksEditor />
               </CardContent>
             </Card>
           </TabsContent>
