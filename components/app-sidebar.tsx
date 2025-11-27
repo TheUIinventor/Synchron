@@ -11,8 +11,8 @@ export function AppSidebar() {
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
     { href: "/timetable", icon: Calendar, label: "Timetable" },
-    { href: "/clipboard", icon: Clipboard, label: "Clipboard" },
     { href: "/notices", icon: Bell, label: "Notices" },
+    { href: "/clipboard", icon: Clipboard, label: "Clipboard" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ];
 

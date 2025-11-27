@@ -2,7 +2,7 @@
 
 import { useTimetable } from "@/contexts/timetable-context";
 import { format } from "date-fns";
-import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen } from "lucide-react";
+import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AuthButton } from "@/components/auth-button";
 import { parseTimeRange } from "@/utils/time-utils";
@@ -167,7 +167,10 @@ export default function HomeClient() {
           </p>
         </div>
 
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
+          <Link href="/settings" className="rounded-full p-2 hover:bg-surface-variant transition-colors">
+            <SettingsIcon className="h-5 w-5 text-muted-foreground" />
+          </Link>
           <AuthButton />
         </div>
       </div>
