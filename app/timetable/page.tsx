@@ -342,30 +342,34 @@ export default function TimetablePage() {
                           period.subject === "Break" ? "bg-surface-container-high/50" : "bg-surface-container-high"
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
                           {/* Time on the left */}
                           <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
                             {period.time.split(" - ")[0]} {/* Only show start time */}
                           </span>
 
-                          {/* Subject */}
-                          <span className="font-semibold text-sm flex-1 min-w-0 truncate text-on-surface">
-                            {getDisplaySubject(period)}
-                          </span>
+                          {/* Main content: subject + small meta line with room and teacher on one line */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm truncate text-on-surface">{getDisplaySubject(period)}</span>
+                              {period.subject !== "Break" && (
+                                <>
+                                  {period.isSubstitute && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                                  )}
+                                  {period.isRoomChange && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
+                                  )}
+                                </>
+                              )}
+                            </div>
 
-                          {/* Teacher and Room (only for non-break periods) */}
-                          {period.subject !== "Break" && (
-                            <span className="text-xs text-on-surface-variant flex-shrink-0 ml-auto flex items-center gap-2">
-                              <span>{period.teacher} • {period.room}</span>
-                              {/* Substitution / room-change badges */}
-                              {period.isSubstitute && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                              )}
-                              {period.isRoomChange && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                              )}
-                            </span>
-                          )}
+                            {period.subject !== "Break" ? (
+                              <div className="text-xs text-on-surface-variant truncate mt-1">{period.room} • {period.teacher}</div>
+                            ) : (
+                              <div className="text-xs text-on-surface-variant mt-1">{period.period}</div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -430,33 +434,33 @@ export default function TimetablePage() {
                 <div className="grid grid-cols-5 gap-6">
                   {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
                     <div key={day} className="space-y-3">
-                      {timetableData[day]
-                        .filter((period) => period.subject !== "Break")
-                        .map((period, index) => (
+                      {timetableData[day].map((period, index) => (
+                        period.subject === "Break" ? (
+                          <div key={`${period.id}-break-${index}`} className="bg-surface-container-high/50 rounded-lg p-2 text-sm text-on-surface-variant">
+                            <div className="font-medium">{period.period}</div>
+                            <div className="text-xs">{period.time}</div>
+                          </div>
+                        ) : (
                           <div key={period.id} className="flex items-center gap-3">
                             <div
-                              className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[48px] text-center ${getSubjectColor(period.subject)}`}
+                              className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}
                             >
                               {getSubjectAbbr(period.subject)}
                             </div>
-                            <div className="text-sm font-medium text-on-surface flex-1">
-                              {/* Desktop: keep room inline. Mobile: show subject name with room underneath */}
-                              <div className="hidden md:block flex items-center gap-2">
-                                <span>{period.room}</span>
-                                {period.isRoomChange && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                                )}
-                                {period.isSubstitute && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                )}
-                              </div>
-                              <div className="md:hidden flex flex-col">
+                            <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
                                 <span className="font-semibold text-sm truncate">{period.subject}</span>
-                                <span className="text-xs text-on-surface-variant truncate">{period.room}</span>
+                                <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
+                                  <span>{period.room}</span>
+                                  <span>•</span>
+                                  <span>{period.teacher}</span>
+                                </div>
                               </div>
+                              <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.teacher}</div>
                             </div>
                           </div>
-                        ))}
+                        )
+                      ))}
                     </div>
                   ))}
                 </div>

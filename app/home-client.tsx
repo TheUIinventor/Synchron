@@ -203,20 +203,37 @@ export default function HomeClient() {
                 <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] pr-2">
                     {todaysPeriods.length > 0 ? (
                       todaysPeriods.map((period, i) => (
-                          <div key={i} className="flex gap-4 items-center group cursor-pointer">
-                              <div className="flex flex-col items-center min-w-[3rem]">
-                                  <span className="text-xs font-bold text-muted-foreground">{period.time.split(' - ')[0]}</span>
-                              </div>
-                              <div className={cn(
-                                "flex-1 p-3 rounded-xl border transition-all shadow-sm",
-                                period.subject === currentPeriod?.subject 
-                                  ? "bg-primary-container border-primary/20" 
-                                  : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
-                              )}>
-                                  <p className="font-medium text-sm">{period.subject}</p>
-                                  <p className="text-xs text-muted-foreground">{period.room}</p>
-                              </div>
+                        <div key={period.id ?? i} className="flex gap-4 items-center group cursor-pointer">
+                          <div className="flex flex-col items-center min-w-[3rem]">
+                            <span className="text-xs font-bold text-muted-foreground">{period.time.split(' - ')[0]}</span>
                           </div>
+
+                          <div className={cn(
+                            "flex-1 p-3 rounded-xl border transition-all shadow-sm",
+                            period.subject === currentPeriod?.subject 
+                              ? "bg-primary-container border-primary/20" 
+                              : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
+                          )}>
+                            {period.subject === "Break" ? (
+                              <div>
+                                <p className="font-medium text-sm">{period.period}</p>
+                                <p className="text-xs text-muted-foreground">{period.time}</p>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="font-medium text-sm truncate">{period.subject}</p>
+                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{period.room}</span>
+                                    <span>•</span>
+                                    <span>{period.teacher}</span>
+                                  </div>
+                                </div>
+                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       ))
                     ) : (
                       <p className="text-muted-foreground text-center py-8">No classes today</p>
