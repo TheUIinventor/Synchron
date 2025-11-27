@@ -11,28 +11,31 @@ export default function ClipboardPage() {
     // Track clipboard usage
     trackSectionUsage("clipboard")
   }, [])
-
   useEffect(() => {
-    // Remove the root transform while this page is active so fixed positioning
-    // behaves relative to the viewport (prevents the iframe being clipped by
-    // the `#__next { transform: scale(...) }` rule used elsewhere).
-    const root = document.getElementById("__next")
-    if (!root) return
-    const prev = root.style.transform
-    root.style.transform = "none"
+    // Create a style tag with responsive left offsets to match the sidebar widths
+    const style = document.createElement("style")
+    style.textContent = `
+      .synchron-clipboard-iframe { position: fixed; top: 0; left: 0; margin: 0; padding: 0; border: 0; z-index: 0; width: 100vw; height: 100vh; }
+      @media (min-width: 768px) { .synchron-clipboard-iframe { left: 5rem; width: calc(100vw - 5rem); } }
+      @media (min-width: 1024px) { .synchron-clipboard-iframe { left: 6rem; width: calc(100vw - 6rem); } }
+    `
+    document.head.appendChild(style)
+
+    const iframe = document.createElement("iframe")
+    iframe.className = "synchron-clipboard-iframe"
+    iframe.src = "https://portal.clipboard.app/sbhs/calendar"
+    iframe.title = "Clipboard Calendar"
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    iframe.setAttribute("allowfullscreen", "")
+    iframe.style.background = "transparent"
+
+    document.body.appendChild(iframe)
+
     return () => {
-      root.style.transform = prev
+      try { iframe.remove() } catch (e) {}
+      try { style.remove() } catch (e) {}
     }
   }, [])
 
-  return (
-    <iframe
-      src="https://portal.clipboard.app/sbhs/calendar"
-      title="Clipboard Calendar"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen
-      className="fixed top-0 bottom-0 left-0 right-0 md:left-20 lg:left-24 m-0 p-0 border-0 z-0"
-      style={{ margin: 0, padding: 0, border: 0 }}
-    />
-  )
+  return null
 }
