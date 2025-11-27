@@ -4,6 +4,7 @@ import { useTimetable } from "@/contexts/timetable-context";
 import { format } from "date-fns";
 import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AuthButton } from "@/components/auth-button";
 import { parseTimeRange } from "@/utils/time-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -156,13 +157,19 @@ export default function HomeClient() {
     <div className="space-y-4 pb-12 md:pb-8 animate-in fade-in duration-700">
       
       {/* Header Section */}
-      <div className="flex flex-col gap-1 pt-4 md:pt-0">
-        <h1 className="text-4xl md:text-5xl font-serif text-foreground">
-          {format(currentDate, "EEEE")}
-        </h1>
-        <p className="text-lg text-muted-foreground font-medium">
-          {format(currentDate, "MMMM do")}
-        </p>
+      <div className="flex items-start justify-between gap-4 pt-4 md:pt-0">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-4xl md:text-5xl font-serif text-foreground">
+            {format(currentDate, "EEEE")}
+          </h1>
+          <p className="text-lg text-muted-foreground font-medium">
+            {format(currentDate, "MMMM do")}
+          </p>
+        </div>
+
+        <div className="flex items-center">
+          <AuthButton />
+        </div>
       </div>
 
       {/* Main Expressive Grid */}
