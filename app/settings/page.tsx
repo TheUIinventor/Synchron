@@ -36,13 +36,14 @@ function CanvasLinksEditor() {
     new Set(
       Object.values(timetableData || {})
         .flat()
-        .map((p: any) => p.subject)
+        .map((p: any) => (p.subject ?? "").trim())
         .filter((s: string) => !!s && s.toLowerCase() !== "break")
     )
   ).sort()
 
   function handleChange(subject: string, value: string) {
-    setLinks((prev) => ({ ...prev, [subject]: value }))
+    const key = subject.trim()
+    setLinks((prev) => ({ ...prev, [key]: value }))
   }
 
   function handleSave(subject?: string) {
@@ -55,8 +56,10 @@ function CanvasLinksEditor() {
       }
       const currentStored = JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")
       const toSave = subject
-        ? { ...currentStored, [subject]: normalize(links[subject] ?? "") }
-        : Object.fromEntries(Object.entries(links).map(([k, v]) => [k, normalize(v as string)]))
+        ? { ...currentStored, [subject.trim()]: normalize(links[subject.trim()] ?? "") }
+        : Object.fromEntries(
+            Object.entries(links).map(([k, v]) => [k.trim(), normalize(v as string)])
+          )
       localStorage.setItem(CANVAS_LINKS_KEY, JSON.stringify(toSave))
       // Notify other components in this window that links updated
       try { window.dispatchEvent(new CustomEvent('synchron:canvas-links-updated', { detail: { subject: subject ?? 'all' } })) } catch (e) {}
@@ -75,11 +78,11 @@ function CanvasLinksEditor() {
   function handleClear(subject: string) {
     try {
       const raw = JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")
-      delete raw[subject]
+      delete raw[subject.trim()]
       localStorage.setItem(CANVAS_LINKS_KEY, JSON.stringify(raw))
       setLinks((prev) => {
         const copy = { ...prev }
-        delete copy[subject]
+        delete copy[subject.trim()]
         return copy
       })
       setSaved(subject)

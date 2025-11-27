@@ -26,7 +26,19 @@ export default function HomeClient() {
     setCurrentDate(new Date());
     try {
       const raw = localStorage.getItem('synchron-canvas-links')
-      if (raw) setCanvasLinks(JSON.parse(raw))
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw)
+          // normalize keys to trimmed exact names
+          const normalized: Record<string, string> = {}
+          for (const k of Object.keys(parsed)) {
+            normalized[k.trim()] = parsed[k]
+          }
+          setCanvasLinks(normalized)
+        } catch (e) {
+          setCanvasLinks(JSON.parse(raw))
+        }
+      }
     } catch (e) {}
   }, []);
 
@@ -108,13 +120,36 @@ export default function HomeClient() {
 
   // Format a concise remaining label to show on the right-hand side of the bar
   function remainingLabel() {
-    if (!timeUntil) return "";
-    // If we're in class, get the portion before the 'until end' text and append 'left'
-    if (isCurrentlyInClass) {
-      return timeUntil.replace(/\s*until end$/i, "") + " left";
+    // Return countdown as HH:MM:SS (zero-padded). Use currentPeriod end if in class, otherwise nextPeriod start.
+    try {
+      const now = new Date()
+      let target: Date | null = null
+      if (isCurrentlyInClass && currentPeriod?.time) {
+        const { end } = parseTimeRange(currentPeriod.time)
+        target = end
+      } else if (nextPeriod?.time) {
+        const { start } = parseTimeRange(nextPeriod.time)
+        target = start
+      }
+
+      if (!target) {
+        return timeUntil || ""
+      }
+
+      let diff = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000))
+      const hours = Math.floor(diff / 3600)
+      diff = diff % 3600
+      const minutes = Math.floor(diff / 60)
+      const seconds = diff % 60
+
+      const hh = String(hours).padStart(2, "0")
+      const mm = String(minutes).padStart(2, "0")
+      const ss = String(seconds).padStart(2, "0")
+
+      return `${hh}:${mm}:${ss}`
+    } catch (e) {
+      return timeUntil || ""
     }
-    // Otherwise show the provided timeUntil (e.g., '5m 10s until start' or 'No more classes today')
-    return timeUntil;
   }
 
   return (
@@ -165,16 +200,17 @@ export default function HomeClient() {
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
                     <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
-                      {currentPeriod?.room || "Campus"}
+                      {currentPeriod?.teacher || "Self Study"}
                     </span>
                     <span>•</span>
-                    <span>{currentPeriod?.teacher || "Self Study"}</span>
+                    <span>{currentPeriod?.room || "Campus"}</span>
                   </div>
                 </div>
 
                 <div className="mt-6">
-                  <div className="flex justify-end text-sm mb-1">
-                    <span className="font-bold">{remainingLabel()}</span>
+                  <div className="flex flex-col items-end text-sm mb-1">
+                    <span className="text-[15px] opacity-90">{nextPeriod?.subject ? `${nextPeriod.subject} in` : ""}</span>
+                    <span className="font-bold text-[15px]">{remainingLabel()}</span>
                   </div>
                   <div className="h-2 w-full bg-primary/20 rounded-full overflow-hidden">
                     {/* Progress bar updates based on current time within the period/gap */}
@@ -235,7 +271,7 @@ export default function HomeClient() {
                     todaysPeriods.map((period, i) => {
                       const startTime = period.time?.split(' - ')[0] ?? ''
                       const isBreak = period.subject === 'Break'
-                      const link = canvasLinks[period.subject]
+                      const link = canvasLinks[(period.subject ?? '').trim()]
                       const cardClass = cn(
                         'flex-1 p-2 rounded-xl border transition-all shadow-sm',
                         period.subject === currentPeriod?.subject
@@ -256,12 +292,12 @@ export default function HomeClient() {
                               <div className="flex items-center justify-between gap-3">
                                 <span className="font-medium text-sm truncate">{period.subject}</span>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{period.room}</span>
-                                  <span>•</span>
                                   <span>{period.teacher}</span>
+                                  <span>•</span>
+                                  <span>{period.room}</span>
                                 </div>
                               </div>
-                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
+                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.teacher} • {period.room}</div>
                             </a>
                           ) : (
                             <div className={cardClass}>
@@ -269,12 +305,12 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <p className="font-medium text-sm truncate">{period.subject}</p>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span>{period.room}</span>
-                                    <span>•</span>
                                     <span>{period.teacher}</span>
+                                    <span>•</span>
+                                    <span>{period.room}</span>
                                   </div>
                                 </div>
-                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
+                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.teacher} • {period.room}</div>
                               </div>
                             </div>
                           )}
