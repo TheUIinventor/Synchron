@@ -26,6 +26,10 @@ export default function ClipboardPage() {
 
         {/* Full-width iframe */}
         <div className="flex-1 w-full">
+          <div className="p-3 text-sm text-muted-foreground bg-surface-container/50 border-b border-outline-variant">
+            If the calendar doesn't load here (embedding may be blocked), you can open it in a new tab: 
+            <a href="https://portal.clipboard.app/sbhs/calendar" target="_blank" rel="noreferrer" className="text-primary underline ml-1">Open Clipboard Calendar</a>
+          </div>
           <iframe
             src="https://portal.clipboard.app/sbhs/calendar"
             className="w-full h-full border-0"

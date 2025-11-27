@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Bell, Menu, Settings } from "lucide-react";
+import { Home, Calendar, Bell, Menu, Settings, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
@@ -11,6 +11,7 @@ export function BottomNav() {
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
     { href: "/timetable", icon: Calendar, label: "Timetable" },
+    { href: "/clipboard", icon: Clipboard, label: "Clipboard" },
     { href: "/notices", icon: Bell, label: "Notices" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ];
