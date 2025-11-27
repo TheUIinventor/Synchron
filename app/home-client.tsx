@@ -208,18 +208,17 @@ export default function HomeClient() {
                             <span className="text-xs font-bold text-muted-foreground">{period.time.split(' - ')[0]}</span>
                           </div>
 
-                          <div className={cn(
-                            "flex-1 p-3 rounded-xl border transition-all shadow-sm",
-                            period.subject === currentPeriod?.subject 
-                              ? "bg-primary-container border-primary/20" 
-                              : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
-                          )}>
-                            {period.subject === "Break" ? (
-                              <div>
-                                <p className="font-medium text-sm">{period.period}</p>
-                                <p className="text-xs text-muted-foreground">{period.time}</p>
-                              </div>
-                            ) : (
+                          {period.subject === "Break" ? (
+                            <div className="flex-1 text-sm text-muted-foreground flex items-center">
+                              {period.period}
+                            </div>
+                          ) : (
+                            <div className={cn(
+                              "flex-1 p-3 rounded-xl border transition-all shadow-sm",
+                              period.subject === currentPeriod?.subject 
+                                ? "bg-primary-container border-primary/20" 
+                                : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
+                            )}>
                               <div>
                                 <div className="flex items-center justify-between gap-3">
                                   <p className="font-medium text-sm truncate">{period.subject}</p>
@@ -231,8 +230,8 @@ export default function HomeClient() {
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room} • {period.teacher}</div>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : (

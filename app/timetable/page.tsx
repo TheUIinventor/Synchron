@@ -336,42 +336,41 @@ export default function TimetablePage() {
 
                   <div className="space-y-1.5">
                     {todaysTimetable.map((period) => (
-                      <div
-                        key={period.id}
-                        className={`rounded-xl p-3 transition-all duration-200 ease-in-out ${
-                          period.subject === "Break" ? "bg-surface-container-high/50" : "bg-surface-container-high"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          {/* Time on the left */}
+                      period.subject === "Break" ? (
+                        <div key={period.id ?? period.period} className="flex items-center gap-3 py-1">
                           <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
-                            {period.time.split(" - ")[0]} {/* Only show start time */}
+                            {period.time.split(" - ")[0]}
                           </span>
+                          <div className="text-sm text-on-surface-variant">{period.period}</div>
+                        </div>
+                      ) : (
+                        <div
+                          key={period.id}
+                          className={`rounded-xl p-3 transition-all duration-200 ease-in-out bg-surface-container-high`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {/* Time on the left */}
+                            <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
+                              {period.time.split(" - ")[0]} {/* Only show start time */}
+                            </span>
 
-                          {/* Main content: subject + small meta line with room and teacher on one line */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm truncate text-on-surface">{getDisplaySubject(period)}</span>
-                              {period.subject !== "Break" && (
-                                <>
-                                  {period.isSubstitute && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                  )}
-                                  {period.isRoomChange && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                                  )}
-                                </>
-                              )}
-                            </div>
+                            {/* Main content: subject + small meta line with room and teacher on one line */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm truncate text-on-surface">{getDisplaySubject(period)}</span>
+                                {period.isSubstitute && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                                )}
+                                {period.isRoomChange && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
+                                )}
+                              </div>
 
-                            {period.subject !== "Break" ? (
                               <div className="text-xs text-on-surface-variant truncate mt-1">{period.room} • {period.teacher}</div>
-                            ) : (
-                              <div className="text-xs text-on-surface-variant mt-1">{period.period}</div>
-                            )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )
                     ))}
                   </div>
                 </>
@@ -436,9 +435,8 @@ export default function TimetablePage() {
                     <div key={day} className="space-y-3">
                       {timetableData[day].map((period, index) => (
                         period.subject === "Break" ? (
-                          <div key={`${period.id}-break-${index}`} className="bg-surface-container-high/50 rounded-lg p-2 text-sm text-on-surface-variant">
-                            <div className="font-medium">{period.period}</div>
-                            <div className="text-xs">{period.time}</div>
+                          <div key={`${period.id}-break-${index}`} className="py-1 text-sm text-on-surface-variant">
+                            {period.period}
                           </div>
                         ) : (
                           <div key={period.id} className="flex items-center gap-3">
