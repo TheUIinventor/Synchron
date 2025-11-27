@@ -1,8 +1,18 @@
+<<<<<<< HEAD
 import type { ReactNode } from "react"
 import type { Metadata } from "next"
 import { Roboto_Flex, VT323 } from "next/font/google"
 import "./globals.css"
 import ClientLayout from "./client-layout"
+=======
+import type { ReactNode } from "react";
+import type { Metadata, Viewport } from "next";
+import { Roboto_Flex, VT323 } from "next/font/google";
+import "./globals.css";
+import ClientLayout from "./client-layout";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+>>>>>>> e56f7483f26373761f5c7c60f3713de4c9c5ecdd
 
 const roboto = Roboto_Flex({
   subsets: ["latin"],
@@ -15,7 +25,13 @@ const vt323 = VT323({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-vt323",
+<<<<<<< HEAD
 })
+=======
+});
+
+
+>>>>>>> e56f7483f26373761f5c7c60f3713de4c9c5ecdd
 
 export const metadata: Metadata = {
   title: "Synchron",
