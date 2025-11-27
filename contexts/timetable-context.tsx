@@ -236,6 +236,42 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const list = Array.isArray(periods) ? periods : []
         filtered[day] = list.filter((p) => !p.weekType || p.weekType === currentWeek)
       }
+      // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
+      const getBellForDay = (dayName: string) => {
+        if (dayName === 'Friday') return bellTimesData.Fri
+        if (dayName === 'Wednesday' || dayName === 'Thursday') return bellTimesData['Wed/Thurs']
+        return bellTimesData['Mon/Tues']
+      }
+
+      const parseStartMinutes = (timeStr: string) => {
+        try {
+          const part = (timeStr || '').split('-')[0].trim()
+          const [h, m] = part.split(':').map((s) => parseInt(s, 10))
+          if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m
+        } catch (e) {}
+        return 0
+      }
+
+      for (const day of Object.keys(filtered)) {
+        const bells = getBellForDay(day) || []
+        const dayPeriods = filtered[day]
+
+        // For each bell entry that represents a break (contains 'Recess' or 'Lunch'), ensure a period exists
+        for (const b of bells) {
+          const label = b.period // e.g., 'Recess' or 'Lunch 1'
+          if (!/recess|lunch/i.test(label)) continue
+          const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
+          if (!exists) {
+            // Insert as a Break period with the bell time
+            dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+          }
+        }
+
+        // Sort periods by start time to keep ordering
+        dayPeriods.sort((a, z) => parseStartMinutes(a.time) - parseStartMinutes(z.time))
+        filtered[day] = dayPeriods
+      }
+
       return filtered
     }
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
