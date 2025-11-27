@@ -18,7 +18,7 @@ export default function ClipboardPage() {
       title="Clipboard Calendar"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowFullScreen
-      className="fixed inset-0 w-full h-full m-0 p-0 border-0"
+      className="fixed top-0 bottom-0 left-0 right-0 md:left-20 lg:left-24 m-0 p-0 border-0"
       style={{ margin: 0, padding: 0, border: 0 }}
     />
   )
