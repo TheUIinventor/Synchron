@@ -98,7 +98,7 @@ export default function HomeClient() {
   }
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-700">
+    <div className="space-y-4 pb-12 md:pb-8 animate-in fade-in duration-700">
       
       {/* Header Section */}
       <div className="flex flex-col gap-1 pt-4 md:pt-0">
@@ -111,17 +111,17 @@ export default function HomeClient() {
       </div>
 
       {/* Main Expressive Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4">
         
         {/* HERO: Current/Next Period - Spans full width on mobile, 8 cols on desktop */}
-        <div className="md:col-span-8 space-y-4">
+        <div className="md:col-span-8 space-y-3">
             
             {/* Primary Status Card */}
             <div className="relative overflow-hidden rounded-m3-2xl bg-primary-container text-primary-container-foreground p-6 md:p-8 shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-500 ease-expressive hover:scale-[1.01] group">
               {/* Background Blob */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/20" />
               
-              <div className="relative z-10 flex flex-col h-full justify-between min-h-[200px]">
+              <div className="relative z-10 flex flex-col h-full justify-between min-h-[160px]">
                 <div className="flex justify-between items-start">
                   <Badge variant="secondary" className="bg-primary/20 text-primary-container-foreground hover:bg-primary/30 rounded-full px-4 py-1 text-sm font-medium">
                     Now
@@ -129,7 +129,7 @@ export default function HomeClient() {
                   <MapPin className="h-6 w-6 opacity-60" />
                 </div>
                 
-                <div className="mt-4">
+                <div className="mt-3">
                   <h2 className="text-4xl md:text-6xl font-serif leading-tight mb-2">
                     {currentPeriod?.subject || "Free Period"}
                   </h2>
@@ -142,7 +142,7 @@ export default function HomeClient() {
                   </div>
                 </div>
 
-                <div className="mt-8">
+                <div className="mt-6">
                   <div className="flex justify-end text-sm mb-1">
                     <span className="font-bold">{remainingLabel()}</span>
                   </div>
@@ -162,8 +162,8 @@ export default function HomeClient() {
             </div>
 
             {/* Next Up Card */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <div className="rounded-m3-xl bg-surface-container-high p-6 flex flex-col justify-between hover:bg-surface-variant transition-colors duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-m3-xl bg-surface-container-high p-4 flex flex-col justify-between hover:bg-surface-variant transition-colors duration-300">
                   <div className="flex items-center gap-2 text-muted-foreground mb-4">
                     <ArrowRight className="h-5 w-5" />
                     <span className="font-medium">Up Next {timeUntil && `(${timeUntil})`}</span>
@@ -174,7 +174,7 @@ export default function HomeClient() {
                   </div>
                </div>
 
-               <Link href="/notices" className="rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-6 flex flex-col justify-between hover:brightness-95 transition-all cursor-pointer">
+               <Link href="/notices" className="rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex flex-col justify-between hover:brightness-95 transition-all cursor-pointer">
                   <div className="flex items-center gap-2 mb-4 opacity-80">
                     <Bell className="h-5 w-5" />
                     <span className="font-medium">Notices</span>
@@ -193,17 +193,17 @@ export default function HomeClient() {
         </div>
 
         {/* SIDEBAR: Date & Quick Actions - 4 cols on desktop */}
-        <div className="md:col-span-4 space-y-4">
-            <div className="rounded-m3-xl bg-surface-container p-6 h-full min-h-[300px] flex flex-col">
+        <div className="md:col-span-4 space-y-3">
+          <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-primary" />
                     {dayName}
                 </h3>
                 
-                <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] pr-2">
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[360px] pr-2">
                     {todaysPeriods.length > 0 ? (
-                      todaysPeriods.map((period, i) => (
-                        <div key={period.id ?? i} className="flex gap-4 items-center group cursor-pointer">
+                        todaysPeriods.map((period, i) => (
+                        <div key={period.id ?? i} className="flex gap-3 items-center group cursor-pointer">
                           <div className="flex flex-col items-center min-w-[3rem]">
                             <span className="text-xs font-bold text-muted-foreground">{period.time.split(' - ')[0]}</span>
                           </div>
@@ -214,7 +214,7 @@ export default function HomeClient() {
                             </div>
                           ) : (
                             <div className={cn(
-                              "flex-1 p-3 rounded-xl border transition-all shadow-sm",
+                              "flex-1 p-2 rounded-xl border transition-all shadow-sm",
                               period.subject === currentPeriod?.subject 
                                 ? "bg-primary-container border-primary/20" 
                                 : "bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant"
