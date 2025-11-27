@@ -30,6 +30,21 @@ export default function HomeClient() {
     } catch (e) {}
   }, []);
 
+  useEffect(() => {
+    function reload(e?: Event) {
+      try {
+        const raw = localStorage.getItem('synchron-canvas-links')
+        if (raw) setCanvasLinks(JSON.parse(raw))
+        else setCanvasLinks({})
+      } catch (err) {
+        setCanvasLinks({})
+      }
+    }
+    // Custom event dispatched from settings when links change
+    window.addEventListener('synchron:canvas-links-updated', reload as EventListener)
+    return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
+  }, [])
+
   if (isLoading || !currentDate) {
     return (
       <div className="flex h-[80vh] items-center justify-center">

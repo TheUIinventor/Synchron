@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useUserSettings, type ColorTheme, type FontTheme } from "@/components/theme-provider"
 import { useTimetable } from "@/contexts/timetable-context"
+import { useToast } from "@/hooks/use-toast"
 import { Textarea } from "@/components/ui/textarea"
 import type { NavItem } from "@/components/bottom-nav"
 import { trackSectionUsage } from "@/utils/usage-tracker"
@@ -20,6 +21,7 @@ const CANVAS_LINKS_KEY = "synchron-canvas-links"
 
 function CanvasLinksEditor() {
   const { timetableData } = useTimetable()
+  const { toast } = useToast()
   const [links, setLinks] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState<string | null>(null)
 
@@ -45,9 +47,27 @@ function CanvasLinksEditor() {
 
   function handleSave(subject?: string) {
     try {
-      const toSave = subject ? { ...(JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")), [subject]: links[subject] } : links
+      // Normalize URLs: ensure protocol present
+      const normalize = (u: string) => {
+        if (!u) return u
+        if (/^https?:\/\//i.test(u)) return u
+        return `https://${u}`
+      }
+      const currentStored = JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")
+      const toSave = subject
+        ? { ...currentStored, [subject]: normalize(links[subject] ?? "") }
+        : Object.fromEntries(Object.entries(links).map(([k, v]) => [k, normalize(v as string)]))
       localStorage.setItem(CANVAS_LINKS_KEY, JSON.stringify(toSave))
+      // Notify other components in this window that links updated
+      try { window.dispatchEvent(new CustomEvent('synchron:canvas-links-updated', { detail: { subject: subject ?? 'all' } })) } catch (e) {}
       setSaved(subject ?? "all")
+      try {
+        if (subject) {
+          toast({ title: `Saved link for ${subject}`, description: toSave[subject] })
+        } else {
+          toast({ title: `Saved all Canvas links` })
+        }
+      } catch (e) {}
       setTimeout(() => setSaved(null), 2000)
     } catch (e) {}
   }
@@ -63,6 +83,8 @@ function CanvasLinksEditor() {
         return copy
       })
       setSaved(subject)
+      try { window.dispatchEvent(new CustomEvent('synchron:canvas-links-updated', { detail: { subject } })) } catch (e) {}
+      try { toast({ title: `Cleared link for ${subject}` }) } catch (e) {}
       setTimeout(() => setSaved(null), 1500)
     } catch (e) {}
   }
@@ -95,7 +117,15 @@ function CanvasLinksEditor() {
         <div className="pt-2 flex items-center justify-between">
           <div className="text-sm text-on-surface-variant">Links saved locally to your browser.</div>
           <div className="flex items-center gap-2">
-            <button className="px-4 py-2 rounded-full bg-surface text-on-surface" onClick={() => { setLinks({}); localStorage.removeItem(CANVAS_LINKS_KEY); }}>Clear All</button>
+              <button
+                className="px-4 py-2 rounded-full bg-surface text-on-surface"
+                onClick={() => {
+                  setLinks({});
+                  localStorage.removeItem(CANVAS_LINKS_KEY);
+                  try { window.dispatchEvent(new CustomEvent('synchron:canvas-links-updated', { detail: { subject: 'all' } })) } catch (e) {}
+                  try { toast({ title: 'Cleared all Canvas links' }) } catch (e) {}
+                }}
+              >Clear All</button>
             <button className="px-4 py-2 rounded-full bg-primary text-on-primary" onClick={() => handleSave()}>Save All</button>
           </div>
         </div>
