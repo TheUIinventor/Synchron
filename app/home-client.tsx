@@ -4,6 +4,7 @@ import { useTimetable } from "@/contexts/timetable-context";
 import { format } from "date-fns";
 import { Loader2, Bell, MapPin, Calendar, ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
+import { parseTimeRange } from "@/utils/time-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -53,12 +54,48 @@ export default function HomeClient() {
     );
   }
 
-  const { currentPeriod, nextPeriod, timeUntil } = currentMomentPeriodInfo;
+  const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = currentMomentPeriodInfo;
   
   // Get today's periods for the sidebar
   // Use selectedDay if available, otherwise fallback to current day name
   const dayName = selectedDay || format(currentDate, "EEEE");
   const todaysPeriods = timetableData[dayName] || [];
+
+  // Calculate progress percent for the current block (class or break)
+  function calcProgressPercent() {
+    const now = new Date().getTime();
+    // Only show progress when currently inside a period. This ensures the bar
+    // strictly represents period progress (start -> end). When not in a period
+    // show 0% so the UI represents 'no active period'.
+    if (currentPeriod && currentPeriod.time) {
+      try {
+        const { start, end } = parseTimeRange(currentPeriod.time);
+        const total = end.getTime() - start.getTime();
+        if (!isFinite(total) || total <= 0) return 0;
+        const elapsed = now - start.getTime();
+        const pct = Math.round((elapsed / total) * 100);
+        return Math.max(0, Math.min(100, isFinite(pct) ? pct : 0));
+      } catch (e) {
+        return 0;
+      }
+    }
+
+    // Not currently in a period
+    return 0;
+  }
+
+  const progress = calcProgressPercent();
+
+  // Format a concise remaining label to show on the right-hand side of the bar
+  function remainingLabel() {
+    if (!timeUntil) return "";
+    // If we're in class, get the portion before the 'until end' text and append 'left'
+    if (isCurrentlyInClass) {
+      return timeUntil.replace(/\s*until end$/i, "") + " left";
+    }
+    // Otherwise show the provided timeUntil (e.g., '5m 10s until start' or 'No more classes today')
+    return timeUntil;
+  }
 
   return (
     <div className="space-y-6 pb-24 md:pb-8 animate-in fade-in duration-700">
@@ -106,9 +143,15 @@ export default function HomeClient() {
                 </div>
 
                 <div className="mt-8">
+                  <div className="flex justify-end text-sm mb-1">
+                    <span className="font-bold">{remainingLabel()}</span>
+                  </div>
                   <div className="h-2 w-full bg-primary/20 rounded-full overflow-hidden">
-                    {/* Progress bar could be calculated based on time */}
-                    <div className="h-full bg-primary w-[45%] rounded-full" />
+                    {/* Progress bar updates based on current time within the period/gap */}
+                    <div
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{ width: `${progress}%` }}
+                    />
                   </div>
                   <div className="flex justify-between text-sm mt-2 font-medium opacity-70">
                     <span>{currentPeriod?.time?.split(' - ')[0] || "Now"}</span>
