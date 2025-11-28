@@ -37,6 +37,17 @@ function inferWeekType(dayKey?: any, source?: any): WeekType | null {
     const normalized = normalizeWeekType(c)
     if (normalized) return normalized
   }
+  // Special-case: dayKey values like 'MonA' / 'TueB' encode week letter as last char
+  try {
+    if (typeof dayKey === 'string') {
+      const m = dayKey.match(/^[A-Za-z]{3,4}([AB])$/i)
+      if (m && m[1]) return m[1].toUpperCase() as WeekType
+    }
+    if (source && typeof source === 'object' && typeof source.dayname === 'string') {
+      const m2 = (source.dayname as string).match(/^[A-Za-z]{3,4}([AB])$/i)
+      if (m2 && m2[1]) return m2[1].toUpperCase() as WeekType
+    }
+  } catch (e) {}
   return null
 }
 
@@ -243,13 +254,14 @@ export async function GET(req: NextRequest) {
         return dayNames[new Date().getDay()] || 'Monday'
       }
 
-  const assign = (dayKey: any, items: any[], source?: any) => {
+    const assign = (dayKey: any, items: any[], source?: any) => {
     if (!Array.isArray(items)) return
     const normalizedKey = resolveDayKey(dayKey)
     if (!byDay[normalizedKey]) byDay[normalizedKey] = []
     const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
     if (inferred) detectedWeekType = inferred
-    byDay[normalizedKey] = items.map((entry: any) => toPeriod(entry, inferred))
+    // Append periods rather than replace so A/B variants don't overwrite each other
+    byDay[normalizedKey] = byDay[normalizedKey].concat(items.map((entry: any) => toPeriod(entry, inferred)))
   }
 
       const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
@@ -346,7 +358,8 @@ export async function GET(req: NextRequest) {
         if (!byDay[normalizedKey]) byDay[normalizedKey] = []
         const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
         if (inferred) detectedWeekType = inferred
-        byDay[normalizedKey] = items.map((entry: any) => toPeriod(entry, inferred))
+        // Append instead of replace so structured 'days' entries for A/B don't overwrite
+        byDay[normalizedKey] = byDay[normalizedKey].concat(items.map((entry: any) => toPeriod(entry, inferred)))
       }
 
       const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
