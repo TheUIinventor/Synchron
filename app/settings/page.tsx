@@ -14,7 +14,7 @@ import { useUserSettings, type ColorTheme, type FontTheme } from "@/components/t
 import { useTimetable } from "@/contexts/timetable-context"
 import { useToast } from "@/hooks/use-toast"
 import { Textarea } from "@/components/ui/textarea"
-import type { NavItem } from "@/components/bottom-nav"
+// NavItem removed - navigation tabs control is no longer user-configurable
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 
@@ -149,37 +149,13 @@ export default function SettingsPage() {
   const [appearanceTabClicks, setAppearanceTabClicks] = useState(0)
   const [showFontSelector, setShowFontSelector] = useState(false)
   const router = useRouter()
-  const { navigationTabs, setNavigationTabs, colorTheme, setColorTheme, fontTheme, setFontTheme } = useUserSettings()
+  const { colorTheme, setColorTheme, fontTheme, setFontTheme } = useUserSettings()
 
-  // Available navigation tabs
-  const availableTabs = [
-    { id: "home" as NavItem, label: "Home", icon: <Home className="h-5 w-5" />, required: true },
-    { id: "timetable" as NavItem, label: "My Synchron", icon: <Calendar className="h-5 w-5" /> },
-    { id: "notices" as NavItem, label: "Daily Notices", icon: <Bell className="h-5 w-5" /> },
-    { id: "clipboard" as NavItem, label: "Clipboard", icon: <Clipboard className="h-5 w-5" /> },
-    { id: "awards" as NavItem, label: "Award Points", icon: <Award className="h-5 w-5" /> },
-  ]
-
-  const handleTabToggle = (tabId: NavItem) => {
-    if (tabId === "home") return // Home is required
-
-    const isCurrentlyVisible = navigationTabs.includes(tabId)
-    if (isCurrentlyVisible) {
-      // Remove tab (but keep at least 2 tabs including home)
-      if (navigationTabs.length > 2) {
-        setNavigationTabs(navigationTabs.filter((tab) => tab !== tabId))
-      }
-    } else {
-      // Add tab (but keep max 5 tabs)
-      if (navigationTabs.length < 5) {
-        setNavigationTabs([...navigationTabs, tabId])
-      }
-    }
-  }
+  // Navigation tabs are not user-configurable in this build.
 
   // Load saved preference on mount and reset font easter egg
   useEffect(() => {
-    trackSectionUsage("settings" as NavItem)
+    trackSectionUsage("settings")
 
     // Reset font easter egg on page load - don't persist it
     setShowFontSelector(false)
@@ -304,52 +280,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Navigation Tabs moved here from removed General tab */}
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Navigation Tabs</CardTitle>
-                <CardDescription className="text-on-surface-variant">
-                  Customize which tabs appear in your bottom navigation (2-5 tabs)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {availableTabs.map((tab) => {
-                  const isVisible = navigationTabs.includes(tab.id)
-                  const isRequired = tab.required
-                  const canRemove = navigationTabs.length > 2 && !isRequired
-                  const canAdd = navigationTabs.length < 5
-
-                  return (
-                    <div
-                      key={tab.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-surface-container-high/50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${isVisible ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
-                          {tab.icon}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-on-surface">{tab.label}</span>
-                          {isRequired && (
-                            <span className="text-xs text-primary font-medium">Required</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <Switch
-                        checked={isVisible}
-                        onCheckedChange={() => handleTabToggle(tab.id)}
-                        disabled={isRequired || (isVisible && !canRemove) || (!isVisible && !canAdd)}
-                      />
-                    </div>
-                  )
-                })}
-
-                <div className="pt-2 text-xs text-center text-on-surface-variant">
-                  {navigationTabs.length}/5 tabs selected • Home is always required
-                </div>
-              </CardContent>
-            </Card>
+            {/* Navigation Tabs control removed - navigation is fixed in this build */}
 
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
@@ -509,11 +440,11 @@ export default function SettingsPage() {
         {/* Easter Egg Area - Link to new page */}
         <div className="mt-8 pt-6 border-t border-outline-variant">
           <div className="text-center">
-            <Link
+              <Link
               href="/easter-egg"
               className="text-xs text-on-surface-variant/50 hover:text-primary transition-all duration-200 px-3 py-2 rounded-md hover:bg-surface-container-high focus:outline-none select-none"
             >
-              Synchron v2.1.1
+              Synchron v3.0.1
             </Link>
           </div>
         </div>

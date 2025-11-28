@@ -286,6 +286,53 @@ export default function HomeClient() {
                     <span className="text-sm font-medium">Canvas</span>
                   </a>
                 </div>
+                {/* Divider and adaptive class links row */}
+                <div className="mt-4">
+                  <div className="border-t border-outline-variant" />
+                  <div className="mt-3 flex items-center gap-3">
+                    {(() => {
+                      const subject = (currentPeriod?.subject ?? "").trim()
+                      const subKey = subject.toLowerCase()
+                      const mapping: Record<string, { label: string; url: string }> = {
+                        chinese: { label: "Junqi", url: "https://www.junqi.app/en/game/ZGIV?mode=private" },
+                        ved: { label: "Wellio", url: "https://app.wellioeducation.com/" },
+                      }
+
+                      // Determine if subject matches a mapping.
+                      let matched: { label: string; url: string } | null = null
+                      if (subKey.includes("chinese") || subKey.includes("chin")) matched = mapping.chinese
+                      else if (subKey === "ved" || subKey.includes("ved")) matched = mapping.ved
+
+                      // Render three boxes; centre one contains the adaptive link when available.
+                      return [0, 1, 2].map((i) => {
+                        const isCenter = i === 1
+                        if (isCenter && matched) {
+                          return (
+                            <a
+                              key={i}
+                              href={matched.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 min-w-[6rem] px-4 py-3 rounded-md border border-outline-variant bg-surface-container-high hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-2"
+                            >
+                              <Globe className="h-4 w-4" />
+                              <span className="font-medium">{matched.label}</span>
+                            </a>
+                          )
+                        }
+
+                        // Empty placeholder boxes
+                        return (
+                          <div
+                            key={i}
+                            className="flex-1 min-w-[6rem] h-10 rounded-md border border-outline-variant bg-transparent"
+                            aria-hidden
+                          />
+                        )
+                      })
+                    })()}
+                  </div>
+                </div>
               </div>
 
                <Link href="/notices" className="rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex flex-col justify-between hover:brightness-95 transition-all cursor-pointer">
