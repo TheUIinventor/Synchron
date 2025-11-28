@@ -465,6 +465,31 @@ export async function GET(req: NextRequest) {
       full: fullRes?.json,
     })
 
+    // If we still couldn't determine a week type from upstream data, fall back
+    // to a parity-based inference using the ISO week number. This provides a
+    // stable A/B toggle even when the portal omits explicit week tags.
+    function isoWeekNumber(d: Date) {
+      // Copy date so don't modify original
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+      // Thursday in current week decides the year
+      date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1))
+      const weekNo = Math.floor(((+date - +yearStart) / 86400000 + 1) / 7) + 1
+      return weekNo
+    }
+
+    let finalWeekType = weekType as WeekType | null
+    if (!finalWeekType) {
+      try {
+        const today = new Date()
+        const weekNo = isoWeekNumber(today)
+        // Choose a mapping: odd -> A, even -> B. This is adjustable later.
+        finalWeekType = (weekNo % 2) === 1 ? 'A' : 'B'
+      } catch (e) {
+        finalWeekType = null
+      }
+    }
+
     // Build per-day week tag counts for diagnostics
     const perDayWeekCounts: Record<string, { A: number; B: number; unknown: number }> = {}
     for (const [dayName, periods] of Object.entries(byDay)) {
@@ -477,16 +502,29 @@ export async function GET(req: NextRequest) {
       perDayWeekCounts[dayName] = { A: a, B: b, unknown: u }
     }
 
+    // Build explicit lists of periods tagged A/B/unknown for debugging
+    const weekBreakdown: { A: any[]; B: any[]; unknown: any[] } = { A: [], B: [], unknown: [] }
+    for (const [dayName, periods] of Object.entries(byDay)) {
+      for (const p of periods) {
+        const entry = { day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room }
+        if (p.weekType === 'A') weekBreakdown.A.push(entry)
+        else if (p.weekType === 'B') weekBreakdown.B.push(entry)
+        else weekBreakdown.unknown.push(entry)
+      }
+    }
+
     const hasAny = Object.values(byDay).some(a => a.length)
     if (hasAny) return NextResponse.json({
       timetable: byDay,
       source: 'sbhs-api',
-      weekType,
+      weekType: finalWeekType,
       diagnostics: {
         detectedWeekType: detectedWeekType ?? null,
         dominantWeekType: dominantWeekType ?? null,
+        inferredWeekParityFallback: finalWeekType ? finalWeekType : null,
         weekTally,
         perDayWeekCounts,
+        weekBreakdown,
       }
     })
 
