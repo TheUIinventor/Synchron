@@ -13,9 +13,8 @@ function normalizeWeekType(value: any): WeekType | null {
   const explicit = str.match(/\b(?:WEEK|WEEKTYPE|WEEK_LABEL|CYCLE|ROTATION|ROT)\b[^A-Z0-9]*([AB])\b/)
   if (explicit && explicit[1]) return explicit[1] as WeekType
 
-  // Match a standalone A or B as a whole word (prevents matching parts of room names like "B101")
-  const standalone = str.match(/\b([AB])\b/)
-  if (standalone && standalone[1]) return standalone[1] as WeekType
+  // Do NOT match single letters inside longer strings (eg. class names like "MAT A").
+  // Only accept an explicit single-letter string which we already handled above.
 
   return null
 }
@@ -56,13 +55,23 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
   const start = item.start || item.startTime || item.timeStart || item.from || item.begin || item.start_time || ''
   const end = item.end || item.finish || item.timeEnd || item.endTime || item.end_time || item.to || item.until || ''
   const time = [start, end].filter(Boolean).join(' - ')
-  const subject = item.subject || item.subjectName || item.subject_name || item.class || item.title || item.name || 'Class'
+  let subject = item.subject || item.subjectName || item.subject_name || item.class || item.title || item.name || 'Class'
   const teacher = item.teacher || item.teacherName || item.teacher_name || item.classTeacher || item.staff || item.staffName || ''
   const room = item.room || item.roomName || item.room_name || item.venue || item.location || ''
   const period = String(item.period || item.p || item.block || item.lesson || item.lessonNumber || item.lesson_number || item.name || item.title || '')
+  // Avoid using subject/title/name fields when inferring week type because class
+  // names sometimes include trailing group letters (e.g. "MAT A") which falsely
+  // indicate a week letter. Only consider explicit week-like fields.
   const weekType = normalizeWeekType(
-    item.weekType || item.week_type || item.week || item.rotation || item.cycle || item.dayname || item.dayName || item.day || item.subject || item.title || item.name || item.label
+    item.weekType || item.week_type || item.week || item.rotation || item.cycle || item.weekLabel || item.week_label || item.dayname || item.dayName || item.day
   ) || fallbackWeekType
+
+  // Normalize subject by removing trailing single-letter group suffixes like " A" or " B"
+  try {
+    const m = String(subject || '').trim().match(/^(.+?)\s+([AB])$/i)
+    if (m && m[1]) subject = m[1].trim()
+  } catch (e) {}
+
   return { period, time, subject, teacher, room, weekType: weekType ?? undefined }
 }
 
@@ -451,6 +460,15 @@ export async function GET(req: NextRequest) {
       // Normalize common alternate spacings like "09:00-10:00" vs "09:00 - 10:00"
       return s.replace(/\s*-\s*/g, ' - ')
     }
+    const parseStartMinutes = (timeStr: any) => {
+      try {
+        const s = normalizeString(timeStr)
+        const part = s.split('-')[0].trim()
+        const [h, m] = part.split(':').map((x: string) => parseInt(x, 10))
+        if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + (Number.isFinite(m) ? m : 0)
+      } catch (e) {}
+      return -1
+    }
 
     const dedupePerDay = (b: Record<string, any[]>) => {
       for (const [dayName, periods] of Object.entries(b)) {
@@ -458,12 +476,17 @@ export async function GET(req: NextRequest) {
         for (const p of periods) {
           const period = normalizeString(p.period)
           const time = normalizeTime(p.time)
-          const subject = normalizeString(p.subject).toUpperCase()
+          const startMin = parseStartMinutes(time)
+          // Strip trailing A/B from subject for dedupe key so group suffixes don't split duplicates
+          const rawSubject = normalizeString(p.subject)
+          const subjNoSuffix = rawSubject.replace(/\s+([AB])$/i, '')
+          const subject = subjNoSuffix.toUpperCase()
+          const subjectDisplay = subjNoSuffix
           const teacher = normalizeString(p.teacher).toUpperCase()
           const room = normalizeString(p.room).toUpperCase()
           const weekTypeKey = normalizeString(p.weekType).toUpperCase()
-          const key = [period, time, subject, teacher, room, weekTypeKey].join('|')
-          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject, teacher, room, weekType: weekTypeKey || undefined })
+          const key = [period, startMin, subject, teacher, room, weekTypeKey].join('|')
+          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher, room, weekType: weekTypeKey || undefined })
         }
         b[dayName] = Array.from(seen.values())
       }
@@ -491,12 +514,16 @@ export async function GET(req: NextRequest) {
       for (const p of arr) {
         const period = normalizeString(p.period)
         const time = normalizeTime(p.time)
-        const subject = normalizeString(p.subject).toUpperCase()
+        const startMin = parseStartMinutes(time)
+        const rawSubject = normalizeString(p.subject)
+        const subjNoSuffix = rawSubject.replace(/\s+([AB])$/i, '')
+        const subject = subjNoSuffix.toUpperCase()
+        const subjectDisplay = subjNoSuffix
         const teacher = normalizeString(p.teacher).toUpperCase()
         const room = normalizeString(p.room).toUpperCase()
         const weekTypeKey = normalizeString(p.weekType).toUpperCase()
-        const key = [period, time, subject, teacher, room, weekTypeKey].join('|')
-        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject, teacher, room, weekType: weekTypeKey || undefined })
+        const key = [period, startMin, subject, teacher, room, weekTypeKey].join('|')
+        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher, room, weekType: weekTypeKey || undefined })
       }
       return Array.from(seen.values())
     }
