@@ -22,11 +22,18 @@ export async function GET(req: NextRequest) {
     }
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
-    // Forward SBHS cookies as a Cookie header so endpoints expecting cookie-based sessions work
-    const cookieParts: string[] = []
-    if (accessToken) cookieParts.push(`sbhs_access_token=${accessToken}`)
-    if (refreshToken) cookieParts.push(`sbhs_refresh_token=${refreshToken}`)
-    if (cookieParts.length > 0) headers['Cookie'] = cookieParts.join('; ')
+    // Forward SBHS cookies as a Cookie header so endpoints expecting cookie-based sessions work.
+    // Prefer forwarding the incoming Cookie header (this ensures portal session cookies like
+    // SHSIDP-S / SHPSID / SHSSAMLS are preserved). Fall back to just access/refresh tokens.
+    const incomingCookieHeader = req.headers.get('cookie')
+    if (incomingCookieHeader) {
+      headers['Cookie'] = incomingCookieHeader
+    } else {
+      const cookieParts: string[] = []
+      if (accessToken) cookieParts.push(`sbhs_access_token=${accessToken}`)
+      if (refreshToken) cookieParts.push(`sbhs_refresh_token=${refreshToken}`)
+      if (cookieParts.length > 0) headers['Cookie'] = cookieParts.join('; ')
+    }
 
     const response = await fetch(apiUrl, {
       headers,
