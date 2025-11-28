@@ -21,6 +21,16 @@ export async function GET(req: NextRequest) {
       'Accept-Language': 'en-AU,en;q=0.9',
     }
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+    // Diagnostic: masked Authorization token value for debugging
+    const authHeader = headers['Authorization']
+    const maskedAuth = authHeader ? (() => {
+      try {
+        const parts = authHeader.split(' ')
+        const token = parts[1] || ''
+        if (token.length <= 8) return `${parts[0]} ${'*'.repeat(token.length)}`
+        return `${parts[0]} ${token.slice(0,4)}…${token.slice(-4)}`
+      } catch (e) { return '[masked]' }
+    })() : null
 
     // Forward SBHS cookies as a Cookie header so endpoints expecting cookie-based sessions work.
     // Prefer forwarding the incoming Cookie header (this ensures portal session cookies like
@@ -130,6 +140,9 @@ export async function GET(req: NextRequest) {
             responseBody: truncated,
             responseHeaders: maskedHeaders,
             probeResults,
+            maskedIncomingCookies,
+            sentAuthorization: !!authHeader,
+            maskedAuthorization: maskedAuth,
           },
           forwardedSetCookie ? { status: 401, headers: { 'set-cookie': forwardedSetCookie } } : { status: 401 },
         )
