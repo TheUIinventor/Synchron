@@ -130,6 +130,47 @@ export async function GET(req: NextRequest) {
           }).join(',')
         }
 
+        // Before returning diagnostics, attempt a best-effort scrape of the portal
+        // homepage/profile to extract a student name. This helps when the portal
+        // doesn't expose a JSON userinfo endpoint but the user's name is visible
+        // on an HTML page. Use cheerio server-side to parse HTML.
+        try {
+          const profilePaths = ['/', '/details', '/profile', '/details/profile', '/home']
+          for (const pp of profilePaths) {
+            try {
+              const url = `https://student.sbhs.net.au${pp}`
+              const r3 = await fetch(url, { headers })
+              if (!r3.ok) continue
+              const html3 = await r3.text()
+              if (!html3 || html3.trim().length === 0) continue
+              try {
+                const cheerioMod: any = await import('cheerio')
+                const $ = cheerioMod.load(html3)
+                const nameSelectors = ['.student-name', '.profile-name', '.student-info .name', '[class*="student"] .name', 'h1', 'h2', '.name']
+                for (const sel of nameSelectors) {
+                  const el = $(sel).first()
+                  if (el && el.text()) {
+                    const fullName = el.text().trim()
+                    if (fullName && fullName.split(' ').length >= 1) {
+                      const given = fullName.split(/\s+/)[0]
+                      const result = { givenName: given, fullName }
+                      const res = NextResponse.json({ success: true, data: result, source: `scraped:${pp}` })
+                      if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
+                      return res
+                    }
+                  }
+                }
+              } catch (e) {
+                // ignore cheerio errors and continue to probes below
+              }
+            } catch (e) {
+              // ignore fetch errors for profilePaths
+            }
+          }
+        } catch (e) {
+          // ignore any scraping errors and continue to diagnostics
+        }
+
         // Additionally probe a few other endpoints to see which ones accept the session
         const probePaths = ['/notices', '/awards', '/timetable']
         const probeResults: Record<string, any> = {}
