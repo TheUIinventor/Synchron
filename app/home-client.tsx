@@ -178,10 +178,7 @@ export default function HomeClient() {
       <div className="flex items-start justify-between gap-4 pt-4 md:pt-0">
         <div className="flex flex-col gap-1">
           <h2 className="mt-[10px] text-3xl md:text-4xl font-medium text-foreground">{givenName ? `Hello, ${givenName}!` : 'Hello!'}</h2>
-          <h1 className="text-4xl md:text-5xl font-serif text-foreground">My Synchron</h1>
-          <p className="text-lg text-muted-foreground font-medium">
-            {format(currentDate, "EEEE, d MMMM")}
-          </p>
+          {/* Page title and date removed per user preference; greeting shown above */}
         </div>
 
           <div className="flex items-center gap-3">
