@@ -292,20 +292,47 @@ export default function HomeClient() {
                   <div className="mt-3 flex items-center gap-3">
                     {(() => {
                       const subject = (currentPeriod?.subject ?? "").trim()
-                      const subKey = subject.toLowerCase()
+                      // Normalize subject: remove digits/punctuation and lower-case
+                      const cleaned = subject.replace(/[^a-zA-Z\s]/g, "").toLowerCase()
+                      const tokens = cleaned.split(/\s+/).filter(Boolean)
+                      const first = tokens[0] ?? ""
+
                       const mapping: Record<string, { label: string; url: string }> = {
                         chinese: { label: "Junqi", url: "https://www.junqi.app/en/game/ZGIV?mode=private" },
                         ved: { label: "Wellio", url: "https://app.wellioeducation.com/" },
                         va: { label: "SmartHistory", url: "https://smarthistory.org/" },
+                        math: { label: "Dictionary", url: "https://www.mathsisfun.com/definitions/" },
                       }
 
-                      // Determine if subject matches a mapping.
-                      let matched: { label: string; url: string } | null = null
-                      if (subKey.includes("chinese") || subKey.includes("chin")) matched = mapping.chinese
-                      else if (subKey === "ved" || subKey.includes("ved")) matched = mapping.ved
-                      else if (/
-\bva\b
-/.test(subKey) || subKey.includes("visual") || subKey.includes(" art") || subKey === "art") matched = mapping.va
+                      const codeMap: Record<string, string> = {
+                        // Chinese codes
+                        chi: "chinese",
+                        chin: "chinese",
+                        chinese: "chinese",
+                        // VED
+                        ved: "ved",
+                        // Visual Art
+                        va: "va",
+                        visual: "va",
+                        art: "va",
+                        // Math codes
+                        math: "math",
+                        maths: "math",
+                        mat: "math",
+                        ma: "math",
+                      }
+
+                      let canonical: string | null = null
+                      if (codeMap[first]) canonical = codeMap[first]
+                      else {
+                        // Fallback to contains checks on the cleaned subject
+                        if (cleaned.includes("chinese") || cleaned.includes("chin")) canonical = "chinese"
+                        else if (cleaned.includes("ved")) canonical = "ved"
+                        else if (/\bva\b/.test(cleaned) || cleaned.includes("visual") || cleaned.includes(" art")) canonical = "va"
+                        else if (cleaned.includes("math") || cleaned.includes("mat")) canonical = "math"
+                      }
+
+                      const matched = canonical ? mapping[canonical as keyof typeof mapping] ?? null : null
 
                       // Render three boxes; centre one contains the adaptive link when available.
                       return [0, 1, 2].map((i) => {
