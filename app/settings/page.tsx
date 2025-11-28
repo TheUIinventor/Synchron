@@ -454,20 +454,7 @@ export default function SettingsPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="integrations" className="space-y-4 mt-0">
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Canvas Links</CardTitle>
-                <CardDescription className="text-on-surface-variant">
-                  Provide the Canvas (LMS) URL for each subject so the timetable links open the correct class page.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-on-surface-variant">Links are stored locally in your browser.</p>
-                <CanvasLinksEditor />
-              </CardContent>
-            </Card>
-          </TabsContent>
+          
 
           <TabsContent value="feedback" className="space-y-6 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
