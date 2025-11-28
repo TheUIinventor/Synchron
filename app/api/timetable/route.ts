@@ -31,6 +31,12 @@ function inferWeekType(dayKey?: any, source?: any): WeekType | null {
     source?.rotation,
     source?.dayname,
     source?.dayName,
+    // Common fields where portals sometimes embed week markers
+    source?.subject,
+    source?.title,
+    source?.name,
+    source?.label,
+    source?.period,
     dayKey,
   ]
   for (const c of candidates) {
@@ -50,7 +56,7 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
   const room = item.room || item.roomName || item.room_name || item.venue || item.location || ''
   const period = String(item.period || item.p || item.block || item.lesson || item.lessonNumber || item.lesson_number || item.name || item.title || '')
   const weekType = normalizeWeekType(
-    item.weekType || item.week_type || item.week || item.rotation || item.cycle || item.dayname || item.dayName || item.day
+    item.weekType || item.week_type || item.week || item.rotation || item.cycle || item.dayname || item.dayName || item.day || item.subject || item.title || item.name || item.label
   ) || fallbackWeekType
   return { period, time, subject, teacher, room, weekType: weekType ?? undefined }
 }
