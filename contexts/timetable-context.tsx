@@ -299,20 +299,38 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (externalTimetable && !timetableSource) {
       setTimetableSource('cache')
     }
-
-    // Persist timetable to localStorage whenever it updates (including source)
   }, [])
 
+  // Debounced persistence of the last-known timetable to localStorage. This
+  // avoids lots of synchronous I/O if the timetable is updated repeatedly in
+  // quick succession (for example when substitutions are applied).
+  const persistTimerRef = useRef<number | null>(null)
   useEffect(() => {
     try {
-      if (externalTimetable) {
-        const payload = { timetable: externalTimetable, source: timetableSource ?? 'external' }
-        localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
-      } else {
-        localStorage.removeItem('synchron-last-timetable')
+      if (persistTimerRef.current != null) {
+        window.clearTimeout(persistTimerRef.current)
+        persistTimerRef.current = null
       }
+      persistTimerRef.current = window.setTimeout(() => {
+        try {
+          if (externalTimetable) {
+            const payload = { timetable: externalTimetable, source: timetableSource ?? 'external', ts: Date.now() }
+            localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
+          } else {
+            localStorage.removeItem('synchron-last-timetable')
+          }
+        } catch (e) {
+          // ignore storage errors
+        }
+      }, 500)
     } catch (e) {
-      // ignore storage errors
+      // ignore
+    }
+    return () => {
+      if (persistTimerRef.current != null) {
+        window.clearTimeout(persistTimerRef.current)
+        persistTimerRef.current = null
+      }
     }
   }, [externalTimetable, timetableSource])
 
@@ -868,9 +886,38 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Initial update and 1-second interval for all time-based states
   useEffect(() => {
-    updateAllTimeStates()
-    const interval = setInterval(updateAllTimeStates, 1000)
-    return () => clearInterval(interval)
+    // Adaptive ticking: update frequently while the document is visible, but
+    // reduce frequency (or pause) when hidden to save CPU and battery.
+    let intervalId: number | null = null
+
+    function startFastTick() {
+      if (intervalId != null) window.clearInterval(intervalId)
+      updateAllTimeStates()
+      intervalId = window.setInterval(updateAllTimeStates, 1000)
+    }
+
+    function startSlowTick() {
+      if (intervalId != null) window.clearInterval(intervalId)
+      // slow update every 15s when tab is hidden
+      intervalId = window.setInterval(updateAllTimeStates, 15000)
+    }
+
+    function handleVisibility() {
+      if (typeof document === 'undefined') return
+      if (document.visibilityState === 'visible') startFastTick()
+      else startSlowTick()
+    }
+
+    // Initialize based on current visibility and keep listeners to adjust.
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
   }, [updateAllTimeStates])
 
   return (
