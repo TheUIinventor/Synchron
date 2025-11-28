@@ -19,9 +19,9 @@ const config = {
     },
     extend: {
       fontFamily: {
-        // M3 Expressive Typography - Switched to Calibri as requested
-        sans: ["Calibri", "sans-serif"],
-        serif: ["Calibri", "serif"],
+        // Use Roboto Flex (via CSS variable provided by Next's font loader)
+        sans: ["var(--font-roboto-flex)", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
+        serif: ["var(--font-roboto-flex)", "Georgia", "Times New Roman", "serif"],
       },
       colors: {
         border: "hsl(var(--border) / <alpha-value>)",

@@ -3,6 +3,9 @@ import "./globals.css";
 import ClientLayout from "./client-layout";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { Roboto_Flex } from "next/font/google";
+
+const roboto = Roboto_Flex({ subsets: ["latin"], display: "swap", variable: "--font-roboto-flex" });
 
 export const metadata: Metadata = {
   title: "Synchron",
@@ -24,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
+      <body className={`${roboto.variable} font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
         <ClientLayout>
           {children}
           <Toaster />
