@@ -18,7 +18,8 @@ export default function HomeClient() {
     isLoading, 
     error, 
     refreshExternal,
-    selectedDay
+    selectedDay,
+    selectedDateObject
   , timetableSource } = useTimetable();
   
   // Initialize immediately so header can render without waiting for effects
@@ -76,7 +77,7 @@ export default function HomeClient() {
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
 
-  if (!currentDate) {
+  if (!currentDate && !selectedDateObject) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -107,9 +108,10 @@ export default function HomeClient() {
 
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = currentMomentPeriodInfo;
   
-  // Get today's periods for the sidebar
-  // Use selectedDay if available, otherwise fallback to current day name
-  const dayName = selectedDay || format(currentDate, "EEEE");
+  // Determine the date to display: prefer provider's selected date, otherwise local currentDate
+  const displayDate = selectedDateObject ?? currentDate;
+  // Get today's periods for the sidebar - prefer selectedDay (context), otherwise use the displayDate's weekday
+  const dayName = selectedDay || format(displayDate, "EEEE");
   const todaysPeriods = timetableData[dayName] || [];
 
   // Calculate progress percent for the current block (class or break)
@@ -403,7 +405,7 @@ export default function HomeClient() {
           <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  {format(currentDate, "EEEE, d MMMM")}
+                  {format(displayDate, "EEEE, d MMMM")}
                 </h3>
                 
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[360px] pr-2">
