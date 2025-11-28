@@ -45,6 +45,30 @@ export async function GET(req: NextRequest) {
       if (cookieParts.length > 0) headers['Cookie'] = cookieParts.join('; ')
     }
 
+    // Forward a small whitelist of incoming browser headers so the portal
+    // treats this request like it came from a browser. Do NOT forward
+    // sensitive headers beyond what the browser sent; Cookie and Authorization
+    // are already handled above.
+    const headerWhitelist = [
+      'user-agent',
+      'accept',
+      'accept-language',
+      'referer',
+      'x-requested-with',
+      'sec-fetch-site',
+      'sec-fetch-mode',
+      'sec-fetch-dest',
+      'sec-fetch-user'
+    ]
+    try {
+      for (const h of headerWhitelist) {
+        const val = req.headers.get(h)
+        if (val) headers[h] = val
+      }
+    } catch (e) {
+      // ignore header-copy failures
+    }
+
     const response = await fetch(apiUrl, {
       headers,
     })
