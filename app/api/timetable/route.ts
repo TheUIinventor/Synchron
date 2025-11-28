@@ -442,6 +442,22 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Deduplicate entries per-day. Upstream payloads (full.days, timetable, bells, day) can contain
+    // the same logical period multiple times via different shapes; perform a stable dedupe so the
+    // client doesn't receive repeated identical rows. Key uses period/time/subject/teacher/room/weekType.
+    const dedupePerDay = (b: Record<string, any[]>) => {
+      for (const [dayName, periods] of Object.entries(b)) {
+        const seen = new Map<string, any>()
+        for (const p of periods) {
+          const key = [p.period || '', p.time || '', (p.subject || '').trim(), (p.teacher || '').trim(), (p.room || '').trim(), p.weekType || ''].join('|')
+          if (!seen.has(key)) seen.set(key, p)
+        }
+        b[dayName] = Array.from(seen.values())
+      }
+    }
+
+    dedupePerDay(byDay)
+
     // If some weekdays remain empty but the full timetable has entries, backfill from the detailed days object
     // Remove obvious placeholder entries with no useful information
     for (const dayName of Object.keys(byDay)) {
