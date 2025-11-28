@@ -20,11 +20,11 @@ export default function HomeClient() {
     selectedDay
   } = useTimetable();
   
-  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+  // Initialize immediately so header can render without waiting for effects
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    setCurrentDate(new Date());
     try {
       const raw = localStorage.getItem('synchron-canvas-links')
       if (raw) {
@@ -58,7 +58,7 @@ export default function HomeClient() {
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
 
-  if (isLoading || !currentDate) {
+  if (!currentDate) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -167,14 +167,24 @@ export default function HomeClient() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link href="/settings" className="rounded-full p-2 hover:bg-surface-variant transition-colors">
-            <SettingsIcon className="h-5 w-5 text-muted-foreground" />
-          </Link>
-          <AuthButton />
-        </div>
+          <div className="flex items-center gap-3">
+            <Link href="/settings" className="rounded-full p-2 hover:bg-surface-variant transition-colors">
+              <SettingsIcon className="h-5 w-5 text-muted-foreground" />
+            </Link>
+            <AuthButton />
+          </div>
       </div>
 
+        {/* Subtle syncing indicator so header shows while background refresh runs */}
+        {isLoading && (
+          <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4 text-primary" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span>Syncing timetable...</span>
+          </div>
+        )}
       {/* Main Expressive Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4">
         

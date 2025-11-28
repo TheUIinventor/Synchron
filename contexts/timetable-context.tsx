@@ -224,7 +224,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   })
 
   // Memoize the current timetable based on selected week
-  const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
+  // Try to synchronously hydrate last-known timetable from localStorage so the UI
+  // can display cached data instantly while we fetch fresh data in the background.
+  const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-last-timetable') : null
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && parsed.timetable && typeof parsed.timetable === 'object') return parsed.timetable
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+    return null
+  })
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -281,6 +294,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const subsAppliedRef = useRef<number | null>(null)
 
   // When an external timetable is loaded, attempt to fetch live substitutions and apply them once.
+  useEffect(() => {
+    // If we hydrated a cached timetable, mark the source so UI can show it's cached
+    if (externalTimetable && !timetableSource) {
+      setTimetableSource('cache')
+    }
+
+    // Persist timetable to localStorage whenever it updates (including source)
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (externalTimetable) {
+        const payload = { timetable: externalTimetable, source: timetableSource ?? 'external' }
+        localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
+      } else {
+        localStorage.removeItem('synchron-last-timetable')
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [externalTimetable, timetableSource])
+
   useEffect(() => {
     if (!externalTimetable) return
     if (!timetableSource) return
