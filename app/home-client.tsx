@@ -296,12 +296,14 @@ export default function HomeClient() {
                       const mapping: Record<string, { label: string; url: string }> = {
                         chinese: { label: "Junqi", url: "https://www.junqi.app/en/game/ZGIV?mode=private" },
                         ved: { label: "Wellio", url: "https://app.wellioeducation.com/" },
+                        va: { label: "SmartHistory", url: "https://smarthistory.org/" },
                       }
 
                       // Determine if subject matches a mapping.
                       let matched: { label: string; url: string } | null = null
                       if (subKey.includes("chinese") || subKey.includes("chin")) matched = mapping.chinese
                       else if (subKey === "ved" || subKey.includes("ved")) matched = mapping.ved
+                      else if (subKey === "va" || subKey.includes("visual") || subKey.includes(" art" ) || subKey === "art") matched = mapping.va
 
                       // Render three boxes; centre one contains the adaptive link when available.
                       return [0, 1, 2].map((i) => {
