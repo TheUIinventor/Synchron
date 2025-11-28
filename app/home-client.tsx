@@ -303,7 +303,9 @@ export default function HomeClient() {
                       let matched: { label: string; url: string } | null = null
                       if (subKey.includes("chinese") || subKey.includes("chin")) matched = mapping.chinese
                       else if (subKey === "ved" || subKey.includes("ved")) matched = mapping.ved
-                      else if (subKey === "va" || subKey.includes("visual") || subKey.includes(" art" ) || subKey === "art") matched = mapping.va
+                      else if (/
+\bva\b
+/.test(subKey) || subKey.includes("visual") || subKey.includes(" art") || subKey === "art") matched = mapping.va
 
                       // Render three boxes; centre one contains the adaptive link when available.
                       return [0, 1, 2].map((i) => {
