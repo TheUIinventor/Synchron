@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Bell, Menu, Settings, Clipboard } from "lucide-react";
+import { Home, Calendar, Bell, Menu, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
@@ -13,7 +13,6 @@ export function BottomNav() {
     { href: "/timetable", icon: Calendar, label: "Timetable" },
     { href: "/notices", icon: Bell, label: "Notices" },
     { href: "/clipboard", icon: Clipboard, label: "Clipboard" },
-    { href: "/settings", icon: Settings, label: "Settings" },
   ];
 
   return (

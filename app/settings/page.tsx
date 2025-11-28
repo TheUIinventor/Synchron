@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Send, Type, Home, ChevronLeft, Calendar, Bell, Clipboard, Award } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import ThemeToggle from "@/components/theme-toggle"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
@@ -142,7 +143,7 @@ function CanvasLinksEditor() {
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "feedback" | "integrations">("general")
+  const [activeTab, setActiveTab] = useState<"appearance" | "integrations" | "feedback">("appearance")
   const [feedbackText, setFeedbackText] = useState("")
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [appearanceTabClicks, setAppearanceTabClicks] = useState(0)
@@ -260,40 +261,50 @@ export default function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
-            <TabsTrigger 
-              value="general" 
-              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
-            >
-              General
-            </TabsTrigger>
-            <TabsTrigger 
-              value="appearance" 
-              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2 relative"
-              onClick={handleAppearanceTabClick}
-            >
-              Appearance
-              {appearanceTabClicks > 0 && appearanceTabClicks < 7 && (
-                <span className="absolute -top-1 -right-1 text-xs animate-bounce">
-                  {"🎨".repeat(Math.min(appearanceTabClicks, 3))}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger 
-              value="feedback" 
-              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
-            >
-              Feedback
-            </TabsTrigger>
-            <TabsTrigger 
-              value="integrations" 
-              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
-            >
-              Integrations
-            </TabsTrigger>
-          </TabsList>
+          <TabsList className="grid w-full grid-cols-3 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
+              <TabsTrigger 
+                value="appearance" 
+                className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2 relative"
+                onClick={handleAppearanceTabClick}
+              >
+                Appearance
+                {appearanceTabClicks > 0 && appearanceTabClicks < 7 && (
+                  <span className="absolute -top-1 -right-1 text-xs animate-bounce">
+                    {"🎨".repeat(Math.min(appearanceTabClicks, 3))}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="integrations" 
+                className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+              >
+                Integrations
+              </TabsTrigger>
+              <TabsTrigger 
+                value="feedback" 
+                className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+              >
+                Feedback
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="general" className="space-y-6 mt-0">
+          {/* General tab removed - navigation settings moved into Appearance tab */}
+
+          <TabsContent value="appearance" className="space-y-6 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Theme Mode</CardTitle>
+                <CardDescription className="text-on-surface-variant">Switch between Light and Dark</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-on-surface-variant">Appearance</div>
+                  <ThemeToggle />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Navigation Tabs moved here from removed General tab */}
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Navigation Tabs</CardTitle>
@@ -339,9 +350,7 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="appearance" className="space-y-6 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Color Theme</CardTitle>
@@ -443,6 +452,21 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-4 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Canvas Links</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Provide the Canvas (LMS) URL for each subject so the timetable links open the correct class page.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-on-surface-variant">Links are stored locally in your browser.</p>
+                <CanvasLinksEditor />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="feedback" className="space-y-6 mt-0">
