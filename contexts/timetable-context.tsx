@@ -240,10 +240,54 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return null
   })
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
+  const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
+    // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
+    if (externalTimetableByWeek) {
+      const filtered: Record<string, Period[]> = {}
+      for (const [day, groups] of Object.entries(externalTimetableByWeek)) {
+        const list = (groups && Array.isArray(groups[currentWeek]) ? groups[currentWeek] : []) as Period[]
+        filtered[day] = list.slice()
+      }
+      // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
+      const getBellForDay = (dayName: string) => {
+        if (dayName === 'Friday') return bellTimesData.Fri
+        if (dayName === 'Wednesday' || dayName === 'Thursday') return bellTimesData['Wed/Thurs']
+        return bellTimesData['Mon/Tues']
+      }
+
+      const parseStartMinutes = (timeStr: string) => {
+        try {
+          const part = (timeStr || '').split('-')[0].trim()
+          const [h, m] = part.split(':').map((s) => parseInt(s, 10))
+          if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m
+        } catch (e) {}
+        return 0
+      }
+
+      for (const day of Object.keys(filtered)) {
+        const bells = getBellForDay(day) || []
+        const dayPeriods = filtered[day]
+
+        for (const b of bells) {
+          const label = b.period
+          if (!/recess|lunch/i.test(label)) continue
+          const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
+          if (!exists) {
+            dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+          }
+        }
+
+        dayPeriods.sort((a, z) => parseStartMinutes(a.time) - parseStartMinutes(z.time))
+        filtered[day] = dayPeriods
+      }
+
+      return filtered
+    }
+
     if (externalTimetable) {
       const filtered: Record<string, Period[]> = {}
       for (const [day, periods] of Object.entries(externalTimetable)) {
@@ -270,18 +314,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const bells = getBellForDay(day) || []
         const dayPeriods = filtered[day]
 
-        // For each bell entry that represents a break (contains 'Recess' or 'Lunch'), ensure a period exists
         for (const b of bells) {
           const label = b.period // e.g., 'Recess' or 'Lunch 1'
           if (!/recess|lunch/i.test(label)) continue
           const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
           if (!exists) {
-            // Insert as a Break period with the bell time
             dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
           }
         }
 
-        // Sort periods by start time to keep ordering
         dayPeriods.sort((a, z) => parseStartMinutes(a.time) - parseStartMinutes(z.time))
         filtered[day] = dayPeriods
       }
@@ -289,7 +330,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return filtered
     }
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
-  }, [currentWeek, externalTimetable])
+  }, [currentWeek, externalTimetable, externalTimetableByWeek])
 
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>(null)
@@ -563,6 +604,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (j == null) return
               if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
                 if (!cancelled) {
+                  if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
                   setExternalTimetable(j.timetable)
                   setTimetableSource(j.source ?? 'external')
                   if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
@@ -745,6 +787,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const j = await r.json()
           if (j && j.timetable) {
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+              if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
               setExternalTimetable(j.timetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
