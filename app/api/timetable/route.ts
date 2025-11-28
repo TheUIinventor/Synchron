@@ -31,12 +31,6 @@ function inferWeekType(dayKey?: any, source?: any): WeekType | null {
     source?.rotation,
     source?.dayname,
     source?.dayName,
-    // Common fields where portals sometimes embed week markers
-    source?.subject,
-    source?.title,
-    source?.name,
-    source?.label,
-    source?.period,
     dayKey,
   ]
   for (const c of candidates) {
@@ -531,6 +525,12 @@ export async function GET(req: NextRequest) {
         weekTally,
         perDayWeekCounts,
         weekBreakdown,
+        // Include raw upstream payloads to help diagnose where A/B info may be present
+        upstream: {
+          day: dayRes?.json ?? null,
+          full: fullRes?.json ?? null,
+          bells: bellsRes?.json ?? null,
+        }
       }
     })
 
