@@ -856,12 +856,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const now = new Date()
 
     // 1. Determine day for main timetable display
-    let dayForMainTimetable = now
-    let showingNextDayFlag = false
-    if (isSchoolDayOver()) {
-      dayForMainTimetable = getNextSchoolDay(now)
-      showingNextDayFlag = true
-    }
+      let dayForMainTimetable = now
+      let showingNextDayFlag = false
+
+      // If today is a weekend, show the next school day (e.g., Monday)
+      const todayDow = now.getDay()
+      if (todayDow === 0 || todayDow === 6) {
+        dayForMainTimetable = getNextSchoolDay(now)
+        showingNextDayFlag = true
+      } else if (isSchoolDayOver()) {
+        // If it's a weekday but the school day is over, show tomorrow's school day
+        dayForMainTimetable = getNextSchoolDay(now)
+        showingNextDayFlag = true
+      }
     const mainTimetableDayName = days[dayForMainTimetable.getDay()]
     setSelectedDay(
       mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName,

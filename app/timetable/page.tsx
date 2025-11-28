@@ -54,12 +54,9 @@ export default function TimetablePage() {
   }
 
   const formatSelectedDate = () => {
-    return selectedDateObject.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    })
+    // Show weekday and date+month (no year) as requested: "Monday, 1 December"
+    const opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }
+    return selectedDateObject.toLocaleDateString('en-US', opts)
   }
 
   // Navigate dates by updating the provider's selected date object so
