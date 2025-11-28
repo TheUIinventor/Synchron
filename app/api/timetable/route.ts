@@ -445,12 +445,25 @@ export async function GET(req: NextRequest) {
     // Deduplicate entries per-day. Upstream payloads (full.days, timetable, bells, day) can contain
     // the same logical period multiple times via different shapes; perform a stable dedupe so the
     // client doesn't receive repeated identical rows. Key uses period/time/subject/teacher/room/weekType.
+    const normalizeString = (v: any) => (v == null ? '' : String(v).trim())
+    const normalizeTime = (t: any) => {
+      const s = normalizeString(t)
+      // Normalize common alternate spacings like "09:00-10:00" vs "09:00 - 10:00"
+      return s.replace(/\s*-\s*/g, ' - ')
+    }
+
     const dedupePerDay = (b: Record<string, any[]>) => {
       for (const [dayName, periods] of Object.entries(b)) {
         const seen = new Map<string, any>()
         for (const p of periods) {
-          const key = [p.period || '', p.time || '', (p.subject || '').trim(), (p.teacher || '').trim(), (p.room || '').trim(), p.weekType || ''].join('|')
-          if (!seen.has(key)) seen.set(key, p)
+          const period = normalizeString(p.period)
+          const time = normalizeTime(p.time)
+          const subject = normalizeString(p.subject).toUpperCase()
+          const teacher = normalizeString(p.teacher).toUpperCase()
+          const room = normalizeString(p.room).toUpperCase()
+          const weekTypeKey = normalizeString(p.weekType).toUpperCase()
+          const key = [period, time, subject, teacher, room, weekTypeKey].join('|')
+          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject, teacher, room, weekType: weekTypeKey || undefined })
         }
         b[dayName] = Array.from(seen.values())
       }
@@ -470,12 +483,44 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const weekTally: Record<WeekType, number> = { A: 0, B: 0 }
-    for (const periods of Object.values(byDay)) {
-      for (const period of periods) {
-        if (period.weekType === 'A') weekTally.A += 1
-        if (period.weekType === 'B') weekTally.B += 1
+    // Build a grouped view per weekday split by week-type (A/B/unknown).
+    // We keep the original `timetable: byDay` for backward compatibility and
+    // provide `timetableByWeek` for clients that want explicit A/B buckets.
+    const dedupeArray = (arr: any[]) => {
+      const seen = new Map<string, any>()
+      for (const p of arr) {
+        const period = normalizeString(p.period)
+        const time = normalizeTime(p.time)
+        const subject = normalizeString(p.subject).toUpperCase()
+        const teacher = normalizeString(p.teacher).toUpperCase()
+        const room = normalizeString(p.room).toUpperCase()
+        const weekTypeKey = normalizeString(p.weekType).toUpperCase()
+        const key = [period, time, subject, teacher, room, weekTypeKey].join('|')
+        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject, teacher, room, weekType: weekTypeKey || undefined })
       }
+      return Array.from(seen.values())
+    }
+
+    const timetableByWeek: Record<string, { A: any[]; B: any[]; unknown: any[] }> = {}
+    for (const [dayName, periods] of Object.entries(byDay)) {
+      const groups = { A: [] as any[], B: [] as any[], unknown: [] as any[] }
+      for (const p of periods) {
+        const wt = normalizeString(p.weekType).toUpperCase()
+        if (wt === 'A') groups.A.push(p)
+        else if (wt === 'B') groups.B.push(p)
+        else groups.unknown.push(p)
+      }
+      // Deduplicate inside each group (in case duplicates slipped through)
+      groups.A = dedupeArray(groups.A)
+      groups.B = dedupeArray(groups.B)
+      groups.unknown = dedupeArray(groups.unknown)
+      timetableByWeek[dayName] = groups
+    }
+
+    const weekTally: Record<WeekType, number> = { A: 0, B: 0 }
+    for (const groups of Object.values(timetableByWeek)) {
+      weekTally.A += groups.A.length
+      weekTally.B += groups.B.length
     }
 
     let dominantWeekType: WeekType | null = null
@@ -519,32 +564,24 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Build per-day week tag counts for diagnostics
+    // Build per-day week tag counts for diagnostics using the grouped view
     const perDayWeekCounts: Record<string, { A: number; B: number; unknown: number }> = {}
-    for (const [dayName, periods] of Object.entries(byDay)) {
-      let a = 0, b = 0, u = 0
-      for (const p of periods) {
-        if (p.weekType === 'A') a += 1
-        else if (p.weekType === 'B') b += 1
-        else u += 1
-      }
-      perDayWeekCounts[dayName] = { A: a, B: b, unknown: u }
+    for (const [dayName, groups] of Object.entries(timetableByWeek)) {
+      perDayWeekCounts[dayName] = { A: groups.A.length, B: groups.B.length, unknown: groups.unknown.length }
     }
 
-    // Build explicit lists of periods tagged A/B/unknown for debugging
+    // Build explicit lists of periods tagged A/B/unknown for debugging from grouped view
     const weekBreakdown: { A: any[]; B: any[]; unknown: any[] } = { A: [], B: [], unknown: [] }
-    for (const [dayName, periods] of Object.entries(byDay)) {
-      for (const p of periods) {
-        const entry = { day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room }
-        if (p.weekType === 'A') weekBreakdown.A.push(entry)
-        else if (p.weekType === 'B') weekBreakdown.B.push(entry)
-        else weekBreakdown.unknown.push(entry)
-      }
+    for (const [dayName, groups] of Object.entries(timetableByWeek)) {
+      for (const p of groups.A) weekBreakdown.A.push({ day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room })
+      for (const p of groups.B) weekBreakdown.B.push({ day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room })
+      for (const p of groups.unknown) weekBreakdown.unknown.push({ day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room })
     }
 
     const hasAny = Object.values(byDay).some(a => a.length)
     if (hasAny) return NextResponse.json({
       timetable: byDay,
+      timetableByWeek,
       source: 'sbhs-api',
       weekType: finalWeekType,
       diagnostics: {
