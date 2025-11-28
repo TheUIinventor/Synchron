@@ -10,6 +10,31 @@ export async function GET(req: NextRequest) {
   if (!accessToken && !refreshToken) {
     return NextResponse.json({ success: false, error: 'Missing SBHS access token' }, { status: 401 })
   }
+  // If we have an access token that appears to be a JWT, try to decode it
+  // and extract common name claims as a fast fallback. This does not verify
+  // the token signature; it's only used to populate a friendly greeting when
+  // the portal doesn't return JSON and scraping fails.
+  try {
+    if (accessToken && typeof accessToken === 'string') {
+      const parts = accessToken.split('.')
+      if (parts.length === 3) {
+        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+        try {
+          const decoded = Buffer.from(payload.padEnd(payload.length + (4 - (payload.length % 4)) % 4, '='), 'base64').toString('utf8')
+          const claims = JSON.parse(decoded)
+          const possibleName = claims.given_name || claims.givenName || claims.name || claims.preferred_username || claims.email || null
+          if (possibleName) {
+            const given = (typeof possibleName === 'string' && possibleName.split) ? String(possibleName).split(/\s+/)[0] : null
+            return NextResponse.json({ success: true, data: { givenName: given, rawClaims: { sub: claims.sub || null } }, source: 'token' })
+          }
+        } catch (e) {
+          // ignore decode errors and continue to proxy/fallback
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
   try {
     // Build headers: include Authorization when we have a bearer token and also forward cookies
     const headers: Record<string,string> = {
@@ -133,7 +158,8 @@ export async function GET(req: NextRequest) {
         // Before returning diagnostics, attempt a best-effort scrape of the portal
         // homepage/profile to extract a student name. This helps when the portal
         // doesn't expose a JSON userinfo endpoint but the user's name is visible
-        // on an HTML page. Use cheerio server-side to parse HTML.
+        // on an HTML page. Use cheerio server-side to parse HTML and run a few
+        // broader heuristics (selectors, title/meta, and greeting regex).
         try {
           const profilePaths = ['/', '/details', '/profile', '/details/profile', '/home']
           for (const pp of profilePaths) {
@@ -146,18 +172,56 @@ export async function GET(req: NextRequest) {
               try {
                 const cheerioMod: any = await import('cheerio')
                 const $ = cheerioMod.load(html3)
-                const nameSelectors = ['.student-name', '.profile-name', '.student-info .name', '[class*="student"] .name', 'h1', 'h2', '.name']
+                // Try common selectors first
+                const nameSelectors = ['.student-name', '.profile-name', '.student-info .name', '[class*="student"] .name', 'h1', 'h2', '.name', '.profile-header', '.user-name']
                 for (const sel of nameSelectors) {
                   const el = $(sel).first()
                   if (el && el.text()) {
-                    const fullName = el.text().trim()
-                    if (fullName && fullName.split(' ').length >= 1) {
+                    const fullName = el.text().trim().replace(/\s{2,}/g, ' ')
+                    if (fullName && /[A-Za-z]/.test(fullName)) {
                       const given = fullName.split(/\s+/)[0]
                       const result = { givenName: given, fullName }
                       const res = NextResponse.json({ success: true, data: result, source: `scraped:${pp}` })
                       if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
                       return res
                     }
+                  }
+                }
+
+                // Fallback: title/meta tags
+                const title = ($('title').first().text() || '').trim()
+                if (title && /[A-Za-z]/.test(title)) {
+                  // Look for a name-looking substring in the title (e.g. "Welcome Sam Smith")
+                  const m = title.match(/(?:Welcome|Hi|Hello|Signed in as|Signed in)[:,\s]+([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/)
+                  if (m && m[1]) {
+                    const fullName = m[1].trim()
+                    const given = fullName.split(/\s+/)[0]
+                    const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `title:${pp}` })
+                    if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
+                    return res
+                  }
+                }
+
+                const metaAuthor = ($('meta[name="author"]').attr('content') || '').trim()
+                if (metaAuthor) {
+                  const fullName = metaAuthor
+                  const given = fullName.split(/\s+/)[0]
+                  const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `meta:${pp}` })
+                  if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
+                  return res
+                }
+
+                // Fallback: greeting regex over visible text (collapse whitespace to simplify)
+                const bodyText = $('body').text().replace(/\s+/g, ' ').trim()
+                if (bodyText && bodyText.length > 0) {
+                  // Look for patterns like "Welcome Sam", "Hi Sam", "Hello Sam" or "Signed in as Sam Smith"
+                  const greet = bodyText.match(/(?:Welcome|Hi|Hello|Signed in as|Signed in)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/)
+                  if (greet && greet[1]) {
+                    const fullName = greet[1].trim()
+                    const given = fullName.split(/\s+/)[0]
+                    const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `greeting:${pp}` })
+                    if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
+                    return res
                   }
                 }
               } catch (e) {
@@ -169,6 +233,29 @@ export async function GET(req: NextRequest) {
           }
         } catch (e) {
           // ignore any scraping errors and continue to diagnostics
+        }
+
+        // If scraping didn't yield a name, try a final JWT decode fallback that
+        // returns all token claims as the response payload. This gives the app
+        // full token data to extract a name client-side if present.
+        try {
+          if (accessToken && typeof accessToken === 'string') {
+            const parts = accessToken.split('.')
+            if (parts.length >= 2) {
+              const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+              try {
+                const decoded = Buffer.from(payload.padEnd(payload.length + (4 - (payload.length % 4)) % 4, '='), 'base64').toString('utf8')
+                const claims = JSON.parse(decoded)
+                const possibleName = claims.given_name || claims.givenName || claims.name || claims.preferred_username || null
+                const given = possibleName ? String(possibleName).split(/\s+/)[0] : null
+                return NextResponse.json({ success: true, data: { tokenClaims: claims, givenName: given, fullName: possibleName || null }, source: 'token:claims' })
+              } catch (e) {
+                // ignore decode errors and continue to diagnostics
+              }
+            }
+          }
+        } catch (e) {
+          // ignore
         }
 
         // Additionally probe a few other endpoints to see which ones accept the session
