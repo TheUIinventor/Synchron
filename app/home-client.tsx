@@ -2,7 +2,7 @@
 
 import { useTimetable } from "@/contexts/timetable-context";
 import { format } from "date-fns";
-import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon } from "lucide-react";
+import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AuthButton } from "@/components/auth-button";
 import { parseTimeRange } from "@/utils/time-utils";
@@ -18,7 +18,7 @@ export default function HomeClient() {
     error, 
     refreshExternal,
     selectedDay
-  } = useTimetable();
+  , timetableSource } = useTimetable();
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -168,6 +168,20 @@ export default function HomeClient() {
         </div>
 
           <div className="flex items-center gap-3">
+            {/* Sync indicator placed left of the settings icon. Spinner while loading, cloud+check when synced. */}
+            <div className="flex items-center">
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
+              ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
+                <div className="relative w-5 h-5" title="Synced to cloud">
+                  <Cloud className="h-5 w-5 text-muted-foreground" />
+                  <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                    <Check className="h-3 w-3 text-green-600" />
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
             <Link href="/settings" className="rounded-full p-2 hover:bg-surface-variant transition-colors">
               <SettingsIcon className="h-5 w-5 text-muted-foreground" />
             </Link>
@@ -175,16 +189,7 @@ export default function HomeClient() {
           </div>
       </div>
 
-        {/* Subtle syncing indicator so header shows while background refresh runs */}
-        {isLoading && (
-          <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-            <svg className="animate-spin h-4 w-4 text-primary" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-            </svg>
-            <span>Syncing timetable...</span>
-          </div>
-        )}
+        {/* Small inline sync indicator placed left of settings icon */}
       {/* Main Expressive Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4">
         
