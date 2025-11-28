@@ -4,6 +4,7 @@ import { useTimetable } from "@/contexts/timetable-context";
 import { format } from "date-fns";
 import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check } from "lucide-react";
 import { useEffect, useState } from "react";
+import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
 import { parseTimeRange } from "@/utils/time-utils";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ export default function HomeClient() {
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({})
+  const [givenName, setGivenName] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -42,6 +44,22 @@ export default function HomeClient() {
       }
     } catch (e) {}
   }, []);
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await sbhsPortal.getStudentProfile()
+        if (!mounted) return
+        if (res && res.success && res.data && res.data.givenName) {
+          setGivenName(res.data.givenName)
+        }
+      } catch (e) {
+        // ignore
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
 
   useEffect(() => {
     function reload(e?: Event) {
@@ -159,11 +177,10 @@ export default function HomeClient() {
       {/* Header Section */}
       <div className="flex items-start justify-between gap-4 pt-4 md:pt-0">
         <div className="flex flex-col gap-1">
-          <h1 className="text-4xl md:text-5xl font-serif text-foreground">
-            {format(currentDate, "EEEE")}
-          </h1>
+          <h2 className="mt-[10px] text-3xl md:text-4xl font-medium text-foreground">{givenName ? `Hello, ${givenName}!` : 'Hello!'}</h2>
+          <h1 className="text-4xl md:text-5xl font-serif text-foreground">My Synchron</h1>
           <p className="text-lg text-muted-foreground font-medium">
-            {format(currentDate, "MMMM do")}
+            {format(currentDate, "EEEE, d MMMM")}
           </p>
         </div>
 
@@ -388,8 +405,8 @@ export default function HomeClient() {
         <div className="md:col-span-4 space-y-3">
           <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    {dayName}
+                  <Calendar className="h-5 w-5 text-primary" />
+                  {format(currentDate, "EEEE, d MMMM")}
                 </h3>
                 
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[360px] pr-2">
