@@ -30,6 +30,7 @@ type TimetableContextType = {
   selectedDay: string // Day for the main timetable display (e.g., "Monday")
   selectedDateObject: Date // The actual Date object for the selectedDay
   setSelectedDay: (day: string) => void
+  setSelectedDateObject: (d: Date) => void
   timetableData: Record<string, Period[]>
   currentMomentPeriodInfo: {
     // Renamed from nextPeriodInfo to be clearer
@@ -928,6 +929,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         selectedDay,
         selectedDateObject, // Provide the new state
         setSelectedDay,
+        setSelectedDateObject,
         timetableData,
         currentMomentPeriodInfo, // Provide the new state
         // Backwards-compatible alias for older components

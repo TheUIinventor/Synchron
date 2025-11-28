@@ -11,9 +11,10 @@ import { useTimetable } from "@/contexts/timetable-context"
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  // Use selected date from timetable context so the header date follows
+  // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, setCurrentWeek, timetableData, timetableSource, refreshExternal } = useTimetable()
+  const { currentWeek, setCurrentWeek, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -46,15 +47,14 @@ export default function TimetablePage() {
     }
   }
 
-  // Get day name from selected date
+  // Use provider-selected date by default
   const getSelectedDayName = () => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    return days[selectedDate.getDay()]
+    return days[selectedDateObject.getDay()]
   }
 
-  // Format selected date
   const formatSelectedDate = () => {
-    return selectedDate.toLocaleDateString("en-US", {
+    return selectedDateObject.toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
@@ -62,21 +62,22 @@ export default function TimetablePage() {
     })
   }
 
-  // Navigate dates
+  // Navigate dates by updating the provider's selected date object so
+  // the whole app stays in sync with navigation actions.
   const goToPreviousDay = () => {
-    const newDate = new Date(selectedDate)
+    const newDate = new Date(selectedDateObject)
     newDate.setDate(newDate.getDate() - 1)
-    setSelectedDate(newDate)
+    setSelectedDateObject(newDate)
   }
 
   const goToNextDay = () => {
-    const newDate = new Date(selectedDate)
+    const newDate = new Date(selectedDateObject)
     newDate.setDate(newDate.getDate() + 1)
-    setSelectedDate(newDate)
+    setSelectedDateObject(newDate)
   }
 
   const goToToday = () => {
-    setSelectedDate(new Date())
+    setSelectedDateObject(new Date())
   }
 
   // Subject color mapping
@@ -247,7 +248,7 @@ export default function TimetablePage() {
               <div className="text-center">
                 <h2 className="font-semibold text-on-surface">{selectedDayName}</h2>
                 <p className="text-sm text-on-surface-variant">
-                  {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {selectedDateObject.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </p>
               </div>
 
