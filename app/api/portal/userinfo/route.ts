@@ -6,6 +6,56 @@ export async function GET(req: NextRequest) {
   const accessToken = req.cookies.get('sbhs_access_token')?.value
   const refreshToken = req.cookies.get('sbhs_refresh_token')?.value
 
+  // Name validation helper (top-level so all fallbacks can reuse it)
+  const isProbableName = (v: any) => {
+    if (!v) return false
+    const s = String(v).trim().replace(/\s+/g, ' ')
+    if (s.length < 3) return false
+    const low = s.toLowerCase()
+    const blacklist = new Set(['sign', 'sign in', 'sign-in', 'signing in', 'login', 'log in', 'portal', 'dashboard', 'home', 'student portal', 'profile', 'welcome'])
+    if (blacklist.has(low)) return false
+    if (/@/.test(s)) return false
+    if (/^[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+$/.test(s)) return true
+    if (/^[A-Z][a-z]{2,}$/.test(s)) return true
+    return false
+  }
+
+  // Helper: try to find a usable name in various JSON shapes
+  const extractNameFromJson = (obj: any) => {
+    if (!obj) return null
+    const tryCandidates = (cands: any[]) => {
+      for (const c of cands) {
+        if (!c) continue
+        try {
+          const s = String(c).trim()
+          if (isProbableName(s)) return s
+        } catch (e) { continue }
+      }
+      return null
+    }
+
+    // Common shapes
+    const candidates: any[] = []
+    if (typeof obj === 'string') candidates.push(obj)
+    if (obj.givenName) candidates.push(obj.givenName)
+    if (obj.given_name) candidates.push(obj.given_name)
+    if (obj.name) candidates.push(obj.name)
+    if (obj.fullName) candidates.push(obj.fullName)
+    if (obj.displayName) candidates.push(obj.displayName)
+    if (obj.username) candidates.push(obj.username)
+    if (obj.student && typeof obj.student === 'object') {
+      candidates.push(obj.student.givenName, obj.student.name, obj.student.fullName)
+    }
+    if (obj.data && typeof obj.data === 'object') {
+      candidates.push(obj.data.givenName, obj.data.name, obj.data.fullName, obj.data.displayName)
+    }
+    if (obj.user && typeof obj.user === 'object') {
+      candidates.push(obj.user.name, obj.user.displayName, obj.user.givenName)
+    }
+
+    return tryCandidates(candidates)
+  }
+
   // If no access token, return 401 to signal signed-out; client will attempt refresh
   if (!accessToken && !refreshToken) {
     return NextResponse.json({ success: false, error: 'Missing SBHS access token' }, { status: 401 })
@@ -15,6 +65,7 @@ export async function GET(req: NextRequest) {
   // the token signature; it's only used to populate a friendly greeting when
   // the portal doesn't return JSON and scraping fails.
   try {
+
     if (accessToken && typeof accessToken === 'string') {
       const parts = accessToken.split('.')
       if (parts.length === 3) {
@@ -23,7 +74,7 @@ export async function GET(req: NextRequest) {
           const decoded = Buffer.from(payload.padEnd(payload.length + (4 - (payload.length % 4)) % 4, '='), 'base64').toString('utf8')
           const claims = JSON.parse(decoded)
           const possibleName = claims.given_name || claims.givenName || claims.name || claims.preferred_username || claims.email || null
-          if (possibleName) {
+          if (possibleName && isProbableName(possibleName)) {
             const given = (typeof possibleName === 'string' && possibleName.split) ? String(possibleName).split(/\s+/)[0] : null
             return NextResponse.json({ success: true, data: { givenName: given, rawClaims: { sub: claims.sub || null } }, source: 'token' })
           }
@@ -94,6 +145,40 @@ export async function GET(req: NextRequest) {
       // ignore header-copy failures
     }
 
+    // First: try a list of likely API hosts/paths that may expose JSON userinfo.
+    const apiHosts = ['https://api.sbhs.net.au', 'https://student.sbhs.net.au', 'https://student.sbhs.net.au/api']
+    const apiPaths = ['/details/userinfo.json', '/details/userinfo', '/api/userinfo.json', '/api/userinfo', '/details/profile.json', '/details/profile']
+
+    for (const host of apiHosts) {
+      for (const path of apiPaths) {
+        try {
+          const url = `${host.replace(/\/$/, '')}${path.startsWith('/') ? path : '/' + path}`
+          const r = await fetch(url, { headers })
+          if (!r.ok) continue
+          const ct = r.headers.get('content-type') || ''
+          if (ct.includes('application/json')) {
+            try {
+              const j = await r.json()
+              const found = extractNameFromJson(j)
+              if (found) {
+                const given = found.split(/\s+/)[0]
+                const res = NextResponse.json({ success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${host}${path}` })
+                // propagate any set-cookie header we received
+                const sc = r.headers.get('set-cookie')
+                if (sc) res.headers.set('set-cookie', sc.replace(/;\s*Domain=[^;]+/gi, ''))
+                return res
+              }
+            } catch (e) {
+              // ignore JSON parse errors and continue
+            }
+          }
+        } catch (e) {
+          // ignore fetch errors for these probes
+        }
+      }
+    }
+
+    // Fallback: request the configured API URL (keeps previous behavior)
     const response = await fetch(apiUrl, {
       headers,
     })
@@ -178,7 +263,7 @@ export async function GET(req: NextRequest) {
                   const el = $(sel).first()
                   if (el && el.text()) {
                     const fullName = el.text().trim().replace(/\s{2,}/g, ' ')
-                    if (fullName && /[A-Za-z]/.test(fullName)) {
+                    if (isProbableName(fullName)) {
                       const given = fullName.split(/\s+/)[0]
                       const result = { givenName: given, fullName }
                       const res = NextResponse.json({ success: true, data: result, source: `scraped:${pp}` })
@@ -195,20 +280,24 @@ export async function GET(req: NextRequest) {
                   const m = title.match(/(?:Welcome|Hi|Hello|Signed in as|Signed in)[:,\s]+([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/)
                   if (m && m[1]) {
                     const fullName = m[1].trim()
-                    const given = fullName.split(/\s+/)[0]
-                    const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `title:${pp}` })
-                    if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
-                    return res
+                    if (isProbableName(fullName)) {
+                      const given = fullName.split(/\s+/)[0]
+                      const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `title:${pp}` })
+                      if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
+                      return res
+                    }
                   }
                 }
 
                 const metaAuthor = ($('meta[name="author"]').attr('content') || '').trim()
                 if (metaAuthor) {
                   const fullName = metaAuthor
-                  const given = fullName.split(/\s+/)[0]
-                  const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `meta:${pp}` })
-                  if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
-                  return res
+                  if (isProbableName(fullName)) {
+                    const given = fullName.split(/\s+/)[0]
+                    const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `meta:${pp}` })
+                    if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
+                    return res
+                  }
                 }
 
                 // Fallback: greeting regex over visible text (collapse whitespace to simplify)
@@ -218,10 +307,12 @@ export async function GET(req: NextRequest) {
                   const greet = bodyText.match(/(?:Welcome|Hi|Hello|Signed in as|Signed in)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/)
                   if (greet && greet[1]) {
                     const fullName = greet[1].trim()
-                    const given = fullName.split(/\s+/)[0]
-                    const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `greeting:${pp}` })
-                    if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
-                    return res
+                    if (isProbableName(fullName)) {
+                      const given = fullName.split(/\s+/)[0]
+                      const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `greeting:${pp}` })
+                      if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
+                      return res
+                    }
                   }
                 }
               } catch (e) {
@@ -247,8 +338,12 @@ export async function GET(req: NextRequest) {
                 const decoded = Buffer.from(payload.padEnd(payload.length + (4 - (payload.length % 4)) % 4, '='), 'base64').toString('utf8')
                 const claims = JSON.parse(decoded)
                 const possibleName = claims.given_name || claims.givenName || claims.name || claims.preferred_username || null
-                const given = possibleName ? String(possibleName).split(/\s+/)[0] : null
-                return NextResponse.json({ success: true, data: { tokenClaims: claims, givenName: given, fullName: possibleName || null }, source: 'token:claims' })
+                const valid = possibleName && isProbableName(possibleName) ? String(possibleName).trim() : null
+                const given = valid ? valid.split(/\s+/)[0] : null
+                const payload: any = { tokenClaims: claims }
+                if (valid) payload.givenName = given
+                if (valid) payload.fullName = valid
+                return NextResponse.json({ success: true, data: payload, source: 'token:claims' })
               } catch (e) {
                 // ignore decode errors and continue to diagnostics
               }
