@@ -49,6 +49,21 @@ export async function GET(req: NextRequest) {
         if (v) respHeaders[h] = v
       }
 
+      // Masked view of incoming cookies for diagnostics (do not expose full values)
+      const mask = (v: string | null | undefined) => {
+        if (!v) return ''
+        return v.split(';').map(part => {
+          const idx = part.indexOf('=')
+          if (idx === -1) return part.trim()
+          const name = part.slice(0, idx).trim()
+          const val = part.slice(idx + 1).trim()
+          if (!val) return `${name}=`
+          if (val.length <= 8) return `${name}=${'*'.repeat(val.length)}`
+          return `${name}=${val.slice(0,4)}…${val.slice(-4)}`
+        }).join('; ')
+      }
+      const maskedIncomingCookies = mask(incomingCookieHeader)
+
       // If the portal set cookies, prepare a forwarded Set-Cookie for the client.
       // We strip any Domain attribute so the browser stores the cookie for our origin.
       const rawSetCookie = response.headers.get('set-cookie')
