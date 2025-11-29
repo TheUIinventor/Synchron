@@ -468,19 +468,39 @@ export async function GET(req: NextRequest) {
           'MTL': 'Lunch',
           'L': 'Lunch'
         }
-        for (const b of bellsArr) {
-          const rawLabel = String(b.period || b.name || b.title || b.bellDisplay || '').trim()
-          const key = rawLabel.toUpperCase()
-          const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
-          const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
-          const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
-          const timeStr = [bs, be].filter(Boolean).join(' - ')
-          const entry = { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
-          const pattern = (b.dayPattern || b.pattern || b.day || '').toString().toLowerCase()
-          if (pattern.includes('mon') || pattern.includes('tue')) { schedules['Mon/Tues'].push(entry); bellSources['Mon/Tues'] = 'api' }
-          else if (pattern.includes('wed') || pattern.includes('thu') || pattern.includes('thur')) { schedules['Wed/Thurs'].push(entry); bellSources['Wed/Thurs'] = 'api' }
-          else if (pattern.includes('fri')) { schedules['Fri'].push(entry); bellSources['Fri'] = 'api' }
-          else { schedules['Mon/Tues'].push(entry); if (bellSources['Mon/Tues'] === 'empty') bellSources['Mon/Tues'] = 'api' }
+        // If the bells payload includes a top-level day/date field it means
+        // the entire bells array applies to a specific date (e.g. Wednesday).
+        // Map the whole array into the bucket for that day so we don't rely
+        // on per-bell `pattern` properties which many payloads omit.
+        const topLevelDayRaw = (bj && (bj.day || bj.date || bj.dayName || bj.dayname)) ? String(bj.day || bj.date || bj.dayName || bj.dayname).toLowerCase() : null
+        if (topLevelDayRaw) {
+          const target = topLevelDayRaw.includes('fri') ? 'Fri' : (topLevelDayRaw.includes('wed') || topLevelDayRaw.includes('thu') || topLevelDayRaw.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+          const mappedAll = (bellsArr || []).map((b: any) => {
+            const rawLabel = String(b.period || b.name || b.title || b.bellDisplay || '').trim()
+            const key = rawLabel.toUpperCase()
+            const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
+            const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
+            const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
+            const timeStr = [bs, be].filter(Boolean).join(' - ')
+            return { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
+          })
+          schedules[target] = schedules[target].concat(mappedAll)
+          bellSources[target] = 'api'
+        } else {
+          for (const b of bellsArr) {
+            const rawLabel = String(b.period || b.name || b.title || b.bellDisplay || '').trim()
+            const key = rawLabel.toUpperCase()
+            const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
+            const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
+            const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
+            const timeStr = [bs, be].filter(Boolean).join(' - ')
+            const entry = { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
+            const pattern = (b.dayPattern || b.pattern || b.day || '').toString().toLowerCase()
+            if (pattern.includes('mon') || pattern.includes('tue')) { schedules['Mon/Tues'].push(entry); bellSources['Mon/Tues'] = 'api' }
+            else if (pattern.includes('wed') || pattern.includes('thu') || pattern.includes('thur')) { schedules['Wed/Thurs'].push(entry); bellSources['Wed/Thurs'] = 'api' }
+            else if (pattern.includes('fri')) { schedules['Fri'].push(entry); bellSources['Fri'] = 'api' }
+            else { schedules['Mon/Tues'].push(entry); if (bellSources['Mon/Tues'] === 'empty') bellSources['Mon/Tues'] = 'api' }
+          }
         }
       } catch (e) {
         // ignore bell adaptation errors; client will fall back to defaults
