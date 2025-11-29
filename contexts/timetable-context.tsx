@@ -740,9 +740,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     if (j.bellTimes || j.upstream) {
                       try {
                         const computed = buildBellTimesFromPayload(j)
-                        setExternalBellTimes(computed)
+                        const jHasNonEmpty = j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)
+                        const finalBellTimes = jHasNonEmpty ? j.bellTimes : computed
+                        setExternalBellTimes(finalBellTimes)
                       } catch (e) {
-                        if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+                        if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) setExternalBellTimes(j.bellTimes)
                       }
                     }
                     setExternalTimetable(j.timetable)
@@ -991,9 +993,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (j.bellTimes || j.upstream) {
                 try {
                   const computed = buildBellTimesFromPayload(j)
-                  setExternalBellTimes(computed)
+                  const jHasNonEmpty = j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)
+                  const finalBellTimes = jHasNonEmpty ? j.bellTimes : computed
+                  setExternalBellTimes(finalBellTimes)
                 } catch (e) {
-                  if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+                  if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) setExternalBellTimes(j.bellTimes)
                 }
               }
               setExternalTimetable(j.timetable)
