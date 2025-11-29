@@ -106,7 +106,31 @@ export async function GET(req: NextRequest) {
       }
 
       const has = Object.values(byDay).some(a => a.length)
-      if (has) return NextResponse.json({ timetable: byDay, source: 'portal-home' })
+      // Try to augment the scraped timetable with an API-derived weekType
+      let weekType: string | null = null
+      try {
+        const headersForApi: Record<string, string> = { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
+        if (incomingCookie) headersForApi['Cookie'] = incomingCookie
+        const hosts = ['https://student.sbhs.net.au', 'https://api.sbhs.net.au']
+        for (const host of hosts) {
+          try {
+            const dr = await fetch(`${host}/api/timetable/daytimetable.json`, { headers: headersForApi })
+            const fr = await fetch(`${host}/api/timetable/timetable.json`, { headers: headersForApi })
+            const candidate = (await (dr.ok ? dr.json().catch(() => null) : Promise.resolve(null))) || (await (fr.ok ? fr.json().catch(() => null) : Promise.resolve(null)))
+            if (candidate && typeof candidate === 'object') {
+              const maybe = (candidate.weekType || candidate.week || candidate.week_label || candidate.cycle || candidate.rotation || candidate.weekLabel || candidate.week_type)
+              if (maybe) {
+                const s = String(maybe).trim().toUpperCase()
+                if (s === 'A' || s === 'B') { weekType = s; break }
+                const m = s.match(/\b([AB])\b/)
+                if (m && m[1]) { weekType = m[1]; break }
+              }
+            }
+          } catch (e) { /* ignore host errors */ }
+        }
+      } catch (e) { /* ignore api augmentation errors */ }
+
+      if (has) return NextResponse.json({ timetable: byDay, source: 'portal-home', weekType: weekType ?? undefined })
 
       // If no timetable found, forward the HTML for client-side handling
       return new NextResponse(html, { headers: { 'content-type': ctype || 'text/html; charset=utf-8' }, status: res.status })
