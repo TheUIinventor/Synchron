@@ -387,7 +387,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           // treat it as a Break and insert it using the API's label/time.
           try {
             const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
-            const hasMatchingClass = dayPeriods.some((p) => Math.abs(parseStartMinutesForDay(dayPeriods, p.time) - bellStart) <= 1)
+            const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
+            const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
+            const hasMatchingClass = matching.length > 0
+            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
             const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
@@ -468,7 +471,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         for (const b of bells) {
           try {
             const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
-            const hasMatchingClass = dayPeriods.some((p) => Math.abs(parseStartMinutesForDay(dayPeriods, p.time) - bellStart) <= 1)
+            const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
+            const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
+            const hasMatchingClass = matching.length > 0
+            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
             const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
@@ -538,7 +544,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         for (const b of bells) {
           try {
             const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
-            const hasMatchingClass = dayPeriods.some((p) => Math.abs(parseStartMinutesForDay(dayPeriods, p.time) - bellStart) <= 1)
+            const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
+            const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
+            const hasMatchingClass = matching.length > 0
+            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
             const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
