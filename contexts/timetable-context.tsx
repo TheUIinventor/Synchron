@@ -480,7 +480,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return filtered
     }
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
-  }, [currentWeek, externalTimetable, externalTimetableByWeek])
+  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes])
 
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>(null)
