@@ -339,10 +339,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
+  const lastSeenBellTsRef = useRef<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
+    try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
     if (externalTimetableByWeek) {
@@ -863,17 +865,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         // non-empty bucket, or if we have never seen any before.
                         const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
                         if (hasAny || !lastSeenBellTimesRef.current) {
-                          try { console.debug('[timetable.provider] setExternalBellTimes (merged)', finalBellTimes) } catch (e) {}
+                          try { console.log('[timetable.provider] setExternalBellTimes (merged)', finalBellTimes) } catch (e) {}
                           setExternalBellTimes(finalBellTimes)
                           lastSeenBellTimesRef.current = finalBellTimes
+                          lastSeenBellTsRef.current = Date.now()
                         } else {
-                          try { console.debug('[timetable.provider] skipping empty external bellTimes merge') } catch (e) {}
+                          try { console.log('[timetable.provider] skipping empty external bellTimes merge') } catch (e) {}
                         }
                       } catch (e) {
                         if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
-                          try { console.debug('[timetable.provider] setExternalBellTimes (raw)', j.bellTimes) } catch (e) {}
+                          try { console.log('[timetable.provider] setExternalBellTimes (raw)', j.bellTimes) } catch (e) {}
                           setExternalBellTimes(j.bellTimes)
                           lastSeenBellTimesRef.current = j.bellTimes
+                          lastSeenBellTsRef.current = Date.now()
                         }
                       }
                     }
@@ -930,6 +934,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // continue to follow the API's bells rather than reverting to defaults.
         if (!cancelled) {
           // Only null the timetable if it's not already set; preserve bell times.
+          try { console.log('[timetable.provider] falling back to sample timetable (exhausted attempts)') } catch (e) {}
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("Could not connect to school portal. Showing sample data.")
@@ -938,6 +943,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           // On unexpected error, preserve any existing `externalBellTimes` so
           // the UI can still show API-derived breaks while we investigate.
+          try { console.log('[timetable.provider] falling back to sample timetable (error)') } catch (e) {}
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("An error occurred while fetching timetable.")
@@ -1141,15 +1147,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                   const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
                   if (hasAny || !lastSeenBellTimesRef.current) {
+                    try { console.log('[timetable.provider] setExternalBellTimes (merged retry)', finalBellTimes) } catch (e) {}
                     setExternalBellTimes(finalBellTimes)
                     lastSeenBellTimesRef.current = finalBellTimes
+                    lastSeenBellTsRef.current = Date.now()
                   } else {
-                    try { console.debug('[timetable.provider] skipping empty external bellTimes merge (retry)') } catch (e) {}
+                    try { console.log('[timetable.provider] skipping empty external bellTimes merge (retry)') } catch (e) {}
                   }
                 } catch (e) {
                   if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
+                    try { console.log('[timetable.provider] setExternalBellTimes (raw retry)', j.bellTimes) } catch (e) {}
                     setExternalBellTimes(j.bellTimes)
                     lastSeenBellTimesRef.current = j.bellTimes
+                    lastSeenBellTsRef.current = Date.now()
                   }
                 }
               }
@@ -1187,10 +1197,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
 
       // If we still don't have live data, fall back to sample
+      try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
       setExternalTimetable(null)
       setTimetableSource('fallback-sample')
       setError("Could not refresh timetable. Showing sample data.")
     } catch (e) {
+      try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
       setExternalTimetable(null)
       setTimetableSource('fallback-sample')
       setError("An error occurred while refreshing timetable.")
