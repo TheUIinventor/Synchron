@@ -241,6 +241,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   })
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
+  const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -254,9 +255,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
-        if (dayName === 'Friday') return bellTimesData.Fri
-        if (dayName === 'Wednesday' || dayName === 'Thursday') return bellTimesData['Wed/Thurs']
-        return bellTimesData['Mon/Tues']
+        const source = externalBellTimes || bellTimesData
+        if (dayName === 'Friday') return source.Fri
+        if (dayName === 'Wednesday' || dayName === 'Thursday') return source['Wed/Thurs']
+        return source['Mon/Tues']
       }
 
       const parseStartMinutes = (timeStr: string) => {
@@ -296,9 +298,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
-        if (dayName === 'Friday') return bellTimesData.Fri
-        if (dayName === 'Wednesday' || dayName === 'Thursday') return bellTimesData['Wed/Thurs']
-        return bellTimesData['Mon/Tues']
+        const source = externalBellTimes || bellTimesData
+        if (dayName === 'Friday') return source.Fri
+        if (dayName === 'Wednesday' || dayName === 'Thursday') return source['Wed/Thurs']
+        return source['Mon/Tues']
       }
 
       const parseStartMinutes = (timeStr: string) => {
@@ -605,6 +608,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
                 if (!cancelled) {
                   if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
+                  if (j.bellTimes) setExternalBellTimes(j.bellTimes)
                   setExternalTimetable(j.timetable)
                   setTimetableSource(j.source ?? 'external')
                   if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
@@ -847,6 +851,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const j = await r2.json()
           if (j && j.timetable) {
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+              if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
+              if (j.bellTimes) setExternalBellTimes(j.bellTimes)
               setExternalTimetable(j.timetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
@@ -984,7 +990,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         currentMomentPeriodInfo, // Provide the new state
         // Backwards-compatible alias for older components
         nextPeriodInfo: currentMomentPeriodInfo,
-        bellTimes: bellTimesData,
+        bellTimes: externalBellTimes || bellTimesData,
         isShowingNextDay,
         timetableSource,
         isLoading,

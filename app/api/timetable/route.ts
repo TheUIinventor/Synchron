@@ -449,6 +449,30 @@ export async function GET(req: NextRequest) {
           })
         }
       }
+      // Build a normalized bell schedules object so clients can consume accurate
+      // break times instead of relying on built-in defaults. The API may include
+      // a `dayPattern` (e.g. 'mon-tue','wed-thu','fri') or similar; we try to
+      // map those into our three buckets: 'Mon/Tues', 'Wed/Thurs', 'Fri'.
+      const schedules: Record<string, { period: string; time: string }[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] }
+      try {
+        const bellsArr = Array.isArray(bj) ? bj : (bj.bells || bj.periods || [])
+        for (const b of bellsArr) {
+          const label = String(b.period || b.name || b.title || '').trim()
+          const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
+          const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
+          const timeStr = [bs, be].filter(Boolean).join(' - ')
+          const entry = { period: label, time: timeStr }
+          const pattern = (b.dayPattern || b.pattern || b.day || '').toString().toLowerCase()
+          if (pattern.includes('mon') || pattern.includes('tue')) schedules['Mon/Tues'].push(entry)
+          else if (pattern.includes('wed') || pattern.includes('thu') || pattern.includes('thur')) schedules['Wed/Thurs'].push(entry)
+          else if (pattern.includes('fri')) schedules['Fri'].push(entry)
+          else schedules['Mon/Tues'].push(entry)
+        }
+      } catch (e) {
+        // ignore bell adaptation errors; client will fall back to defaults
+      }
+      // expose schedules variable outside so response can include it
+      var bellSchedules = schedules
     }
 
     // Deduplicate entries per-day. Upstream payloads (full.days, timetable, bells, day) can contain
@@ -609,6 +633,7 @@ export async function GET(req: NextRequest) {
     if (hasAny) return NextResponse.json({
       timetable: byDay,
       timetableByWeek,
+      bellTimes: typeof bellSchedules !== 'undefined' ? bellSchedules : undefined,
       source: 'sbhs-api',
       weekType: finalWeekType,
       diagnostics: {
