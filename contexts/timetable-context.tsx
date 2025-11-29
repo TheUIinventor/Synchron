@@ -318,12 +318,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
 
         for (const b of bells) {
-          const label = b.period
-          // Accept a broader set of break-like labels (recess, lunch, break)
-          if (!/(recess|lunch|break)/i.test(label)) continue
-          const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
-          if (!exists) {
-            dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+          // Use the API ordering and decide whether this bell represents a
+          // break by checking whether its start time already matches an
+          // existing class start time. If no class starts at this minute,
+          // treat it as a Break and insert it using the API's label/time.
+          try {
+            const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
+            const hasMatchingClass = dayPeriods.some((p) => Math.abs(parseStartMinutesForDay(dayPeriods, p.time) - bellStart) <= 1)
+            if (hasMatchingClass) continue
+            const label = b.period || 'Break'
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
+          } catch (e) {
+            // If parsing fails, fall back to label-based detection
+            const label = b.period
+            if (!/(recess|lunch|break)/i.test(label)) continue
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
           }
         }
         dayPeriods.sort((a, z) => parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time))
@@ -379,11 +394,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
 
         for (const b of bells) {
-          const label = b.period // e.g., 'Recess' or 'Lunch 1'
-          if (!/(recess|lunch|break)/i.test(label)) continue
-          const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
-          if (!exists) {
-            dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+          try {
+            const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
+            const hasMatchingClass = dayPeriods.some((p) => Math.abs(parseStartMinutesForDay(dayPeriods, p.time) - bellStart) <= 1)
+            if (hasMatchingClass) continue
+            const label = b.period || 'Break'
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
+          } catch (e) {
+            const label = b.period
+            if (!/(recess|lunch|break)/i.test(label)) continue
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
           }
         }
 
