@@ -6,7 +6,7 @@ import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as Clipboa
 import { useEffect, useState } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
-import { parseTimeRange } from "@/utils/time-utils";
+import { parseTimeRange, formatTo12Hour } from "@/utils/time-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -411,7 +411,11 @@ export default function HomeClient() {
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[360px] pr-2">
                   {todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
-                      const startTime = period.time?.split(' - ')[0] ?? ''
+                      let startTime = period.time?.split(' - ')[0] ?? ''
+                      try {
+                        const { start } = parseTimeRange(period.time || '')
+                        startTime = formatTo12Hour(start)
+                      } catch (e) {}
                       const isBreak = period.subject === 'Break'
                       const link = canvasLinks[(period.subject ?? '').trim()]
                       const cardClass = cn(

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
+import { parseTimeRange, formatTo12Hour } from "@/utils/time-utils"
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
@@ -337,7 +338,12 @@ export default function TimetablePage() {
                       period.subject === "Break" ? (
                         <div key={period.id ?? period.period} className="flex items-center gap-3 py-1">
                           <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
-                            {period.time.split(" - ")[0]}
+                            {(() => {
+                              try {
+                                const { start } = parseTimeRange(period.time || '')
+                                return formatTo12Hour(start)
+                              } catch (e) { return (period.time || '').split(' - ')[0] }
+                            })()}
                           </span>
                           <div className="text-sm text-on-surface-variant">{period.period}</div>
                         </div>
@@ -349,7 +355,12 @@ export default function TimetablePage() {
                           <div className="flex items-center gap-3">
                             {/* Time on the left */}
                             <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
-                              {period.time.split(" - ")[0]} {/* Only show start time */}
+                              {(() => {
+                                try {
+                                  const { start } = parseTimeRange(period.time || '')
+                                  return formatTo12Hour(start)
+                                } catch (e) { return (period.time || '').split(' - ')[0] }
+                              })()}{/* Only show start time */}
                             </span>
 
                             {/* Main content: subject + small meta line with room and teacher on one line */}
