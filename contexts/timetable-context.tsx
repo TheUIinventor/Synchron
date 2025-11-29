@@ -150,9 +150,12 @@ const buildBellTimesFromPayload = (payload: any) => {
       return result
     }
 
-    // Try upstream.day.bells or upstream.bells.bells
-    const upstreamBells = (payload?.upstream?.day?.bells && Array.isArray(payload.upstream.day.bells) && payload.upstream.day.bells.length) ? payload.upstream.day.bells :
-      (payload?.upstream?.bells?.bells && Array.isArray(payload.upstream.bells.bells) && payload.upstream.bells.bells.length ? payload.upstream.bells.bells : null)
+    // Try upstream.day.bells or upstream.bells.bells. Some servers place the
+    // upstream payload inside `diagnostics.upstream` (server-side diagnostics),
+    // so check that as well.
+    const candidateUpstream = payload?.upstream || payload?.diagnostics?.upstream || {}
+    const upstreamBells = (candidateUpstream?.day?.bells && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) ? candidateUpstream.day.bells :
+      (candidateUpstream?.bells?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length ? candidateUpstream.bells.bells : null)
 
     if (upstreamBells) {
       const mapped = upstreamBells.map((b: any) => {
@@ -740,8 +743,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     if (j.bellTimes || j.upstream) {
                       try {
                         const computed = buildBellTimesFromPayload(j)
-                        const jHasNonEmpty = j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)
-                        const finalBellTimes = jHasNonEmpty ? j.bellTimes : computed
+                        // Merge per-bucket: prefer server-provided bucket if non-empty,
+                        // otherwise fall back to our computed/backfilled bucket. This
+                        // ensures a single empty bucket in the API doesn't erase
+                        // useful per-day bells coming from upstream diagnostics.
+                        const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                        const src = j.bellTimes || {}
+                        for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                          if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                          else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                          else finalBellTimes[k] = []
+                        }
                         setExternalBellTimes(finalBellTimes)
                       } catch (e) {
                         if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) setExternalBellTimes(j.bellTimes)
