@@ -66,10 +66,10 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
     item.weekType || item.week_type || item.week || item.rotation || item.cycle || item.weekLabel || item.week_label || item.dayname || item.dayName || item.day
   ) || fallbackWeekType
 
-  // Normalize subject by removing trailing single-letter group suffixes like " A" or " B"
+  // Preserve subject exactly as provided (trim only). Do NOT remove trailing
+  // A/B group suffixes because they are part of the class name.
   try {
-    const m = String(subject || '').trim().match(/^(.+?)\s+([AB])$/i)
-    if (m && m[1]) subject = m[1].trim()
+    subject = String(subject || '').trim()
   } catch (e) {}
 
   return { period, time, subject, teacher, room, weekType: weekType ?? undefined }
@@ -456,12 +456,23 @@ export async function GET(req: NextRequest) {
       const schedules: Record<string, { period: string; time: string }[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] }
       try {
         const bellsArr = Array.isArray(bj) ? bj : (bj.bells || bj.periods || [])
+        // Friendly mapping for common portal bell labels
+        const bellLabelMap: Record<string, string> = {
+          'RC': 'Roll Call',
+          'R': 'Recess',
+          'MTL1': 'Lunch 1',
+          'MTL2': 'Lunch 2',
+          'MTL': 'Lunch',
+          'L': 'Lunch'
+        }
         for (const b of bellsArr) {
-          const label = String(b.period || b.name || b.title || '').trim()
+          const rawLabel = String(b.period || b.name || b.title || b.bellDisplay || '').trim()
+          const key = rawLabel.toUpperCase()
+          const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
           const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
           const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
           const timeStr = [bs, be].filter(Boolean).join(' - ')
-          const entry = { period: label, time: timeStr }
+          const entry = { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
           const pattern = (b.dayPattern || b.pattern || b.day || '').toString().toLowerCase()
           if (pattern.includes('mon') || pattern.includes('tue')) schedules['Mon/Tues'].push(entry)
           else if (pattern.includes('wed') || pattern.includes('thu') || pattern.includes('thur')) schedules['Wed/Thurs'].push(entry)
@@ -478,18 +489,38 @@ export async function GET(req: NextRequest) {
     // Deduplicate entries per-day. Upstream payloads (full.days, timetable, bells, day) can contain
     // the same logical period multiple times via different shapes; perform a stable dedupe so the
     // client doesn't receive repeated identical rows. Key uses period/time/subject/teacher/room/weekType.
+    // Keep normalizeString as trim-only; do not collapse internal whitespace.
     const normalizeString = (v: any) => (v == null ? '' : String(v).trim())
+
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`)
+    const formatTimePart = (part: string) => {
+      if (!part) return ''
+      const m = String(part).trim().match(/(\d{1,2})\s*:?\s*(\d{0,2})/)
+      if (!m) return part.trim()
+      const h = parseInt(m[1], 10)
+      const min = m[2] ? parseInt(m[2], 10) : 0
+      if (!Number.isFinite(h) || !Number.isFinite(min)) return part.trim()
+      return `${pad(h)}:${pad(min)}`
+    }
+
     const normalizeTime = (t: any) => {
       const s = normalizeString(t)
-      // Normalize common alternate spacings like "09:00-10:00" vs "09:00 - 10:00"
-      return s.replace(/\s*-\s*/g, ' - ')
+      if (!s) return ''
+      // Split on dash-like separators, tolerate variants like '-' '–' '—'
+      const parts = s.split(/\s*[\-–—]\s*/)
+      const start = formatTimePart(parts[0] || '')
+      const end = parts[1] ? formatTimePart(parts[1]) : ''
+      return end ? `${start} - ${end}` : start
     }
+
     const parseStartMinutes = (timeStr: any) => {
       try {
-        const s = normalizeString(timeStr)
+        const s = normalizeTime(timeStr)
         const part = s.split('-')[0].trim()
-        const [h, m] = part.split(':').map((x: string) => parseInt(x, 10))
-        if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + (Number.isFinite(m) ? m : 0)
+        const [hStr, mStr] = String(part).split(':')
+        const h = parseInt(hStr, 10)
+        const m = parseInt(mStr || '0', 10)
+        if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m
       } catch (e) {}
       return -1
     }
@@ -501,16 +532,16 @@ export async function GET(req: NextRequest) {
           const period = normalizeString(p.period)
           const time = normalizeTime(p.time)
           const startMin = parseStartMinutes(time)
-          // Strip trailing A/B from subject for dedupe key so group suffixes don't split duplicates
+          // Keep subject as-is (trimmed) including any group suffixes
           const rawSubject = normalizeString(p.subject)
-          const subjNoSuffix = rawSubject.replace(/\s+([AB])$/i, '')
-          const subject = subjNoSuffix.toUpperCase()
-          const subjectDisplay = subjNoSuffix
-          const teacher = normalizeString(p.teacher).toUpperCase()
-          const room = normalizeString(p.room).toUpperCase()
+          const subjectKey = rawSubject.toUpperCase()
+          const subjectDisplay = rawSubject
+          const teacherKey = normalizeString(p.teacher).toUpperCase()
+          const roomKey = normalizeString(p.room).toUpperCase()
           const weekTypeKey = normalizeString(p.weekType).toUpperCase()
-          const key = [period, startMin, subject, teacher, room, weekTypeKey].join('|')
-          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher, room, weekType: weekTypeKey || undefined })
+          // include start minute in the dedupe key to avoid merging distinct periods that share labels
+          const key = [period, startMin, subjectKey, teacherKey, roomKey, weekTypeKey].join('|')
+          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
         }
         b[dayName] = Array.from(seen.values())
       }
@@ -540,14 +571,13 @@ export async function GET(req: NextRequest) {
         const time = normalizeTime(p.time)
         const startMin = parseStartMinutes(time)
         const rawSubject = normalizeString(p.subject)
-        const subjNoSuffix = rawSubject.replace(/\s+([AB])$/i, '')
-        const subject = subjNoSuffix.toUpperCase()
-        const subjectDisplay = subjNoSuffix
-        const teacher = normalizeString(p.teacher).toUpperCase()
-        const room = normalizeString(p.room).toUpperCase()
+        const subjectKey = rawSubject.toUpperCase()
+        const subjectDisplay = rawSubject
+        const teacherKey = normalizeString(p.teacher).toUpperCase()
+        const roomKey = normalizeString(p.room).toUpperCase()
         const weekTypeKey = normalizeString(p.weekType).toUpperCase()
-        const key = [period, startMin, subject, teacher, room, weekTypeKey].join('|')
-        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher, room, weekType: weekTypeKey || undefined })
+        const key = [period, startMin, subjectKey, teacherKey, roomKey, weekTypeKey].join('|')
+        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
       }
       return Array.from(seen.values())
     }

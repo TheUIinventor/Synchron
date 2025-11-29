@@ -129,6 +129,48 @@ const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
   } catch (e) { return 0 }
 }
 
+// Build a normalized external bellTimes mapping from the server payload.
+// If the server provided explicit `bellTimes`, prefer those. When a
+// bucket is missing or empty, fall back to using `upstream` bell data if
+// available in the payload (same-origin data from the server).
+const buildBellTimesFromPayload = (payload: any) => {
+  const result: Record<string, { period: string; time: string }[]> = {
+    'Mon/Tues': [],
+    'Wed/Thurs': [],
+    'Fri': [],
+  }
+
+  try {
+    const src = payload?.bellTimes || {}
+    if (src['Mon/Tues'] && Array.isArray(src['Mon/Tues']) && src['Mon/Tues'].length) result['Mon/Tues'] = src['Mon/Tues']
+    if (src['Wed/Thurs'] && Array.isArray(src['Wed/Thurs']) && src['Wed/Thurs'].length) result['Wed/Thurs'] = src['Wed/Thurs']
+    if (src['Fri'] && Array.isArray(src['Fri']) && src['Fri'].length) result['Fri'] = src['Fri']
+
+    if ((result['Mon/Tues'] && result['Mon/Tues'].length) && (result['Wed/Thurs'] && result['Wed/Thurs'].length) && (result['Fri'] && result['Fri'].length)) {
+      return result
+    }
+
+    // Try upstream.day.bells or upstream.bells.bells
+    const upstreamBells = (payload?.upstream?.day?.bells && Array.isArray(payload.upstream.day.bells) && payload.upstream.day.bells.length) ? payload.upstream.day.bells :
+      (payload?.upstream?.bells?.bells && Array.isArray(payload.upstream.bells.bells) && payload.upstream.bells.bells.length ? payload.upstream.bells.bells : null)
+
+    if (upstreamBells) {
+      const mapped = upstreamBells.map((b: any) => {
+        const label = b.bellDisplay || b.period || b.bell || String(b.period)
+        const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
+        return { period: String(label), time }
+      })
+      if (!result['Mon/Tues'] || result['Mon/Tues'].length === 0) result['Mon/Tues'] = mapped.slice()
+      if (!result['Wed/Thurs'] || result['Wed/Thurs'].length === 0) result['Wed/Thurs'] = mapped.slice()
+      if (!result['Fri'] || result['Fri'].length === 0) result['Fri'] = mapped.slice()
+    }
+  } catch (e) {
+    // ignore and return what we could assemble
+  }
+
+  return result
+}
+
 // Mock data for the timetable - memoized
 const timetableWeekA = {
   Monday: [
@@ -695,8 +737,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
                 if (!cancelled) {
                   if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
-                  if (j.bellTimes) setExternalBellTimes(j.bellTimes)
-                  setExternalTimetable(j.timetable)
+                    if (j.bellTimes || j.upstream) {
+                      try {
+                        const computed = buildBellTimesFromPayload(j)
+                        setExternalBellTimes(computed)
+                      } catch (e) {
+                        if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+                      }
+                    }
+                    setExternalTimetable(j.timetable)
                   setTimetableSource(j.source ?? 'external')
                   if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
                 }
@@ -939,7 +988,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (j && j.timetable) {
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
               if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
-              if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+              if (j.bellTimes || j.upstream) {
+                try {
+                  const computed = buildBellTimesFromPayload(j)
+                  setExternalBellTimes(computed)
+                } catch (e) {
+                  if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+                }
+              }
               setExternalTimetable(j.timetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
