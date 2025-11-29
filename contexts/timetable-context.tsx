@@ -338,6 +338,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(null)
+  const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -401,7 +402,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-        dayPeriods.sort((a, z) => parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time))
+        dayPeriods.sort((a, z) => {
+          const aIsBreak = /(?:recess|lunch|break)/i.test(String(a.subject || a.period || ''))
+          const zIsBreak = /(?:recess|lunch|break)/i.test(String(z.subject || z.period || ''))
+          if (!aIsBreak && !zIsBreak) {
+            const ai = canonicalIndex(a.period)
+            const zi = canonicalIndex(z.period)
+            if (ai < 998 && zi < 998 && ai !== zi) return ai - zi
+          }
+          return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time)
+        })
         filtered[day] = dayPeriods
       }
 
@@ -473,7 +483,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        dayPeriods.sort((a, z) => parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time))
+        dayPeriods.sort((a, z) => {
+          const aIsBreak = /(?:recess|lunch|break)/i.test(String(a.subject || a.period || ''))
+          const zIsBreak = /(?:recess|lunch|break)/i.test(String(z.subject || z.period || ''))
+          if (!aIsBreak && !zIsBreak) {
+            const ai = canonicalIndex(a.period)
+            const zi = canonicalIndex(z.period)
+            if (ai < 998 && zi < 998 && ai !== zi) return ai - zi
+          }
+          return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time)
+        })
         filtered[day] = dayPeriods
       }
 
@@ -534,7 +553,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        dayPeriods.sort((a, z) => parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time))
+        dayPeriods.sort((a, z) => {
+          const aIsBreak = /(?:recess|lunch|break)/i.test(String(a.subject || a.period || ''))
+          const zIsBreak = /(?:recess|lunch|break)/i.test(String(z.subject || z.period || ''))
+          if (!aIsBreak && !zIsBreak) {
+            const ai = canonicalIndex(a.period)
+            const zi = canonicalIndex(z.period)
+            if (ai < 998 && zi < 998 && ai !== zi) return ai - zi
+          }
+          return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time)
+        })
         filtered[day] = dayPeriods
       }
 
@@ -831,13 +859,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                           else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
                           else finalBellTimes[k] = []
                         }
-                        // Debug: announce arrival of external bell buckets
-                        try { console.debug('[timetable.provider] setExternalBellTimes (merged)', finalBellTimes) } catch (e) {}
-                        setExternalBellTimes(finalBellTimes)
+                        // Only set external bell times if we have at least one
+                        // non-empty bucket, or if we have never seen any before.
+                        const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                        if (hasAny || !lastSeenBellTimesRef.current) {
+                          try { console.debug('[timetable.provider] setExternalBellTimes (merged)', finalBellTimes) } catch (e) {}
+                          setExternalBellTimes(finalBellTimes)
+                          lastSeenBellTimesRef.current = finalBellTimes
+                        } else {
+                          try { console.debug('[timetable.provider] skipping empty external bellTimes merge') } catch (e) {}
+                        }
                       } catch (e) {
                         if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
                           try { console.debug('[timetable.provider] setExternalBellTimes (raw)', j.bellTimes) } catch (e) {}
                           setExternalBellTimes(j.bellTimes)
+                          lastSeenBellTimesRef.current = j.bellTimes
                         }
                       }
                     }
@@ -1103,9 +1139,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
                     else finalBellTimes[k] = []
                   }
-                  setExternalBellTimes(finalBellTimes)
+                  const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                  if (hasAny || !lastSeenBellTimesRef.current) {
+                    setExternalBellTimes(finalBellTimes)
+                    lastSeenBellTimesRef.current = finalBellTimes
+                  } else {
+                    try { console.debug('[timetable.provider] skipping empty external bellTimes merge (retry)') } catch (e) {}
+                  }
                 } catch (e) {
-                  if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) setExternalBellTimes(j.bellTimes)
+                  if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
+                    setExternalBellTimes(j.bellTimes)
+                    lastSeenBellTimesRef.current = j.bellTimes
+                  }
                 }
               }
               setExternalTimetable(j.timetable)
