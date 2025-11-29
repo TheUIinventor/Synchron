@@ -1020,8 +1020,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (j.bellTimes || j.upstream) {
                 try {
                   const computed = buildBellTimesFromPayload(j)
-                  const jHasNonEmpty = j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)
-                  const finalBellTimes = jHasNonEmpty ? j.bellTimes : computed
+                  // Merge per-bucket: prefer server-provided bucket if non-empty,
+                  // otherwise fall back to our computed/backfilled bucket. This
+                  // prevents a single non-empty server bucket from wiping others.
+                  const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                  const src = j.bellTimes || {}
+                  for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                    if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                    else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                    else finalBellTimes[k] = []
+                  }
                   setExternalBellTimes(finalBellTimes)
                 } catch (e) {
                   if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) setExternalBellTimes(j.bellTimes)
