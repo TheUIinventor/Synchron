@@ -550,6 +550,19 @@ export async function GET(req: NextRequest) {
       // expose schedules variable outside so response can include it
       var bellSchedules = schedules
       var bellTimesSources = bellSources
+      try {
+        // Helpful debug output during development: show which buckets were
+        // populated and whether a top-level day or upstream day bells were
+        // observed. The client can then use this to verify API-derived
+        // bell times aren't being discarded later in the fetch/retry flow.
+        const _tl = topLevelDayRaw || null
+        // rawDayName may be set further below when upstreamDay is detected;
+        // include it if available.
+        // eslint-disable-next-line no-console
+        console.debug('[timetable.route] bellTimesSources:', bellTimesSources, 'topLevelDay:', _tl, 'bellsCount:', (bellsArr || []).length)
+      } catch (e) {
+        /* ignore logging errors */
+      }
     }
 
     // Deduplicate entries per-day. Upstream payloads (full.days, timetable, bells, day) can contain
