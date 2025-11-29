@@ -479,6 +479,68 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
       return filtered
     }
+
+    // If we don't have an external timetable but we do have bell times from
+    // the API, apply those bell buckets to our sample timetable so the UI
+    // continues to FOLLOW THE API (insert breaks) instead of reverting to
+    // a view that lacks the API's break rows. This addresses a race where
+    // the timetable payload may be lost or fall back to sample after bells
+    // have already arrived.
+    if (externalBellTimes) {
+      const sample = (currentWeek === "A" ? timetableWeekA : timetableWeekB)
+      const filtered: Record<string, Period[]> = {}
+      for (const [day, periods] of Object.entries(sample)) filtered[day] = (periods || []).slice()
+
+      const getBellForDay = (dayName: string) => {
+        const source = externalBellTimes || bellTimesData
+        const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
+        const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
+        if (!hasBreakLike && externalBellTimes) {
+          return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
+        }
+        return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
+      }
+
+      for (const day of Object.keys(filtered)) {
+        let bells = (getBellForDay(day) || []).slice()
+        const dayPeriods = filtered[day]
+        // When externalBellTimes is present we should respect API ordering.
+        if (!externalBellTimes) {
+          bells.sort((a, b) => {
+            const ai = canonicalIndex(a?.period)
+            const bi = canonicalIndex(b?.period)
+            if (ai !== bi) return ai - bi
+            return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
+          })
+        }
+
+        for (const b of bells) {
+          try {
+            const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
+            const hasMatchingClass = dayPeriods.some((p) => Math.abs(parseStartMinutesForDay(dayPeriods, p.time) - bellStart) <= 1)
+            if (hasMatchingClass) continue
+            const label = b.period || 'Break'
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
+          } catch (e) {
+            const label = b.period
+            if (!/(recess|lunch|break)/i.test(label)) continue
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
+          }
+        }
+
+        dayPeriods.sort((a, z) => parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time))
+        filtered[day] = dayPeriods
+      }
+
+      return filtered
+    }
+
     return currentWeek === "A" ? timetableWeekA : timetableWeekB
   }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes])
 
@@ -769,9 +831,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                           else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
                           else finalBellTimes[k] = []
                         }
+                        // Debug: announce arrival of external bell buckets
+                        try { console.debug('[timetable.provider] setExternalBellTimes (merged)', finalBellTimes) } catch (e) {}
                         setExternalBellTimes(finalBellTimes)
                       } catch (e) {
-                        if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) setExternalBellTimes(j.bellTimes)
+                        if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
+                          try { console.debug('[timetable.provider] setExternalBellTimes (raw)', j.bellTimes) } catch (e) {}
+                          setExternalBellTimes(j.bellTimes)
+                        }
                       }
                     }
                     setExternalTimetable(j.timetable)
@@ -821,14 +888,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           await wait(1200)
         }
 
-        // After attempts exhausted, fall back to bundled sample data
+        // After attempts exhausted, fall back to bundled sample data.
+        // Do NOT clear previously-discovered `externalBellTimes` here — if
+        // we already received bell buckets earlier, keep them so the UI can
+        // continue to follow the API's bells rather than reverting to defaults.
         if (!cancelled) {
+          // Only null the timetable if it's not already set; preserve bell times.
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("Could not connect to school portal. Showing sample data.")
         }
       } catch (e) {
         if (!cancelled) {
+          // On unexpected error, preserve any existing `externalBellTimes` so
+          // the UI can still show API-derived breaks while we investigate.
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("An error occurred while fetching timetable.")
