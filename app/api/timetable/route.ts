@@ -454,6 +454,9 @@ export async function GET(req: NextRequest) {
       // a `dayPattern` (e.g. 'mon-tue','wed-thu','fri') or similar; we try to
       // map those into our three buckets: 'Mon/Tues', 'Wed/Thurs', 'Fri'.
       const schedules: Record<string, { period: string; time: string }[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] }
+      // Track source of each bucket so clients can tell whether it came from
+      // the bells API, from an upstream day-specific bells array, or is empty.
+      const bellSources: Record<string, string> = { 'Mon/Tues': 'empty', 'Wed/Thurs': 'empty', Fri: 'empty' }
       try {
         const bellsArr = Array.isArray(bj) ? bj : (bj.bells || bj.periods || [])
         // Friendly mapping for common portal bell labels
@@ -474,10 +477,10 @@ export async function GET(req: NextRequest) {
           const timeStr = [bs, be].filter(Boolean).join(' - ')
           const entry = { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
           const pattern = (b.dayPattern || b.pattern || b.day || '').toString().toLowerCase()
-          if (pattern.includes('mon') || pattern.includes('tue')) schedules['Mon/Tues'].push(entry)
-          else if (pattern.includes('wed') || pattern.includes('thu') || pattern.includes('thur')) schedules['Wed/Thurs'].push(entry)
-          else if (pattern.includes('fri')) schedules['Fri'].push(entry)
-          else schedules['Mon/Tues'].push(entry)
+          if (pattern.includes('mon') || pattern.includes('tue')) { schedules['Mon/Tues'].push(entry); bellSources['Mon/Tues'] = 'api' }
+          else if (pattern.includes('wed') || pattern.includes('thu') || pattern.includes('thur')) { schedules['Wed/Thurs'].push(entry); bellSources['Wed/Thurs'] = 'api' }
+          else if (pattern.includes('fri')) { schedules['Fri'].push(entry); bellSources['Fri'] = 'api' }
+          else { schedules['Mon/Tues'].push(entry); if (bellSources['Mon/Tues'] === 'empty') bellSources['Mon/Tues'] = 'api' }
         }
       } catch (e) {
         // ignore bell adaptation errors; client will fall back to defaults
@@ -515,7 +518,10 @@ export async function GET(req: NextRequest) {
               return { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
             })
             // Only replace if the target bucket is empty to avoid overwriting explicit patterns
-            if (!schedules[bucket] || schedules[bucket].length === 0) schedules[bucket] = mapped.slice()
+            if (!schedules[bucket] || schedules[bucket].length === 0) {
+              schedules[bucket] = mapped.slice()
+              bellSources[bucket] = 'upstream-day'
+            }
           }
         }
       } catch (e) {
@@ -523,6 +529,7 @@ export async function GET(req: NextRequest) {
       }
       // expose schedules variable outside so response can include it
       var bellSchedules = schedules
+      var bellTimesSources = bellSources
     }
 
     // Deduplicate entries per-day. Upstream payloads (full.days, timetable, bells, day) can contain
@@ -703,6 +710,7 @@ export async function GET(req: NextRequest) {
       timetable: byDay,
       timetableByWeek,
       bellTimes: typeof bellSchedules !== 'undefined' ? bellSchedules : undefined,
+      bellTimesSources: typeof bellTimesSources !== 'undefined' ? bellTimesSources : undefined,
       source: 'sbhs-api',
       weekType: finalWeekType,
       diagnostics: {
