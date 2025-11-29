@@ -287,25 +287,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (!Number.isFinite(hRaw)) return 0
           const m = Number.isFinite(mRaw) ? mRaw : 0
           let h = hRaw
-          const hasMorning = dayPeriods.some((p) => {
-            try {
-              const ppart = (p.time || '').split('-')[0].trim()
-              const hh = parseInt(ppart.split(':')[0], 10)
-              return Number.isFinite(hh) && hh >= 8
-            } catch (e) { return false }
-          })
-          if (h < 8 && hasMorning) h += 12
-          return h * 60 + m
-        } catch (e) { return 0 }
-      }
-
-      const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
-        try {
-          const part = (timeStr || '').split('-')[0].trim()
-          const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
-          if (!Number.isFinite(hRaw)) return 0
-          const m = Number.isFinite(mRaw) ? mRaw : 0
-          let h = hRaw
           // Heuristic: if the day contains at least one period with hour >= 8 (morning)
           // and this time's hour is a small number (< 8), treat it as PM (add 12).
           const hasMorning = dayPeriods.some((p) => {
