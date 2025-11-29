@@ -256,9 +256,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         const source = externalBellTimes || bellTimesData
-        if (dayName === 'Friday') return source.Fri
-        if (dayName === 'Wednesday' || dayName === 'Thursday') return source['Wed/Thurs']
-        return source['Mon/Tues']
+        const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
+        // If external source exists but contains no break-like labels, fall back to local defaults
+        const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
+        if (!hasBreakLike && externalBellTimes) {
+          return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
+        }
+        return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
       }
 
       const parseStartMinutes = (timeStr: string) => {
@@ -300,9 +304,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         const source = externalBellTimes || bellTimesData
-        if (dayName === 'Friday') return source.Fri
-        if (dayName === 'Wednesday' || dayName === 'Thursday') return source['Wed/Thurs']
-        return source['Mon/Tues']
+        const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
+        const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
+        if (!hasBreakLike && externalBellTimes) {
+          return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
+        }
+        return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
       }
 
       const parseStartMinutes = (timeStr: string) => {
