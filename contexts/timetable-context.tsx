@@ -216,6 +216,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
+  // Track when the user manually selected a date so we don't auto-override it
+  const lastUserSelectedRef = useRef<number | null>(null)
   const [currentMomentPeriodInfo, setCurrentMomentPeriodInfo] = useState({
     // For header status
     nextPeriod: null as Period | null,
@@ -255,14 +257,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
-        const source = externalBellTimes || bellTimesData
-        const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
-        // If external source exists but contains no break-like labels, fall back to local defaults
-        const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
-        if (!hasBreakLike && externalBellTimes) {
-          return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
+        // If the server provided bell times at all, always prefer the API's
+        // bucket for that day and respect its ordering. Only fall back to the
+        // built-in `bellTimesData` when no `externalBellTimes` object exists.
+        if (externalBellTimes) {
+          return dayName === 'Friday' ? externalBellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? externalBellTimes['Wed/Thurs'] : externalBellTimes['Mon/Tues']) || []
         }
-        return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
+        return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
+      }
+      // Canonical ordering for bell/period labels
+      const canonicalIndex = (label?: string) => {
+        if (!label) return 999
+        const s = String(label).toLowerCase()
+        if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
+        if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
+        if (/recess|break|interval|morning break/.test(s)) return 2
+        if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
+        if (/lunch\s*1|lunch1/.test(s)) return 4
+        if (/lunch\s*2|lunch2/.test(s)) return 5
+        if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
+        if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
+        return 998
       }
 
       const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
@@ -306,8 +321,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
 
       for (const day of Object.keys(filtered)) {
-        const bells = getBellForDay(day) || []
+        let bells = (getBellForDay(day) || []).slice()
         const dayPeriods = filtered[day]
+        // If the server provided `externalBellTimes`, always respect the
+        // API ordering; otherwise, sort bells by canonical order.
+        if (!externalBellTimes) {
+          // Sort bells by canonical order, falling back to time when labels are ambiguous
+          bells.sort((a, b) => {
+            const ai = canonicalIndex(a?.period)
+            const bi = canonicalIndex(b?.period)
+            if (ai !== bi) return ai - bi
+            return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
+          })
+        }
 
         for (const b of bells) {
           const label = b.period
@@ -354,6 +380,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       for (const day of Object.keys(filtered)) {
         const bells = getBellForDay(day) || []
         const dayPeriods = filtered[day]
+
+        // If the server provided an explicit bellTimes object, respect the
+        // original API ordering for that day's bucket. Otherwise, sort bells
+        // into canonical order as a fallback.
+        const externalBucket = externalBellTimes ? (day === 'Friday' ? externalBellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? externalBellTimes['Wed/Thurs'] : externalBellTimes['Mon/Tues'])) : null
+        const shouldRespectApiOrder = !!externalBucket && Array.isArray(externalBucket)
+
+        if (!shouldRespectApiOrder) {
+          bells.sort((a, b) => {
+            const ai = canonicalIndex(a?.period)
+            const bi = canonicalIndex(b?.period)
+            if (ai !== bi) return ai - bi
+            return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
+          })
+        }
 
         for (const b of bells) {
           const label = b.period // e.g., 'Recess' or 'Lunch 1'
@@ -957,11 +998,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         showingNextDayFlag = true
       }
     const mainTimetableDayName = days[dayForMainTimetable.getDay()]
-    setSelectedDay(
-      mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName,
-    )
-    setSelectedDateObject(dayForMainTimetable) // Set the actual Date object
-    setIsShowingNextDay(showingNextDayFlag)
+    // Respect a recent manual selection by the user: do not override if the user
+    // selected a date within the grace period.
+    const GRACE_MS = 2 * 60 * 1000 // 2 minutes
+    const nowMs = Date.now()
+    const lastUser = lastUserSelectedRef.current
+    const shouldRespectUser = lastUser && (nowMs - lastUser) < GRACE_MS
+
+    if (!shouldRespectUser) {
+      setSelectedDay(
+        mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName,
+      )
+      setSelectedDateObject(dayForMainTimetable) // Set the actual Date object
+      setIsShowingNextDay(showingNextDayFlag)
+    }
 
     // 2. Calculate current moment's period info (always based on actual current day)
     const actualCurrentDayName = getCurrentDay() // Use getCurrentDay for the actual day
@@ -1015,6 +1065,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [updateAllTimeStates])
 
+  // Wrapped setters that record a user selection timestamp so automatic
+  // time-based updates can respect manual choices for a short grace period.
+  const userSetSelectedDay = (day: string) => {
+    lastUserSelectedRef.current = Date.now()
+    setSelectedDay(day)
+  }
+  const userSetSelectedDateObject = (d: Date) => {
+    lastUserSelectedRef.current = Date.now()
+    setSelectedDateObject(d)
+  }
+
   return (
     <TimetableContext.Provider
       value={{
@@ -1022,8 +1083,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         setCurrentWeek,
         selectedDay,
         selectedDateObject, // Provide the new state
-        setSelectedDay,
-        setSelectedDateObject,
+        setSelectedDay: userSetSelectedDay,
+        setSelectedDateObject: userSetSelectedDateObject,
         timetableData,
         currentMomentPeriodInfo, // Provide the new state
         // Backwards-compatible alias for older components
