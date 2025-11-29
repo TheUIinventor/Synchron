@@ -482,6 +482,45 @@ export async function GET(req: NextRequest) {
       } catch (e) {
         // ignore bell adaptation errors; client will fall back to defaults
       }
+      // If some buckets are empty (e.g. Wed/Thurs or Fri) try to backfill
+      // them using the detailed per-day bells that may be present in the
+      // full or day timetable responses (some portal endpoints include a
+      // `day.bells` array with a dayName/routine that indicates which
+      // weekday the bells apply to). This prevents the common case where
+      // the bells.json payload is generic and lacks a `pattern` field.
+      try {
+        const upstreamDay = (fullRes && (fullRes as any).json && (fullRes as any).json.day && Array.isArray((fullRes as any).json.day.bells) && (fullRes as any).json.day.bells.length)
+          ? (fullRes as any).json.day
+          : (dayRes && (dayRes as any).json && (dayRes as any).json.day && Array.isArray((dayRes as any).json.day.bells) && (dayRes as any).json.day.bells.length)
+            ? (dayRes as any).json.day
+            : null
+
+        if (upstreamDay) {
+          const rawDayName = String(upstreamDay.dayName || upstreamDay.dayname || upstreamDay.day || upstreamDay.date || '').toLowerCase()
+          const bucket = rawDayName.includes('fri') ? 'Fri' : (rawDayName.includes('wed') || rawDayName.includes('thu') || rawDayName.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+          if (Array.isArray(upstreamDay.bells) && upstreamDay.bells.length) {
+            const bellLabelMap: Record<string, string> = {
+              'RC': 'Roll Call',
+              'R': 'Recess',
+              'MTL1': 'Lunch 1',
+              'MTL2': 'Lunch 2',
+              'MTL': 'Lunch',
+              'L': 'Lunch'
+            }
+            const mapped = (upstreamDay.bells || []).map((b: any) => {
+              const rawLabel = String(b.bellDisplay || b.period || b.bell || '').trim()
+              const key = rawLabel.toUpperCase()
+              const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
+              const timeStr = (b.startTime || b.time || '') + (b.endTime ? (' - ' + b.endTime) : '')
+              return { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
+            })
+            // Only replace if the target bucket is empty to avoid overwriting explicit patterns
+            if (!schedules[bucket] || schedules[bucket].length === 0) schedules[bucket] = mapped.slice()
+          }
+        }
+      } catch (e) {
+        // ignore backfill errors
+      }
       // expose schedules variable outside so response can include it
       var bellSchedules = schedules
     }
