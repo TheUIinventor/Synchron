@@ -431,12 +431,9 @@ export default function TimetablePage() {
                 <div className="grid grid-cols-5 gap-6">
                   {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
                     <div key={day} className="space-y-3">
-                      {timetableData[day].map((period, index) => (
-                        period.subject === "Break" ? (
-                          <div key={`${period.id}-break-${index}`} className="py-1 text-sm text-on-surface-variant">
-                            {period.period}
-                          </div>
-                        ) : (
+                      {timetableData[day]
+                        .filter((period) => period.subject !== "Break")
+                        .map((period) => (
                           <div key={period.id} className="flex items-center gap-3">
                             <div
                               className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}

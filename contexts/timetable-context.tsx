@@ -276,7 +276,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
         for (const b of bells) {
           const label = b.period
-          if (!/recess|lunch/i.test(label)) continue
+          // Accept a broader set of break-like labels (recess, lunch, break)
+          if (!/(recess|lunch|break)/i.test(label)) continue
           const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
           if (!exists) {
             dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
@@ -319,7 +320,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
         for (const b of bells) {
           const label = b.period // e.g., 'Recess' or 'Lunch 1'
-          if (!/recess|lunch/i.test(label)) continue
+          if (!/(recess|lunch|break)/i.test(label)) continue
           const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
           if (!exists) {
             dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
