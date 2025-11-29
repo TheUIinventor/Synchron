@@ -150,22 +150,37 @@ const buildBellTimesFromPayload = (payload: any) => {
       return result
     }
 
-    // Try upstream.day.bells or upstream.bells.bells. Some servers place the
-    // upstream payload inside `diagnostics.upstream` (server-side diagnostics),
-    // so check that as well.
+    // Try upstream/day bells and map them into the correct bucket. Some
+    // servers include the upstream payload inside `diagnostics.upstream`, so
+    // check that location too. IMPORTANT: only populate the bucket that the
+    // upstream bells actually apply to (e.g. a Wednesday-only bells array
+    // should populate `Wed/Thurs`), instead of duplicating the same array
+    // across all buckets.
     const candidateUpstream = payload?.upstream || payload?.diagnostics?.upstream || {}
-    const upstreamBells = (candidateUpstream?.day?.bells && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) ? candidateUpstream.day.bells :
-      (candidateUpstream?.bells?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length ? candidateUpstream.bells.bells : null)
-
-    if (upstreamBells) {
-      const mapped = upstreamBells.map((b: any) => {
-        const label = b.bellDisplay || b.period || b.bell || String(b.period)
-        const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
-        return { period: String(label), time }
-      })
-      if (!result['Mon/Tues'] || result['Mon/Tues'].length === 0) result['Mon/Tues'] = mapped.slice()
-      if (!result['Wed/Thurs'] || result['Wed/Thurs'].length === 0) result['Wed/Thurs'] = mapped.slice()
-      if (!result['Fri'] || result['Fri'].length === 0) result['Fri'] = mapped.slice()
+    try {
+      if (candidateUpstream?.day && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) {
+        const rawDay = String(candidateUpstream.day.dayName || candidateUpstream.day.day || candidateUpstream.day.date || candidateUpstream.day.dayname || '').toLowerCase()
+        const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+        const mapped = (candidateUpstream.day.bells || []).map((b: any) => {
+          const label = b.bellDisplay || b.period || b.bell || String(b.period)
+          const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
+          return { period: String(label), time }
+        })
+        if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
+      } else if (candidateUpstream?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length) {
+        const rawDay = String(candidateUpstream.bells.day || candidateUpstream.bells.date || candidateUpstream.bells.dayName || '').toLowerCase()
+        if (rawDay) {
+          const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+          const mapped = (candidateUpstream.bells.bells || []).map((b: any) => {
+            const label = b.bellDisplay || b.period || b.bell || String(b.period)
+            const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
+            return { period: String(label), time }
+          })
+          if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
+        }
+      }
+    } catch (e) {
+      // ignore and return what we could assemble
     }
   } catch (e) {
     // ignore and return what we could assemble
