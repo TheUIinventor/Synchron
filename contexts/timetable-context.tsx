@@ -95,6 +95,40 @@ const bellTimesData = {
   ],
 }
 
+// Shared helpers for bell ordering/time parsing used across the provider
+const canonicalIndex = (label?: string) => {
+  if (!label) return 999
+  const s = String(label).toLowerCase()
+  if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
+  if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
+  if (/recess|break|interval|morning break/.test(s)) return 2
+  if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
+  if (/lunch\s*1|lunch1/.test(s)) return 4
+  if (/lunch\s*2|lunch2/.test(s)) return 5
+  if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
+  if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
+  return 998
+}
+
+const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
+  try {
+    const part = (timeStr || '').split('-')[0].trim()
+    const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
+    if (!Number.isFinite(hRaw)) return 0
+    const m = Number.isFinite(mRaw) ? mRaw : 0
+    let h = hRaw
+    const hasMorning = dayPeriods.some((p) => {
+      try {
+        const ppart = (p.time || '').split('-')[0].trim()
+        const hh = parseInt(ppart.split(':')[0], 10)
+        return Number.isFinite(hh) && hh >= 8
+      } catch (e) { return false }
+    })
+    if (h < 8 && hasMorning) h += 12
+    return h * 60 + m
+  } catch (e) { return 0 }
+}
+
 // Mock data for the timetable - memoized
 const timetableWeekA = {
   Monday: [
@@ -249,6 +283,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
+    
     if (externalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
       for (const [day, groups] of Object.entries(externalTimetableByWeek)) {
@@ -265,41 +300,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
       }
-      // Canonical ordering for bell/period labels
-      const canonicalIndex = (label?: string) => {
-        if (!label) return 999
-        const s = String(label).toLowerCase()
-        if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
-        if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
-        if (/recess|break|interval|morning break/.test(s)) return 2
-        if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
-        if (/lunch\s*1|lunch1/.test(s)) return 4
-        if (/lunch\s*2|lunch2/.test(s)) return 5
-        if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
-        if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
-        return 998
-      }
-
-      const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
-        try {
-          const part = (timeStr || '').split('-')[0].trim()
-          const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
-          if (!Number.isFinite(hRaw)) return 0
-          const m = Number.isFinite(mRaw) ? mRaw : 0
-          let h = hRaw
-          // Heuristic: if the day contains at least one period with hour >= 8 (morning)
-          // and this time's hour is a small number (< 8), treat it as PM (add 12).
-          const hasMorning = dayPeriods.some((p) => {
-            try {
-              const ppart = (p.time || '').split('-')[0].trim()
-              const hh = parseInt(ppart.split(':')[0], 10)
-              return Number.isFinite(hh) && hh >= 8
-            } catch (e) { return false }
-          })
-          if (h < 8 && hasMorning) h += 12
-          return h * 60 + m
-        } catch (e) { return 0 }
-      }
+      
 
       for (const day of Object.keys(filtered)) {
         let bells = (getBellForDay(day) || []).slice()
