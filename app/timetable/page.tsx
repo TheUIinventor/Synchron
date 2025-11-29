@@ -453,7 +453,7 @@ export default function TimetablePage() {
                             </div>
                           </div>
                         )
-                      ))}
+                      )}
                     </div>
                   ))}
                 </div>
