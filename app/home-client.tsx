@@ -231,13 +231,13 @@ export default function HomeClient() {
 
         {/* Small inline sync indicator placed left of settings icon */}
       {/* Main Expressive Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start md:items-stretch">
         
         {/* HERO: Current/Next Period - Spans full width on mobile, 8 cols on desktop */}
-        <div className="md:col-span-8 space-y-3 flex flex-col">
+        <div className="md:col-span-8 space-y-3 flex flex-col md:h-full">
             
             {/* Primary Status Card */}
-            <div className="relative overflow-hidden rounded-m3-2xl bg-primary-container text-primary-container-foreground p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group mx-auto w-[92%] sm:w-auto max-w-[720px]">
+            <div className="relative overflow-hidden rounded-m3-2xl bg-primary-container text-primary-container-foreground p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group mx-auto w-[92%] max-w-[720px] md:mx-0 md:w-full md:max-w-none">
               {/* Background Blob */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/20" />
               
@@ -293,7 +293,7 @@ export default function HomeClient() {
             </div>
 
             {/* Quick Links (replaces Up Next card) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 mx-auto w-[92%] sm:w-full max-w-[720px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 mx-auto w-[92%] max-w-[720px] md:mx-0 md:w-full md:max-w-none md:items-stretch">
               <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-variant transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
                 <div className="flex flex-wrap items-center gap-3">
                   <a
