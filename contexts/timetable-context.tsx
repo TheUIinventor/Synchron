@@ -341,6 +341,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
   // Record the authoritative week type provided by the server (A/B) when available
   const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(null)
+  // Debug: record last fetched date and a small payload summary for diagnostics
+  const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null)
+  const [lastFetchedPayloadSummary, setLastFetchedPayloadSummary] = useState<any | null>(null)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
@@ -1108,6 +1111,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
               if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
               setExternalTimetable(j.timetable)
+              try {
+                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                const summary = {
+                  weekType: j.weekType ?? null,
+                  counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                    ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                    : null,
+                }
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary(summary)
+              } catch (e) {}
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)
@@ -1210,6 +1224,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setExternalWeekType(j.weekType)
                 setCurrentWeek(j.weekType)
               }
+              try {
+                // record payload summary when present
+                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                const summary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary(summary)
+              } catch (e) {}
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -1359,8 +1380,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (cancelled) return
           if (j && j.timetable && typeof j.timetable === 'object') {
             if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
-            setExternalTimetable(j.timetable)
-            setTimetableSource(j.source ?? 'external')
+                  setExternalTimetable(j.timetable)
+                  setTimetableSource(j.source ?? 'external')
+                  // record debug summary
+                  try {
+                    const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                    const summary = {
+                      weekType: j.weekType ?? null,
+                      counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                        ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                        : null,
+                    }
+                    setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                    setLastFetchedPayloadSummary(summary)
+                  } catch (e) {}
             if (j.bellTimes) setExternalBellTimes(j.bellTimes)
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
@@ -1403,6 +1436,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       value={{
         currentWeek,
         externalWeekType,
+        lastFetchedDate,
+        lastFetchedPayloadSummary,
         selectedDay,
         selectedDateObject, // Provide the new state
         setSelectedDay: userSetSelectedDay,

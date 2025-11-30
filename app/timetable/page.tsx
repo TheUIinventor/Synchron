@@ -16,6 +16,8 @@ export default function TimetablePage() {
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
   const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek } = useTimetable()
+  // debug values
+  const { lastFetchedDate, lastFetchedPayloadSummary } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -154,6 +156,11 @@ export default function TimetablePage() {
                 <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">API week: —</span>
               )}
               <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">UI week: {currentWeek ?? '—'}</span>
+              {/* Small debug info about last fetch */}
+              <div className="ml-2 text-xs text-on-surface-variant">
+                <div>fetched: {lastFetchedDate ?? '—'}</div>
+                <div>payload: {lastFetchedPayloadSummary ? JSON.stringify(lastFetchedPayloadSummary) : '—'}</div>
+              </div>
             </div>
             <button
               onClick={async () => {
