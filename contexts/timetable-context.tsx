@@ -1242,21 +1242,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const rctype2 = r2.headers.get('content-type') || ''
         if (rctype2.includes('application/json')) {
           const j = await r2.json()
-              if (j == null) return
-              if (payloadHasNoTimetable(j)) {
-                if (!cancelled) {
-                  setExternalTimetable(emptyByDay)
-                  setTimetableSource(j.source ?? 'external')
-                  setExternalWeekType(null)
-                  setCurrentWeek(null)
-                  try {
-                    setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                    setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
-                  } catch (e) {}
-                }
-                return
-              }
-            if (payloadHasNoTimetable(j)) {
+          if (j == null) return
+          if (payloadHasNoTimetable(j)) {
+            if (!cancelled) {
               setExternalTimetable(emptyByDay)
               setTimetableSource(j.source ?? 'external')
               setExternalWeekType(null)
@@ -1265,71 +1253,69 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
               } catch (e) {}
-              return
             }
-            if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
-              if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
-              if (j.bellTimes || j.upstream) {
-                try {
-                  const computed = buildBellTimesFromPayload(j)
-                  // Merge per-bucket: prefer server-provided bucket if non-empty,
-                  // otherwise fall back to our computed/backfilled bucket. This
-                  // prevents a single non-empty server bucket from wiping others.
-                  const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                  const src = j.bellTimes || {}
-                  for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                    if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                    else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                    else finalBellTimes[k] = []
-                  }
-                  const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                  if (hasAny || !lastSeenBellTimesRef.current) {
-                    try { console.log('[timetable.provider] setExternalBellTimes (merged retry)', finalBellTimes) } catch (e) {}
-                    setExternalBellTimes(finalBellTimes)
-                    lastSeenBellTimesRef.current = finalBellTimes
-                    lastSeenBellTsRef.current = Date.now()
-                  } else {
-                    try { console.log('[timetable.provider] skipping empty external bellTimes merge (retry)') } catch (e) {}
-                  }
-                } catch (e) {
-                  if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
-                    try { console.log('[timetable.provider] setExternalBellTimes (raw retry)', j.bellTimes) } catch (e) {}
-                    setExternalBellTimes(j.bellTimes)
-                    lastSeenBellTimesRef.current = j.bellTimes
-                    lastSeenBellTsRef.current = Date.now()
-                  }
+            return
+          }
+
+          if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+            if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
+            if (j.bellTimes || j.upstream) {
+              try {
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny || !lastSeenBellTimesRef.current) {
+                  try { console.log('[timetable.provider] setExternalBellTimes (merged retry)', finalBellTimes) } catch (e) {}
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                } else {
+                  try { console.log('[timetable.provider] skipping empty external bellTimes merge (retry)') } catch (e) {}
+                }
+              } catch (e) {
+                if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
+                  try { console.log('[timetable.provider] setExternalBellTimes (raw retry)', j.bellTimes) } catch (e) {}
+                  setExternalBellTimes(j.bellTimes)
+                  lastSeenBellTimesRef.current = j.bellTimes
+                  lastSeenBellTsRef.current = Date.now()
                 }
               }
-              setExternalTimetable(j.timetable)
-              setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
-              }
-              try {
-                // record payload summary when present
-                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-                const summary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
-                setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                setLastFetchedPayloadSummary(summary)
-              } catch (e) {}
-              return
             }
-            if (Array.isArray(j.timetable)) {
-              const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-              for (const p of j.timetable) {
-                const day = p.day || p.weekday || 'Monday'
-                if (!byDay[day]) byDay[day] = []
-                byDay[day].push(p)
-              }
-              setExternalTimetable(byDay)
-              setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
-              }
-              return
+            setExternalTimetable(j.timetable)
+            setTimetableSource(j.source ?? 'external')
+            if (j.weekType === 'A' || j.weekType === 'B') {
+              setExternalWeekType(j.weekType)
+              setCurrentWeek(j.weekType)
             }
+            try {
+              const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+              const summary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
+              setLastFetchedDate((new Date()).toISOString().slice(0,10))
+              setLastFetchedPayloadSummary(summary)
+            } catch (e) {}
+            return
+          }
+
+          if (Array.isArray(j.timetable)) {
+            const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+            for (const p of j.timetable) {
+              const day = p.day || p.weekday || 'Monday'
+              if (!byDay[day]) byDay[day] = []
+              byDay[day].push(p)
+            }
+            setExternalTimetable(byDay)
+            setTimetableSource(j.source ?? 'external')
+            if (j.weekType === 'A' || j.weekType === 'B') {
+              setExternalWeekType(j.weekType)
+              setCurrentWeek(j.weekType)
+            }
+            return
           }
         }
         if (rctype2.includes('text/html')) {
