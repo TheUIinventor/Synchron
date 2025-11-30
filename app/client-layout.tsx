@@ -12,6 +12,7 @@ import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider
 import { TimetableProvider } from "@/contexts/timetable-context"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   useEffect(() => {
     // Attempt a silent server-side refresh on initial load to restore session if possible
     fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
@@ -44,7 +45,11 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
 
       // Compute needed scale but clamp between 0.85 and 1
       const needed = clientH / contentH
-      const scale = Math.max(0.85, Math.min(1, needed))
+      // Apply a small page-specific multiplier on the home page to trim
+      // vertical space (5% reduction) — this only affects the home route.
+      const isHome = typeof window !== 'undefined' && (pathname === '/' || pathname === '')
+      const pageMultiplier = isHome ? 0.95 : 1
+      const scale = Math.max(0.85, Math.min(1, needed * pageMultiplier))
       // Only update the property when it actually changes to avoid layout thrash
       const prev = doc.style.getPropertyValue('--ui-scale') || ''
       if (prev !== String(scale)) doc.style.setProperty('--ui-scale', String(scale))
@@ -79,7 +84,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       // Reset the scale when unmounting to avoid leaking into other pages
       document.documentElement.style.setProperty('--ui-scale', '1')
     }
-  }, [])
+  }, [pathname])
   return (
     <ThemeProvider
       attribute="class"
