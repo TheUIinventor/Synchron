@@ -25,7 +25,7 @@ export type BellTime = {
 
 // Define the timetable context type
 type TimetableContextType = {
-  currentWeek: "A" | "B"
+  currentWeek: "A" | "B" | null
   selectedDay: string // Day for the main timetable display (e.g., "Monday")
   selectedDateObject: Date // The actual Date object for the selectedDay
   setSelectedDay: (day: string) => void
@@ -307,7 +307,7 @@ const timetableWeekB = {
 
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
-  const [currentWeek, setCurrentWeek] = useState<"A" | "B">("A")
+  const [currentWeek, setCurrentWeek] = useState<"A" | "B" | null>(null)
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
@@ -351,7 +351,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (externalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
       for (const [day, groups] of Object.entries(externalTimetableByWeek)) {
-        const list = (groups && Array.isArray(groups[currentWeek]) ? groups[currentWeek] : []) as Period[]
+        const list = ((currentWeek === 'A' || currentWeek === 'B') && groups && Array.isArray(groups[currentWeek])) ? (groups[currentWeek] as Period[]) : []
         filtered[day] = list.slice()
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
@@ -428,7 +428,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const filtered: Record<string, Period[]> = {}
       for (const [day, periods] of Object.entries(externalTimetable)) {
         const list = Array.isArray(periods) ? periods : []
-        filtered[day] = list.filter((p) => !p.weekType || p.weekType === currentWeek)
+        // Only show entries that explicitly match the API-determined week. Do not
+        // include untagged entries when `currentWeek` is unknown.
+        filtered[day] = (currentWeek === 'A' || currentWeek === 'B') ? list.filter((p) => p.weekType === currentWeek) : []
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
@@ -515,7 +517,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // the timetable payload may be lost or fall back to sample after bells
     // have already arrived.
     if (externalBellTimes) {
-      const sample = (currentWeek === "A" ? timetableWeekA : timetableWeekB)
+      const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+      const sample = (timetableSource === 'fallback-sample' && (currentWeek !== 'A' && currentWeek !== 'B'))
+        ? emptyByDay
+        : (currentWeek === "B" ? timetableWeekB : timetableWeekA)
       const filtered: Record<string, Period[]> = {}
       for (const [day, periods] of Object.entries(sample)) filtered[day] = (periods || []).slice()
 
@@ -581,7 +586,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return filtered
     }
 
-    return currentWeek === "A" ? timetableWeekA : timetableWeekB
+    // If we're displaying the bundled sample because live data couldn't be obtained,
+    // and the API hasn't explicitly specified A/B (currentWeek is null), do not
+    // assume a default week — return an empty timetable so the UI can show a
+    // clear message instead of presenting potentially incorrect week data.
+    if (timetableSource === 'fallback-sample' && (currentWeek !== 'A' && currentWeek !== 'B')) {
+      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    }
+
+    return currentWeek === "B" ? timetableWeekB : timetableWeekA
   }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes])
 
   // Track whether substitutions have been applied to the current external timetable

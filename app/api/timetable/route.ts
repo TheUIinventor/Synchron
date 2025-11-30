@@ -693,36 +693,30 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const weekType = dominantWeekType || detectedWeekType || inferWeekType(undefined, {
-      bells: bellsRes?.json,
-      day: dayRes?.json,
-      full: fullRes?.json,
-    })
+    // Prefer explicit upstream `weekType` when present on any of the
+    // fetched JSON responses (day/full/bells). This ensures the portal's
+    // canonical week marker takes precedence over heuristic inference.
+    const upstreamExplicitWeek = (
+      (dayRes && (dayRes as any).json && ((dayRes as any).json.weekType || (dayRes as any).json.week || (dayRes as any).json.week_label)) ||
+      (fullRes && (fullRes as any).json && ((fullRes as any).json.weekType || (fullRes as any).json.week || (fullRes as any).json.week_label)) ||
+      (bellsRes && (bellsRes as any).json && ((bellsRes as any).json.weekType || (bellsRes as any).json.week || (bellsRes as any).json.week_label))
+    )
 
-    // If we still couldn't determine a week type from upstream data, fall back
-    // to a parity-based inference using the ISO week number. This provides a
-    // stable A/B toggle even when the portal omits explicit week tags.
-    function isoWeekNumber(d: Date) {
-      // Copy date so don't modify original
-      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-      // Thursday in current week decides the year
-      date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
-      const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1))
-      const weekNo = Math.floor(((+date - +yearStart) / 86400000 + 1) / 7) + 1
-      return weekNo
-    }
-
-    let finalWeekType = weekType as WeekType | null
-    if (!finalWeekType) {
-      try {
-        const today = new Date()
-        const weekNo = isoWeekNumber(today)
-        // Choose a mapping: odd -> A, even -> B. This is adjustable later.
-        finalWeekType = (weekNo % 2) === 1 ? 'A' : 'B'
-      } catch (e) {
-        finalWeekType = null
+    let weekType = null as WeekType | null
+    if (upstreamExplicitWeek) {
+      const s = String(upstreamExplicitWeek).trim().toUpperCase()
+      if (s === 'A' || s === 'B') weekType = s as WeekType
+      else {
+        const m = s.match(/\b([AB])\b/)
+        if (m && m[1]) weekType = m[1].toUpperCase() as WeekType
       }
     }
+    // Only use an explicit upstream week marker. Do NOT apply heuristics or
+    // parity fallbacks — if the portal does not provide `weekType` then the
+    // route will leave the week unset (null) so the client can decide how to
+    // behave. We still compute diagnostics above but they are informational
+    // only and are not used to select the canonical week.
+    const finalWeekType = weekType as WeekType | null
 
     // Build per-day week tag counts for diagnostics using the grouped view
     const perDayWeekCounts: Record<string, { A: number; B: number; unknown: number }> = {}
@@ -749,7 +743,7 @@ export async function GET(req: NextRequest) {
       diagnostics: {
         detectedWeekType: detectedWeekType ?? null,
         dominantWeekType: dominantWeekType ?? null,
-        inferredWeekParityFallback: finalWeekType ? finalWeekType : null,
+        inferredWeekParityFallback: null,
         weekTally,
         perDayWeekCounts,
         weekBreakdown,
