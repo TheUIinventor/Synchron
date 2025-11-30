@@ -338,6 +338,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   })
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
+  // Record the authoritative week type provided by the server (A/B) when available
+  const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(null)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
@@ -906,7 +908,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     }
                     setExternalTimetable(j.timetable)
                   setTimetableSource(j.source ?? 'external')
-                  if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
                 }
                 return
               }
@@ -920,7 +925,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (!cancelled) {
                   setExternalTimetable(byDay)
                   setTimetableSource(j.source ?? 'external')
-                  if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
                 }
                 return
               }
@@ -992,7 +1000,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (jht && jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
           setExternalTimetable(jht.timetable)
           setTimetableSource(jht.source ?? 'external-homepage')
-          if (jht.weekType === 'A' || jht.weekType === 'B') setCurrentWeek(jht.weekType)
+          if (jht.weekType === 'A' || jht.weekType === 'B') {
+            setExternalWeekType(jht.weekType)
+            setCurrentWeek(jht.weekType)
+          }
           return
         }
       } else if (htctype.includes('text/html')) {
@@ -1097,7 +1108,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
               setExternalTimetable(j.timetable)
               setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -1109,7 +1123,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               setExternalTimetable(byDay)
               setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
               return
             }
           }
@@ -1188,7 +1205,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               setExternalTimetable(j.timetable)
               setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -1200,7 +1220,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               setExternalTimetable(byDay)
               setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') setCurrentWeek(j.weekType)
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
               return
             }
           }
@@ -1320,6 +1343,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', handleVisibility)
     }
   }, [updateAllTimeStates])
+
+  // Keep currentWeek synchronized with the server-provided externalWeekType
+  useEffect(() => {
+    if (externalWeekType && currentWeek !== externalWeekType) {
+      try { console.log('[timetable.provider] syncing currentWeek to externalWeekType', externalWeekType) } catch (e) {}
+      setCurrentWeek(externalWeekType)
+    }
+  }, [externalWeekType, currentWeek])
 
   // Wrapped setters that record a user selection timestamp so automatic
   // time-based updates can respect manual choices for a short grace period.
