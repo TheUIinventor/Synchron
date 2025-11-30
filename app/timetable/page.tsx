@@ -15,7 +15,7 @@ export default function TimetablePage() {
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, setCurrentWeek, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject } = useTimetable()
+  const { currentWeek, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -396,77 +396,104 @@ export default function TimetablePage() {
 
         {viewMode === "cycle" && (
           <>
-            {/* Week A/B Toggle */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-surface-container-high p-1 rounded-full">
-                <button
-                  onClick={() => setCurrentWeek("A")}
-                  className={`px-4 py-2 text-sm rounded-full transition-all ${
-                    currentWeek === "A" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  Week A
-                </button>
-                <button
-                  onClick={() => setCurrentWeek("B")}
-                  className={`px-4 py-2 text-sm rounded-full transition-all ${
-                    currentWeek === "B" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  Week B
-                </button>
-              </div>
-            </div>
+            {/* Full Cycle View (show both Week A and Week B) */}
 
             {/* Grid Timetable */}
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <div className="p-6">
                 <div className="text-center mb-6">
-                  <h2 className="text-xl font-semibold text-on-surface">Week {currentWeek} Timetable</h2>
-                  <p className="text-sm text-on-surface-variant">Grid View</p>
+                  <h2 className="text-xl font-semibold text-on-surface">Full Cycle Timetable</h2>
+                  <p className="text-sm text-on-surface-variant">Week A and Week B</p>
                 </div>
 
                 {/* Days Header */}
                 <div className="grid grid-cols-5 gap-6 mb-6">
-                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
                     <div key={day} className="text-center">
-                      <h3 className="font-semibold text-on-surface-variant text-base">
-                        {day.substring(0, 3)}
-                        {currentWeek}
-                      </h3>
+                      <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}</h3>
                     </div>
                   ))}
                 </div>
 
-                {/* Timetable Grid */}
+                {/* Timetable Grid: each day shows Week A then Week B */}
                 <div className="grid grid-cols-5 gap-6">
-                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
-                    <div key={day} className="space-y-3">
-                      {timetableData[day]
-                        .filter((period) => period.subject !== "Break")
-                        .map((period) => (
-                          <div key={period.id} className="flex items-center gap-3">
-                            <div
-                              className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}
-                            >
-                              {getSubjectAbbr(period.subject)}
-                            </div>
-                            <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <span className="font-semibold text-sm truncate">{period.subject}</span>
-                                <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
-                                  <span>{period.room}</span>
-                                  <span>•</span>
-                                  <span>{period.teacher}</span>
-                                </div>
-                              </div>
-                              <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.teacher}</div>
-                            </div>
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
+                    // prefer grouped timetableByWeek when available
+                    // fall back to showing the current week's data if grouped data isn't present.
+                    const tt = timetableByWeek
+                    return (
+                      <div key={day} className="space-y-3">
+                        {/* Week A */}
+                        <div className="p-2 rounded-md bg-surface-container-high">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">Week A</div>
                           </div>
-                        )
-                      )}
-                    </div>
-                  ))}
+                          {(() => {
+                            // Prefer provider's grouped data if available
+                            try {
+                              const itemsA = tt && tt[day] && Array.isArray(tt[day].A) ? tt[day].A : (timetableData[day] || [])
+                              return itemsA.filter((p: any) => p.subject !== 'Break').map((period: any) => (
+                                <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
+                                  <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
+                                    {getSubjectAbbr(period.subject)}
+                                  </div>
+                                  <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-semibold text-sm truncate">{period.subject}</span>
+                                      <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
+                                        <span>{period.room}</span>
+                                        <span>•</span>
+                                        <span>{period.teacher}</span>
+                                      </div>
+                                    </div>
+                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.teacher}</div>
+                                  </div>
+                                </div>
+                              ))
+                            } catch (e) {
+                              return <div className="text-xs text-on-surface-variant">No data</div>
+                            }
+                          })()}
+                        </div>
+
+                        {/* Week B */}
+                        <div className="p-2 rounded-md bg-surface-container-high">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">Week B</div>
+                          </div>
+                          {(() => {
+                            try {
+                              const itemsB = tt && tt[day] && Array.isArray(tt[day].B) ? tt[day].B : []
+                              if ((!itemsB || itemsB.length === 0) && (!tt || !tt[day])) {
+                                // no grouped data available; indicate there's only one week available
+                                return <div className="text-xs text-on-surface-variant">Only one week available</div>
+                              }
+                              return itemsB.filter((p: any) => p.subject !== 'Break').map((period: any) => (
+                                <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
+                                  <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
+                                    {getSubjectAbbr(period.subject)}
+                                  </div>
+                                  <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-semibold text-sm truncate">{period.subject}</span>
+                                      <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
+                                        <span>{period.room}</span>
+                                        <span>•</span>
+                                        <span>{period.teacher}</span>
+                                      </div>
+                                    </div>
+                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.teacher}</div>
+                                  </div>
+                                </div>
+                              ))
+                            } catch (e) {
+                              return <div className="text-xs text-on-surface-variant">No data</div>
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </Card>

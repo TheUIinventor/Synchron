@@ -26,7 +26,6 @@ export type BellTime = {
 // Define the timetable context type
 type TimetableContextType = {
   currentWeek: "A" | "B"
-  setCurrentWeek: (week: "A" | "B") => void
   selectedDay: string // Day for the main timetable display (e.g., "Monday")
   selectedDateObject: Date // The actual Date object for the selectedDay
   setSelectedDay: (day: string) => void
@@ -53,6 +52,8 @@ type TimetableContextType = {
   error: string | null
   // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
   refreshExternal?: () => Promise<void>
+  // Full A/B grouped timetable when available from the server
+  timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
 }
 
 // Create the context
@@ -1322,7 +1323,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     <TimetableContext.Provider
       value={{
         currentWeek,
-        setCurrentWeek,
         selectedDay,
         selectedDateObject, // Provide the new state
         setSelectedDay: userSetSelectedDay,
@@ -1334,6 +1334,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         bellTimes: externalBellTimes || bellTimesData,
         isShowingNextDay,
         timetableSource,
+        timetableByWeek: externalTimetableByWeek || undefined,
         isLoading,
         error,
         refreshExternal,
