@@ -45,7 +45,9 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       // Compute needed scale but clamp between 0.85 and 1
       const needed = clientH / contentH
       const scale = Math.max(0.85, Math.min(1, needed))
-      doc.style.setProperty('--ui-scale', String(scale))
+      // Only update the property when it actually changes to avoid layout thrash
+      const prev = doc.style.getPropertyValue('--ui-scale') || ''
+      if (prev !== String(scale)) doc.style.setProperty('--ui-scale', String(scale))
     }
 
     function onResize() {
@@ -53,7 +55,13 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       raf = requestAnimationFrame(adjustScale)
     }
 
+    // Run initial adjustment immediately, then re-run after short delays to
+    // accommodate late-loading fonts/images and small DOM mutations that can
+    // change layout height. This reduces flicker where a single early measurement
+    // flips the scale then resets on subsequent layout passes.
     adjustScale()
+    const t1 = setTimeout(adjustScale, 200)
+    const t2 = setTimeout(adjustScale, 800)
     window.addEventListener('resize', onResize)
     window.addEventListener('orientationchange', onResize)
 
@@ -66,6 +74,9 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       window.removeEventListener('orientationchange', onResize)
       mo.disconnect()
       if (raf) cancelAnimationFrame(raf)
+      clearTimeout(t1)
+      clearTimeout(t2)
+      // Reset the scale when unmounting to avoid leaking into other pages
       document.documentElement.style.setProperty('--ui-scale', '1')
     }
   }, [])

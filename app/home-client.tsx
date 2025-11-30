@@ -294,7 +294,7 @@ export default function HomeClient() {
 
             {/* Quick Links (replaces Up Next card) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 mx-auto w-[92%] sm:w-full max-w-[720px]">
-              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-variant transition-colors duration-300 flex flex-col justify-between h-full">
+              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-variant transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
                 <div className="flex flex-wrap items-center gap-3">
                   <a
                     href="https://mail.google.com/a/student.sbhs.nsw.edu.au"
