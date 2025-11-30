@@ -61,7 +61,7 @@ export default function CombinedStatus() {
               </div>
               <p className="font-medium mb-1">{getDisplaySubject(nextPeriodInfo.currentPeriod)}</p>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400 mb-2">
-                <span>{nextPeriodInfo.currentPeriod.teacher}</span>
+                <span>{nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher}</span>
                 <span>•</span>
                 <span>{nextPeriodInfo.currentPeriod.room}</span>
               </div>
@@ -78,7 +78,7 @@ export default function CombinedStatus() {
                 </div>
                 <p className="font-medium text-sm mb-1">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
                 <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  <span>{nextPeriodInfo.nextPeriod.teacher}</span>
+                  <span>{nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher}</span>
                   <span>•</span>
                   <span>{nextPeriodInfo.nextPeriod.room}</span>
                 </div>

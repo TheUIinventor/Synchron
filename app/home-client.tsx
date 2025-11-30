@@ -6,7 +6,7 @@ import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as Clipboa
 import { useEffect, useState } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
-import { parseTimeRange, formatTo12Hour } from "@/utils/time-utils";
+import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -108,8 +108,14 @@ export default function HomeClient() {
 
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = currentMomentPeriodInfo;
   
-  // Determine the date to display: prefer provider's selected date, otherwise local currentDate
-  const displayDate = selectedDateObject ?? currentDate;
+  // Determine the date to display: prefer provider's selected date, otherwise local currentDate.
+  // If no user-selected date and it's after school hours or a weekend, show the next school day.
+  const displayDate = selectedDateObject ?? (((): Date => {
+    const now = currentDate
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6
+    if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
+    return now
+  })());
   // Get today's periods for the sidebar - prefer selectedDay (context), otherwise use the displayDate's weekday
   const dayName = selectedDay || format(displayDate, "EEEE");
   const todaysPeriods = timetableData[dayName] || [];
@@ -241,7 +247,7 @@ export default function HomeClient() {
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
                     <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
-                      {currentPeriod?.teacher || "Self Study"}
+                      {currentPeriod?.fullTeacher || currentPeriod?.teacher || "Self Study"}
                     </span>
                     <span>•</span>
                     <span>{currentPeriod?.room || "Campus"}</span>
@@ -443,7 +449,7 @@ export default function HomeClient() {
                                   <span>{period.room}</span>
                                 </div>
                               </div>
-                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.teacher} • {period.room}</div>
+                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.fullTeacher || period.teacher} • {period.room}</div>
                             </a>
                           ) : (
                             <div className={cardClass}>
@@ -451,12 +457,12 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <p className="font-medium text-sm truncate">{period.subject}</p>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span>{period.teacher}</span>
+                                    <span>{period.fullTeacher || period.teacher}</span>
                                     <span>•</span>
                                     <span>{period.room}</span>
                                   </div>
                                 </div>
-                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.teacher} • {period.room}</div>
+                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.fullTeacher || period.teacher} • {period.room}</div>
                               </div>
                             </div>
                           )}

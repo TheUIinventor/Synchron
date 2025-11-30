@@ -57,6 +57,7 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
   const time = [start, end].filter(Boolean).join(' - ')
   let subject = item.subject || item.subjectName || item.subject_name || item.class || item.title || item.name || 'Class'
   const teacher = item.teacher || item.teacherName || item.teacher_name || item.classTeacher || item.staff || item.staffName || ''
+  const fullTeacher = item.fullTeacher || item.full_teacher || item.fullTeacherName || item.full_teacher_name || item.fullname || item.full_name || ''
   const room = item.room || item.roomName || item.room_name || item.venue || item.location || ''
   const period = String(item.period || item.p || item.block || item.lesson || item.lessonNumber || item.lesson_number || item.name || item.title || '')
   // Avoid using subject/title/name fields when inferring week type because class
@@ -72,7 +73,7 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
     subject = String(subject || '').trim()
   } catch (e) {}
 
-  return { period, time, subject, teacher, room, weekType: weekType ?? undefined }
+  return { period, time, subject, teacher, fullTeacher: fullTeacher || undefined, room, weekType: weekType ?? undefined }
 }
 
 // This route proxies SBHS Timetable API endpoints shown in the portal docs:
@@ -620,7 +621,7 @@ export async function GET(req: NextRequest) {
           const weekTypeKey = normalizeString(p.weekType).toUpperCase()
           // include start minute in the dedupe key to avoid merging distinct periods that share labels
           const key = [period, startMin, subjectKey, teacherKey, roomKey, weekTypeKey].join('|')
-          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
+          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), fullTeacher: normalizeString(p.fullTeacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
         }
         b[dayName] = Array.from(seen.values())
       }
@@ -656,7 +657,7 @@ export async function GET(req: NextRequest) {
         const roomKey = normalizeString(p.room).toUpperCase()
         const weekTypeKey = normalizeString(p.weekType).toUpperCase()
         const key = [period, startMin, subjectKey, teacherKey, roomKey, weekTypeKey].join('|')
-        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
+        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), fullTeacher: normalizeString(p.fullTeacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
       }
       return Array.from(seen.values())
     }

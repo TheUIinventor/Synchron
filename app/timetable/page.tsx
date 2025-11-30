@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
-import { parseTimeRange, formatTo12Hour } from "@/utils/time-utils"
+import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
@@ -53,6 +53,17 @@ export default function TimetablePage() {
   // Use provider-selected date by default
   const getSelectedDayName = () => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    // If the provider's selected date is today and it's after school hours or a weekend,
+    // display the next school day instead (this mirrors home view behaviour).
+    try {
+      const now = new Date()
+      const sameDate = selectedDateObject.toDateString() === now.toDateString()
+      const isWeekend = now.getDay() === 0 || now.getDay() === 6
+      if (sameDate && (isWeekend || isSchoolDayOver())) {
+        const next = getNextSchoolDay(now)
+        return days[next.getDay()]
+      }
+    } catch (e) {}
     return days[selectedDateObject.getDay()]
   }
 
@@ -389,7 +400,7 @@ export default function TimetablePage() {
                                 )}
                               </div>
 
-                              <div className="text-xs text-on-surface-variant truncate mt-1">{period.room} • {period.teacher}</div>
+                              <div className="text-xs text-on-surface-variant truncate mt-1">{period.room} • {period.fullTeacher || period.teacher}</div>
                             </div>
                           </div>
                         </div>
@@ -457,10 +468,10 @@ export default function TimetablePage() {
                                       <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
                                         <span>{period.room}</span>
                                         <span>•</span>
-                                        <span>{period.teacher}</span>
+                                        <span>{period.fullTeacher || period.teacher}</span>
                                       </div>
                                     </div>
-                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.teacher}</div>
+                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.fullTeacher || period.teacher}</div>
                                   </div>
                                 </div>
                               ))
@@ -493,10 +504,10 @@ export default function TimetablePage() {
                                       <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
                                         <span>{period.room}</span>
                                         <span>•</span>
-                                        <span>{period.teacher}</span>
+                                        <span>{period.fullTeacher || period.teacher}</span>
                                       </div>
                                     </div>
-                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.teacher}</div>
+                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.fullTeacher || period.teacher}</div>
                                   </div>
                                 </div>
                               ))
