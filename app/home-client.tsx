@@ -198,7 +198,7 @@ export default function HomeClient() {
   }
 
   return (
-    <div className="space-y-4 pb-12 md:pb-8 animate-in fade-in duration-700">
+    <div className="space-y-4 pb-6 md:pb-6 animate-in fade-in duration-700">
       
       {/* Header Section */}
       <div className="flex items-start justify-between gap-4 pt-4 md:pt-0">
@@ -231,17 +231,17 @@ export default function HomeClient() {
 
         {/* Small inline sync indicator placed left of settings icon */}
       {/* Main Expressive Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start">
         
         {/* HERO: Current/Next Period - Spans full width on mobile, 8 cols on desktop */}
-        <div className="md:col-span-8 space-y-3">
+        <div className="md:col-span-8 space-y-3 flex flex-col">
             
             {/* Primary Status Card */}
-            <div className="relative overflow-hidden rounded-m3-2xl bg-primary-container text-primary-container-foreground p-6 md:p-8 shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-500 ease-expressive hover:scale-[1.01] group">
+            <div className="relative overflow-hidden rounded-m3-2xl bg-primary-container text-primary-container-foreground p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group mx-auto w-[92%] sm:w-auto max-w-[720px]">
               {/* Background Blob */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/20" />
               
-              <div className="relative z-10 flex flex-col h-full justify-between min-h-[160px]">
+              <div className="relative z-10 flex flex-col h-full justify-between min-h-[150px]">
                 <div className="flex justify-between items-start">
                   <Badge variant="secondary" className="bg-primary/20 text-primary-container-foreground hover:bg-primary/30 rounded-full px-4 py-1 text-sm font-medium">
                     Now
@@ -250,7 +250,7 @@ export default function HomeClient() {
                 </div>
                 
                 <div className="mt-3">
-                  <h2 className="text-4xl md:text-6xl font-serif leading-tight mb-2">
+                  <h2 className="text-3xl md:text-5xl font-serif leading-tight mb-2">
                     {currentPeriod?.subject ? (
                       canvasLinks[currentPeriod.subject] ? (
                         <a href={canvasLinks[currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
@@ -293,8 +293,8 @@ export default function HomeClient() {
             </div>
 
             {/* Quick Links (replaces Up Next card) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-variant transition-colors duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 mx-auto w-[92%] sm:w-full max-w-[720px]">
+              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-variant transition-colors duration-300 flex flex-col justify-between h-full">
                 <div className="flex flex-wrap items-center gap-3">
                   <a
                     href="https://mail.google.com/a/student.sbhs.nsw.edu.au"
@@ -406,7 +406,7 @@ export default function HomeClient() {
                 </div>
               </div>
 
-               <Link href="/notices" className="rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex flex-col justify-between hover:brightness-95 transition-all cursor-pointer">
+               <Link href="/notices" className="hidden sm:flex rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex-col justify-between hover:brightness-95 transition-all cursor-pointer h-full">
                   <div className="flex items-center gap-2 mb-4 opacity-80">
                     <Bell className="h-5 w-5" />
                     <span className="font-medium">Notices</span>
