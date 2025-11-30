@@ -118,7 +118,25 @@ export default function HomeClient() {
   })());
   // Get today's periods for the sidebar - prefer selectedDay (context), otherwise use the displayDate's weekday
   const dayName = selectedDay || format(displayDate, "EEEE");
-  const todaysPeriods = timetableData[dayName] || [];
+  const todaysPeriodsRaw = timetableData[dayName] || [];
+
+  // Helper: normalize period label for comparison
+  const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
+  const isRollCallEntry = (p: any) => {
+    const subj = String(p.subject || '') .toLowerCase()
+    const per = normalizePeriodLabel(p.period)
+    return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
+  }
+
+  // If there is no real period '0' present in the raw data for this day, drop any placeholder period '0'
+  const hasPeriod0 = todaysPeriodsRaw.some(p => normalizePeriodLabel(p.period) === '0')
+
+  // Filter out roll-call entries and orphaned period 0 placeholders
+  const todaysPeriods = todaysPeriodsRaw.filter(p => {
+    if (isRollCallEntry(p)) return false
+    if (!hasPeriod0 && normalizePeriodLabel(p.period) === '0') return false
+    return true
+  })
 
   // Calculate progress percent for the current block (class or break)
   function calcProgressPercent() {
@@ -414,7 +432,7 @@ export default function HomeClient() {
                   {format(displayDate, "EEEE, d MMMM")}
                 </h3>
                 
-                <div className="space-y-3 flex-1 overflow-y-auto max-h-[360px] pr-2">
+                <div className="space-y-3 flex-1 pr-2">
                   {todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
                       let startTime = period.time?.split(' - ')[0] ?? ''
@@ -444,7 +462,7 @@ export default function HomeClient() {
                               <div className="flex items-center justify-between gap-3">
                                 <span className="font-medium text-sm truncate">{period.subject}</span>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{period.teacher}</span>
+                                  <span>{period.fullTeacher || period.teacher}</span>
                                   <span>•</span>
                                   <span>{period.room}</span>
                                 </div>

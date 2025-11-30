@@ -137,7 +137,20 @@ export default function TimetablePage() {
 
   const selectedDayName = getSelectedDayName()
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
-  const todaysTimetable = timetableData[selectedDayName] || []
+  const todaysTimetableRaw = timetableData[selectedDayName] || []
+
+  const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
+  const isRollCallEntry = (p: any) => {
+    const subj = String(p.subject || '').toLowerCase()
+    const per = normalizePeriodLabel(p.period)
+    return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
+  }
+  const hasPeriod0 = todaysTimetableRaw.some(p => normalizePeriodLabel(p.period) === '0')
+  const todaysTimetable = todaysTimetableRaw.filter(p => {
+    if (isRollCallEntry(p)) return false
+    if (!hasPeriod0 && normalizePeriodLabel(p.period) === '0') return false
+    return true
+  })
 
   if (!mounted) return null
 

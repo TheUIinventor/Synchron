@@ -366,6 +366,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
+
+    // Cleanup helper: remove roll-call entries and orphaned period '0' placeholders
+    const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
+    const isRollCallEntry = (p: any) => {
+      const subj = String(p?.subject || '').toLowerCase()
+      const per = normalizePeriodLabel(p?.period)
+      return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
+    }
+    const cleanupMap = (m: Record<string, Period[]>) => {
+      for (const [day, arr] of Object.entries(m)) {
+        try {
+          const hasReal0 = arr.some(p => normalizePeriodLabel(p.period) === '0' && String(p.subject || '').trim() !== '')
+          m[day] = arr.filter(p => {
+            if (isRollCallEntry(p)) return false
+            if (!hasReal0 && normalizePeriodLabel(p.period) === '0') return false
+            return true
+          })
+        } catch (e) { /* ignore cleanup errors */ }
+      }
+      return m
+    }
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
     if (externalTimetableByWeek) {
@@ -441,7 +462,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
-      return filtered
+      return cleanupMap(filtered)
     }
 
     if (externalTimetable) {
@@ -456,7 +477,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // requested date, return the empty-by-day map as-is (do not insert
       // Break rows based on bell times). This keeps the UI blank like a
       // weekend when upstream reports "no timetable".
-      if (timetableSource === 'external-empty') return filtered
+      if (timetableSource === 'external-empty') return cleanupMap(filtered)
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         const source = externalBellTimes || bellTimesData
@@ -532,7 +553,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
-      return filtered
+      return cleanupMap(filtered)
     }
 
     // If we don't have an external timetable but we do have bell times from
@@ -608,7 +629,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
-      return filtered
+      return cleanupMap(filtered)
     }
 
     // If we're displaying the bundled sample because live data couldn't be obtained,
