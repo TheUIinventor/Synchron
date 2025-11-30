@@ -351,8 +351,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
     return null
   })
+  const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
   const [timetableSource, setTimetableSource] = useState<string | null>(null)
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
+  const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(externalTimetableByWeek)
   // Record the authoritative week type provided by the server (A/B) when available
   const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(null)
   // Debug: record last fetched date and a small payload summary for diagnostics
@@ -366,6 +368,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
+
+    // When loading fresh API data, prefer showing the last recorded external
+    // timetable so the UI doesn't flash empty while a reload completes.
+    const useExternalTimetable = (isLoading && lastRecordedTimetable) ? lastRecordedTimetable : externalTimetable
+    const useExternalTimetableByWeek = (isLoading && lastRecordedTimetableByWeek) ? lastRecordedTimetableByWeek : externalTimetableByWeek
+    const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
 
     // Cleanup helper: remove roll-call entries and orphaned period '0' placeholders
     const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
@@ -389,9 +397,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
-    if (externalTimetableByWeek) {
+    if (useExternalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
-      for (const [day, groups] of Object.entries(externalTimetableByWeek)) {
+      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
         const list = ((currentWeek === 'A' || currentWeek === 'B') && groups && Array.isArray(groups[currentWeek])) ? (groups[currentWeek] as Period[]) : []
         filtered[day] = list.slice()
       }
@@ -400,8 +408,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // If the server provided bell times at all, always prefer the API's
         // bucket for that day and respect its ordering. Only fall back to the
         // built-in `bellTimesData` when no `externalBellTimes` object exists.
-        if (externalBellTimes) {
-          return dayName === 'Friday' ? externalBellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? externalBellTimes['Wed/Thurs'] : externalBellTimes['Mon/Tues']) || []
+        if (useExternalBellTimes) {
+          return dayName === 'Friday' ? useExternalBellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues']) || []
         }
         return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
       }
@@ -412,7 +420,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const dayPeriods = filtered[day]
         // If the server provided `externalBellTimes`, always respect the
         // API ordering; otherwise, sort bells by canonical order.
-        if (!externalBellTimes) {
+        if (!useExternalBellTimes) {
           // Sort bells by canonical order, falling back to time when labels are ambiguous
           bells.sort((a, b) => {
             const ai = canonicalIndex(a?.period)
@@ -465,9 +473,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return cleanupMap(filtered)
     }
 
-    if (externalTimetable) {
+    if (useExternalTimetable) {
       const filtered: Record<string, Period[]> = {}
-      for (const [day, periods] of Object.entries(externalTimetable)) {
+      for (const [day, periods] of Object.entries(useExternalTimetable)) {
         const list = Array.isArray(periods) ? periods : []
         // Only show entries that explicitly match the API-determined week. Do not
         // include untagged entries when `currentWeek` is unknown.
@@ -480,10 +488,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (timetableSource === 'external-empty') return cleanupMap(filtered)
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
-        const source = externalBellTimes || bellTimesData
+        const source = useExternalBellTimes || bellTimesData
         const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
         const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
-        if (!hasBreakLike && externalBellTimes) {
+        if (!hasBreakLike && useExternalBellTimes) {
           return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
         }
         return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
@@ -505,7 +513,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // If the server provided an explicit bellTimes object, respect the
         // original API ordering for that day's bucket. Otherwise, sort bells
         // into canonical order as a fallback.
-        const externalBucket = externalBellTimes ? (day === 'Friday' ? externalBellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? externalBellTimes['Wed/Thurs'] : externalBellTimes['Mon/Tues'])) : null
+        const externalBucket = useExternalBellTimes ? (day === 'Friday' ? useExternalBellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues'])) : null
         const shouldRespectApiOrder = !!externalBucket && Array.isArray(externalBucket)
 
         if (!shouldRespectApiOrder) {
@@ -562,7 +570,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // a view that lacks the API's break rows. This addresses a race where
     // the timetable payload may be lost or fall back to sample after bells
     // have already arrived.
-    if (externalBellTimes) {
+    if (useExternalBellTimes) {
       const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
       const sample = (timetableSource === 'fallback-sample' && (currentWeek !== 'A' && currentWeek !== 'B'))
         ? emptyByDay
@@ -571,10 +579,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       for (const [day, periods] of Object.entries(sample)) filtered[day] = (periods || []).slice()
 
       const getBellForDay = (dayName: string) => {
-        const source = externalBellTimes || bellTimesData
+        const source = useExternalBellTimes || bellTimesData
         const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
         const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
-        if (!hasBreakLike && externalBellTimes) {
+        if (!hasBreakLike && useExternalBellTimes) {
           return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
         }
         return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
@@ -641,7 +649,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
 
     return currentWeek === "B" ? timetableWeekB : timetableWeekA
-  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes])
+  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading])
 
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>(null)
@@ -666,12 +674,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       persistTimerRef.current = window.setTimeout(() => {
         try {
-          if (externalTimetable) {
-            const payload = { timetable: externalTimetable, source: timetableSource ?? 'external', ts: Date.now() }
-            localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
-          } else {
-            localStorage.removeItem('synchron-last-timetable')
-          }
+          if (lastRecordedTimetable) {
+                const payload = { timetable: lastRecordedTimetable, source: timetableSource ?? 'external', ts: Date.now() }
+                localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
+              } else {
+                localStorage.removeItem('synchron-last-timetable')
+              }
         } catch (e) {
           // ignore storage errors
         }
@@ -685,7 +693,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         persistTimerRef.current = null
       }
     }
-  }, [externalTimetable, timetableSource])
+  }, [lastRecordedTimetable, timetableSource])
 
   useEffect(() => {
     if (!externalTimetable) return
@@ -721,6 +729,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     return () => { cancelled = true }
   }, [externalTimetable, timetableSource])
+
+  // Remember last known-good external timetable data so we can continue
+  // showing it while a reload is in progress or when a refresh falls back.
+  useEffect(() => {
+    if (externalTimetable && timetableSource && timetableSource !== 'fallback-sample') {
+      setLastRecordedTimetable(externalTimetable)
+    }
+  }, [externalTimetable, timetableSource])
+
+  useEffect(() => {
+    if (externalTimetableByWeek) setLastRecordedTimetableByWeek(externalTimetableByWeek)
+  }, [externalTimetableByWeek])
 
   // Try to fetch external timetable on mount
   useEffect(() => {
@@ -1565,10 +1585,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         currentMomentPeriodInfo, // Provide the new state
         // Backwards-compatible alias for older components
         nextPeriodInfo: currentMomentPeriodInfo,
-        bellTimes: externalBellTimes || bellTimesData,
+        bellTimes: externalBellTimes || lastSeenBellTimesRef.current || bellTimesData,
         isShowingNextDay,
         timetableSource,
-        timetableByWeek: externalTimetableByWeek || undefined,
+        timetableByWeek: lastRecordedTimetableByWeek || externalTimetableByWeek || undefined,
         externalWeekType,
         isLoading,
         error,
