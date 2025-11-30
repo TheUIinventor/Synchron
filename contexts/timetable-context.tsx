@@ -191,6 +191,20 @@ const buildBellTimesFromPayload = (payload: any) => {
   return result
 }
 
+// Explicit empty timetable used when the upstream API reports "no timetable".
+const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+
+const payloadHasNoTimetable = (payload: any) => {
+  try {
+    if (!payload) return false
+    if (payload.error) return true
+    if (payload.timetable === false) return true
+    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
+    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
+  } catch (e) {}
+  return false
+}
+
 // Mock data for the timetable - memoized
 const timetableWeekA = {
   Monday: [
@@ -762,26 +776,37 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const htctype = ht.headers.get('content-type') || ''
               if (ht.ok && htctype.includes('application/json')) {
                 const jht = await ht.json()
-                if (jht && jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-                  if (!cancelled) {
-                    // apply substitutions if available
-                    try {
-                      const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
-                      const subsCtype = subsRes.headers.get('content-type') || ''
-                      if (subsRes.ok && subsCtype.includes('application/json')) {
-                        const subsJson = await subsRes.json()
-                        const applied = applySubstitutionsToTimetable(jht.timetable, subsJson.substitutions || [], { debug: true })
-                        setExternalTimetable(applied)
-                      } else {
-                        setExternalTimetable(jht.timetable)
-                      }
+                if (jht) {
+                  if (payloadHasNoTimetable(jht)) {
+                    if (!cancelled) {
+                      setExternalTimetable(emptyByDay)
                       setTimetableSource(jht.source ?? 'external-homepage')
-                    } catch (e) {
-                      setExternalTimetable(jht.timetable)
-                      setTimetableSource(jht.source ?? 'external-homepage')
+                      setExternalWeekType(null)
+                      setCurrentWeek(null)
                     }
+                    return
                   }
-                  return
+                  if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
+                    if (!cancelled) {
+                      // apply substitutions if available
+                      try {
+                        const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
+                        const subsCtype = subsRes.headers.get('content-type') || ''
+                        if (subsRes.ok && subsCtype.includes('application/json')) {
+                          const subsJson = await subsRes.json()
+                          const applied = applySubstitutionsToTimetable(jht.timetable, subsJson.substitutions || [], { debug: true })
+                          setExternalTimetable(applied)
+                        } else {
+                          setExternalTimetable(jht.timetable)
+                        }
+                        setTimetableSource(jht.source ?? 'external-homepage')
+                      } catch (e) {
+                        setExternalTimetable(jht.timetable)
+                        setTimetableSource(jht.source ?? 'external-homepage')
+                      }
+                    }
+                    return
+                  }
                 }
               } else if (htctype.includes('text/html')) {
                 const html = await ht.text()
@@ -873,6 +898,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (rctype.includes('application/json')) {
               const j = await r.json()
               if (j == null) return
+              if (payloadHasNoTimetable(j)) {
+                if (!cancelled) {
+                  setExternalTimetable(emptyByDay)
+                  setTimetableSource(j.source ?? 'external')
+                  setExternalWeekType(null)
+                  setCurrentWeek(null)
+                  try {
+                    setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                    setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+                  } catch (e) {}
+                }
+                return
+              }
               if (j.timetable && typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
                 if (!cancelled) {
                   if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
@@ -1001,14 +1039,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const htctype = ht.headers.get('content-type') || ''
       if (ht.ok && htctype.includes('application/json')) {
         const jht = await ht.json()
-        if (jht && jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-          setExternalTimetable(jht.timetable)
-          setTimetableSource(jht.source ?? 'external-homepage')
-          if (jht.weekType === 'A' || jht.weekType === 'B') {
-            setExternalWeekType(jht.weekType)
-            setCurrentWeek(jht.weekType)
+        if (jht) {
+          if (payloadHasNoTimetable(jht)) {
+            setExternalTimetable(emptyByDay)
+            setTimetableSource(jht.source ?? 'external-homepage')
+            setExternalWeekType(null)
+            setCurrentWeek(null)
+            return
           }
-          return
+          if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
+            setExternalTimetable(jht.timetable)
+            setTimetableSource(jht.source ?? 'external-homepage')
+            if (jht.weekType === 'A' || jht.weekType === 'B') {
+              setExternalWeekType(jht.weekType)
+              setCurrentWeek(jht.weekType)
+            }
+            return
+          }
         }
       } else if (htctype.includes('text/html')) {
         const html = await ht.text()
@@ -1108,6 +1155,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (rctype.includes('application/json')) {
           const j = await r.json()
           if (j && j.timetable) {
+            if (payloadHasNoTimetable(j)) {
+              setExternalTimetable(emptyByDay)
+              setTimetableSource(j.source ?? 'external')
+              setExternalWeekType(null)
+              setCurrentWeek(null)
+              try {
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+              } catch (e) {}
+              return
+            }
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
               if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
               setExternalTimetable(j.timetable)
@@ -1184,7 +1242,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const rctype2 = r2.headers.get('content-type') || ''
         if (rctype2.includes('application/json')) {
           const j = await r2.json()
-          if (j && j.timetable) {
+              if (j == null) return
+              if (payloadHasNoTimetable(j)) {
+                if (!cancelled) {
+                  setExternalTimetable(emptyByDay)
+                  setTimetableSource(j.source ?? 'external')
+                  setExternalWeekType(null)
+                  setCurrentWeek(null)
+                  try {
+                    setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                    setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+                  } catch (e) {}
+                }
+                return
+              }
+            if (payloadHasNoTimetable(j)) {
+              setExternalTimetable(emptyByDay)
+              setTimetableSource(j.source ?? 'external')
+              setExternalWeekType(null)
+              setCurrentWeek(null)
+              try {
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+              } catch (e) {}
+              return
+            }
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
               if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
               if (j.bellTimes || j.upstream) {
@@ -1378,6 +1460,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (ctype.includes('application/json')) {
           const j = await res.json()
           if (cancelled) return
+          if (j && payloadHasNoTimetable(j)) {
+            if (!cancelled) {
+              setExternalTimetable(emptyByDay)
+              setTimetableSource(j.source ?? 'external')
+              setExternalWeekType(null)
+              setCurrentWeek(null)
+              try {
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+              } catch (e) {}
+            }
+            return
+          }
           if (j && j.timetable && typeof j.timetable === 'object') {
             if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
                   setExternalTimetable(j.timetable)
