@@ -54,6 +54,7 @@ type TimetableContextType = {
   refreshExternal?: () => Promise<void>
   // Full A/B grouped timetable when available from the server
   timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+  externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
 }
 
 // Create the context
@@ -1367,6 +1368,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     <TimetableContext.Provider
       value={{
         currentWeek,
+        externalWeekType,
         selectedDay,
         selectedDateObject, // Provide the new state
         setSelectedDay: userSetSelectedDay,
@@ -1379,6 +1381,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         isShowingNextDay,
         timetableSource,
         timetableByWeek: externalTimetableByWeek || undefined,
+        externalWeekType,
         isLoading,
         error,
         refreshExternal,

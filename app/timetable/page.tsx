@@ -15,7 +15,7 @@ export default function TimetablePage() {
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek } = useTimetable()
+  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -141,12 +141,19 @@ export default function TimetablePage() {
           <h1 className="text-2xl font-bold text-on-surface md:text-center md:flex-1">My Synchron</h1>
           {/* Data source badge and manual refresh */}
           <div className="flex items-center gap-2">
-            <div className="text-xs text-on-surface-variant flex items-center">
+            <div className="text-xs text-on-surface-variant flex items-center gap-2">
               {timetableSource === 'fallback-sample' ? (
                 <span className="px-2 py-1 rounded-full bg-tertiary-container text-on-tertiary-container">Using sample data</span>
               ) : timetableSource ? (
                 <span className="px-2 py-1 rounded-full bg-primary-container text-on-primary-container">Live data</span>
               ) : null}
+              {/* Debug badge showing authoritative API week vs provider currentWeek */}
+              {externalWeekType ? (
+                <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">API week: {externalWeekType}</span>
+              ) : (
+                <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">API week: —</span>
+              )}
+              <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">UI week: {currentWeek ?? '—'}</span>
             </div>
             <button
               onClick={async () => {
