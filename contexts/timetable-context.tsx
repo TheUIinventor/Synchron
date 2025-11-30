@@ -1345,6 +1345,40 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [updateAllTimeStates])
 
+  // When the selected date changes, fetch the authoritative timetable for that date
+  useEffect(() => {
+    let cancelled = false
+    const fetchForDate = async () => {
+      try {
+        const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+        const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
+        const ctype = res.headers.get('content-type') || ''
+        if (!res.ok) return
+        if (ctype.includes('application/json')) {
+          const j = await res.json()
+          if (cancelled) return
+          if (j && j.timetable && typeof j.timetable === 'object') {
+            if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
+            setExternalTimetable(j.timetable)
+            setTimetableSource(j.source ?? 'external')
+            if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+            if (j.weekType === 'A' || j.weekType === 'B') {
+              setExternalWeekType(j.weekType)
+              setCurrentWeek(j.weekType)
+            } else {
+              // if the API explicitly left weekType null, clear the externalWeekType
+              setExternalWeekType(null)
+            }
+          }
+        }
+      } catch (e) {
+        // ignore fetch errors here; provider has existing fallback logic
+      }
+    }
+    fetchForDate()
+    return () => { cancelled = true }
+  }, [selectedDateObject])
+
   // Keep currentWeek synchronized with the server-provided externalWeekType
   useEffect(() => {
     if (externalWeekType && currentWeek !== externalWeekType) {
