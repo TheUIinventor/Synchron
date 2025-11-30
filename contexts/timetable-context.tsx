@@ -452,6 +452,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // include untagged entries when `currentWeek` is unknown.
         filtered[day] = (currentWeek === 'A' || currentWeek === 'B') ? list.filter((p) => p.weekType === currentWeek) : []
       }
+      // If the server explicitly reported that there is no timetable for the
+      // requested date, return the empty-by-day map as-is (do not insert
+      // Break rows based on bell times). This keeps the UI blank like a
+      // weekend when upstream reports "no timetable".
+      if (timetableSource === 'external-empty') return filtered
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         const source = externalBellTimes || bellTimesData
@@ -780,7 +785,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   if (payloadHasNoTimetable(jht)) {
                     if (!cancelled) {
                       setExternalTimetable(emptyByDay)
-                      setTimetableSource(jht.source ?? 'external-homepage')
+                      setExternalTimetableByWeek(null)
+                      setExternalBellTimes(null)
+                      setTimetableSource('external-empty')
                       setExternalWeekType(null)
                       setCurrentWeek(null)
                     }
@@ -901,7 +908,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (payloadHasNoTimetable(j)) {
                 if (!cancelled) {
                   setExternalTimetable(emptyByDay)
-                  setTimetableSource(j.source ?? 'external')
+                  setExternalTimetableByWeek(null)
+                  setExternalBellTimes(null)
+                  setTimetableSource('external-empty')
                   setExternalWeekType(null)
                   setCurrentWeek(null)
                   try {
@@ -1041,10 +1050,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const jht = await ht.json()
         if (jht) {
           if (payloadHasNoTimetable(jht)) {
-            setExternalTimetable(emptyByDay)
-            setTimetableSource(jht.source ?? 'external-homepage')
-            setExternalWeekType(null)
-            setCurrentWeek(null)
+              setExternalTimetable(emptyByDay)
+              setExternalTimetableByWeek(null)
+              setExternalBellTimes(null)
+              setTimetableSource('external-empty')
+              setExternalWeekType(null)
+              setCurrentWeek(null)
             return
           }
           if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
@@ -1157,7 +1168,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (j && j.timetable) {
             if (payloadHasNoTimetable(j)) {
               setExternalTimetable(emptyByDay)
-              setTimetableSource(j.source ?? 'external')
+              setExternalTimetableByWeek(null)
+              setExternalBellTimes(null)
+              setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
               try {
@@ -1246,7 +1259,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (payloadHasNoTimetable(j)) {
             if (!cancelled) {
               setExternalTimetable(emptyByDay)
-              setTimetableSource(j.source ?? 'external')
+              setExternalTimetableByWeek(null)
+              setExternalBellTimes(null)
+              setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
               try {
@@ -1449,7 +1464,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (j && payloadHasNoTimetable(j)) {
             if (!cancelled) {
               setExternalTimetable(emptyByDay)
-              setTimetableSource(j.source ?? 'external')
+              setExternalTimetableByWeek(null)
+              setExternalBellTimes(null)
+              setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
               try {
