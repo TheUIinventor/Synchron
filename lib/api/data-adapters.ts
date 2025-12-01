@@ -145,11 +145,18 @@ export function applySubstitutionsToTimetable(
           // Track whether we changed anything for debug output
           let changed = false
 
-          // Replace teacher when substitution provides one
+          // Replace teacher when substitution provides one. Prefer any
+          // normalized full-name for display (substituteTeacherFull) but
+          // keep the short code in `teacher` as a fallback.
           if (sub.substituteTeacher && sub.substituteTeacher !== period.teacher) {
             period.isSubstitute = true
             const prev = period.teacher
             period.teacher = sub.substituteTeacher
+            // If the substitution object provides a full name, prefer that
+            // for `fullTeacher` so UI can display the substitute's full name.
+            if ((sub as any).substituteTeacherFull && String((sub as any).substituteTeacherFull).trim()) {
+              (period as any).fullTeacher = String((sub as any).substituteTeacherFull)
+            }
             changed = true
             if (options?.debug) console.debug(`Applied substitute teacher: ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`)
           }

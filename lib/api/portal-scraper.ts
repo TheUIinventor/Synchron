@@ -132,7 +132,10 @@ export class PortalScraper {
           period: obj.period || obj.periodName || obj.t || undefined,
           subject: obj.subject || obj.class || obj.title || undefined,
           originalTeacher: obj.teacher || obj.originalTeacher || obj.teacherName || undefined,
-          substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || undefined,
+          // Accept casual/replacement fields as substitute identifiers
+          substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || obj.casual || undefined,
+          // Provide a generous guess at the substitute's full name when available
+          substituteTeacherFull: obj.casualSurname ? (obj.casual ? `${obj.casual} ${obj.casualSurname}` : obj.casualSurname) : (obj.substituteFullName || obj.substituteFull || undefined),
           fromRoom: obj.fromRoom || obj.from || obj.oldRoom || undefined,
           toRoom: obj.toRoom || obj.to || obj.room || obj.newRoom || undefined,
           reason: obj.reason || obj.note || obj.comment || undefined,
