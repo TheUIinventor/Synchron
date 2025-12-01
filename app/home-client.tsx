@@ -450,37 +450,49 @@ export default function HomeClient() {
                       )
 
                       return (
-                        <div key={period.id ?? i} className="flex gap-3 items-center group cursor-pointer">
+                    <div key={period.id ?? i} className="flex gap-3 items-center group cursor-pointer">
                           <div className="flex flex-col items-center min-w-[3rem]">
                             <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
                           </div>
 
-                          {isBreak ? (
+                            {isBreak ? (
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{period.period}</div>
                           ) : link ? (
                             <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} block`}>
                               <div className="flex items-center justify-between gap-3">
-                                <span className="font-medium text-sm truncate">{period.subject}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm truncate">{period.subject}</span>
+                                  {period.isSubstitute && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                                  )}
+                                  {period.isRoomChange && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
+                                  )}
+                                </div>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{period.fullTeacher || period.teacher}</span>
-                                  <span>•</span>
                                   <span>{period.room}</span>
                                 </div>
                               </div>
-                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.fullTeacher || period.teacher} • {period.room}</div>
+                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room}</div>
                             </a>
                           ) : (
                             <div className={cardClass}>
                               <div>
                                 <div className="flex items-center justify-between gap-3">
-                                  <p className="font-medium text-sm truncate">{period.subject}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-sm truncate">{period.subject}</p>
+                                    {period.isSubstitute && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                                    )}
+                                    {period.isRoomChange && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
+                                    )}
+                                  </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span>{period.fullTeacher || period.teacher}</span>
-                                    <span>•</span>
                                     <span>{period.room}</span>
                                   </div>
                                 </div>
-                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.fullTeacher || period.teacher} • {period.room}</div>
+                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room}</div>
                               </div>
                             </div>
                           )}

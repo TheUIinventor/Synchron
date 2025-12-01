@@ -1585,21 +1585,77 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             return
           }
           if (j && j.timetable && typeof j.timetable === 'object') {
-            if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
-                  setExternalTimetable(j.timetable)
-                  setTimetableSource(j.source ?? 'external')
-                  // record debug summary
+            // If the server returned substitutions separately, attempt to fetch
+            // them and apply in-place so the day-by-day timetable JSON includes
+            // substitute teachers and room changes.
+            let finalTimetable = j.timetable
+            let finalByWeek = j.timetableByWeek || null
+            try {
+              const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
+              const subsCtype = subsRes.headers.get('content-type') || ''
+              if (subsRes.ok && subsCtype.includes('application/json')) {
+                const subsJson = await subsRes.json()
+                const subs = subsJson.substitutions || []
+                if (Array.isArray(subs) && subs.length) {
                   try {
-                    const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-                    const summary = {
-                      weekType: j.weekType ?? null,
-                      counts: j.timetableByWeek && j.timetableByWeek[dayName]
-                        ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
-                        : null,
+                    finalTimetable = applySubstitutionsToTimetable(j.timetable, subs)
+                  } catch (e) { /* ignore substitution apply errors */ }
+
+                  if (j.timetableByWeek) {
+                    try {
+                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                      const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                      // Copy to avoid mutating original
+                      for (const d of Object.keys(byWeekSrc)) {
+                        transformed[d] = {
+                          A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                          B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                          unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
+                        }
+                      }
+
+                      // For each week (A/B/unknown) build a day->periods map and apply substitutions
+                      const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                        for (const d of Object.keys(transformed)) {
+                          weekMap[d] = transformed[d][weekKey] || []
+                        }
+                        const applied = applySubstitutionsToTimetable(weekMap, subs)
+                        for (const d of Object.keys(transformed)) {
+                          transformed[d][weekKey] = applied[d] || []
+                        }
+                      }
+
+                      applyToWeek('A')
+                      applyToWeek('B')
+                      applyToWeek('unknown')
+
+                      finalByWeek = transformed
+                    } catch (e) {
+                      // ignore by-week substitution failures
                     }
-                    setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                    setLastFetchedPayloadSummary(summary)
-                  } catch (e) {}
+                  }
+                }
+              }
+            } catch (e) {
+              // ignore substitution fetch errors
+            }
+
+            if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+            setExternalTimetable(finalTimetable)
+            setTimetableSource(j.source ?? 'external')
+            // record debug summary
+            try {
+              const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+              const summary = {
+                weekType: j.weekType ?? null,
+                counts: finalByWeek && finalByWeek[dayName]
+                  ? { A: finalByWeek[dayName].A?.length || 0, B: finalByWeek[dayName].B?.length || 0, unknown: finalByWeek[dayName].unknown?.length || 0 }
+                  : null,
+              }
+              setLastFetchedDate((new Date()).toISOString().slice(0,10))
+              setLastFetchedPayloadSummary(summary)
+            } catch (e) {}
             if (j.bellTimes) setExternalBellTimes(j.bellTimes)
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
