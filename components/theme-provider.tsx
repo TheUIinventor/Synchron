@@ -102,6 +102,47 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
 
     root.style.setProperty("--accent", colors.accent)
     root.style.setProperty("--accent-foreground", pickForeground(colors.accent))
+
+    // Create layered surface/card tints and gradients that vary by area and interaction
+    const isDark = root.classList.contains("dark")
+
+    if (!isDark) {
+      // Light mode: subtle tinted surfaces using bright lightness values
+      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 96))
+      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 92))
+      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 88))
+      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 98))
+
+      root.style.setProperty("--card", adjustLightness(colors.primary, 94))
+      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 94)))
+
+      root.style.setProperty("--popover", adjustLightness(colors.accent, 96))
+      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 96)))
+
+      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.min(98, parseLightness(colors.primary) + 6)))
+      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
+
+      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 98))
+      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 92))
+    } else {
+      // Dark mode: subtle darker tints
+      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 12))
+      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 16))
+      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 20))
+      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 24))
+
+      root.style.setProperty("--card", adjustLightness(colors.primary, 14))
+      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 14)))
+
+      root.style.setProperty("--popover", adjustLightness(colors.accent, 14))
+      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 14)))
+
+      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.max(8, parseLightness(colors.primary) - 6)))
+      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
+
+      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 22))
+      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 18))
+    }
   }
 
   const setFontTheme = (theme: FontTheme) => {
@@ -128,6 +169,44 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
 
     root.style.setProperty("--accent", colors.accent)
     root.style.setProperty("--accent-foreground", pickForeground(colors.accent))
+
+    // Ensure surfaces and gradients are applied on initial mount as well
+    const isDark = root.classList.contains("dark")
+    if (!isDark) {
+      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 96))
+      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 92))
+      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 88))
+      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 98))
+
+      root.style.setProperty("--card", adjustLightness(colors.primary, 94))
+      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 94)))
+
+      root.style.setProperty("--popover", adjustLightness(colors.accent, 96))
+      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 96)))
+
+      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.min(98, parseLightness(colors.primary) + 6)))
+      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
+
+      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 98))
+      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 92))
+    } else {
+      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 12))
+      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 16))
+      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 20))
+      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 24))
+
+      root.style.setProperty("--card", adjustLightness(colors.primary, 14))
+      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 14)))
+
+      root.style.setProperty("--popover", adjustLightness(colors.accent, 14))
+      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 14)))
+
+      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.max(8, parseLightness(colors.primary) - 6)))
+      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
+
+      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 22))
+      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 18))
+    }
   }, [colorTheme])
 
   // Apply initial font theme
@@ -227,5 +306,31 @@ function pickForeground(hsl: string): string {
     return lightness > 60 ? "0 0% 9%" : "0 0% 98%"
   } catch (e) {
     return "0 0% 98%"
+  }
+}
+
+// Parse the lightness percentage from an HSL triplet string like "217 91% 60%"
+function parseLightness(hsl: string): number {
+  try {
+    const parts = hsl.trim().split(/\s+/)
+    const last = parts[parts.length - 1]
+    const match = /([0-9]+)\%/.exec(last)
+    return match ? parseInt(match[1], 10) : 50
+  } catch (e) {
+    return 50
+  }
+}
+
+// Return the same H and S with a new lightness value (0-100)
+function adjustLightness(hsl: string, targetLightness: number): string {
+  try {
+    const parts = hsl.trim().split(/\s+/)
+    if (parts.length < 3) return hsl
+    const h = parts[0]
+    const s = parts[1]
+    const l = Math.max(0, Math.min(100, Math.round(targetLightness))) + "%"
+    return `${h} ${s} ${l}`
+  } catch (e) {
+    return hsl
   }
 }

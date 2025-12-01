@@ -102,9 +102,10 @@
     @apply bg-background text-foreground font-sans;
     background-image: 
       radial-gradient(at 0% 0%, hsla(var(--primary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(var(--tertiary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(var(--secondary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, hsla(var(--accent) / 0.15) 0px, transparent 50%);
+      radial-gradient(at 100% 0%, hsla(var(--tertiary) / 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(var(--secondary) / 0.12) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(var(--accent) / 0.12) 0px, transparent 50%),
+      linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.03), hsla(var(--surface-gradient-end) / 0.03));
     background-attachment: fixed;
   }
 }
@@ -112,9 +113,23 @@
 @layer utilities {
   .glass-card {
     @apply bg-opacity-80 backdrop-blur-md;
+    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.06), hsla(var(--surface-gradient-end) / 0.03));
+    transition: background-image 220ms ease, transform 160ms ease;
+  }
+  .glass-card:hover {
+    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.10), hsla(var(--surface-gradient-end) / 0.06));
+    transform: translateY(-2px);
   }
   .glass-border {
     @apply border border-white/20 dark:border-white/10;
+  }
+
+  /* Buttons and small controls get a subtle primary gradient on hover/focus */
+  .glass-button {
+    transition: background-image 220ms ease, box-shadow 160ms ease;
+  }
+  .glass-button:hover {
+    background-image: linear-gradient(180deg, hsla(var(--primary-gradient-start) / 0.06), hsla(var(--primary-gradient-end) / 0.04));
   }
 }
 
