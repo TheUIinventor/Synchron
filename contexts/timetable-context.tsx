@@ -682,22 +682,60 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // and HTML fallbacks by scraping via PortalScraper when necessary.
   const getPortalSubstitutions = async (): Promise<any[]> => {
     try {
-      const res = await fetch('/api/portal/substitutions', { credentials: 'include' })
-      const ctype = res.headers.get('content-type') || ''
-      if (res.ok && ctype.includes('application/json')) {
-        const j = await res.json()
-        try { console.debug('[timetable.provider] fetched substitutions', Array.isArray(j.substitutions) ? j.substitutions.length : 0, (j.substitutions && j.substitutions[0]) || null) } catch (e) {}
-        return j.substitutions || []
-      }
-      if (res.ok && ctype.includes('text/html')) {
-        const text = await res.text()
-        try {
-          const extracted = PortalScraper.extractVariationsFromHtml(text)
-          try { console.debug('[timetable.provider] extracted substitutions from HTML', extracted.length, extracted[0] || null) } catch (e) {}
-          return extracted || []
-        } catch (e) {
-          return []
+      // Prefer the AI timetable endpoint which does not require portal sign-in.
+      // Use the provider's selected date (fall back to today) to request date-specific substitutions.
+      const dateObj = selectedDateObject || new Date()
+      const y = dateObj.getFullYear()
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0')
+      const d = String(dateObj.getDate()).padStart(2, '0')
+      const dateParam = `${y}-${m}-${d}`
+      const aiUrl = `/ai/timetable?date=${dateParam}`
+
+      try {
+        const res = await fetch(aiUrl, { credentials: 'include' })
+        const ct = res.headers.get('content-type') || ''
+        if (res.ok && ct.includes('application/json')) {
+          const j = await res.json()
+          try { console.debug('[timetable.provider] ai timetable fetched', aiUrl, (j && (Array.isArray(j.variations) ? j.variations.length : (j.substitutions ? j.substitutions.length : undefined)) ) ) } catch (e) {}
+          // Try to extract variations from known fields in the AI payload first
+          const fromUpstream = PortalScraper.extractVariationsFromJson(j)
+          if (Array.isArray(fromUpstream) && fromUpstream.length) return fromUpstream
+          // fall back to commonly named keys
+          if (Array.isArray(j.substitutions)) return j.substitutions
+          if (Array.isArray(j.variations)) return j.variations
         }
+        // If AI endpoint returned HTML, attempt to scrape it
+        if (res.ok && ct.includes('text/html')) {
+          const text = await res.text()
+          try {
+            const extracted = PortalScraper.extractVariationsFromHtml(text)
+            try { console.debug('[timetable.provider] ai timetable extracted from HTML', extracted.length) } catch (e) {}
+            return extracted || []
+          } catch (e) {}
+        }
+      } catch (e) {
+        // ignore and fall through to other strategies
+      }
+
+      // As a last resort we may try the legacy portal route, but avoid it if possible
+      try {
+        const res2 = await fetch('/api/portal/substitutions', { credentials: 'include' })
+        const ctype = res2.headers.get('content-type') || ''
+        if (res2.ok && ctype.includes('application/json')) {
+          const j = await res2.json()
+          try { console.debug('[timetable.provider] portal subs fallback', Array.isArray(j.substitutions) ? j.substitutions.length : 0) } catch (e) {}
+          return j.substitutions || []
+        }
+        if (res2.ok && ctype.includes('text/html')) {
+          const text = await res2.text()
+          try {
+            const extracted = PortalScraper.extractVariationsFromHtml(text)
+            try { console.debug('[timetable.provider] portal subs extracted from HTML', extracted.length) } catch (e) {}
+            return extracted || []
+          } catch (e) {}
+        }
+      } catch (e) {
+        // ignore
       }
     } catch (e) {
       // ignore network errors
@@ -1413,17 +1451,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // First try to extract variations embedded in the timetable payload
               let subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
 
-              // If none found, fall back to the substitutions endpoint
+              // If none found in upstream, request from the AI timetable endpoint
               if ((!Array.isArray(subs) || subs.length === 0)) {
                 try {
-                  const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
-                  const subsCtype = subsRes.headers.get('content-type') || ''
-                  if (subsRes.ok && subsCtype.includes('application/json')) {
-                    const subsJson = await subsRes.json()
-                    subs = subsJson.substitutions || []
-                  }
+                  const fetched = await getPortalSubstitutions()
+                  if (Array.isArray(fetched) && fetched.length) subs = fetched
                 } catch (e) {
-                  // ignore network errors
+                  // ignore
                 }
               }
 

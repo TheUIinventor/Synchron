@@ -32,7 +32,8 @@ export default function TimetablePage() {
     setShowDiag(true)
     setDiagLoading(true)
     try {
-      const res = await fetch('/api/portal/substitutions/debug', { credentials: 'include' })
+      const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
+      const res = await fetch(`/ai/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
       const ctype = res.headers.get('content-type') || ''
       let payload: any
       if (res.ok && ctype.includes('application/json')) {
