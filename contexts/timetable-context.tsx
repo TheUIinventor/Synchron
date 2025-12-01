@@ -260,7 +260,6 @@ const timetableWeekA = {
     { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
   ],
 }
-}
 
 const timetableWeekB = {
   Monday: [
