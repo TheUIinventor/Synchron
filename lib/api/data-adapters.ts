@@ -104,6 +104,10 @@ export function applySubstitutionsToTimetable(
   })
 
   // Simple heuristic: match substitution by period string and subject (if provided)
+  if (options?.debug) {
+    try { console.debug('[adapters] applySubstitutionsToTimetable subs=', substitutions ? substitutions.length : 0, substitutions && substitutions[0] ? substitutions[0] : null) } catch (e) {}
+  }
+
   substitutions.forEach((sub) => {
     if (!sub) return
     // If date is present, try to map to day name; otherwise apply across all days
@@ -156,9 +160,11 @@ export function applySubstitutionsToTimetable(
             // for `fullTeacher` so UI can display the substitute's full name.
             if ((sub as any).substituteTeacherFull && String((sub as any).substituteTeacherFull).trim()) {
               (period as any).fullTeacher = String((sub as any).substituteTeacherFull)
+              if (options?.debug) console.debug(`Applied substitute teacher (with full name): ${prev} -> ${period.teacher} / ${ (period as any).fullTeacher } (day=${day} period=${period.period} subject=${period.subject})`)
+            } else {
+              if (options?.debug) console.debug(`Applied substitute teacher (no full name): ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`, sub)
             }
             changed = true
-            if (options?.debug) console.debug(`Applied substitute teacher: ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`)
           }
 
           // Prefer explicit toRoom, then room, then fromRoom as replacement

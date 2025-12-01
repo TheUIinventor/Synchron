@@ -699,6 +699,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           try { console.debug('[timetable.provider] ai timetable fetched', aiUrl, (j && (Array.isArray(j.variations) ? j.variations.length : (j.substitutions ? j.substitutions.length : undefined)) ) ) } catch (e) {}
           // Try to extract variations from known fields in the AI payload first
           const fromUpstream = PortalScraper.extractVariationsFromJson(j)
+          try { console.debug('[timetable.provider] extracted variations from /api/timetable payload', Array.isArray(fromUpstream) ? fromUpstream.length : 0, fromUpstream && fromUpstream[0] || null) } catch (e) {}
           if (Array.isArray(fromUpstream) && fromUpstream.length) return fromUpstream
           // fall back to commonly named keys
           if (Array.isArray(j.substitutions)) return j.substitutions
