@@ -52,37 +52,37 @@
   }
  
   .dark {
-    /* Force dark mode to use light-toned variables so UI remains light-shaded */
-    --background: 290 52% 99%;
-    --foreground: 290 8% 12%;
+    /* Dark mode: darker surfaces and light foreground for readability */
+    --background: 230 12% 8%;
+    --foreground: 0 0% 98%;
 
-    --surface-container: 280 30% 98%;
-    --surface-container-high: 280 30% 95%;
-    --surface-variant: 280 18% 94%;
+    --surface-container: 230 10% 12%;
+    --surface-container-high: 230 12% 16%;
+    --surface-variant: 230 14% 20%;
 
-    --card: 280 30% 98%;
-    --card-foreground: 290 8% 12%;
+    --card: 230 12% 14%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 290 50% 98%;
-    --popover-foreground: 290 8% 12%;
+    --popover: 230 12% 16%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 265 46% 58%;
-    --primary-foreground: 0 0% 100%;
-    --primary-container: 265 70% 94%;
-    --primary-container-foreground: 265 60% 22%;
+    --primary: 265 46% 60%;
+    --primary-foreground: 0 0% 98%;
+    --primary-container: 265 46% 20%;
+    --primary-container-foreground: 265 60% 96%;
 
     --secondary: 290 18% 46%;
-    --secondary-foreground: 0 0% 100%;
-    --secondary-container: 290 36% 92%;
-    --secondary-container-foreground: 290 32% 18%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-container: 290 18% 22%;
+    --secondary-container-foreground: 290 32% 88%;
 
     --tertiary: 45 88% 50%;
-    --tertiary-foreground: 45 18% 12%;
-    --tertiary-container: 45 78% 94%;
-    --tertiary-container-foreground: 45 40% 18%;
+    --tertiary-foreground: 0 0% 98%;
+    --tertiary-container: 45 88% 24%;
+    --tertiary-container-foreground: 45 40% 92%;
 
-    --muted: 280 10% 94%;
-    --muted-foreground: 280 6% 44%;
+    --muted: 280 8% 22%;
+    --muted-foreground: 280 6% 70%;
 
     --accent: 265 76% 94%;
     --accent-foreground: 265 60% 22%;
@@ -90,8 +90,8 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 280 10% 85%;
-    --input: 280 10% 85%;
+    --border: 230 8% 16%;
+    --input: 230 8% 16%;
     --ring: 265 50% 50%;
   }
 }

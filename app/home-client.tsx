@@ -243,7 +243,7 @@ export default function HomeClient() {
               
               <div className="relative z-10 flex flex-col h-full justify-between min-h-[150px]">
                 <div className="flex justify-between items-start">
-                  <Badge variant="secondary" className="bg-primary/20 text-primary-container-foreground hover:bg-primary/30 rounded-full px-4 py-1 text-sm font-medium">
+                  <Badge variant="secondary" className="bg-primary/20 text-current hover:bg-primary/30 rounded-full px-4 py-1 text-sm font-medium">
                     Now
                   </Badge>
                   <MapPin className="h-6 w-6 opacity-60" />
