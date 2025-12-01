@@ -53,46 +53,48 @@
  
   .dark {
     /* Dark mode: darker surfaces and light foreground for readability */
-    --background: 230 12% 8%;
-    --foreground: 0 0% 98%;
+    --background: 220 12% 8%;
+    --foreground: 0 0% 96%;
 
-    --surface-container: 230 10% 12%;
-    --surface-container-high: 230 12% 16%;
-    --surface-variant: 230 14% 20%;
+    /* Surfaces: subtle separation from the very dark background */
+    --surface-container: 220 10% 12%;
+    --surface-container-high: 220 12% 15%;
+    --surface-variant: 220 14% 18%;
 
-    --card: 230 12% 14%;
-    --card-foreground: 0 0% 98%;
+    --card: 220 12% 14%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 230 12% 16%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 220 12% 16%;
+    --popover-foreground: 0 0% 96%;
 
-    --primary: 265 46% 60%;
-    --primary-foreground: 0 0% 98%;
-    --primary-container: 265 46% 20%;
-    --primary-container-foreground: 265 60% 96%;
+    /* Keep primary hue expressive but readable on dark backgrounds */
+    --primary: 220 80% 60%;
+    --primary-foreground: 0 0% 96%;
+    --primary-container: 220 70% 18%;
+    --primary-container-foreground: 220 60% 96%;
 
-    --secondary: 290 18% 46%;
-    --secondary-foreground: 0 0% 98%;
-    --secondary-container: 290 18% 22%;
-    --secondary-container-foreground: 290 32% 88%;
+    --secondary: 260 18% 46%;
+    --secondary-foreground: 0 0% 96%;
+    --secondary-container: 260 18% 22%;
+    --secondary-container-foreground: 260 32% 88%;
 
-    --tertiary: 45 88% 50%;
-    --tertiary-foreground: 0 0% 98%;
-    --tertiary-container: 45 88% 24%;
-    --tertiary-container-foreground: 45 40% 92%;
+    --tertiary: 40 80% 50%;
+    --tertiary-foreground: 0 0% 96%;
+    --tertiary-container: 40 80% 24%;
+    --tertiary-container-foreground: 40 40% 92%;
 
-    --muted: 280 8% 22%;
-    --muted-foreground: 280 6% 70%;
+    --muted: 220 8% 18%;
+    --muted-foreground: 220 6% 72%;
 
-    --accent: 265 76% 94%;
-    --accent-foreground: 265 60% 22%;
+    --accent: 220 76% 56%;
+    --accent-foreground: 0 0% 96%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 230 8% 16%;
-    --input: 230 8% 16%;
-    --ring: 265 50% 50%;
+    --border: 220 8% 14%;
+    --input: 220 8% 14%;
+    --ring: 220 60% 60%;
   }
 }
  
@@ -175,6 +177,39 @@
     background-color: hsl(var(--now-card) / 1) !important;
     color: hsl(var(--card-foreground)) !important;
     border-color: hsl(var(--primary) / 0.12) !important;
+  }
+
+  /* Dark-mode adjustments for better layering and contrast */
+  .dark .glass-card {
+    background-color: hsl(var(--card) / 0.94) !important;
+    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.04), hsla(var(--surface-gradient-end) / 0.03));
+    box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+  }
+
+  .dark .glass-button:hover {
+    background-image: linear-gradient(180deg, hsla(var(--primary-gradient-start) / 0.08), hsla(var(--primary-gradient-end) / 0.06));
+  }
+
+  .dark .now-card {
+    /* Make Now card sit a bit lighter than surrounding surfaces for emphasis */
+    background-color: hsl(var(--now-card) / 0.98) !important;
+    color: hsl(var(--card-foreground)) !important;
+    border: 1px solid hsla(var(--primary) / 0.06) !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.55) inset, 0 6px 20px rgba(0,0,0,0.36);
+  }
+
+  .dark .radix-popover-content, .dark [data-radix-popover-content] {
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .dark .bg-popover {
+    background-color: hsl(var(--popover) / 0.96) !important;
+    color: hsl(var(--popover-foreground)) !important;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.48);
+  }
+
+  .dark .sidebar-current {
+    border-color: hsla(var(--primary) / 0.16) !important;
   }
 }
 
