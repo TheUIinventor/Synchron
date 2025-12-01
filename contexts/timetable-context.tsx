@@ -214,55 +214,52 @@ const timetableWeekA = {
     { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
     { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
     { id: 4, period: "3", time: "11:25 - 12:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
-    {
-      id: 5,
-      period: "4",
-      time: "12:30 - 1:30",
-            try {
-              const subs = await getPortalSubstitutions()
-              if (Array.isArray(subs) && subs.length) {
-                try {
-                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs)
-                } catch (e) { /* ignore substitution apply errors */ }
-
-                if (j.timetableByWeek) {
-                  try {
-                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
-                    // Copy to avoid mutating original
-                    for (const d of Object.keys(byWeekSrc)) {
-                      transformed[d] = {
-                        A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
-                        B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
-                        unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
-                      }
-                    }
-
-                    // For each week (A/B/unknown) build a day->periods map and apply substitutions
-                    const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
-                      const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                      for (const d of Object.keys(transformed)) {
-                        weekMap[d] = transformed[d][weekKey] || []
-                      }
-                      const applied = applySubstitutionsToTimetable(weekMap, subs)
-                      for (const d of Object.keys(transformed)) {
-                        transformed[d][weekKey] = applied[d] || []
-                      }
-                    }
-
-                    applyToWeek('A')
-                    applyToWeek('B')
-                    applyToWeek('unknown')
-
-                    finalByWeek = transformed
-                  } catch (e) {
-                    // ignore by-week substitution failures
-                  }
-                }
-              }
-            } catch (e) {
-              // ignore substitution fetch errors
-            }
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
+  Tuesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+  ],
+  Wednesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+  ],
+  Thursday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
+  ],
+  Friday: [
+    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
+}
 }
 
 const timetableWeekB = {
