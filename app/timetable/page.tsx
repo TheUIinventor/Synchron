@@ -135,6 +135,15 @@ export default function TimetablePage() {
     return period.subject
   }
 
+  const getDisplayRoom = (period: any) => {
+    try {
+      if (!period) return ''
+      const cand = (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom || (period as any).to
+      if (cand && String(cand).trim()) return String(cand)
+    } catch (e) {}
+    return period.room || ''
+  }
+
   const selectedDayName = getSelectedDayName()
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
   const todaysTimetableRaw = timetableData[selectedDayName] || []
@@ -413,7 +422,7 @@ export default function TimetablePage() {
                                 )}
                               </div>
 
-                                    <div className="text-xs text-on-surface-variant truncate mt-1">{period.room} • {period.isSubstitute ? period.teacher : (period.fullTeacher || period.teacher)}</div>
+                                    <div className="text-xs text-on-surface-variant truncate mt-1">{getDisplayRoom(period)} • {period.isSubstitute ? period.teacher : (period.fullTeacher || period.teacher)}</div>
                             </div>
                           </div>
                         </div>
