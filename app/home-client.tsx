@@ -470,25 +470,19 @@ export default function HomeClient() {
                                   )}
                                 </div>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  {period.isSubstitute ? (
-                                    <>
-                                      <span>Sub • {period.fullTeacher || period.teacher}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span>{period.fullTeacher || period.teacher}</span>
-                                      <span>•</span>
-                                      <span>{(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
-                                    </>
+                                  {period.isSubstitute && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                                   )}
+                                  <span>{period.fullTeacher || period.teacher}</span>
+                                  <span>•</span>
+                                  <span>{(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
                                 </div>
                               </div>
                               <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                {period.isSubstitute ? (
-                                  <span>Sub • {period.fullTeacher || period.teacher}</span>
-                                ) : (
-                                  <>{(period.fullTeacher || period.teacher)} • {(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</>
+                                {period.isSubstitute && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container mr-2">Sub</span>
                                 )}
+                                <span>{(period.fullTeacher || period.teacher)} • {(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
                               </div>
                             </a>
                           ) : (
@@ -505,23 +499,19 @@ export default function HomeClient() {
                                     )}
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    {period.isSubstitute ? (
-                                      <span>Sub • {period.fullTeacher || period.teacher}</span>
-                                    ) : (
-                                      <>
-                                        <span>{period.fullTeacher || period.teacher}</span>
-                                        <span>•</span>
-                                        <span>{period.room}</span>
-                                      </>
+                                    {period.isSubstitute && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                                     )}
+                                    <span>{period.fullTeacher || period.teacher}</span>
+                                    <span>•</span>
+                                    <span>{period.room}</span>
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  {period.isSubstitute ? (
-                                    <span>Sub • {period.fullTeacher || period.teacher}</span>
-                                  ) : (
-                                    <>{(period.fullTeacher || period.teacher)} • {period.room}</>
+                                  {period.isSubstitute && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container mr-2">Sub</span>
                                   )}
+                                  <span>{(period.fullTeacher || period.teacher)} • {period.room}</span>
                                 </div>
                               </div>
                             </div>
