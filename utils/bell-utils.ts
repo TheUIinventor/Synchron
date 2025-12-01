@@ -13,10 +13,15 @@ const formatTo12HourNoAmPm = (date: Date): string => {
 // Parse time string (e.g., "9:00 - 10:05" or "3:10") to get Date object
 export const parseBellTime = (timeString: string): { start: Date; end: Date | null } => {
   const now = new Date()
+  // Defensive: handle missing or malformed input
+  if (!timeString || typeof timeString !== 'string') {
+    const far = new Date(8640000000000000)
+    return { start: far, end: null }
+  }
 
   // Check if it's a time range or just a single time (like "End of Day")
-  if (timeString.includes(" - ")) {
-    const [startStr, endStr] = timeString.split(" - ")
+  if ((timeString || '').includes(" - ")) {
+    const [startStr, endStr] = (timeString || '').split(" - ")
 
     const startParts = startStr.trim().split(":")
     const startHour = Number.parseInt(startParts[0], 10)
@@ -35,7 +40,7 @@ export const parseBellTime = (timeString: string): { start: Date; end: Date | nu
     return { start: startDate, end: endDate }
   } else {
     // Single time (like "3:10" for End of Day)
-    const timeParts = timeString.trim().split(":")
+    const timeParts = (timeString || '').trim().split(":")
     const hour = Number.parseInt(timeParts[0], 10)
     const minute = Number.parseInt(timeParts[1], 10)
 
@@ -48,8 +53,8 @@ export const parseBellTime = (timeString: string): { start: Date; end: Date | nu
 
 // Format time string to 12-hour format without AM/PM
 export const formatTimeTo12Hour = (timeString: string): string => {
-  if (timeString.includes(" - ")) {
-    const [startStr, endStr] = timeString.split(" - ")
+  if ((timeString || '').includes(" - ")) {
+    const [startStr, endStr] = (timeString || '').split(" - ")
 
     const startParts = startStr.trim().split(":")
     const startHour = Number.parseInt(startParts[0], 10)
@@ -65,7 +70,7 @@ export const formatTimeTo12Hour = (timeString: string): string => {
 
     return `${formatTo12HourNoAmPm(startDate)} - ${formatTo12HourNoAmPm(endDate)}`
   } else {
-    const timeParts = timeString.trim().split(":")
+    const timeParts = (timeString || '').trim().split(":")
     const hour = Number.parseInt(timeParts[0], 10)
     const minute = Number.parseInt(timeParts[1], 10)
     const date = new Date()

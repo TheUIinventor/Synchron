@@ -27,6 +27,14 @@ export const formatTo12Hour = (date: Date): string => {
 
 // Parse time string (e.g., "8:45 - 9:45") to get start and end times
 export const parseTimeRange = (timeRange: string): { start: Date; end: Date } => {
+  // Defensive: if input is missing or malformed, return distant-future
+  // datetimes so callers that compare now < start will treat the period
+  // as not-yet-started and avoid runtime errors from calling .split()
+  if (!timeRange || typeof timeRange !== 'string' || !timeRange.includes('-')) {
+    const far = new Date(8640000000000000)
+    return { start: far, end: far }
+  }
+
   const [startStr, endStr] = timeRange.split(" - ")
 
   const startDate = new Date()

@@ -30,9 +30,9 @@ export function adaptTimetableData(entries: TimetableEntry[]): Record<string, Pe
   // Sort periods by start time for each day
   Object.keys(timetable).forEach((day) => {
     timetable[day].sort((a, b) => {
-      const timeA = a.time.split(" - ")[0]
-      const timeB = b.time.split(" - ")[0]
-      return timeA.localeCompare(timeB)
+      const timeA = (a.time || '').split(" - ")[0]
+      const timeB = (b.time || '').split(" - ")[0]
+      return String(timeA).localeCompare(String(timeB))
     })
   })
 
