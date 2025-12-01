@@ -413,7 +413,7 @@ export default function TimetablePage() {
                                 )}
                               </div>
 
-                              <div className="text-xs text-on-surface-variant truncate mt-1">{period.room} • {period.fullTeacher || period.teacher}</div>
+                                    <div className="text-xs text-on-surface-variant truncate mt-1">{period.room} • {period.isSubstitute ? period.teacher : (period.fullTeacher || period.teacher)}</div>
                             </div>
                           </div>
                         </div>

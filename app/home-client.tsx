@@ -470,10 +470,12 @@ export default function HomeClient() {
                                   )}
                                 </div>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{period.isSubstitute ? period.teacher : (period.fullTeacher || period.teacher)}</span>
+                                  <span>•</span>
                                   <span>{period.room}</span>
                                 </div>
                               </div>
-                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room}</div>
+                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.isSubstitute ? period.teacher : (period.fullTeacher || period.teacher)} • {period.room}</div>
                             </a>
                           ) : (
                             <div className={cardClass}>
@@ -489,10 +491,12 @@ export default function HomeClient() {
                                     )}
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{period.isSubstitute ? period.teacher : (period.fullTeacher || period.teacher)}</span>
+                                    <span>•</span>
                                     <span>{period.room}</span>
                                   </div>
                                 </div>
-                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.room}</div>
+                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">{period.isSubstitute ? period.teacher : (period.fullTeacher || period.teacher)} • {period.room}</div>
                               </div>
                             </div>
                           )}
