@@ -45,6 +45,7 @@ type TimetableContextType = {
     isCurrentlyInClass: boolean
     currentPeriod: Period | null
   }
+  isShowingCachedWhileLoading?: boolean
   bellTimes: Record<string, BellTime[]>
   isShowingNextDay: boolean // Indicates if the main timetable is showing next day
   timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
@@ -365,6 +366,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const lastSeenBellTsRef = useRef<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
@@ -809,6 +811,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     async function loadExternal() {
       setIsLoading(true)
       setError(null)
+      // Quick probe to determine whether the user is signed in. If the
+      // user is authenticated, we prefer showing cached API data instead
+      // of the bundled sample when live fetches fail.
+      try {
+        const ui = await fetch('/api/portal/userinfo', { credentials: 'include' })
+        const ctype = ui.headers.get('content-type') || ''
+        if (ui.ok && ctype.includes('application/json')) setIsAuthenticated(true)
+        else setIsAuthenticated(false)
+      } catch (e) {
+        setIsAuthenticated(false)
+      }
       try {
         const maxAttempts = 3
         let attempt = 0
@@ -1051,25 +1064,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           await wait(1200)
         }
 
-        // After attempts exhausted, fall back to bundled sample data.
-        // Do NOT clear previously-discovered `externalBellTimes` here — if
-        // we already received bell buckets earlier, keep them so the UI can
-        // continue to follow the API's bells rather than reverting to defaults.
+        // After attempts exhausted, fall back to cached timetable data for
+        // authenticated users. Do NOT clear previously-discovered
+        // `externalBellTimes` here — preserve bucket information so the UI
+        // continues to follow API-derived break rows.
         if (!cancelled) {
-          // Only null the timetable if it's not already set; preserve bell times.
-          try { console.log('[timetable.provider] falling back to sample timetable (exhausted attempts)') } catch (e) {}
-          setExternalTimetable(null)
-          setTimetableSource('fallback-sample')
-          setError("Could not connect to school portal. Showing sample data.")
+          try { console.log('[timetable.provider] falling back after attempts exhausted') } catch (e) {}
+          if (isAuthenticated && lastRecordedTimetable) {
+            // Show last known API data while offline or when fetch fails
+            setExternalTimetable(lastRecordedTimetable)
+            setTimetableSource('cache')
+            setError(null)
+          } else {
+            setExternalTimetable(null)
+            setTimetableSource('fallback-sample')
+            setError("Could not connect to school portal. Showing sample data.")
+          }
         }
       } catch (e) {
         if (!cancelled) {
-          // On unexpected error, preserve any existing `externalBellTimes` so
-          // the UI can still show API-derived breaks while we investigate.
           try { console.log('[timetable.provider] falling back to sample timetable (error)') } catch (e) {}
-          setExternalTimetable(null)
-          setTimetableSource('fallback-sample')
-          setError("An error occurred while fetching timetable.")
+          if (isAuthenticated && lastRecordedTimetable) {
+            setExternalTimetable(lastRecordedTimetable)
+            setTimetableSource('cache')
+            setError(null)
+          } else {
+            setExternalTimetable(null)
+            setTimetableSource('fallback-sample')
+            setError("An error occurred while fetching timetable.")
+          }
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -1388,16 +1411,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // ignore
       }
 
-      // If we still don't have live data, fall back to sample
+      // If we still don't have live data, fall back to cached timetable for
+      // authenticated users. Do NOT clear previously-discovered
+      // `externalBellTimes` here — preserve bucket information so the UI
+      // continues to follow API-derived break rows.
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
-      setExternalTimetable(null)
-      setTimetableSource('fallback-sample')
-      setError("Could not refresh timetable. Showing sample data.")
+      if (isAuthenticated && lastRecordedTimetable) {
+        setExternalTimetable(lastRecordedTimetable)
+        setTimetableSource('cache')
+        setError(null)
+      } else {
+        setExternalTimetable(null)
+        setTimetableSource('fallback-sample')
+        setError("Could not refresh timetable. Showing sample data.")
+      }
     } catch (e) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
-      setExternalTimetable(null)
-      setTimetableSource('fallback-sample')
-      setError("An error occurred while refreshing timetable.")
+      if (isAuthenticated && lastRecordedTimetable) {
+        setExternalTimetable(lastRecordedTimetable)
+        setTimetableSource('cache')
+        setError(null)
+      } else {
+        setExternalTimetable(null)
+        setTimetableSource('fallback-sample')
+        setError("An error occurred while refreshing timetable.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -1591,6 +1629,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         timetableByWeek: lastRecordedTimetableByWeek || externalTimetableByWeek || undefined,
         externalWeekType,
         isLoading,
+        isShowingCachedWhileLoading: Boolean(isLoading && lastRecordedTimetable),
         error,
         refreshExternal,
       }}
