@@ -50,46 +50,47 @@
   }
  
   .dark {
-    /* M3 Expressive: Amethyst & Citrine - Dark Mode */
-    --background: 290 20% 10%;
-    --foreground: 290 10% 95%;
+    /* Soft dark mode: lighter tints and gentle contrast */
+    --background: 290 18% 18%;
+    --foreground: 290 10% 96%;
 
-    --surface-container: 290 20% 14%;
-    --surface-container-high: 290 20% 18%;
-    --surface-variant: 290 15% 25%;
- 
-    --card: 290 20% 14%;
-    --card-foreground: 290 10% 95%;
- 
-    --popover: 290 20% 10%;
-    --popover-foreground: 290 10% 95%;
- 
-    --primary: 265 80% 80%; /* Lighter purple for dark mode */
-    --primary-foreground: 265 60% 10%;
-    --primary-container: 265 50% 30%;
-    --primary-container-foreground: 265 80% 90%;
- 
-    --secondary: 290 20% 75%;
-    --secondary-foreground: 290 20% 15%;
-    --secondary-container: 290 30% 30%;
-    --secondary-container-foreground: 290 20% 85%;
- 
-    --tertiary: 45 80% 70%;
-    --tertiary-foreground: 45 20% 10%;
-    --tertiary-container: 45 40% 30%;
-    --tertiary-container-foreground: 45 80% 90%;
- 
-    --muted: 290 20% 20%;
-    --muted-foreground: 290 10% 70%;
- 
-    --accent: 290 20% 20%;
+    --surface-container: 290 20% 22%;
+    --surface-container-high: 290 20% 26%;
+    --surface-variant: 290 15% 30%;
+
+    --card: 290 20% 22%;
+    --card-foreground: 290 10% 96%;
+
+    --popover: 290 20% 20%;
+    --popover-foreground: 290 10% 96%;
+
+    /* Keep primary/secondary/accent mostly as defined but ensure readable containers */
+    --primary: 265 80% 80%;
+    --primary-foreground: 0 0% 8%;
+    --primary-container: 265 50% 34%;
+    --primary-container-foreground: 265 80% 92%;
+
+    --secondary: 290 20% 72%;
+    --secondary-foreground: 290 20% 18%;
+    --secondary-container: 290 30% 34%;
+    --secondary-container-foreground: 290 20% 86%;
+
+    --tertiary: 45 80% 68%;
+    --tertiary-foreground: 45 20% 12%;
+    --tertiary-container: 45 40% 34%;
+    --tertiary-container-foreground: 45 80% 92%;
+
+    --muted: 290 20% 28%;
+    --muted-foreground: 290 10% 76%;
+
+    --accent: 290 20% 26%;
     --accent-foreground: 290 10% 95%;
- 
-    --destructive: 0 62.8% 30.6%;
+
+    --destructive: 0 62.8% 36%;
     --destructive-foreground: 210 40% 98%;
- 
-    --border: 290 20% 20%;
-    --input: 290 20% 20%;
+
+    --border: 290 20% 30%;
+    --input: 290 20% 28%;
     --ring: 265 80% 80%;
   }
 }
@@ -112,12 +113,12 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-opacity-80 backdrop-blur-md;
+    @apply bg-opacity-70 backdrop-blur-md;
     background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.06), hsla(var(--surface-gradient-end) / 0.03));
     transition: background-image 220ms ease, transform 160ms ease;
   }
   .glass-card:hover {
-    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.10), hsla(var(--surface-gradient-end) / 0.06));
+    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.08), hsla(var(--surface-gradient-end) / 0.05));
     transform: translateY(-2px);
   }
   .glass-border {
