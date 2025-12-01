@@ -124,6 +124,8 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
 
     root.style.setProperty("--surface-gradient-start", clampLightness(adjustLightness(colors.primary, 98), 86))
     root.style.setProperty("--surface-gradient-end", clampLightness(adjustLightness(colors.accent, 92), 84))
+    // Now-card: slightly darker than surface-container-high so it stands out but stays light
+    root.style.setProperty("--now-card", clampLightness(adjustLightness(colors.primary, 92), 86))
   }
 
   const setFontTheme = (theme: FontTheme) => {
@@ -168,6 +170,8 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
 
     root.style.setProperty("--surface-gradient-start", clampLightness(adjustLightness(colors.primary, 98), 86))
     root.style.setProperty("--surface-gradient-end", clampLightness(adjustLightness(colors.accent, 92), 84))
+    // Now-card: slightly darker than surface-container-high so it stands out but stays light
+    root.style.setProperty("--now-card", clampLightness(adjustLightness(colors.primary, 92), 86))
   }, [colorTheme])
 
   // Apply initial font theme

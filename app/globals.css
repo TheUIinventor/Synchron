@@ -165,6 +165,17 @@
     background-color: hsl(var(--card) / 1) !important;
     color: hsl(var(--card-foreground)) !important;
   }
+
+  /* Now card and current-period highlight should be a controlled light shade */
+  .now-card {
+    background-color: hsl(var(--now-card) / 1) !important;
+    color: hsl(var(--card-foreground)) !important;
+  }
+  .sidebar-current {
+    background-color: hsl(var(--now-card) / 1) !important;
+    color: hsl(var(--card-foreground)) !important;
+    border-color: hsl(var(--primary) / 0.12) !important;
+  }
 }
 
 /*

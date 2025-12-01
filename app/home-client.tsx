@@ -237,7 +237,7 @@ export default function HomeClient() {
         <div className="md:col-span-8 space-y-3 flex flex-col md:h-full">
             
             {/* Primary Status Card */}
-            <div className="relative overflow-hidden rounded-m3-2xl bg-primary-container text-primary-container-foreground p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group mx-auto w-[92%] max-w-[720px] md:mx-0 md:w-full md:max-w-none">
+            <div className="relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group mx-auto w-[92%] max-w-[720px] md:mx-0 md:w-full md:max-w-none">
               {/* Background Blob */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/20" />
               
@@ -294,7 +294,7 @@ export default function HomeClient() {
 
             {/* Quick Links (replaces Up Next card) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 mx-auto w-[92%] max-w-[720px] md:mx-0 md:w-full md:max-w-none md:items-stretch">
-              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-variant transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
+              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-container-highest transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
                 <div className="flex flex-wrap items-center gap-3">
                   <a
                     href="https://mail.google.com/a/student.sbhs.nsw.edu.au"
@@ -445,7 +445,7 @@ export default function HomeClient() {
                       const cardClass = cn(
                         'flex-1 p-2 rounded-xl border transition-all shadow-sm',
                         period.subject === currentPeriod?.subject
-                          ? 'bg-primary-container border-primary/20'
+                          ? 'sidebar-current border-primary/20'
                           : 'bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
                       )
 
