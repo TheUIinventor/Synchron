@@ -477,14 +477,10 @@ export default function TimetablePage() {
                                   </div>
                                   <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
-                                      <span className="font-semibold text-sm truncate">{period.subject}</span>
-                                      <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
-                                        <span>{period.room}</span>
-                                        <span>•</span>
-                                        <span>{period.fullTeacher || period.teacher}</span>
-                                      </div>
+                                      {/* Only show classroom on the right; remove duplicate class name and teacher */}
+                                      <div className="text-xs text-on-surface-variant hidden md:block">{period.room}</div>
+                                      <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room}</div>
                                     </div>
-                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.fullTeacher || period.teacher}</div>
                                   </div>
                                 </div>
                               ))
@@ -513,14 +509,10 @@ export default function TimetablePage() {
                                   </div>
                                   <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
-                                      <span className="font-semibold text-sm truncate">{period.subject}</span>
-                                      <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant">
-                                        <span>{period.room}</span>
-                                        <span>•</span>
-                                        <span>{period.fullTeacher || period.teacher}</span>
-                                      </div>
+                                      {/* Only show classroom on the right; remove duplicate class name and teacher */}
+                                      <div className="text-xs text-on-surface-variant hidden md:block">{period.room}</div>
+                                      <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room}</div>
                                     </div>
-                                    <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room} • {period.fullTeacher || period.teacher}</div>
                                   </div>
                                 </div>
                               ))

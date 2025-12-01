@@ -677,7 +677,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       persistTimerRef.current = window.setTimeout(() => {
         try {
           if (lastRecordedTimetable) {
-                const payload = { timetable: lastRecordedTimetable, source: timetableSource ?? 'external', ts: Date.now() }
+                const payload = {
+                  timetable: lastRecordedTimetable,
+                  source: timetableSource ?? 'external',
+                  ts: Date.now(),
+                  // Persist the last-seen bell times so UI can hydrate them
+                  bellTimes: lastSeenBellTimesRef.current || externalBellTimes || null,
+                }
                 localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
               } else {
                 localStorage.removeItem('synchron-last-timetable')
@@ -696,6 +702,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [lastRecordedTimetable, timetableSource])
+
+  // Hydrate bell times from the last-recorded localStorage payload so the
+  // timetable daily view has bell buckets immediately on startup instead of
+  // waiting for the network fetch to provide them.
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-last-timetable') : null
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (!parsed) return
+      const persistedBellTimes = parsed.bellTimes || parsed.bells || null
+      if (persistedBellTimes) {
+        // Only set if we don't already have live external bell times
+        if (!externalBellTimes) {
+          setExternalBellTimes(persistedBellTimes)
+        }
+        lastSeenBellTimesRef.current = persistedBellTimes
+        lastSeenBellTsRef.current = parsed.ts || Date.now()
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+  }, [])
 
   useEffect(() => {
     if (!externalTimetable) return
