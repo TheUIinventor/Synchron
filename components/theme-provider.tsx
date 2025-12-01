@@ -106,43 +106,24 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     // Create layered surface/card tints and gradients that vary by area and interaction
     const isDark = root.classList.contains("dark")
 
-    if (!isDark) {
-      // Light mode: subtle tinted surfaces using bright lightness values
-      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 96))
-      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 92))
-      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 88))
-      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 98))
+    // Keep everything light-toned: clamp surface/card/popover lightness to a high minimum
+    // Surfaces/cards/popovers should always be light shades regardless of dark mode
+    root.style.setProperty("--surface-container", clampLightness(adjustLightness(colors.primary, 96), 86))
+    root.style.setProperty("--surface-container-high", clampLightness(adjustLightness(colors.primary, 92), 84))
+    root.style.setProperty("--surface-container-highest", clampLightness(adjustLightness(colors.primary, 88), 82))
+    root.style.setProperty("--surface-variant", clampLightness(adjustLightness(colors.primary, 98), 88))
 
-      root.style.setProperty("--card", adjustLightness(colors.primary, 94))
-      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 94)))
+    root.style.setProperty("--card", clampLightness(adjustLightness(colors.primary, 94), 86))
+    root.style.setProperty("--card-foreground", pickForeground(clampLightness(adjustLightness(colors.primary, 94), 86)))
 
-      root.style.setProperty("--popover", adjustLightness(colors.accent, 96))
-      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 96)))
+    root.style.setProperty("--popover", clampLightness(adjustLightness(colors.accent, 96), 86))
+    root.style.setProperty("--popover-foreground", pickForeground(clampLightness(adjustLightness(colors.accent, 96), 86)))
 
-      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.min(98, parseLightness(colors.primary) + 6)))
-      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
+    root.style.setProperty("--primary-gradient-start", clampLightness(adjustLightness(colors.primary, Math.min(98, parseLightness(colors.primary) + 6)), 72))
+    root.style.setProperty("--primary-gradient-end", clampLightness(colors.primaryDark, 64))
 
-      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 98))
-      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 92))
-    } else {
-      // Dark mode: subtle darker tints
-      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 12))
-      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 16))
-      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 20))
-      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 24))
-
-      root.style.setProperty("--card", adjustLightness(colors.primary, 14))
-      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 14)))
-
-      root.style.setProperty("--popover", adjustLightness(colors.accent, 14))
-      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 14)))
-
-      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.max(8, parseLightness(colors.primary) - 6)))
-      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
-
-      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 22))
-      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 18))
-    }
+    root.style.setProperty("--surface-gradient-start", clampLightness(adjustLightness(colors.primary, 98), 86))
+    root.style.setProperty("--surface-gradient-end", clampLightness(adjustLightness(colors.accent, 92), 84))
   }
 
   const setFontTheme = (theme: FontTheme) => {
@@ -171,42 +152,22 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     root.style.setProperty("--accent-foreground", pickForeground(colors.accent))
 
     // Ensure surfaces and gradients are applied on initial mount as well
-    const isDark = root.classList.contains("dark")
-    if (!isDark) {
-      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 96))
-      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 92))
-      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 88))
-      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 98))
+    root.style.setProperty("--surface-container", clampLightness(adjustLightness(colors.primary, 96), 86))
+    root.style.setProperty("--surface-container-high", clampLightness(adjustLightness(colors.primary, 92), 84))
+    root.style.setProperty("--surface-container-highest", clampLightness(adjustLightness(colors.primary, 88), 82))
+    root.style.setProperty("--surface-variant", clampLightness(adjustLightness(colors.primary, 98), 88))
 
-      root.style.setProperty("--card", adjustLightness(colors.primary, 94))
-      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 94)))
+    root.style.setProperty("--card", clampLightness(adjustLightness(colors.primary, 94), 86))
+    root.style.setProperty("--card-foreground", pickForeground(clampLightness(adjustLightness(colors.primary, 94), 86)))
 
-      root.style.setProperty("--popover", adjustLightness(colors.accent, 96))
-      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 96)))
+    root.style.setProperty("--popover", clampLightness(adjustLightness(colors.accent, 96), 86))
+    root.style.setProperty("--popover-foreground", pickForeground(clampLightness(adjustLightness(colors.accent, 96), 86)))
 
-      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.min(98, parseLightness(colors.primary) + 6)))
-      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
+    root.style.setProperty("--primary-gradient-start", clampLightness(adjustLightness(colors.primary, Math.min(98, parseLightness(colors.primary) + 6)), 72))
+    root.style.setProperty("--primary-gradient-end", clampLightness(colors.primaryDark, 64))
 
-      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 98))
-      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 92))
-    } else {
-      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 12))
-      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 16))
-      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 20))
-      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 24))
-
-      root.style.setProperty("--card", adjustLightness(colors.primary, 14))
-      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 14)))
-
-      root.style.setProperty("--popover", adjustLightness(colors.accent, 14))
-      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 14)))
-
-      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.max(8, parseLightness(colors.primary) - 6)))
-      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
-
-      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 22))
-      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 18))
-    }
+    root.style.setProperty("--surface-gradient-start", clampLightness(adjustLightness(colors.primary, 98), 86))
+    root.style.setProperty("--surface-gradient-end", clampLightness(adjustLightness(colors.accent, 92), 84))
   }, [colorTheme])
 
   // Apply initial font theme
@@ -330,6 +291,22 @@ function adjustLightness(hsl: string, targetLightness: number): string {
     const s = parts[1]
     const l = Math.max(0, Math.min(100, Math.round(targetLightness))) + "%"
     return `${h} ${s} ${l}`
+  } catch (e) {
+    return hsl
+  }
+}
+
+// Ensure the returned HSL has at least `min` lightness
+function clampLightness(hsl: string, minLightness: number): string {
+  try {
+    const parts = hsl.trim().split(/\s+/)
+    if (parts.length < 3) return hsl
+    const h = parts[0]
+    const s = parts[1]
+    const match = /([0-9]+)\%/.exec(parts[2])
+    const l = match ? parseInt(match[1], 10) : 50
+    const newL = Math.max(minLightness, l)
+    return `${h} ${s} ${newL}%`
   } catch (e) {
     return hsl
   }

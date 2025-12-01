@@ -5,39 +5,41 @@
 @layer base {
   :root {
     /* M3 Expressive: Amethyst (Primary) & Citrine (Tertiary) Theme - Light Mode */
-    --background: 290 50% 98%; /* Surface */
-    --foreground: 290 10% 10%; /* On Surface */
+    --background: 290 52% 99%; /* even lighter surface */
+    --foreground: 290 8% 12%; /* slight softening */
 
-    --surface-container: 280 30% 96%;
-    --surface-container-high: 280 30% 92%;
-    --surface-variant: 280 20% 90%;
+    /* Light mode: favor very light surfaces and subtle contrast */
+    --surface-container: 280 30% 98%;
+    --surface-container-high: 280 30% 95%;
+    --surface-variant: 280 18% 94%;
 
-    --card: 280 30% 96%;
-    --card-foreground: 290 10% 10%;
+    --card: 280 30% 98%;
+    --card-foreground: 290 8% 12%;
  
     --popover: 290 50% 98%;
-    --popover-foreground: 290 10% 10%;
- 
-    --primary: 265 50% 50%; /* Deep Purple */
+    --popover-foreground: 290 8% 12%;
+
+    /* Make primary and supporting tones a bit lighter to avoid heavy saturation */
+    --primary: 265 46% 58%; /* lighter purple */
     --primary-foreground: 0 0% 100%;
-    --primary-container: 265 80% 92%;
-    --primary-container-foreground: 265 60% 20%;
- 
-    --secondary: 290 20% 40%;
+    --primary-container: 265 70% 94%;
+    --primary-container-foreground: 265 60% 22%;
+
+    --secondary: 290 18% 46%;
     --secondary-foreground: 0 0% 100%;
-    --secondary-container: 290 40% 90%;
-    --secondary-container-foreground: 290 30% 15%;
- 
-    --tertiary: 45 90% 45%; /* Citrine/Gold */
-    --tertiary-foreground: 45 20% 10%;
-    --tertiary-container: 45 80% 90%;
-    --tertiary-container-foreground: 45 40% 15%;
- 
-    --muted: 280 10% 90%;
-    --muted-foreground: 280 5% 40%;
- 
-    --accent: 265 80% 92%;
-    --accent-foreground: 265 60% 20%;
+    --secondary-container: 290 36% 92%;
+    --secondary-container-foreground: 290 32% 18%;
+
+    --tertiary: 45 88% 50%; /* slightly brighter citrine */
+    --tertiary-foreground: 45 18% 12%;
+    --tertiary-container: 45 78% 94%;
+    --tertiary-container-foreground: 45 40% 18%;
+
+    --muted: 280 10% 94%;
+    --muted-foreground: 280 6% 44%;
+
+    --accent: 265 76% 94%;
+    --accent-foreground: 265 60% 22%;
  
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
@@ -50,48 +52,47 @@
   }
  
   .dark {
-    /* Soft dark mode: lighter tints and gentle contrast */
-    --background: 290 18% 18%;
-    --foreground: 290 10% 96%;
+    /* Force dark mode to use light-toned variables so UI remains light-shaded */
+    --background: 290 52% 99%;
+    --foreground: 290 8% 12%;
 
-    --surface-container: 290 20% 22%;
-    --surface-container-high: 290 20% 26%;
-    --surface-variant: 290 15% 30%;
+    --surface-container: 280 30% 98%;
+    --surface-container-high: 280 30% 95%;
+    --surface-variant: 280 18% 94%;
 
-    --card: 290 20% 22%;
-    --card-foreground: 290 10% 96%;
+    --card: 280 30% 98%;
+    --card-foreground: 290 8% 12%;
 
-    --popover: 290 20% 20%;
-    --popover-foreground: 290 10% 96%;
+    --popover: 290 50% 98%;
+    --popover-foreground: 290 8% 12%;
 
-    /* Keep primary/secondary/accent mostly as defined but ensure readable containers */
-    --primary: 265 80% 80%;
-    --primary-foreground: 0 0% 8%;
-    --primary-container: 265 50% 34%;
-    --primary-container-foreground: 265 80% 92%;
+    --primary: 265 46% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-container: 265 70% 94%;
+    --primary-container-foreground: 265 60% 22%;
 
-    --secondary: 290 20% 72%;
-    --secondary-foreground: 290 20% 18%;
-    --secondary-container: 290 30% 34%;
-    --secondary-container-foreground: 290 20% 86%;
+    --secondary: 290 18% 46%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-container: 290 36% 92%;
+    --secondary-container-foreground: 290 32% 18%;
 
-    --tertiary: 45 80% 68%;
-    --tertiary-foreground: 45 20% 12%;
-    --tertiary-container: 45 40% 34%;
-    --tertiary-container-foreground: 45 80% 92%;
+    --tertiary: 45 88% 50%;
+    --tertiary-foreground: 45 18% 12%;
+    --tertiary-container: 45 78% 94%;
+    --tertiary-container-foreground: 45 40% 18%;
 
-    --muted: 290 20% 28%;
-    --muted-foreground: 290 10% 76%;
+    --muted: 280 10% 94%;
+    --muted-foreground: 280 6% 44%;
 
-    --accent: 290 20% 26%;
-    --accent-foreground: 290 10% 95%;
+    --accent: 265 76% 94%;
+    --accent-foreground: 265 60% 22%;
 
-    --destructive: 0 62.8% 36%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 290 20% 30%;
-    --input: 290 20% 28%;
-    --ring: 265 80% 80%;
+    --border: 280 10% 85%;
+    --input: 280 10% 85%;
+    --ring: 265 50% 50%;
   }
 }
  
@@ -113,12 +114,14 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-opacity-70 backdrop-blur-md;
-    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.06), hsla(var(--surface-gradient-end) / 0.03));
+    @apply backdrop-blur-md;
+    /* Solid card backing (no translucency): use opaque HSL or a soft gradient */
+    background-color: hsl(var(--card) / 1) !important;
+    background-image: linear-gradient(180deg, hsl(var(--surface-gradient-start) / 1), hsl(var(--surface-gradient-end) / 1));
     transition: background-image 220ms ease, transform 160ms ease;
   }
   .glass-card:hover {
-    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.08), hsla(var(--surface-gradient-end) / 0.05));
+    background-image: linear-gradient(180deg, hsl(var(--surface-gradient-start) / 1), hsl(var(--surface-gradient-end) / 0.96));
     transform: translateY(-2px);
   }
   .glass-border {
@@ -131,6 +134,36 @@
   }
   .glass-button:hover {
     background-image: linear-gradient(180deg, hsla(var(--primary-gradient-start) / 0.06), hsla(var(--primary-gradient-end) / 0.04));
+  }
+  /* Make popovers translucent in light mode; darker in dark mode still uses slightly stronger tint */
+  .bg-popover {
+    background-color: hsl(var(--popover) / 1) !important;
+    color: hsl(var(--popover-foreground)) !important;
+  }
+  .dark .bg-popover {
+    background-color: hsl(var(--popover) / 1) !important;
+    color: hsl(var(--popover-foreground)) !important;
+  }
+  /* Ensure Radix/popover content using absolute/bg-popover also inherits translucency */
+  .radix-popover-content, [data-radix-popover-content] {
+    background-color: hsl(var(--popover) / 1) !important;
+    color: hsl(var(--popover-foreground)) !important;
+    box-shadow: 0 6px 24px rgba(2,6,23,0.06);
+  }
+  .dark .radix-popover-content, .dark [data-radix-popover-content] {
+    background-color: hsl(var(--popover) / 1) !important;
+    color: hsl(var(--popover-foreground)) !important;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  }
+
+  /* Ensure `bg-card` utility does not force full opacity; make it translucent */
+  .bg-card {
+    background-color: hsl(var(--card) / 1) !important;
+    color: hsl(var(--card-foreground)) !important;
+  }
+  .dark .bg-card {
+    background-color: hsl(var(--card) / 1) !important;
+    color: hsl(var(--card-foreground)) !important;
   }
 }
 
