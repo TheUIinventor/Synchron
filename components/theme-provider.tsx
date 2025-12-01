@@ -90,12 +90,18 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     const colors = getThemeColors(theme)
     const root = document.documentElement
 
-    root.style.setProperty("--theme-primary", colors.primary)
-    root.style.setProperty("--theme-primary-dark", colors.primaryDark)
-    root.style.setProperty("--theme-secondary", colors.secondary)
-    root.style.setProperty("--theme-secondary-dark", colors.secondaryDark)
-    root.style.setProperty("--theme-accent", colors.accent)
-    root.style.setProperty("--theme-accent-dark", colors.accentDark)
+    // Map to the CSS variables used by Tailwind config and components
+    root.style.setProperty("--primary", colors.primary)
+    // Choose a readable foreground based on lightness of the color
+    root.style.setProperty("--primary-foreground", pickForeground(colors.primary))
+    root.style.setProperty("--primary-container", colors.primaryDark)
+    root.style.setProperty("--primary-container-foreground", pickForeground(colors.primaryDark))
+
+    root.style.setProperty("--secondary", colors.secondary)
+    root.style.setProperty("--secondary-foreground", pickForeground(colors.secondary))
+
+    root.style.setProperty("--accent", colors.accent)
+    root.style.setProperty("--accent-foreground", pickForeground(colors.accent))
   }
 
   const setFontTheme = (theme: FontTheme) => {
@@ -112,12 +118,16 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     const colors = getThemeColors(colorTheme)
     const root = document.documentElement
 
-    root.style.setProperty("--theme-primary", colors.primary)
-    root.style.setProperty("--theme-primary-dark", colors.primaryDark)
-    root.style.setProperty("--theme-secondary", colors.secondary)
-    root.style.setProperty("--theme-secondary-dark", colors.secondaryDark)
-    root.style.setProperty("--theme-accent", colors.accent)
-    root.style.setProperty("--theme-accent-dark", colors.accentDark)
+    root.style.setProperty("--primary", colors.primary)
+    root.style.setProperty("--primary-foreground", pickForeground(colors.primary))
+    root.style.setProperty("--primary-container", colors.primaryDark)
+    root.style.setProperty("--primary-container-foreground", pickForeground(colors.primaryDark))
+
+    root.style.setProperty("--secondary", colors.secondary)
+    root.style.setProperty("--secondary-foreground", pickForeground(colors.secondary))
+
+    root.style.setProperty("--accent", colors.accent)
+    root.style.setProperty("--accent-foreground", pickForeground(colors.accent))
   }, [colorTheme])
 
   // Apply initial font theme
@@ -204,4 +214,18 @@ function getFontFamily(theme: FontTheme): string {
   }
 
   return fontMap[theme]
+}
+
+// Pick a readable foreground HSL triplet based on the lightness of an HSL value
+function pickForeground(hsl: string): string {
+  try {
+    const parts = hsl.trim().split(/\s+/)
+    const last = parts[parts.length - 1]
+    const match = /([0-9]+)\%/.exec(last)
+    const lightness = match ? parseInt(match[1], 10) : 50
+    // If background is light, use dark text; otherwise use light text
+    return lightness > 60 ? "0 0% 9%" : "0 0% 98%"
+  } catch (e) {
+    return "0 0% 98%"
+  }
 }

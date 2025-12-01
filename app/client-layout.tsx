@@ -91,7 +91,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       defaultTheme="light"
       enableSystem
       disableTransitionOnChange={false}
-      storageKey="chronicl-theme-preference"
+      storageKey="synchron-theme-preference"
     >
       <UserSettingsProvider>
         <TimetableProvider>
