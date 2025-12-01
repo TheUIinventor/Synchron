@@ -689,7 +689,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const m = String(dateObj.getMonth() + 1).padStart(2, '0')
       const d = String(dateObj.getDate()).padStart(2, '0')
       const dateParam = `${y}-${m}-${d}`
-      const aiUrl = `/ai/timetable?date=${dateParam}`
+      const aiUrl = `/api/timetable?date=${dateParam}`
 
       try {
         const res = await fetch(aiUrl, { credentials: 'include' })

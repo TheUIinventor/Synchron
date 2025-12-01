@@ -33,7 +33,7 @@ export default function TimetablePage() {
     setDiagLoading(true)
     try {
       const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
-      const res = await fetch(`/ai/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
+      const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
       const ctype = res.headers.get('content-type') || ''
       let payload: any
       if (res.ok && ctype.includes('application/json')) {
