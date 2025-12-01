@@ -686,12 +686,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const ctype = res.headers.get('content-type') || ''
       if (res.ok && ctype.includes('application/json')) {
         const j = await res.json()
+        try { console.debug('[timetable.provider] fetched substitutions', Array.isArray(j.substitutions) ? j.substitutions.length : 0, (j.substitutions && j.substitutions[0]) || null) } catch (e) {}
         return j.substitutions || []
       }
       if (res.ok && ctype.includes('text/html')) {
         const text = await res.text()
         try {
           const extracted = PortalScraper.extractVariationsFromHtml(text)
+          try { console.debug('[timetable.provider] extracted substitutions from HTML', extracted.length, extracted[0] || null) } catch (e) {}
           return extracted || []
         } catch (e) {
           return []
@@ -1042,7 +1044,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try {
                     // Apply all substitutions (date-specific + generic) to the
                     // per-day timetable so the daily view reflects exact dates.
-                    finalTimetable = applySubstitutionsToTimetable(j.timetable, subs)
+                    finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
                   } catch (e) { /* ignore substitution apply errors */ }
 
                   // For the cycle/grouped view (timetableByWeek), only apply
@@ -1052,7 +1054,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   const genericSubs = subs.filter((s: any) => !s || !s.date)
 
                   if (j.timetableByWeek && genericSubs.length) {
-                    try {
+                      try {
                       const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
                       const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
                       // Copy to avoid mutating original
@@ -1076,6 +1078,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
 
+                      // Apply generic substitutions to grouped week maps (debug enabled)
                       applyToWeek('A')
                       applyToWeek('B')
                       applyToWeek('unknown')
@@ -1427,7 +1430,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (Array.isArray(subs) && subs.length) {
                 try {
                   // Apply all substitutions (date-specific + generic) to the per-day timetable
-                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs)
+                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
                 } catch (e) { /* ignore substitution apply errors */ }
 
                 const genericSubs = subs.filter((s: any) => !s || !s.date)
@@ -1451,7 +1454,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       for (const d of Object.keys(transformed)) {
                         weekMap[d] = transformed[d][weekKey] || []
                       }
-                      const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
+                      const applied = applySubstitutionsToTimetable(weekMap, genericSubs, { debug: true })
                       for (const d of Object.keys(transformed)) {
                         transformed[d][weekKey] = applied[d] || []
                       }
