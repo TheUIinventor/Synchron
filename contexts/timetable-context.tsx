@@ -1005,8 +1005,55 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               return
             }
             if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
-              if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
-              setExternalTimetable(j.timetable)
+              let finalTimetable = j.timetable
+              let finalByWeek = j.timetableByWeek || null
+              try {
+                const subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+                if (Array.isArray(subs) && subs.length) {
+                  try {
+                    finalTimetable = applySubstitutionsToTimetable(j.timetable, subs)
+                  } catch (e) { /* ignore substitution apply errors */ }
+
+                  if (j.timetableByWeek) {
+                    try {
+                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                      const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                      // Copy to avoid mutating original
+                      for (const d of Object.keys(byWeekSrc)) {
+                        transformed[d] = {
+                          A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                          B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                          unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
+                        }
+                      }
+
+                      // For each week (A/B/unknown) build a day->periods map and apply substitutions
+                      const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                        for (const d of Object.keys(transformed)) {
+                          weekMap[d] = transformed[d][weekKey] || []
+                        }
+                        const applied = applySubstitutionsToTimetable(weekMap, subs)
+                        for (const d of Object.keys(transformed)) {
+                          transformed[d][weekKey] = applied[d] || []
+                        }
+                      }
+
+                      applyToWeek('A')
+                      applyToWeek('B')
+                      applyToWeek('unknown')
+
+                      finalByWeek = transformed
+                    } catch (e) {
+                      // ignore by-week substitution failures
+                    }
+                  }
+                }
+              } catch (e) {
+                // ignore substitution extraction errors
+              }
+              if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+              setExternalTimetable(finalTimetable)
               try {
                 const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
                 const summary = {
@@ -1323,54 +1370,65 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             let finalTimetable = j.timetable
             let finalByWeek = j.timetableByWeek || null
             try {
-              const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
-              const subsCtype = subsRes.headers.get('content-type') || ''
-              if (subsRes.ok && subsCtype.includes('application/json')) {
-                const subsJson = await subsRes.json()
-                const subs = subsJson.substitutions || []
-                if (Array.isArray(subs) && subs.length) {
+              // First try to extract variations embedded in the timetable payload
+              let subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+
+              // If none found, fall back to the substitutions endpoint
+              if ((!Array.isArray(subs) || subs.length === 0)) {
+                try {
+                  const subsRes = await fetch('/api/portal/substitutions', { credentials: 'include' })
+                  const subsCtype = subsRes.headers.get('content-type') || ''
+                  if (subsRes.ok && subsCtype.includes('application/json')) {
+                    const subsJson = await subsRes.json()
+                    subs = subsJson.substitutions || []
+                  }
+                } catch (e) {
+                  // ignore network errors
+                }
+              }
+
+              if (Array.isArray(subs) && subs.length) {
+                try {
+                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs)
+                } catch (e) { /* ignore substitution apply errors */ }
+
+                if (j.timetableByWeek) {
                   try {
-                    finalTimetable = applySubstitutionsToTimetable(j.timetable, subs)
-                  } catch (e) { /* ignore substitution apply errors */ }
-
-                  if (j.timetableByWeek) {
-                    try {
-                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-                      const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
-                      // Copy to avoid mutating original
-                      for (const d of Object.keys(byWeekSrc)) {
-                        transformed[d] = {
-                          A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
-                          B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
-                          unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
-                        }
+                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                    // Copy to avoid mutating original
+                    for (const d of Object.keys(byWeekSrc)) {
+                      transformed[d] = {
+                        A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                        B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                        unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
                       }
-
-                      // For each week (A/B/unknown) build a day->periods map and apply substitutions
-                      const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
-                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                        for (const d of Object.keys(transformed)) {
-                          weekMap[d] = transformed[d][weekKey] || []
-                        }
-                        const applied = applySubstitutionsToTimetable(weekMap, subs)
-                        for (const d of Object.keys(transformed)) {
-                          transformed[d][weekKey] = applied[d] || []
-                        }
-                      }
-
-                      applyToWeek('A')
-                      applyToWeek('B')
-                      applyToWeek('unknown')
-
-                      finalByWeek = transformed
-                    } catch (e) {
-                      // ignore by-week substitution failures
                     }
+
+                    // For each week (A/B/unknown) build a day->periods map and apply substitutions
+                    const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                      const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                      for (const d of Object.keys(transformed)) {
+                        weekMap[d] = transformed[d][weekKey] || []
+                      }
+                      const applied = applySubstitutionsToTimetable(weekMap, subs)
+                      for (const d of Object.keys(transformed)) {
+                        transformed[d][weekKey] = applied[d] || []
+                      }
+                    }
+
+                    applyToWeek('A')
+                    applyToWeek('B')
+                    applyToWeek('unknown')
+
+                    finalByWeek = transformed
+                  } catch (e) {
+                    // ignore by-week substitution failures
                   }
                 }
               }
             } catch (e) {
-              // ignore substitution fetch errors
+              // ignore substitution extraction/apply errors
             }
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
