@@ -390,6 +390,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       return m
     }
+    // Normalize any explicit to-room fields left on period objects so the UI
+    // displays the destination room (toRoom / roomTo / room_to) in place of
+    // the original room. This is defensive: some upstream payloads include
+    // room variations directly on period objects instead of separate
+    // substitutions; prefer those when present.
+    const preferToRoomOnMap = (m: Record<string, Period[]>) => {
+      for (const day of Object.keys(m)) {
+        try {
+          m[day] = (m[day] || []).map((p) => {
+            // Check several common variant keys that might exist on the
+            // incoming period object.
+            const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to || undefined
+            if (candidate && String(candidate).trim() && candidate !== p.room) {
+              return { ...p, room: String(candidate), isRoomChange: true }
+            }
+            return p
+          })
+        } catch (e) {
+          // ignore normalization errors
+        }
+      }
+      return m
+    }
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
     if (useExternalTimetableByWeek) {
@@ -465,6 +488,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
+      preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
     }
 
@@ -480,7 +504,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // requested date, return the empty-by-day map as-is (do not insert
       // Break rows based on bell times). This keeps the UI blank like a
       // weekend when upstream reports "no timetable".
-      if (timetableSource === 'external-empty') return cleanupMap(filtered)
+      if (timetableSource === 'external-empty') {
+        preferToRoomOnMap(filtered)
+        return cleanupMap(filtered)
+      }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         const source = useExternalBellTimes || bellTimesData
@@ -556,6 +583,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
+      preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
     }
 
@@ -632,6 +660,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
+      preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
     }
 
