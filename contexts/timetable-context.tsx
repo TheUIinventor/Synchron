@@ -361,6 +361,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
+  // Persist the last successful external timetable to localStorage so the
+  // app can immediately show the most-recent real data after a reload.
+  useEffect(() => {
+    try {
+      if (externalTimetable && timetableSource && timetableSource !== 'fallback-sample') {
+        const payload = {
+          timetable: externalTimetable,
+          timetableByWeek: externalTimetableByWeek || null,
+          bellTimes: externalBellTimes || null,
+          source: timetableSource,
+          weekType: externalWeekType || null,
+          savedAt: (new Date()).toISOString(),
+        }
+        try {
+          localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
+        } catch (e) {
+          // ignore storage errors
+        }
+        setLastRecordedTimetable(externalTimetable)
+        if (externalTimetableByWeek) setLastRecordedTimetableByWeek(externalTimetableByWeek)
+        if (externalBellTimes) { lastSeenBellTimesRef.current = externalBellTimes; lastSeenBellTsRef.current = Date.now() }
+        try { console.log('[timetable.provider] persisted last external timetable', { source: timetableSource }) } catch (e) {}
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [externalTimetable, externalTimetableByWeek, externalBellTimes, timetableSource, externalWeekType])
+
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 

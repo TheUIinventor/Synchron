@@ -18,9 +18,13 @@ export default function ThemeToggle() {
     if (resolvedTheme === "dark") {
       setTheme("light")
       localStorage.setItem("synchron-theme-preference", "light")
+      // Force a full reload so all components pick up the new theme variables
+      setTimeout(() => window.location.reload(), 60)
     } else {
       setTheme("dark")
       localStorage.setItem("synchron-theme-preference", "dark")
+      // Force a full reload so all components pick up the new theme variables
+      setTimeout(() => window.location.reload(), 60)
     }
   }
 

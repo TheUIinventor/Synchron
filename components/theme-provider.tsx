@@ -85,20 +85,20 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
   const setColorTheme = (theme: ColorTheme) => {
     setColorThemeState(theme)
     localStorage.setItem("synchron-color-theme", theme)
-
-    // Apply the color theme to CSS variables
+    // Apply the color theme to CSS variables immediately
     const colors = getThemeColors(theme)
     const root = document.documentElement
+    applyThemeColors(colors, root)
+  }
 
-    // Map to the CSS variables used by Tailwind config and components
-    // In light mode, use softened (lower-saturation) tones so the UI stays pastel/airy
+  // Reusable function to apply CSS variables for a theme to a given root element
+  const applyThemeColors = (colors: ReturnType<typeof getThemeColors>, root: HTMLElement) => {
     const computedIsDark = root.classList.contains("dark")
     const primaryValue = computedIsDark ? colors.primary : adjustSaturation(colors.primary, 0.5)
     const secondaryValue = computedIsDark ? colors.secondary : adjustSaturation(colors.secondary, 0.6)
     const accentValue = computedIsDark ? colors.accent : adjustSaturation(colors.accent, 0.6)
 
     root.style.setProperty("--primary", primaryValue)
-    // Choose a readable foreground based on the computed primary value
     root.style.setProperty("--primary-foreground", pickForeground(primaryValue))
     root.style.setProperty("--primary-container", colors.primaryDark)
     root.style.setProperty("--primary-container-foreground", pickForeground(colors.primaryDark))
@@ -109,12 +109,9 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     root.style.setProperty("--accent", accentValue)
     root.style.setProperty("--accent-foreground", pickForeground(accentValue))
 
-    // Create layered surface/card tints and gradients that vary by area and interaction
-    const isDark = root.classList.contains("dark")
-    // Create layered surface/card/popover tints depending on light/dark mode
-    const isDarkMode = root.classList.contains("dark")
+    // Surfaces/cards/popovers
+    const isDarkMode = computedIsDark
     if (!isDarkMode) {
-      // Light mode: clamp to high lightness so surfaces stay airy
       root.style.setProperty("--surface-container", clampLightness(adjustLightness(colors.primary, 96), 86))
       root.style.setProperty("--surface-container-high", clampLightness(adjustLightness(colors.primary, 92), 84))
       root.style.setProperty("--surface-container-highest", clampLightness(adjustLightness(colors.primary, 88), 82))
@@ -131,10 +128,8 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
 
       root.style.setProperty("--surface-gradient-start", clampLightness(adjustLightness(colors.primary, 98), 86))
       root.style.setProperty("--surface-gradient-end", clampLightness(adjustLightness(colors.accent, 92), 84))
-      // Now-card: slightly darker than surface-container-high so it stands out but stays light
       root.style.setProperty("--now-card", clampLightness(adjustLightness(colors.primary, 92), 86))
     } else {
-      // Dark mode: use darker tints appropriate for dark backgrounds
       root.style.setProperty("--surface-container", adjustLightness(colors.primary, 14))
       root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 18))
       root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 22))
@@ -168,62 +163,19 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const colors = getThemeColors(colorTheme)
     const root = document.documentElement
+    applyThemeColors(colors, root)
 
-    const initialIsDark = root.classList.contains("dark")
-    const initialPrimary = initialIsDark ? colors.primary : adjustSaturation(colors.primary, 0.5)
-    const initialSecondary = initialIsDark ? colors.secondary : adjustSaturation(colors.secondary, 0.6)
-    const initialAccent = initialIsDark ? colors.accent : adjustSaturation(colors.accent, 0.6)
-
-    root.style.setProperty("--primary", initialPrimary)
-    root.style.setProperty("--primary-foreground", pickForeground(initialPrimary))
-    root.style.setProperty("--primary-container", colors.primaryDark)
-    root.style.setProperty("--primary-container-foreground", pickForeground(colors.primaryDark))
-
-    root.style.setProperty("--secondary", initialSecondary)
-    root.style.setProperty("--secondary-foreground", pickForeground(initialSecondary))
-
-    root.style.setProperty("--accent", initialAccent)
-    root.style.setProperty("--accent-foreground", pickForeground(initialAccent))
-
-    // Ensure surfaces and gradients are applied on initial mount as well
-    if (!initialIsDark) {
-      root.style.setProperty("--surface-container", clampLightness(adjustLightness(colors.primary, 96), 86))
-      root.style.setProperty("--surface-container-high", clampLightness(adjustLightness(colors.primary, 92), 84))
-      root.style.setProperty("--surface-container-highest", clampLightness(adjustLightness(colors.primary, 88), 82))
-      root.style.setProperty("--surface-variant", clampLightness(adjustLightness(colors.primary, 98), 88))
-
-      root.style.setProperty("--card", clampLightness(adjustLightness(colors.primary, 94), 86))
-      root.style.setProperty("--card-foreground", pickForeground(clampLightness(adjustLightness(colors.primary, 94), 86)))
-
-      root.style.setProperty("--popover", clampLightness(adjustLightness(colors.accent, 96), 86))
-      root.style.setProperty("--popover-foreground", pickForeground(clampLightness(adjustLightness(colors.accent, 96), 86)))
-
-      root.style.setProperty("--primary-gradient-start", clampLightness(adjustLightness(colors.primary, Math.min(98, parseLightness(colors.primary) + 6)), 72))
-      root.style.setProperty("--primary-gradient-end", clampLightness(colors.primaryDark, 64))
-
-      root.style.setProperty("--surface-gradient-start", clampLightness(adjustLightness(colors.primary, 98), 86))
-      root.style.setProperty("--surface-gradient-end", clampLightness(adjustLightness(colors.accent, 92), 84))
-      // Now-card: slightly darker than surface-container-high so it stands out but stays light
-      root.style.setProperty("--now-card", clampLightness(adjustLightness(colors.primary, 92), 86))
-    } else {
-      root.style.setProperty("--surface-container", adjustLightness(colors.primary, 14))
-      root.style.setProperty("--surface-container-high", adjustLightness(colors.primary, 18))
-      root.style.setProperty("--surface-container-highest", adjustLightness(colors.primary, 22))
-      root.style.setProperty("--surface-variant", adjustLightness(colors.primary, 24))
-
-      root.style.setProperty("--card", adjustLightness(colors.primary, 12))
-      root.style.setProperty("--card-foreground", pickForeground(adjustLightness(colors.primary, 12)))
-
-      root.style.setProperty("--popover", adjustLightness(colors.accent, 14))
-      root.style.setProperty("--popover-foreground", pickForeground(adjustLightness(colors.accent, 14)))
-
-      root.style.setProperty("--primary-gradient-start", adjustLightness(colors.primary, Math.max(8, parseLightness(colors.primary) - 6)))
-      root.style.setProperty("--primary-gradient-end", colors.primaryDark)
-
-      root.style.setProperty("--surface-gradient-start", adjustLightness(colors.primary, 22))
-      root.style.setProperty("--surface-gradient-end", adjustLightness(colors.accent, 18))
-      root.style.setProperty("--now-card", adjustLightness(colors.primary, 28))
-    }
+    // Observe class changes on the document element (e.g., `dark` toggled) and re-apply theme variables.
+    const obs = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === "attributes" && m.attributeName === "class") {
+          // Re-apply computed variables for the current color theme when `class` changes
+          applyThemeColors(getThemeColors(colorTheme), document.documentElement)
+        }
+      }
+    })
+    obs.observe(document.documentElement, { attributes: true })
+    return () => obs.disconnect()
   }, [colorTheme])
 
   // Apply initial font theme
