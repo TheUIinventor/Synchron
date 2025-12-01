@@ -389,7 +389,7 @@ export default function TimetablePage() {
                               try {
                                 const { start } = parseTimeRange(period.time || '')
                                 return formatTo12Hour(start)
-                              } catch (e) { return (period.time || '').split(' - ')[0] }
+                              } catch (e) { return ((period.time || '').split(' - ')[0] || '') }
                             })()}
                           </span>
                           <div className="text-sm text-on-surface-variant">{period.period}</div>
@@ -406,7 +406,7 @@ export default function TimetablePage() {
                                 try {
                                   const { start } = parseTimeRange(period.time || '')
                                   return formatTo12Hour(start)
-                                } catch (e) { return (period.time || '').split(' - ')[0] }
+                                } catch (e) { return ((period.time || '').split(' - ')[0] || '') }
                               })()}{/* Only show start time */}
                             </span>
 

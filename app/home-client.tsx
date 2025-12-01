@@ -285,8 +285,8 @@ export default function HomeClient() {
                     />
                   </div>
                   <div className="flex justify-between text-sm mt-2 font-medium opacity-70">
-                    <span>{currentPeriod?.time?.split(' - ')[0] || "Now"}</span>
-                    <span>{currentPeriod?.time?.split(' - ')[1] || "Later"}</span>
+                    <span>{((currentPeriod?.time) || "").split(' - ')[0] || "Now"}</span>
+                    <span>{((currentPeriod?.time) || "").split(' - ')[1] || "Later"}</span>
                   </div>
                 </div>
               </div>
@@ -435,7 +435,7 @@ export default function HomeClient() {
                 <div className="space-y-3 flex-1 pr-2">
                   {todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
-                      let startTime = period.time?.split(' - ')[0] ?? ''
+                      let startTime = (period.time || '').split(' - ')[0] || ''
                       try {
                         const { start } = parseTimeRange(period.time || '')
                         startTime = formatTo12Hour(start)
