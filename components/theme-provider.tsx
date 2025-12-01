@@ -91,17 +91,23 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     const root = document.documentElement
 
     // Map to the CSS variables used by Tailwind config and components
-    root.style.setProperty("--primary", colors.primary)
-    // Choose a readable foreground based on lightness of the color
-    root.style.setProperty("--primary-foreground", pickForeground(colors.primary))
+    // In light mode, use softened (lower-saturation) tones so the UI stays pastel/airy
+    const computedIsDark = root.classList.contains("dark")
+    const primaryValue = computedIsDark ? colors.primary : adjustSaturation(colors.primary, 0.5)
+    const secondaryValue = computedIsDark ? colors.secondary : adjustSaturation(colors.secondary, 0.6)
+    const accentValue = computedIsDark ? colors.accent : adjustSaturation(colors.accent, 0.6)
+
+    root.style.setProperty("--primary", primaryValue)
+    // Choose a readable foreground based on the computed primary value
+    root.style.setProperty("--primary-foreground", pickForeground(primaryValue))
     root.style.setProperty("--primary-container", colors.primaryDark)
     root.style.setProperty("--primary-container-foreground", pickForeground(colors.primaryDark))
 
-    root.style.setProperty("--secondary", colors.secondary)
-    root.style.setProperty("--secondary-foreground", pickForeground(colors.secondary))
+    root.style.setProperty("--secondary", secondaryValue)
+    root.style.setProperty("--secondary-foreground", pickForeground(secondaryValue))
 
-    root.style.setProperty("--accent", colors.accent)
-    root.style.setProperty("--accent-foreground", pickForeground(colors.accent))
+    root.style.setProperty("--accent", accentValue)
+    root.style.setProperty("--accent-foreground", pickForeground(accentValue))
 
     // Create layered surface/card tints and gradients that vary by area and interaction
     const isDark = root.classList.contains("dark")
@@ -163,19 +169,23 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     const colors = getThemeColors(colorTheme)
     const root = document.documentElement
 
-    root.style.setProperty("--primary", colors.primary)
-    root.style.setProperty("--primary-foreground", pickForeground(colors.primary))
+    const initialIsDark = root.classList.contains("dark")
+    const initialPrimary = initialIsDark ? colors.primary : adjustSaturation(colors.primary, 0.5)
+    const initialSecondary = initialIsDark ? colors.secondary : adjustSaturation(colors.secondary, 0.6)
+    const initialAccent = initialIsDark ? colors.accent : adjustSaturation(colors.accent, 0.6)
+
+    root.style.setProperty("--primary", initialPrimary)
+    root.style.setProperty("--primary-foreground", pickForeground(initialPrimary))
     root.style.setProperty("--primary-container", colors.primaryDark)
     root.style.setProperty("--primary-container-foreground", pickForeground(colors.primaryDark))
 
-    root.style.setProperty("--secondary", colors.secondary)
-    root.style.setProperty("--secondary-foreground", pickForeground(colors.secondary))
+    root.style.setProperty("--secondary", initialSecondary)
+    root.style.setProperty("--secondary-foreground", pickForeground(initialSecondary))
 
-    root.style.setProperty("--accent", colors.accent)
-    root.style.setProperty("--accent-foreground", pickForeground(colors.accent))
+    root.style.setProperty("--accent", initialAccent)
+    root.style.setProperty("--accent-foreground", pickForeground(initialAccent))
 
     // Ensure surfaces and gradients are applied on initial mount as well
-    const initialIsDark = root.classList.contains("dark")
     if (!initialIsDark) {
       root.style.setProperty("--surface-container", clampLightness(adjustLightness(colors.primary, 96), 86))
       root.style.setProperty("--surface-container-high", clampLightness(adjustLightness(colors.primary, 92), 84))
@@ -353,6 +363,23 @@ function clampLightness(hsl: string, minLightness: number): string {
     const l = match ? parseInt(match[1], 10) : 50
     const newL = Math.max(minLightness, l)
     return `${h} ${s} ${newL}%`
+  } catch (e) {
+    return hsl
+  }
+}
+
+// Reduce the saturation of an HSL triplet by a factor (0-1).
+function adjustSaturation(hsl: string, factor: number): string {
+  try {
+    const parts = hsl.trim().split(/\s+/)
+    if (parts.length < 3) return hsl
+    const h = parts[0]
+    const s = parts[1]
+    const l = parts[2]
+    const match = /([0-9]+)\%/.exec(s)
+    const sat = match ? parseInt(match[1], 10) : 100
+    const newSat = Math.max(0, Math.min(100, Math.round(sat * Math.max(0, Math.min(1, factor)))))
+    return `${h} ${newSat}% ${l}`
   } catch (e) {
     return hsl
   }
