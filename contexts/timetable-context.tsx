@@ -723,6 +723,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>(null)
+  // Track the last date string we requested from /api/timetable to avoid
+  // redundant concurrent or repeated fetches for the same date.
+  const lastRequestedDateRef = useRef<string | null>(null)
 
   // Helper: fetch substitutions from our server route. Supports JSON responses
   // and HTML fallbacks by scraping via PortalScraper when necessary.
@@ -1411,6 +1414,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Function to update all relevant time-based states
   const updateAllTimeStates = useCallback(() => {
+    const currentSelectedIso = (selectedDateObject || new Date()).toISOString().slice(0,10)
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     const now = new Date()
 
@@ -1437,11 +1441,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const shouldRespectUser = lastUser && (nowMs - lastUser) < GRACE_MS
 
     if (!shouldRespectUser) {
-      setSelectedDay(
-        mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName,
-      )
-      setSelectedDateObject(dayForMainTimetable) // Set the actual Date object
-      setIsShowingNextDay(showingNextDayFlag)
+      const targetDayName = mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName
+      const targetIso = dayForMainTimetable.toISOString().slice(0,10)
+      // Only update if the selected date actually changed to avoid triggering
+      // repeated fetches every tick when the date is identical.
+      if (targetIso !== currentSelectedIso) {
+        setSelectedDay(targetDayName)
+        setSelectedDateObject(dayForMainTimetable) // Set the actual Date object
+        setIsShowingNextDay(showingNextDayFlag)
+      }
     }
 
     // 2. Calculate current moment's period info (always based on actual current day)
@@ -1458,7 +1466,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         currentPeriod: null,
       })
     }
-  }, [timetableData]) // timetableData is a dependency because it's used to get actualTodayTimetable
+  }, [timetableData, selectedDateObject]) // include selectedDateObject to compare and avoid redundant updates
 
   // Initial update and 1-second interval for all time-based states
   useEffect(() => {
@@ -1502,6 +1510,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const fetchForDate = async () => {
       try {
         const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+        // If we've just requested this same date, skip duplicate fetch
+        if (lastRequestedDateRef.current === ds) return
+        lastRequestedDateRef.current = ds
         const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
         const ctype = res.headers.get('content-type') || ''
         if (!res.ok) return
@@ -1533,6 +1544,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // First try to extract variations embedded in the timetable payload
               let subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
 
+    
               // If none found in upstream, request from the AI timetable endpoint
               if ((!Array.isArray(subs) || subs.length === 0)) {
                 try {
@@ -1617,6 +1629,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         // ignore fetch errors here; provider has existing fallback logic
+      } finally {
+        // Allow subsequent attempts for the same date by clearing the marker
+        try { lastRequestedDateRef.current = null } catch (e) {}
       }
     }
     fetchForDate()
