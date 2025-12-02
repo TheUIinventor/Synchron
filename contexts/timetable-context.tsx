@@ -322,6 +322,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
+  const loadTimingStartedRef = useRef(false)
   const [currentMomentPeriodInfo, setCurrentMomentPeriodInfo] = useState({
     // For header status
     nextPeriod: null as Period | null,
@@ -369,6 +370,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+
+  // Start a simple mount->ready timer so we can measure app load time
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { console.time('[timetable] mount->ready') } catch (e) {}
+    loadTimingStartedRef.current = true
+  }, [])
 
   // Persist the last successful external timetable to localStorage so the
   // app can immediately show the most-recent real data after a reload.
@@ -989,6 +997,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Expose a refresh function so UI can trigger a retry without reloading the page
   async function refreshExternal(attemptedRefresh = false): Promise<void> {
     setIsLoading(true)
+    try { console.time('[timetable] refreshExternal') } catch (e) {}
     setError(null)
     // First try the server-scraped homepage endpoint
     try {
@@ -1387,9 +1396,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         setError("An error occurred while refreshing timetable.")
       }
     } finally {
+      try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
       setIsLoading(false)
     }
   }
+
+  // End the mount->ready timer when the provider finishes loading
+  useEffect(() => {
+    if (loadTimingStartedRef.current && !isLoading) {
+      try { console.timeEnd('[timetable] mount->ready') } catch (e) {}
+      loadTimingStartedRef.current = false
+    }
+  }, [isLoading])
 
   // Function to update all relevant time-based states
   const updateAllTimeStates = useCallback(() => {
