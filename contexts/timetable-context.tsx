@@ -338,7 +338,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-last-timetable') : null
       if (raw) {
         const parsed = JSON.parse(raw)
-        if (parsed && parsed.timetable && typeof parsed.timetable === 'object') return parsed.timetable
+        if (!parsed) return null
+        // Support either the payload shape { timetable: {...} } or a plain day->period map
+        if (parsed.timetable && typeof parsed.timetable === 'object') return parsed.timetable
+        // If the stored object looks like { Monday: [...], Tuesday: [...] } treat it as the timetable directly
+        const keys = Object.keys(parsed)
+        const daySet = new Set(['monday','tuesday','wednesday','thursday','friday'])
+        const lcKeys = keys.map(k => String(k).toLowerCase())
+        const hasDayKeys = lcKeys.some(k => daySet.has(k))
+        if (hasDayKeys) return parsed as Record<string, Period[]>
       }
     } catch (e) {
       // ignore parse errors
@@ -778,7 +786,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (externalTimetable && !timetableSource) {
       setTimetableSource('cache')
     }
-  }, [])
+  }, [externalTimetable, timetableSource])
 
   // Debounced persistence of the last-known timetable to localStorage. This
   // avoids lots of synchronous I/O if the timetable is updated repeatedly in
@@ -1331,21 +1339,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // `externalBellTimes` here — preserve bucket information so the UI
       // continues to follow API-derived break rows.
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
-      if (isAuthenticated && lastRecordedTimetable) {
+      if (lastRecordedTimetable) {
+        // Prefer showing cached real data when available regardless of auth state.
         setExternalTimetable(lastRecordedTimetable)
         setTimetableSource('cache')
         setError(null)
+      } else if (isAuthenticated) {
+        setExternalTimetable(null)
+        setTimetableSource('fallback-sample')
+        setError("Could not refresh timetable. Showing sample data.")
       } else {
+        // No cached data and auth unknown/false: keep whatever we have and surface an error
         setExternalTimetable(null)
         setTimetableSource('fallback-sample')
         setError("Could not refresh timetable. Showing sample data.")
       }
     } catch (e) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
-      if (isAuthenticated && lastRecordedTimetable) {
+      if (lastRecordedTimetable) {
         setExternalTimetable(lastRecordedTimetable)
         setTimetableSource('cache')
         setError(null)
+      } else if (isAuthenticated) {
+        setExternalTimetable(null)
+        setTimetableSource('fallback-sample')
+        setError("An error occurred while refreshing timetable.")
       } else {
         setExternalTimetable(null)
         setTimetableSource('fallback-sample')
