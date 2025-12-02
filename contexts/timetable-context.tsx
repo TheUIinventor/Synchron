@@ -336,6 +336,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(() => {
     try {
       const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-last-timetable') : null
+      try { if (raw) { console.debug('[timetable.provider] found synchron-last-timetable in storage') } } catch (e) {}
       if (raw) {
         const parsed = JSON.parse(raw)
         if (!parsed) return null
@@ -384,6 +385,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         try {
           localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
+          try { console.debug('[timetable.provider] wrote synchron-last-timetable (externalTimetable payload)') } catch (e) {}
         } catch (e) {
           // ignore storage errors
         }
@@ -788,6 +790,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [externalTimetable, timetableSource])
 
+  // If we hydrated a cached externalTimetable on load, ensure the lastRecorded
+  // pointer is set so other fallback logic and persistence pick it up.
+  useEffect(() => {
+    try {
+      if (externalTimetable && !lastRecordedTimetable) {
+        setLastRecordedTimetable(externalTimetable)
+        try { console.debug('[timetable.provider] hydrated lastRecordedTimetable from storage') } catch (e) {}
+      }
+      if (externalTimetableByWeek && !lastRecordedTimetableByWeek) {
+        setLastRecordedTimetableByWeek(externalTimetableByWeek)
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [externalTimetable, externalTimetableByWeek, lastRecordedTimetable, lastRecordedTimetableByWeek])
+
   // Debounced persistence of the last-known timetable to localStorage. This
   // avoids lots of synchronous I/O if the timetable is updated repeatedly in
   // quick succession (for example when substitutions are applied).
@@ -799,19 +817,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         persistTimerRef.current = null
       }
       persistTimerRef.current = window.setTimeout(() => {
-        try {
-          if (lastRecordedTimetable) {
-                const payload = {
-                  timetable: lastRecordedTimetable,
-                  source: timetableSource ?? 'external',
-                  ts: Date.now(),
-                  // Persist the last-seen bell times so UI can hydrate them
-                  bellTimes: lastSeenBellTimesRef.current || externalBellTimes || null,
-                }
-                localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
-              } else {
-                localStorage.removeItem('synchron-last-timetable')
+          try {
+            if (lastRecordedTimetable) {
+              const payload = {
+                timetable: lastRecordedTimetable,
+                source: timetableSource ?? 'external',
+                ts: Date.now(),
+                // Persist the last-seen bell times so UI can hydrate them
+                bellTimes: lastSeenBellTimesRef.current || externalBellTimes || null,
               }
+              localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
+              try { console.debug('[timetable.provider] wrote synchron-last-timetable (lastRecordedTimetable persist)') } catch (e) {}
+            }
         } catch (e) {
           // ignore storage errors
         }
