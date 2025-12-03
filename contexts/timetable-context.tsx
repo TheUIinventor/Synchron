@@ -888,19 +888,33 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     ;(async () => {
       try {
+        try { console.debug('[timetable.provider] fetching substitutions for externalTimetable') } catch (e) {}
         const subs = await getPortalSubstitutions()
+        try { console.debug('[timetable.provider] substitutions fetched', Array.isArray(subs) ? subs.length : 0) } catch (e) {}
         if (!cancelled && subs.length > 0) {
           try {
             const applied = applySubstitutionsToTimetable(externalTimetable, subs, { debug: true })
+            // Count how many periods were marked as substitutes for logging
+            let appliedCount = 0
+            try {
+              for (const d of Object.keys(applied)) {
+                for (const p of applied[d] || []) {
+                  if ((p as any).isSubstitute) appliedCount++
+                }
+              }
+            } catch (e) {}
+            try { console.debug('[timetable.provider] substitutions applied, substituteCount=', appliedCount) } catch (e) {}
             setExternalTimetable(applied)
             subsAppliedRef.current = Date.now()
           } catch (e) {
+            try { console.debug('[timetable.provider] error applying substitutions', e) } catch (err) {}
             // ignore apply errors
           }
         } else {
           subsAppliedRef.current = Date.now()
         }
       } catch (e) {
+        try { console.debug('[timetable.provider] error fetching substitutions', e) } catch (err) {}
         // ignore network errors
       }
     })()
@@ -1145,11 +1159,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
                 if (Array.isArray(subs) && subs.length) {
-                  try {
-                    // Apply all substitutions (date-specific + generic) to the
-                    // per-day timetable so the daily view reflects exact dates.
-                    finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
-                  } catch (e) { /* ignore substitution apply errors */ }
+                    try {
+                      try { console.debug('[timetable.provider] applying substitutions from homepage payload', subs.length) } catch (e) {}
+                      // Apply all substitutions (date-specific + generic) to the
+                      // per-day timetable so the daily view reflects exact dates.
+                      finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                      let appliedCount = 0
+                      try {
+                        for (const d of Object.keys(finalTimetable)) {
+                          for (const p of finalTimetable[d] || []) if ((p as any).isSubstitute) appliedCount++
+                        }
+                      } catch (e) {}
+                      try { console.debug('[timetable.provider] homepage substitutions applied, count=', appliedCount) } catch (e) {}
+                    } catch (e) { try { console.debug('[timetable.provider] homepage substitution apply error', e) } catch (err) {} }
 
                   // For the cycle/grouped view (timetableByWeek), only apply
                   // substitutions that do NOT have a specific date attached.
