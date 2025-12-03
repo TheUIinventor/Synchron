@@ -21,6 +21,8 @@ export default function HomeClient() {
     selectedDay,
     selectedDateObject
   , timetableSource } = useTimetable();
+  // whether provider is showing cached data while still loading
+  const { isShowingCachedWhileLoading } = useTimetable() as any
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -79,16 +81,16 @@ export default function HomeClient() {
 
   // When timetable is loading, render a blank page with a centered loader
   // to avoid showing empty placeholders or partial UI.
-  if (isLoading) {
+  // Only show the full-page loader when loading and there is no cached
+  // timetable to display immediately. If cached data exists we render the
+  // dashboard immediately and keep syncing in the background.
+  if (isLoading && !isShowingCachedWhileLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
-          <div className="w-[60%] max-w-[520px]">
-            <div className="h-3 w-full bg-primary/20 rounded-full overflow-hidden">
-              <div className="h-full bg-primary rounded-full loader-indeterminate" style={{ width: '65%' }} aria-hidden />
-            </div>
+        <div className="w-[60%] max-w-[520px]">
+          <div className="h-3 w-full bg-primary/20 rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full loader-indeterminate" style={{ width: '65%' }} aria-hidden />
           </div>
-          <p className="text-muted-foreground animate-pulse font-medium">Loading...</p>
         </div>
       </div>
     )
