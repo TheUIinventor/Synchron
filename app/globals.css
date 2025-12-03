@@ -97,6 +97,17 @@
     --ring: 220 60% 60%;
   }
 }
+
+/* Small indeterminate loader used by the full-page home loader */
+@keyframes loader-progress {
+  0% { transform: scaleX(0.4); }
+  50% { transform: scaleX(1); }
+  100% { transform: scaleX(0.4); }
+}
+.loader-indeterminate {
+  transform-origin: left;
+  animation: loader-progress 1.4s ease-in-out infinite;
+}
  
 @layer base {
   * {

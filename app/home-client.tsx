@@ -77,15 +77,21 @@ export default function HomeClient() {
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
 
-  if (!currentDate && !selectedDateObject) {
+  // When timetable is loading, render a blank page with a centered loader
+  // to avoid showing empty placeholders or partial UI.
+  if (isLoading) {
     return (
-      <div className="flex h-[80vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-16 w-16 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
-          <p className="text-muted-foreground animate-pulse font-medium">Syncing...</p>
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-[60%] max-w-[520px]">
+            <div className="h-3 w-full bg-primary/20 rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full loader-indeterminate" style={{ width: '65%' }} aria-hidden />
+            </div>
+          </div>
+          <p className="text-muted-foreground animate-pulse font-medium">Loading...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (error) {
