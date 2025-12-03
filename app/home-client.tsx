@@ -26,7 +26,15 @@ export default function HomeClient() {
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({})
-  const [givenName, setGivenName] = useState<string | null>(null)
+  const [givenName, setGivenName] = useState<string | null>(() => {
+    try {
+      if (typeof window === 'undefined') return null
+      const raw = localStorage.getItem('synchron-given-name')
+      return raw || null
+    } catch (e) {
+      return null
+    }
+  })
 
   useEffect(() => {
     try {
@@ -54,7 +62,13 @@ export default function HomeClient() {
         const res = await sbhsPortal.getStudentProfile()
         if (!mounted) return
         if (res && res.success && res.data && res.data.givenName) {
-          setGivenName(res.data.givenName)
+          const name = res.data.givenName
+          setGivenName(name)
+          try {
+            localStorage.setItem('synchron-given-name', String(name))
+          } catch (e) {
+            // ignore storage errors
+          }
         }
       } catch (e) {
         // ignore
@@ -223,6 +237,11 @@ export default function HomeClient() {
 
         {/* Small inline sync indicator placed left of settings icon */}
       {/* Main Expressive Grid */}
+      {(isLoading && isShowingCachedWhileLoading) ? (
+        <div className="flex items-center justify-center h-[60vh] md:h-[70vh]">
+          <div className="h-12 w-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" aria-hidden />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start md:items-stretch">
         
         {/* HERO: Current/Next Period - Spans full width on mobile, 8 cols on desktop */}
@@ -518,6 +537,7 @@ export default function HomeClient() {
             </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
