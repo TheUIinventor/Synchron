@@ -21,7 +21,7 @@ export default function HomeClient() {
     selectedDay,
     selectedDateObject,
     isShowingCachedWhileLoading,
-  , timetableSource } = useTimetable() as any;
+    timetableSource } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
