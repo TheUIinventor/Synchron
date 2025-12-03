@@ -64,7 +64,7 @@ export default function CombinedStatus() {
                 {nextPeriodInfo.currentPeriod.isSubstitute && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                 )}
-                <span>{nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher}</span>
+                <span>{nextPeriodInfo.currentPeriod.isSubstitute ? (nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher) : (nextPeriodInfo.currentPeriod.originalTeacher || nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher)}</span>
                 <span>•</span>
                 <span>{nextPeriodInfo.currentPeriod.room}</span>
               </div>
@@ -84,7 +84,7 @@ export default function CombinedStatus() {
                   {nextPeriodInfo.nextPeriod.isSubstitute && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                   )}
-                  <span>{nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher}</span>
+                  <span>{nextPeriodInfo.nextPeriod.isSubstitute ? (nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher) : (nextPeriodInfo.nextPeriod.originalTeacher || nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher)}</span>
                   <span>•</span>
                   <span>{nextPeriodInfo.nextPeriod.room}</span>
                 </div>

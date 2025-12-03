@@ -155,6 +155,8 @@ export function applySubstitutionsToTimetable(
           if (sub.substituteTeacher && sub.substituteTeacher !== period.teacher) {
             period.isSubstitute = true
             const prev = period.teacher
+            // Preserve the original teacher so UI can show it for other days
+            if (!(period as any).originalTeacher) (period as any).originalTeacher = prev
             period.teacher = sub.substituteTeacher
             // If the substitution object provides a full name, prefer that
             // for `fullTeacher` so UI can display the substitute's full name.

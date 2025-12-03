@@ -168,6 +168,20 @@ export default function HomeClient() {
 
   const progress = calcProgressPercent();
 
+  // Helper to determine which teacher name to display for a period.
+  // If the period has a substitute flagged, prefer the substitute's name
+  // (fullTeacher if present, otherwise teacher). Otherwise prefer the
+  // preserved originalTeacher when available, then fullTeacher, then teacher.
+  const displayTeacher = (p: any) => {
+    try {
+      if (!p) return null
+      if (p.isSubstitute) return p.fullTeacher || p.teacher || null
+      return (p.originalTeacher || p.fullTeacher || p.teacher) || null
+    } catch (e) {
+      return p?.teacher || null
+    }
+  }
+
   // Format a concise remaining label to show on the right-hand side of the bar
   function remainingLabel() {
     // Return countdown as HH:MM:SS (zero-padded). Use currentPeriod end if in class, otherwise nextPeriod start.
@@ -270,7 +284,7 @@ export default function HomeClient() {
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
                     <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
-                      {currentPeriod?.fullTeacher || currentPeriod?.teacher || "Self Study"}
+                      {displayTeacher(currentPeriod) || "Self Study"}
                     </span>
                     <span>•</span>
                     <span>{currentPeriod?.room || "Campus"}</span>
@@ -478,17 +492,17 @@ export default function HomeClient() {
                                   {period.isSubstitute && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                                   )}
-                                  <span>{period.fullTeacher || period.teacher}</span>
+                                  <span>{displayTeacher(period)}</span>
                                   <span>•</span>
                                   <span>{(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
                                 </div>
                               </div>
-                              <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                {period.isSubstitute && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container mr-2">Sub</span>
-                                )}
-                                <span>{(period.fullTeacher || period.teacher)} • {(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
-                              </div>
+                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
+                                  {period.isSubstitute && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container mr-2">Sub</span>
+                                  )}
+                                  <span>{displayTeacher(period)} • {(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
+                                </div>
                             </a>
                           ) : (
                             <div className={cardClass}>

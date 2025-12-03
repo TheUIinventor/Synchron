@@ -423,7 +423,7 @@ export default function TimetablePage() {
                                 )}
                               </div>
 
-                                    <div className="text-xs text-on-surface-variant truncate mt-1">{getDisplayRoom(period)} • {period.fullTeacher || period.teacher}</div>
+                                    <div className="text-xs text-on-surface-variant truncate mt-1">{getDisplayRoom(period)} • {period.isSubstitute ? (period.fullTeacher || period.teacher) : (period.originalTeacher || period.fullTeacher || period.teacher)}</div>
                             </div>
                           </div>
                         </div>
