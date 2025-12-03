@@ -19,10 +19,9 @@ export default function HomeClient() {
     error, 
     refreshExternal,
     selectedDay,
-    selectedDateObject
-  , timetableSource } = useTimetable();
-  // whether provider is showing cached data while still loading
-  const { isShowingCachedWhileLoading } = useTimetable() as any
+    selectedDateObject,
+    isShowingCachedWhileLoading,
+  , timetableSource } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -79,22 +78,7 @@ export default function HomeClient() {
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
 
-  // When timetable is loading, render a blank page with a centered loader
-  // to avoid showing empty placeholders or partial UI.
-  // Only show the full-page loader when loading and there is no cached
-  // timetable to display immediately. If cached data exists we render the
-  // dashboard immediately and keep syncing in the background.
-  if (isLoading && !isShowingCachedWhileLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="w-[60%] max-w-[520px]">
-          <div className="h-3 w-full bg-primary/20 rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full loader-indeterminate" style={{ width: '65%' }} aria-hidden />
-          </div>
-        </div>
-      </div>
-    )
-  }
+  
 
   if (error) {
     return (
@@ -218,7 +202,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-3">
             {/* Sync indicator placed left of the settings icon. Spinner while loading, cloud+check when synced. */}
             <div className="flex items-center">
-              {isLoading ? (
+              {isLoading && isShowingCachedWhileLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
               ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
                 <div className="relative w-5 h-5" title="Synced to cloud">
@@ -400,18 +384,14 @@ export default function HomeClient() {
                           )
                         }
 
-                        // Empty placeholder boxes: show a loading indicator while
-                        // the timetable is loading; otherwise hide the placeholder.
-                        if (isLoading) {
-                          return (
-                            <div key={i} className="flex-1 min-w-[6rem] h-10 rounded-md border border-outline-variant bg-surface-container-high flex items-center justify-center" aria-live="polite">
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            </div>
-                          )
-                        }
-
-                        // Not loading: render nothing (do not show empty placeholders)
-                        return <div key={i} className="flex-1 min-w-[6rem]" />
+                        // Empty placeholder boxes
+                        return (
+                          <div
+                            key={i}
+                            className="flex-1 min-w-[6rem] h-10 rounded-md border border-outline-variant bg-transparent"
+                            aria-hidden
+                          />
+                        )
                       })
                     })()}
                   </div>
