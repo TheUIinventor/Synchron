@@ -392,14 +392,18 @@ export default function HomeClient() {
                           )
                         }
 
-                        // Empty placeholder boxes
-                        return (
-                          <div
-                            key={i}
-                            className="flex-1 min-w-[6rem] h-10 rounded-md border border-outline-variant bg-transparent"
-                            aria-hidden
-                          />
-                        )
+                        // Empty placeholder boxes: show a loading indicator while
+                        // the timetable is loading; otherwise hide the placeholder.
+                        if (isLoading) {
+                          return (
+                            <div key={i} className="flex-1 min-w-[6rem] h-10 rounded-md border border-outline-variant bg-surface-container-high flex items-center justify-center" aria-live="polite">
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            </div>
+                          )
+                        }
+
+                        // Not loading: render nothing (do not show empty placeholders)
+                        return <div key={i} className="flex-1 min-w-[6rem]" />
                       })
                     })()}
                   </div>
