@@ -20,7 +20,6 @@ export default function HomeClient() {
     refreshExternal,
     selectedDay,
     selectedDateObject,
-    isShowingCachedWhileLoading,
     timetableSource } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects
@@ -216,7 +215,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-3">
             {/* Sync indicator placed left of the settings icon. Spinner while loading, cloud+check when synced. */}
             <div className="flex items-center">
-              {isLoading && isShowingCachedWhileLoading ? (
+              {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
               ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
                 <div className="relative w-5 h-5" title="Synced to cloud">
@@ -237,11 +236,6 @@ export default function HomeClient() {
 
         {/* Small inline sync indicator placed left of settings icon */}
       {/* Main Expressive Grid */}
-      {(isLoading && isShowingCachedWhileLoading) ? (
-        <div className="flex items-center justify-center h-[60vh] md:h-[70vh]">
-          <div className="h-12 w-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" aria-hidden />
-        </div>
-      ) : (
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start md:items-stretch">
         
         {/* HERO: Current/Next Period - Spans full width on mobile, 8 cols on desktop */}
