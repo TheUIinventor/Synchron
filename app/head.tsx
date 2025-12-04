@@ -12,7 +12,15 @@ export default function Head() {
         "@type": "WebSite",
         "@id": siteUrl,
         "url": siteUrl,
-        "name": siteName
+        "name": siteName,
+        "publisher": {
+          "@type": "Organization",
+          "name": siteName,
+          "logo": {
+            "@type": "ImageObject",
+            "url": logoPath
+          }
+        }
       },
       {
         "@type": "Organization",
@@ -28,9 +36,19 @@ export default function Head() {
 
   return (
     <>
+      {/* canonical and richer metadata to help search engines prefer the site name */}
+      {origin && <link rel="canonical" href={siteUrl} />}
       <meta name="application-name" content={siteName} />
       <meta name="apple-mobile-web-app-title" content={siteName} />
       <meta property="og:site_name" content={siteName} />
+      {/* Provide a sensible OG/Twitter card */}
+      <meta property="og:title" content={siteName} />
+      <meta property="og:description" content="A modern, expressive timetable app for SBHS students." />
+      <meta property="og:image" content={logoPath} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={siteName} />
+      <meta name="twitter:description" content="A modern, expressive timetable app for SBHS students." />
+      <meta name="twitter:image" content={logoPath} />
       <link rel="icon" href="/favicon.ico" />
       <link rel="manifest" href="/manifest.json" />
       <script key="site-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
