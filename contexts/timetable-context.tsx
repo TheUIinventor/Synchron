@@ -410,10 +410,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 
-    // When loading fresh API data, prefer showing the last recorded external
-    // timetable so the UI doesn't flash empty while a reload completes.
-    const useExternalTimetable = (isLoading && lastRecordedTimetable) ? lastRecordedTimetable : externalTimetable
-    const useExternalTimetableByWeek = (isLoading && lastRecordedTimetableByWeek) ? lastRecordedTimetableByWeek : externalTimetableByWeek
+    // Prefer the live external timetable when available. The cached
+    // `lastRecordedTimetable` is only a fallback for fast initial rendering
+    // and should not be used when a fresh `externalTimetable` exists so
+    // that live updates (e.g. substitute/casual teachers) are searchable
+    // and visible immediately.
+    const useExternalTimetable = externalTimetable ?? lastRecordedTimetable
+    const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
     const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
 
     // Cleanup helper: remove roll-call entries and orphaned period '0' placeholders
