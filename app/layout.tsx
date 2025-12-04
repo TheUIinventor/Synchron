@@ -11,6 +11,12 @@ export const metadata: Metadata = {
   title: "Synchron",
   description: "A modern, expressive timetable app for SBHS students.",
   manifest: "/manifest.json",
+  openGraph: {
+    siteName: "Synchron",
+  },
+  twitter: {
+    site: "@SynchronApp",
+  },
 };
 
 export const viewport: Viewport = {
