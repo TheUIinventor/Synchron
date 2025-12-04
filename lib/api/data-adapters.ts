@@ -152,20 +152,31 @@ export function applySubstitutionsToTimetable(
           // Replace teacher when substitution provides one. Prefer any
           // normalized full-name for display (substituteTeacherFull) but
           // keep the short code in `teacher` as a fallback.
-          if (sub.substituteTeacher && sub.substituteTeacher !== period.teacher) {
+          // Accept either a short substitute code/name or a provided full name.
+          const hasShortSub = !!sub.substituteTeacher && String(sub.substituteTeacher).trim().length > 0
+          const hasFullSub = !!(sub as any).substituteTeacherFull && String((sub as any).substituteTeacherFull).trim().length > 0
+
+          if (hasShortSub || hasFullSub) {
             period.isSubstitute = true
             const prev = period.teacher
             // Preserve the original teacher so UI can show it for other days
             if (!(period as any).originalTeacher) (period as any).originalTeacher = prev
-            period.teacher = sub.substituteTeacher
-            // If the substitution object provides a full name, prefer that
-            // for `fullTeacher` so UI can display the substitute's full name.
-            if ((sub as any).substituteTeacherFull && String((sub as any).substituteTeacherFull).trim()) {
-              (period as any).fullTeacher = String((sub as any).substituteTeacherFull)
-              if (options?.debug) console.debug(`Applied substitute teacher (with full name): ${prev} -> ${period.teacher} / ${ (period as any).fullTeacher } (day=${day} period=${period.period} subject=${period.subject})`)
-            } else {
-              if (options?.debug) console.debug(`Applied substitute teacher (no full name): ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`, sub)
+
+            // If a short substitute identifier is provided, update the `teacher` field
+            if (hasShortSub) {
+              period.teacher = sub.substituteTeacher as string
             }
+
+            // Prefer an available full name for display
+            if (hasFullSub) {
+              (period as any).fullTeacher = String((sub as any).substituteTeacherFull)
+              if (options?.debug) console.debug(`Applied substitute teacher (full name provided): ${prev} -> ${period.teacher || (period as any).fullTeacher} / ${ (period as any).fullTeacher } (day=${day} period=${period.period} subject=${period.subject})`)
+            } else if (hasShortSub) {
+              // No full name provided; use the short substitute for display too
+              (period as any).fullTeacher = String(sub.substituteTeacher)
+              if (options?.debug) console.debug(`Applied substitute teacher (short name only): ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`, sub)
+            }
+
             changed = true
           }
 
