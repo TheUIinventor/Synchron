@@ -130,6 +130,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // If the client requested a specific date, prefer that date when
+    // resolving ambiguous/unknown weekday labels. This prevents the
+    // route from falling back to the server's current day (which can
+    // differ in CI/edge environments) and causing the client to see
+    // the wrong weekday (e.g. Monday when the requested date is Friday).
+    const requestedDate = dateParam ? new Date(dateParam) : null
+    const requestedDayIndex = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.getDay() : new Date().getDay()
+    const requestedWeekdayString = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.toLocaleDateString('en-US', { weekday: 'long' }) : new Date().toLocaleDateString('en-US', { weekday: 'long' })
+
     // Helper to coerce various SBHS JSON shapes into an array of period-like entries
     const extractPeriods = (value: any): any[] | null => {
       if (!value) return null
@@ -243,9 +252,9 @@ export async function GET(req: NextRequest) {
       const j = (fullRes as any).json
       const dayNames = Object.keys(byDay)
       const resolveDayKey = (input: any): string => {
-        if (!input) return dayNames[new Date().getDay()] || 'Monday'
+        if (!input) return dayNames[requestedDayIndex] || 'Monday'
         const raw = typeof input === 'string' ? input : input.name || input.label || ''
-        if (!raw) return dayNames[new Date().getDay()] || 'Monday'
+        if (!raw) return dayNames[requestedDayIndex] || 'Monday'
         const lower = raw.toLowerCase()
         const lettersOnly = lower.replace(/[^a-z]/g, '')
         const exact = dayNames.find(d => d.toLowerCase() === lower)
@@ -261,7 +270,7 @@ export async function GET(req: NextRequest) {
           const fromDate = asDate.toLocaleDateString('en-US', { weekday: 'long' })
           if (dayNames.includes(fromDate)) return fromDate
         }
-        return dayNames[new Date().getDay()] || 'Monday'
+        return dayNames[requestedDayIndex] || 'Monday'
       }
 
     const assign = (dayKey: any, items: any[], source?: any) => {
@@ -329,7 +338,7 @@ export async function GET(req: NextRequest) {
       if (!Array.isArray(arr)) arr = []
       const dowDate = dateParam ? new Date(dateParam) : new Date()
       const dow = Number.isNaN(dowDate.getTime())
-        ? new Date().toLocaleDateString('en-US', { weekday: 'long' })
+        ? requestedWeekdayString
         : dowDate.toLocaleDateString('en-US', { weekday: 'long' })
       const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
       if (inferred) detectedWeekType = inferred
@@ -341,9 +350,9 @@ export async function GET(req: NextRequest) {
       const j = (fullRes as any).json
       const dayNames = Object.keys(byDay)
       const resolveDayKey = (input: any): string => {
-        if (!input) return dayNames[new Date().getDay()] || 'Monday'
+        if (!input) return dayNames[requestedDayIndex] || 'Monday'
         const raw = typeof input === 'string' ? input : input.name || input.label || ''
-        if (!raw) return dayNames[new Date().getDay()] || 'Monday'
+        if (!raw) return dayNames[requestedDayIndex] || 'Monday'
         const lower = raw.toLowerCase()
         const lettersOnly = lower.replace(/[^a-z]/g, '')
         const exact = dayNames.find(d => d.toLowerCase() === lower)
@@ -359,7 +368,7 @@ export async function GET(req: NextRequest) {
           const fromDate = asDate.toLocaleDateString('en-US', { weekday: 'long' })
           if (dayNames.includes(fromDate)) return fromDate
         }
-        return dayNames[new Date().getDay()] || 'Monday'
+        return dayNames[requestedDayIndex] || 'Monday'
       }
 
       const assign = (dayKey: any, items: any[], source?: any) => {
