@@ -177,6 +177,11 @@ export function applySubstitutionsToTimetable(
               if (options?.debug) console.debug(`Applied substitute teacher (short name only): ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`, sub)
             }
 
+            // Ensure downstream UI sees the full name (when available) instead of the short code.
+            if ((period as any).fullTeacher) {
+              period.teacher = (period as any).fullTeacher
+            }
+
             changed = true
           }
 
