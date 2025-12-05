@@ -208,8 +208,6 @@ export default function HomeClient() {
     }
   }
 
-  ;
-
   return (
     <div className="space-y-4 pb-6 md:pb-6 animate-in fade-in duration-700">
       
