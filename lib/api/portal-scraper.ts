@@ -201,10 +201,17 @@ export class PortalScraper {
     try {
       collectFromObjectMap(data.classVariations)
       collectFromObjectMap(data.roomVariations)
-      // Also scan top-level object maps in case vendors use different keys
-      for (const k of Object.keys(data || {})) {
-        try { collectFromObjectMap((data as any)[k]) } catch (e) {}
+
+      // Recursively scan all nested objects for object-mapped variation maps
+      const recursiveScan = (obj: any) => {
+        if (!obj || typeof obj !== 'object') return
+        try { collectFromObjectMap(obj) } catch (e) {}
+        for (const k of Object.keys(obj)) {
+          try { recursiveScan((obj as any)[k]) } catch (e) {}
+        }
       }
+
+      recursiveScan(data)
     } catch (e) {
       // ignore
     }

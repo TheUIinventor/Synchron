@@ -283,9 +283,21 @@ export default function HomeClient() {
                     )}
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
-                    <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
-                      {displayTeacher(currentPeriod) || "Self Study"}
-                    </span>
+                    {currentPeriod?.isSubstitute ? (
+                      <div className="flex items-center gap-3">
+                        <span className="px-3 py-1 rounded-md text-sm opacity-80 line-through text-muted-foreground">
+                          {currentPeriod.originalTeacher || currentPeriod.fullTeacher || currentPeriod.teacher || "Teacher"}
+                        </span>
+                        <span className="text-sm opacity-70">→</span>
+                        <span className="bg-primary-foreground/20 px-3 py-1 rounded-md font-medium">
+                          {currentPeriod.fullTeacher || currentPeriod.teacher || "Casual"}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
+                        {displayTeacher(currentPeriod) || "Self Study"}
+                      </span>
+                    )}
                     <span>•</span>
                     <span>{currentPeriod?.room || "Campus"}</span>
                   </div>
