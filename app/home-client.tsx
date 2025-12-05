@@ -168,18 +168,10 @@ export default function HomeClient() {
 
   const progress = calcProgressPercent();
 
-  // Helper to determine which teacher name to display for a period.
-  // If the period has a substitute flagged, prefer the substitute's name
-  // (fullTeacher if present, otherwise teacher). Otherwise prefer the
-  // preserved originalTeacher when available, then fullTeacher, then teacher.
+  // Helper to determine which teacher name to display for a period, preferring full names.
   const displayTeacher = (p: any) => {
-    try {
-      if (!p) return null
-      if (p.isSubstitute) return p.fullTeacher || p.teacher || null
-      return (p.originalTeacher || p.fullTeacher || p.teacher) || null
-    } catch (e) {
-      return p?.teacher || null
-    }
+    if (!p) return null
+    return p.fullTeacher || p.teacher || null
   }
 
   // Format a concise remaining label to show on the right-hand side of the bar
@@ -283,21 +275,9 @@ export default function HomeClient() {
                     )}
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
-                    {currentPeriod?.isSubstitute ? (
-                      <div className="flex items-center gap-3">
-                        <span className="px-3 py-1 rounded-md text-sm opacity-80 line-through text-muted-foreground">
-                          {currentPeriod.originalTeacher || currentPeriod.fullTeacher || currentPeriod.teacher || "Teacher"}
-                        </span>
-                        <span className="text-sm opacity-70">→</span>
-                        <span className="bg-primary-foreground/20 px-3 py-1 rounded-md font-medium">
-                          {currentPeriod.fullTeacher || currentPeriod.teacher || "Casual"}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
-                        {displayTeacher(currentPeriod) || "Self Study"}
-                      </span>
-                    )}
+                    <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
+                      {displayTeacher(currentPeriod) || "Self Study"}
+                    </span>
                     <span>•</span>
                     <span>{currentPeriod?.room || "Campus"}</span>
                   </div>
