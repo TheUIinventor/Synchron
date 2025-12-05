@@ -128,21 +128,8 @@ export default function HomeClient() {
 
   // Helper: normalize period label for comparison
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
-  const isRollCallEntry = (p: any) => {
-    const subj = String(p.subject || '') .toLowerCase()
-    const per = normalizePeriodLabel(p.period)
-    return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
-  }
-
-  // If there is no real period '0' present in the raw data for this day, drop any placeholder period '0'
-  const hasPeriod0 = todaysPeriodsRaw.some(p => normalizePeriodLabel(p.period) === '0')
-
-  // Filter out roll-call entries and orphaned period 0 placeholders
-  const todaysPeriods = todaysPeriodsRaw.filter(p => {
-    if (isRollCallEntry(p)) return false
-    if (!hasPeriod0 && normalizePeriodLabel(p.period) === '0') return false
-    return true
-  })
+  // Keep roll call and period 0 visible — show all entries
+  const todaysPeriods = todaysPeriodsRaw
 
   // Calculate progress percent for the current block (class or break)
   function calcProgressPercent() {
