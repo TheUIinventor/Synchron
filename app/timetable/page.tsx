@@ -165,6 +165,8 @@ export default function TimetablePage() {
   const selectedDayName = days[displayDateObject.getDay()]
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
   const todaysTimetableRaw = timetableData[selectedDayName] || []
+  // Provider bell bucket for the selected day (used when individual period.time is missing)
+  const bucketForSelectedDay = bellTimes ? (selectedDayName === 'Friday' ? bellTimes.Fri : (selectedDayName === 'Wednesday' || selectedDayName === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
 
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
   const isRollCallEntry = (p: any) => {
@@ -416,38 +418,40 @@ export default function TimetablePage() {
                   )}
 
                   <div className="space-y-3">
-                    {todaysTimetable.map((period) => (
+                    {todaysTimetable.map((period, idx) => (
                       period.subject === "Break" ? (
                         <div key={period.id ?? period.period} className="flex items-start gap-4 py-2">
                           <div className="w-24 text-sm font-medium text-on-surface-variant">
-                            {(() => {
-                              try {
-                                const { start } = parseTimeRange(period.time || '')
-                                return formatTo12Hour(start)
-                              } catch (e) { return ((period.time || '').split(' - ')[0] || '') }
-                            })()}
+                              {(() => {
+                                try {
+                                  const timeSrc = (period.time || '') || (bucketForSelectedDay && bucketForSelectedDay[idx] && bucketForSelectedDay[idx].time) || ''
+                                  const { start } = parseTimeRange(timeSrc || '')
+                                  return formatTo12Hour(start)
+                                } catch (e) { return ((period.time || (bucketForSelectedDay && bucketForSelectedDay[idx] && bucketForSelectedDay[idx].time) || '').split(' - ')[0] || '') }
+                              })()}
                           </div>
                           <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                         </div>
                       ) : (
                         <div key={period.id ?? period.period} className="flex items-start gap-4 py-2">
                           <div className="w-24 text-sm font-medium text-on-surface-variant">
-                            {(() => {
-                              try {
-                                const { start } = parseTimeRange(period.time || '')
-                                return formatTo12Hour(start)
-                              } catch (e) { return ((period.time || '').split(' - ')[0] || '') }
-                            })()}
+                              {(() => {
+                                try {
+                                  const timeSrc = (period.time || '') || (bucketForSelectedDay && bucketForSelectedDay[idx] && bucketForSelectedDay[idx].time) || ''
+                                  const { start } = parseTimeRange(timeSrc || '')
+                                  return formatTo12Hour(start)
+                                } catch (e) { return ((period.time || (bucketForSelectedDay && bucketForSelectedDay[idx] && bucketForSelectedDay[idx].time) || '').split(' - ')[0] || '') }
+                              })()}
                           </div>
                           <div className="flex-1">
-                            <div className={`p-3 rounded-xl flex items-center justify-between ${period.isSubstitute ? 'bg-primary/30' : 'bg-surface-container-high'}`}>
+                              <div className={`p-3 rounded-xl flex items-center justify-between bg-surface-container-high`}>
                               <div className="min-w-0 pr-4">
                                 <div className={`text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
                               <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {period.isSubstitute ? (
-                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-primary-foreground truncate">{period.fullTeacher || period.teacher}</span>
+                                    <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-black truncate">{period.fullTeacher || period.teacher}</span>
                                 ) : (
                                   <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
                                 )}

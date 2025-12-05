@@ -20,7 +20,8 @@ export default function HomeClient() {
     refreshExternal,
     selectedDay,
     selectedDateObject,
-    timetableSource } = useTimetable() as any;
+    timetableSource,
+    bellTimes } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -440,9 +441,14 @@ export default function HomeClient() {
                 <div className="space-y-3 flex-1 pr-2">
                   {todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
-                      let startTime = (period.time || '').split(' - ')[0] || ''
+                      // prefer explicit period.time, otherwise use provider bell bucket
+                      let startTime = (period.time || '')
                       try {
-                        const { start } = parseTimeRange(period.time || '')
+                        if (!startTime && bellTimes) {
+                          const bucket = (dayName === 'Friday' ? bellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues']))
+                          if (bucket && bucket[i] && bucket[i].time) startTime = bucket[i].time
+                        }
+                        const { start } = parseTimeRange(startTime || '')
                         startTime = formatTo12Hour(start)
                       } catch (e) {}
                       const isBreak = period.subject === 'Break'
@@ -472,7 +478,7 @@ export default function HomeClient() {
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                   <span>
                                     {period.isSubstitute ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}>{displayTeacher(period)}</span>
+                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayTeacher(period)}</span>
                                     ) : (
                                       <span>{displayTeacher(period)}</span>
                                     )}
@@ -484,7 +490,7 @@ export default function HomeClient() {
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
                                   <span>
                                     {period.isSubstitute ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}>{displayTeacher(period)}</span>
+                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayTeacher(period)}</span>
                                     ) : (
                                       <span>{displayTeacher(period)}</span>
                                     )}
