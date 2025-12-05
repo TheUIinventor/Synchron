@@ -182,6 +182,33 @@ export class PortalScraper {
       }
     }
 
+    // Also handle object-maps like `classVariations: { "1": {...}, "2": {...} }`
+    // where variations may be keyed by period number rather than provided as an array.
+    const collectFromObjectMap = (obj: any) => {
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return
+      const vals = Object.values(obj)
+      if (vals.length > 0 && vals.every((v) => v && typeof v === 'object')) {
+        // Heuristic: check if child objects include substitution-like keys
+        const sample = vals[0]
+        const sampleKeys = Object.keys(sample).join('|').toLowerCase()
+        if (sampleKeys.includes('substitute') || sampleKeys.includes('casual') || sampleKeys.includes('replacement') || sampleKeys.includes('variation') || sampleKeys.includes('room')) {
+          // Normalize each child object
+          vals.forEach((v) => pushVariation(v))
+        }
+      }
+    }
+
+    try {
+      collectFromObjectMap(data.classVariations)
+      collectFromObjectMap(data.roomVariations)
+      // Also scan top-level object maps in case vendors use different keys
+      for (const k of Object.keys(data || {})) {
+        try { collectFromObjectMap((data as any)[k]) } catch (e) {}
+      }
+    } catch (e) {
+      // ignore
+    }
+
     searchForArrays(data)
 
     return collected
