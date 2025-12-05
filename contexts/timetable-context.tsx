@@ -86,23 +86,18 @@ const bellTimesData = {
     { period: "Period 5", time: "2:10 - 3:10" },
     { period: "End of Day", time: "3:10" },
   ],
-      try {
-        // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
-        try {
-          const r = await fetch('/api/timetable', { credentials: 'include' })
-          if (r.status === 401) {
-            // even when unauthorized, attempt to parse any JSON body for bellTimes so
-            // we can still show breaks to the user
-            try { await extractBellTimesFromResponse(r) } catch (e) {}
-            if (!attemptedRefresh) {
-              try {
-                await fetch('/api/auth/refresh', { credentials: 'include' })
-              } catch (e) {
-                // ignore
-              }
-                return refreshExternal(true)
-            }
-          }
+  Fri: [
+    { period: "Period 1", time: "9:25 - 10:20" },
+    { period: "Period 2", time: "10:20 - 11:10" },
+    { period: "Recess", time: "11:10 - 11:40" },
+    { period: "Period 3", time: "11:40 - 12:35" },
+    { period: "Lunch 1", time: "12:35 - 12:55" },
+    { period: "Lunch 2", time: "12:55 - 1:15" },
+    { period: "Period 4", time: "1:15 - 2:15" },
+    { period: "Period 5", time: "2:15 - 3:10" },
+    { period: "End of Day", time: "3:10" },
+  ],
+}
 const canonicalIndex = (label?: string) => {
   if (!label) return 999
   const s = String(label).toLowerCase()
