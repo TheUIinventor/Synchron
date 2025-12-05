@@ -440,18 +440,18 @@ export default function TimetablePage() {
                             })()}
                           </div>
                           <div className="flex-1">
-                            <div className="bg-surface-container-high p-3 rounded-xl flex items-center justify-between">
+                            <div className={`p-3 rounded-xl flex items-center justify-between ${period.isSubstitute ? 'bg-primary/20' : 'bg-surface-container-high'}`}>
                               <div className="min-w-0 pr-4">
-                                <div className="text-lg font-semibold text-on-surface truncate">{getDisplaySubject(period)}</div>
+                                <div className={`text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
                               <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-                                {/* Teacher (highlight only when substitute/casual) - slightly darker than card */}
+                                {/* Teacher (highlight only when substitute/casual) - darker pill when substitute */}
                                 {period.isSubstitute ? (
-                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/30 text-primary-foreground truncate">{period.fullTeacher || period.teacher}</span>
+                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/60 text-primary-foreground truncate">{period.fullTeacher || period.teacher}</span>
                                 ) : (
                                   <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
                                 )}
-                                <span className="text-sm text-on-surface-variant truncate">{period.room}</span>
+                                <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate`}>{period.room}</span>
                               </div>
                             </div>
                           </div>
