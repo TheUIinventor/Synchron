@@ -62,15 +62,12 @@ export default function TimetablePage() {
       const now = new Date()
       const sameDate = selectedDateObject.toDateString() === now.toDateString()
       const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
-      // Respect a recent manual user selection (2 minute grace) so when the
-      // user explicitly navigates to today we don't immediately auto-advance
-      // to the next school day. `lastUserSelectedAt` is provided by the
-      // TimetableProvider and updated when the user sets the date/day.
-      const GRACE_MS = 2 * 60 * 1000
-      const nowMs = Date.now()
-      const userSelectedRecently = lastUserSelectedAt && (nowMs - lastUserSelectedAt) < GRACE_MS
-
-      if (sameDate && (isWeekendNow || isSchoolDayOver()) && !userSelectedRecently) {
+      // Auto-advance behavior applies only when the user has not manually
+      // selected a date during this page session. `lastUserSelectedAt` is
+      // null on initial load; once the user changes dates we avoid
+      // auto-advancing until a reload.
+      const userHasManuallySelected = Boolean(lastUserSelectedAt)
+      if (!userHasManuallySelected && sameDate && (isWeekendNow || isSchoolDayOver())) {
         return getNextSchoolDay(now)
       }
     } catch (e) {}
@@ -99,6 +96,13 @@ export default function TimetablePage() {
 
   const goToToday = () => {
     setSelectedDateObject(new Date())
+  }
+
+  const resetToCurrentOrNext = () => {
+    const now = new Date()
+    const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
+    const target = (isWeekendNow || isSchoolDayOver()) ? getNextSchoolDay(now) : now
+    setSelectedDateObject(target)
   }
 
   // Subject color mapping
@@ -331,16 +335,16 @@ export default function TimetablePage() {
               </button>
             </div>
 
-            {/* Today Button */}
+            {/* Reset Button */}
             <div className="flex justify-center mb-6">
               <Button
-                onClick={goToToday}
+                onClick={resetToCurrentOrNext}
                 variant="outline"
                 size="sm"
                 className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
               >
                 <CalendarIcon className="h-4 w-4 mr-2" />
-                Today
+                Reset
               </Button>
             </div>
 
