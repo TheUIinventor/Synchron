@@ -1150,11 +1150,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const htctype = ht.headers.get('content-type') || ''
       if (ht.ok && htctype.includes('application/json')) {
         const jht = await ht.json()
-        if (jht) {
+          if (jht) {
           if (payloadHasNoTimetable(jht)) {
+              // Try to preserve or extract bell times when the homepage
+              // reports "no timetable" so we don't lose previously-hydrated
+              // bell buckets that the UI relies on for showing breaks.
+              try {
+                const computed = buildBellTimesFromPayload(jht)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = jht.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore extraction errors and preserve previously-seen bells
+              }
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
-              setExternalBellTimes(null)
+              // Do not clear previously discovered bell times when upstream
+              // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
