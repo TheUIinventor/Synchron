@@ -86,20 +86,23 @@ const bellTimesData = {
     { period: "Period 5", time: "2:10 - 3:10" },
     { period: "End of Day", time: "3:10" },
   ],
-  Fri: [
-    { period: "Period 1", time: "9:25 - 10:20" },
-    { period: "Period 2", time: "10:20 - 11:10" },
-    { period: "Recess", time: "11:10 - 11:40" },
-    { period: "Period 3", time: "11:40 - 12:35" },
-    { period: "Lunch 1", time: "12:35 - 12:55" },
-    { period: "Lunch 2", time: "12:55 - 1:15" },
-    { period: "Period 4", time: "1:15 - 2:15" },
-    { period: "Period 5", time: "2:15 - 3:10" },
-    { period: "End of Day", time: "3:10" },
-  ],
-}
-
-// Shared helpers for bell ordering/time parsing used across the provider
+      try {
+        // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
+        try {
+          const r = await fetch('/api/timetable', { credentials: 'include' })
+          if (r.status === 401) {
+            // even when unauthorized, attempt to parse any JSON body for bellTimes so
+            // we can still show breaks to the user
+            try { await extractBellTimesFromResponse(r) } catch (e) {}
+            if (!attemptedRefresh) {
+              try {
+                await fetch('/api/auth/refresh', { credentials: 'include' })
+              } catch (e) {
+                // ignore
+              }
+                return refreshExternal(true)
+            }
+          }
 const canonicalIndex = (label?: string) => {
   if (!label) return 999
   const s = String(label).toLowerCase()
@@ -191,6 +194,41 @@ const buildBellTimesFromPayload = (payload: any) => {
   }
 
   return result
+}
+
+// Try to parse a fetch Response for bell times and apply them to state.
+const extractBellTimesFromResponse = async (res: Response | null) => {
+  if (!res) return
+  try {
+    const ctype = res.headers.get('content-type') || ''
+    if (!ctype.includes('application/json')) return
+    // clone/parse safely
+    let j: any = null
+    try { j = await res.clone().json() } catch (e) { return }
+    if (!j) return
+    try {
+      const computed = buildBellTimesFromPayload(j)
+      const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+      const src = j.bellTimes || {}
+      for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+        if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+        else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+        else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+        else finalBellTimes[k] = []
+      }
+      const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+      if (hasAny) {
+        try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
+        setExternalBellTimes(finalBellTimes)
+        lastSeenBellTimesRef.current = finalBellTimes
+        lastSeenBellTsRef.current = Date.now()
+      }
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 // Explicit empty timetable used when the upstream API reports "no timetable".
@@ -1464,6 +1502,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const r2 = await fetch('/api/timetable', { credentials: 'include' })
         if (r2.status === 401) {
+          try { await extractBellTimesFromResponse(r2) } catch (e) {}
           if (!attemptedRefresh) {
             try {
               await fetch('/api/auth/refresh', { credentials: 'include' })
@@ -1738,7 +1777,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         lastRequestedDateRef.current = ds
         const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
         const ctype = res.headers.get('content-type') || ''
-        if (!res.ok) return
+        if (!res.ok) {
+          try { await extractBellTimesFromResponse(res) } catch (e) {}
+          return
+        }
         if (ctype.includes('application/json')) {
           const j = await res.json()
           if (cancelled) return
