@@ -1347,19 +1347,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
-              // If the API payload carries an authoritative date for the timetable
-              // prefer that as the selected date so the UI reflects the server's
-              // calendar date rather than the client's local clock.
-              try {
-                const payloadDate = extractDateFromPayload(j)
-                if (payloadDate) {
-                  const d = new Date(payloadDate)
-                  setSelectedDateObject(d)
-                  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-                  setSelectedDay(days[d.getDay()])
-                  setIsShowingNextDay(false)
-                }
-              } catch (e) {}
+              // Note: do not override provider-selected date here. The
+              // `selectedDateObject` is driven by user choice and time-based
+              // auto-selection logic; forcing it from a general `/api/timetable`
+              // response can produce surprising results (e.g. showing Monday
+              // when the user expects today). If a date-affine fetch was
+              // performed specifically for a requested date, that code path
+              // (fetch-for-date) will handle aligning the provider date.
               try {
                 const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
                 const summary = {
@@ -1386,16 +1380,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 byDay[day].push(p)
               }
               setExternalTimetable(byDay)
-              try {
-                const payloadDate = extractDateFromPayload(j)
-                if (payloadDate) {
-                  const d = new Date(payloadDate)
-                  setSelectedDateObject(d)
-                  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-                  setSelectedDay(days[d.getDay()])
-                  setIsShowingNextDay(false)
-                }
-              } catch (e) {}
+              // Intentionally not overriding `selectedDateObject` here for
+              // the reasons described above.
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)
