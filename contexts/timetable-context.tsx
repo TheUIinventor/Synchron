@@ -753,6 +753,47 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const fromUpstream = PortalScraper.extractVariationsFromJson(j)
           try { console.debug('[timetable.provider] extracted variations from /api/timetable payload', Array.isArray(fromUpstream) ? fromUpstream.length : 0, fromUpstream && fromUpstream[0] || null) } catch (e) {}
           if (Array.isArray(fromUpstream) && fromUpstream.length) return fromUpstream
+          // Some timetable JSON shapes embed substitute/casual fields directly
+          // on period items rather than exposing a separate `variations` array.
+          // Scan common payload locations for inline substitution markers and
+          // normalize them into variation-like objects.
+          try {
+            const inlineFound: any[] = []
+            const keysRe = /substitute|replacement|casual|relief|variation/i
+            const scan = (obj: any) => {
+              if (!obj || typeof obj !== 'object') return
+              if (Array.isArray(obj)) {
+                for (const v of obj) scan(v)
+                return
+              }
+              // If this object looks like a period/entry and contains casual/sub keys
+              const props = Object.keys(obj).join('|')
+              if (keysRe.test(props)) {
+                inlineFound.push(obj)
+              }
+              for (const k of Object.keys(obj)) scan(obj[k])
+            }
+            scan(j)
+            if (inlineFound.length) {
+              try { console.debug('[timetable.provider] found inline substitution-like items in /api/timetable payload', inlineFound.length, inlineFound[0]) } catch (e) {}
+              // Normalize inline items to variation objects similar to portal-scraper.normalizeVariation
+              const normalizedInline = inlineFound.map((it: any) => ({
+                date: it.date || it.day || undefined,
+                period: it.period || it.p || it.block || undefined,
+                subject: it.subject || it.class || undefined,
+                originalTeacher: it.teacher || it.originalTeacher || undefined,
+                substituteTeacher: it.substitute || it.replacement || it.casual || it.substituteTeacher || undefined,
+                substituteTeacherFull: it.substituteFullName || it.substituteFull || (it.casual && it.casualSurname ? `${it.casual} ${it.casualSurname}` : undefined) || undefined,
+                fromRoom: it.fromRoom || it.from || undefined,
+                toRoom: it.toRoom || it.to || it.room || undefined,
+                reason: it.reason || it.note || undefined,
+                raw: it,
+              }))
+              return normalizedInline
+            }
+          } catch (e) {
+            try { console.debug('[timetable.provider] inline scan failed', e) } catch (err) {}
+          }
           // fall back to commonly named keys
           if (Array.isArray(j.substitutions)) return j.substitutions
           if (Array.isArray(j.variations)) return j.variations
