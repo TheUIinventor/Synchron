@@ -75,6 +75,9 @@ export default function TimetablePage() {
   }
 
   const displayDateObject = getDisplayDateObject()
+  // Compute the default date that would be shown on a fresh load
+  const nowForDefault = new Date()
+  const defaultDisplayDate = (nowForDefault.getDay() === 0 || nowForDefault.getDay() === 6 || isSchoolDayOver()) ? getNextSchoolDay(nowForDefault) : nowForDefault
   const formatSelectedDate = () => {
     const opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }
     return displayDateObject.toLocaleDateString('en-US', opts)
@@ -335,18 +338,20 @@ export default function TimetablePage() {
               </button>
             </div>
 
-            {/* Reset Button */}
-            <div className="flex justify-center mb-6">
-              <Button
-                onClick={resetToCurrentOrNext}
-                variant="outline"
-                size="sm"
-                className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
-              >
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                Reset
-              </Button>
-            </div>
+            {/* Reset Button: show only when user has moved away from the default applying day */}
+            {defaultDisplayDate.toDateString() !== selectedDateObject.toDateString() && (
+              <div className="flex justify-center mb-6">
+                <Button
+                  onClick={resetToCurrentOrNext}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
+                >
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+              </div>
+            )}
 
             {/* Daily Schedule (wide format) */}
             <div className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4 max-w-6xl mx-auto">
@@ -435,14 +440,19 @@ export default function TimetablePage() {
                             })()}
                           </div>
                           <div className="flex-1">
-                            <div className="flex items-center justify-between bg-surface-container-high p-4 rounded-xl">
+                            <div className="bg-surface-container-high p-3 rounded-xl">
                               <div className="min-w-0">
                                 <div className="text-lg font-semibold text-on-surface truncate">{getDisplaySubject(period)}</div>
-                                <div className="text-sm text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
-                              </div>
-                              <div className="flex items-center gap-3 ml-4">
-                                <div className="inline-block px-3 py-1 rounded-full bg-primary text-on-primary text-sm">{period.fullTeacher || period.teacher}</div>
-                                <div className="text-sm font-semibold text-on-surface">{period.room}</div>
+                                <div className="text-sm text-on-surface-variant mt-1 flex items-center gap-3 truncate">
+                                  {/* Teacher (highlight only when substitute/casual) */}
+                                  {period.isSubstitute ? (
+                                    <span className="bg-primary-foreground/20 px-2 py-0.5 rounded-md text-sm truncate">{period.fullTeacher || period.teacher}</span>
+                                  ) : (
+                                    <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
+                                  )}
+                                  <span className="text-on-surface-variant">•</span>
+                                  <span className="text-sm text-on-surface-variant truncate">{period.room}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
