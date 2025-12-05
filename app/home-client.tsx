@@ -131,6 +131,40 @@ export default function HomeClient() {
   // Keep roll call and period 0 visible — show all entries
   const todaysPeriods = todaysPeriodsRaw
 
+  // Helper: find a bell time for a given period by label matching, falling
+  // back to index-based lookup when a direct label match isn't found.
+  const findBellTimeForPeriod = (p: any, bucket: any[] | null, index: number) => {
+    try {
+      if (!bucket || !Array.isArray(bucket)) return ''
+      const label = String(p?.period || p?.title || '').trim()
+      if (label) {
+        const found = bucket.find((b: any) => {
+          const bLabel = String(b?.originalPeriod || b?.period || b?.bell || b?.bellDisplay || '').trim()
+          if (!bLabel) return false
+          if (bLabel.toLowerCase() === label.toLowerCase()) return true
+          if (bLabel.toLowerCase().includes(label.toLowerCase())) return true
+          if (label.toLowerCase().includes(bLabel.toLowerCase())) return true
+          // numeric match (e.g. '1' vs 'Period 1')
+          const n1 = (label.match(/\d+/) || [])[0]
+          const n2 = (bLabel.match(/\d+/) || [])[0]
+          if (n1 && n2 && n1 === n2) return true
+          // RC / Roll Call tolerance
+          if ((/^(rc|roll call)$/i).test(label) && /rc|roll/i.test(bLabel)) return true
+          return false
+        })
+        if (found) {
+          return found.time || (found.startTime ? (found.startTime + (found.endTime ? ' - ' + found.endTime : '')) : '')
+        }
+      }
+      // fallback to index-based bucket lookup
+      const byIndex = bucket[index]
+      if (byIndex) return byIndex.time || (byIndex.startTime ? (byIndex.startTime + (byIndex.endTime ? ' - ' + byIndex.endTime : '')) : '')
+    } catch (e) {
+      // ignore
+    }
+    return ''
+  }
+
   // Calculate progress percent for the current block (class or break)
   function calcProgressPercent() {
     const now = new Date().getTime();
@@ -433,7 +467,7 @@ export default function HomeClient() {
                       try {
                         if (!startTime && bellTimes) {
                           const bucket = (dayName === 'Friday' ? bellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues']))
-                          if (bucket && bucket[i] && bucket[i].time) startTime = bucket[i].time
+                          startTime = startTime || findBellTimeForPeriod(period, bucket, i)
                         }
                         const { start } = parseTimeRange(startTime || '')
                         startTime = formatTo12Hour(start)
