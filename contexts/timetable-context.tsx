@@ -207,6 +207,39 @@ const payloadHasNoTimetable = (payload: any) => {
   return false
 }
 
+// Try to extract an authoritative ISO date string from various payload locations
+const extractDateFromPayload = (payload: any): string | null => {
+  try {
+    if (!payload) return null
+    const maybe = (p: any) => {
+      if (!p) return null
+      if (typeof p === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p)) return p
+      if (p.date && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date)) return p.date
+      return null
+    }
+
+    // Common locations seen in API payloads
+    const paths = [
+      payload.date,
+      payload.day,
+      payload.dayInfo && payload.dayInfo.date,
+      payload.upstream && payload.upstream.day && payload.upstream.day.date,
+      payload.upstream && payload.upstream.dayInfo && payload.upstream.dayInfo.date,
+      payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && payload.diagnostics.upstream.day.date,
+      payload.upstream && payload.upstream.full && payload.upstream.full.dayInfo && payload.upstream.full.dayInfo.date,
+    ]
+
+    for (const p of paths) {
+      const found = maybe(p)
+      if (found) return found
+    }
+
+    return null
+  } catch (e) {
+    return null
+  }
+}
+
 // Mock data for the timetable - memoized
 const timetableWeekA = {
   Monday: [
@@ -732,8 +765,58 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Helper: fetch substitutions from our server route. Supports JSON responses
   // and HTML fallbacks by scraping via PortalScraper when necessary.
-  const getPortalSubstitutions = async (): Promise<any[]> => {
+  // If `payload` is provided, attempt to extract substitution variations
+  // directly from it (avoids an extra network round-trip). When no payload
+  // is provided, fetch the AI timetable endpoint for the currently
+  // selected date and extract substitutions as before.
+  const getPortalSubstitutions = async (payload?: any): Promise<any[]> => {
     try {
+      // If a payload object was provided by the caller (we already fetched
+      // `/api/timetable`), try to extract variations directly from it to
+      // avoid additional network requests.
+      if (payload) {
+        try {
+          const fromUpstream = PortalScraper.extractVariationsFromJson(payload.upstream || payload)
+          if (Array.isArray(fromUpstream) && fromUpstream.length) return fromUpstream
+
+          // Inline scanning for substitution-like objects embedded in the payload
+          const inlineFound: any[] = []
+          const keysRe = /substitute|replacement|casual|relief|variation/i
+          const scan = (obj: any) => {
+            if (!obj || typeof obj !== 'object') return
+            if (Array.isArray(obj)) {
+              for (const v of obj) scan(v)
+              return
+            }
+            const props = Object.keys(obj).join('|')
+            if (keysRe.test(props)) inlineFound.push(obj)
+            for (const k of Object.keys(obj)) scan(obj[k])
+          }
+          scan(payload)
+          if (inlineFound.length) {
+            const normalizedInline = inlineFound.map((it: any) => ({
+              date: it.date || it.day || undefined,
+              period: it.period || it.p || it.block || undefined,
+              subject: it.subject || it.class || undefined,
+              originalTeacher: it.teacher || it.originalTeacher || undefined,
+              substituteTeacher: it.substitute || it.replacement || it.casual || it.substituteTeacher || undefined,
+              substituteTeacherFull: it.substituteFullName || it.substituteFull || (it.casual && it.casualSurname ? `${it.casual} ${it.casualSurname}` : undefined) || undefined,
+              fromRoom: it.fromRoom || it.from || undefined,
+              toRoom: it.toRoom || it.to || it.room || undefined,
+              reason: it.reason || it.note || undefined,
+              raw: it,
+            }))
+            return normalizedInline
+          }
+          if (Array.isArray(payload.substitutions)) return payload.substitutions
+          if (Array.isArray(payload.variations)) return payload.variations
+        } catch (e) {
+          // fall through to fetch-based fallback
+        }
+      }
+
+      // No payload or extraction failed - fall back to fetching the AI endpoint
+      // for the selected date (same behavior as before).
       // Prefer the AI timetable endpoint which does not require portal sign-in.
       // Use the provider's selected date (fall back to today) to request date-specific substitutions.
       const dateObj = selectedDateObject || new Date()
@@ -1264,6 +1347,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
+              // If the API payload carries an authoritative date for the timetable
+              // prefer that as the selected date so the UI reflects the server's
+              // calendar date rather than the client's local clock.
+              try {
+                const payloadDate = extractDateFromPayload(j)
+                if (payloadDate) {
+                  const d = new Date(payloadDate)
+                  setSelectedDateObject(d)
+                  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+                  setSelectedDay(days[d.getDay()])
+                  setIsShowingNextDay(false)
+                }
+              } catch (e) {}
               try {
                 const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
                 const summary = {
@@ -1290,6 +1386,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 byDay[day].push(p)
               }
               setExternalTimetable(byDay)
+              try {
+                const payloadDate = extractDateFromPayload(j)
+                if (payloadDate) {
+                  const d = new Date(payloadDate)
+                  setSelectedDateObject(d)
+                  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+                  setSelectedDay(days[d.getDay()])
+                  setIsShowingNextDay(false)
+                }
+              } catch (e) {}
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)
@@ -1614,7 +1720,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // If none found in upstream, request from the AI timetable endpoint
               if ((!Array.isArray(subs) || subs.length === 0)) {
                 try {
-                  const fetched = await getPortalSubstitutions()
+                  // Try to extract substitutions from the already-fetched timetable payload
+                  const fetched = await getPortalSubstitutions(j)
                   if (Array.isArray(fetched) && fetched.length) subs = fetched
                 } catch (e) {
                   // ignore

@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
-import { ChevronLeft, Calendar } from "lucide-react"
+import { ChevronLeft, Calendar as CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Calendar as DatePicker } from "@/components/ui/calendar"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
@@ -291,12 +293,27 @@ export default function TimetablePage() {
                 <ChevronLeft className="h-5 w-5" />
               </button>
 
-              <div className="text-center">
-                <h2 className="font-semibold text-on-surface">{selectedDayName}</h2>
-                <p className="text-sm text-on-surface-variant">
-                  {selectedDateObject.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </p>
-              </div>
+                <div className="text-center">
+                  <h2 className="font-semibold text-on-surface">{selectedDayName}</h2>
+                  <div className="text-sm text-on-surface-variant">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="px-3 py-1 rounded-md bg-transparent hover:bg-surface-container-highest transition-colors text-sm">
+                          {selectedDateObject.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto">
+                        <DatePicker
+                          mode="single"
+                          selected={selectedDateObject}
+                          onSelect={(d: Date | undefined) => {
+                            if (d) setSelectedDateObject(d)
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
 
               <button
                 className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
@@ -314,16 +331,16 @@ export default function TimetablePage() {
                 size="sm"
                 className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
               >
-                <Calendar className="h-4 w-4 mr-2" />
+                <CalendarIcon className="h-4 w-4 mr-2" />
                 Today
               </Button>
             </div>
 
-            {/* Daily Schedule */}
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 max-w-lg mx-auto p-4">
+            {/* Daily Schedule (wide format) */}
+            <div className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4 max-w-6xl mx-auto">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-full bg-primary/10 text-primary">
-                  <Calendar className="h-5 w-5" />
+                  <div className="p-2 rounded-full bg-primary/10 text-primary">
+                  <CalendarIcon className="h-5 w-5" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-on-surface">{selectedDayName} Schedule</h2>
@@ -381,56 +398,40 @@ export default function TimetablePage() {
                     </div>
                   )}
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-3">
                     {todaysTimetable.map((period) => (
                       period.subject === "Break" ? (
-                        <div key={period.id ?? period.period} className="flex items-center gap-3 py-1">
-                          <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
+                        <div key={period.id ?? period.period} className="flex items-start gap-4 py-2">
+                          <div className="w-24 text-sm font-medium text-on-surface-variant">
                             {(() => {
                               try {
                                 const { start } = parseTimeRange(period.time || '')
                                 return formatTo12Hour(start)
                               } catch (e) { return ((period.time || '').split(' - ')[0] || '') }
                             })()}
-                          </span>
-                          <div className="text-sm text-on-surface-variant">{period.period}</div>
+                          </div>
+                          <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                         </div>
                       ) : (
-                        <div
-                          key={period.id}
-                          className={`rounded-xl p-3 transition-all duration-200 ease-in-out bg-surface-container-high`}
-                        >
-                          <div className="flex items-center gap-3">
-                            {/* Time on the left */}
-                            <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
-                              {(() => {
-                                try {
-                                  const { start } = parseTimeRange(period.time || '')
-                                  return formatTo12Hour(start)
-                                } catch (e) { return ((period.time || '').split(' - ')[0] || '') }
-                              })()}{/* Only show start time */}
-                            </span>
-
-                            {/* Main content: subject + small meta line with room and teacher on one line */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm truncate text-on-surface">{getDisplaySubject(period)}</span>
+                        <div key={period.id ?? period.period} className="flex items-start gap-4 py-2">
+                          <div className="w-24 text-sm font-medium text-on-surface-variant">
+                            {(() => {
+                              try {
+                                const { start } = parseTimeRange(period.time || '')
+                                return formatTo12Hour(start)
+                              } catch (e) { return ((period.time || '').split(' - ')[0] || '') }
+                            })()}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between bg-surface-container-high p-4 rounded-xl">
+                              <div className="min-w-0">
+                                <div className="text-lg font-semibold text-on-surface truncate">{getDisplaySubject(period)}</div>
+                                <div className="text-sm text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
                               </div>
-
-                                    <div className="text-xs text-on-surface-variant truncate mt-1">
-                                      {getDisplayRoom(period)} • {
-                                        period.isSubstitute ? (
-                                          <span
-                                            className="inline-block px-2 py-0.5 rounded-md font-medium"
-                                            style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                          >
-                                            {period.fullTeacher || period.teacher}
-                                          </span>
-                                        ) : (
-                                          <span>{period.fullTeacher || period.teacher}</span>
-                                        )
-                                      }
-                                    </div>
+                              <div className="flex items-center gap-3 ml-4">
+                                <div className="inline-block px-3 py-1 rounded-full bg-primary text-on-primary text-sm">{period.fullTeacher || period.teacher}</div>
+                                <div className="text-sm font-semibold text-on-surface">{period.room}</div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -445,7 +446,7 @@ export default function TimetablePage() {
                   No classes scheduled for this day
                 </div>
               )}
-            </Card>
+            </div>
           </>
         )}
 
