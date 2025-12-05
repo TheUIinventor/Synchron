@@ -299,13 +299,13 @@ export default function TimetablePage() {
                     <Popover>
                       <PopoverTrigger asChild>
                         <button className="px-3 py-1 rounded-md bg-transparent hover:bg-surface-container-highest transition-colors text-sm">
-                          {selectedDateObject.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {displayDateObject.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto">
                         <DatePicker
                           mode="single"
-                          selected={selectedDateObject}
+                          selected={displayDateObject}
                           onSelect={(d: Date | undefined) => {
                             if (d) setSelectedDateObject(d)
                           }}
