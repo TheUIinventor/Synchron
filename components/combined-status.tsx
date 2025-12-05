@@ -61,10 +61,15 @@ export default function CombinedStatus() {
               </div>
               <p className="font-medium mb-1">{getDisplaySubject(nextPeriodInfo.currentPeriod)}</p>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400 mb-2">
-                {nextPeriodInfo.currentPeriod.isSubstitute && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                {nextPeriodInfo.currentPeriod.isSubstitute ? (
+                  <span className="inline-block px-2 py-0.5 rounded-md font-medium"
+                    style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                  >
+                    {nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher}
+                  </span>
+                ) : (
+                  <span>{nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher}</span>
                 )}
-                <span>{nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher}</span>
                 <span>•</span>
                 <span>{nextPeriodInfo.currentPeriod.room}</span>
               </div>
@@ -81,10 +86,15 @@ export default function CombinedStatus() {
                 </div>
                 <p className="font-medium text-sm mb-1">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
                 <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  {nextPeriodInfo.nextPeriod.isSubstitute && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                  {nextPeriodInfo.nextPeriod.isSubstitute ? (
+                    <span className="inline-block px-2 py-0.5 rounded-md font-medium"
+                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                    >
+                      {nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher}
+                    </span>
+                  ) : (
+                    <span>{nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher}</span>
                   )}
-                  <span>{nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher}</span>
                   <span>•</span>
                   <span>{nextPeriodInfo.nextPeriod.room}</span>
                 </div>

@@ -415,15 +415,22 @@ export default function TimetablePage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-sm truncate text-on-surface">{getDisplaySubject(period)}</span>
-                                {period.isSubstitute && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                )}
-                                {period.isRoomChange && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                                )}
                               </div>
 
-                                    <div className="text-xs text-on-surface-variant truncate mt-1">{getDisplayRoom(period)} • {period.fullTeacher || period.teacher}</div>
+                                    <div className="text-xs text-on-surface-variant truncate mt-1">
+                                      {getDisplayRoom(period)} • {
+                                        period.isSubstitute ? (
+                                          <span
+                                            className="inline-block px-2 py-0.5 rounded-md font-medium"
+                                            style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                          >
+                                            {period.fullTeacher || period.teacher}
+                                          </span>
+                                        ) : (
+                                          <span>{period.fullTeacher || period.teacher}</span>
+                                        )
+                                      }
+                                    </div>
                             </div>
                           </div>
                         </div>

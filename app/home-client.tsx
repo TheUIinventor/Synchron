@@ -340,23 +340,25 @@ export default function HomeClient() {
                 {/* Divider and adaptive class links row */}
                 <div className="mt-4">
                   <div className="border-t border-outline-variant" />
-                  <div className="mt-3 flex items-center gap-3">
-                    {(() => {
-                      const subject = (currentPeriod?.subject ?? "").trim()
-                      // Normalize subject: remove digits/punctuation and lower-case
-                      const cleaned = subject.replace(/[^a-zA-Z\s]/g, "").toLowerCase()
-                      const tokens = cleaned.split(/\s+/).filter(Boolean)
-                      const first = tokens[0] ?? ""
-
-                      const mapping: Record<string, { label: string; url: string }> = {
-                        chinese: { label: "Junqi", url: "https://www.junqi.app/en/game/ZGIV?mode=private" },
-                        ved: { label: "Wellio", url: "https://app.wellioeducation.com/" },
-                        va: { label: "SmartHistory", url: "https://smarthistory.org/" },
-                        math: { label: "Dictionary", url: "https://www.mathsisfun.com/definitions/" },
-                      }
-
-                      const codeMap: Record<string, string> = {
-                        // Chinese codes
+                                <div className="flex items-center gap-3">
+                                  <p className="font-medium text-sm truncate">{period.subject}</p>
+                                </div>
+                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>
+                                      {period.isSubstitute ? (
+                                        <span
+                                          className="inline-block px-2 py-0.5 rounded-md font-medium"
+                                          style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                        >
+                                          {period.fullTeacher || period.teacher}
+                                        </span>
+                                      ) : (
+                                        <span>{period.fullTeacher || period.teacher}</span>
+                                      )}
+                                    </span>
+                                    <span>•</span>
+                                    <span>{period.room}</span>
+                                  </div>
                         chi: "chinese",
                         chin: "chinese",
                         chinese: "chinese",
@@ -473,27 +475,30 @@ export default function HomeClient() {
                               <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-sm truncate">{period.subject}</span>
-                                  {period.isSubstitute && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                  )}
-                                  {period.isRoomChange && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                                  )}
+                                  {/* no separate Sub/Room pills here; teacher will be highlighted when substituted */}
                                 </div>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  {period.isSubstitute && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                  )}
-                                  <span>{displayTeacher(period)}</span>
+                                  <span>
+                                    {period.isSubstitute ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}>{displayTeacher(period)}</span>
+                                    ) : (
+                                      <span>{displayTeacher(period)}</span>
+                                    )}
+                                  </span>
                                   <span>•</span>
                                   <span>{(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
                                 </div>
                               </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  {period.isSubstitute && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container mr-2">Sub</span>
-                                  )}
-                                  <span>{displayTeacher(period)} • {(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
+                                  <span>
+                                    {period.isSubstitute ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}>{displayTeacher(period)}</span>
+                                    ) : (
+                                      <span>{displayTeacher(period)}</span>
+                                    )}
+                                  </span>
+                                  <span className="mx-2">•</span>
+                                  <span>{(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
                                 </div>
                             </a>
                           ) : (
@@ -519,10 +524,17 @@ export default function HomeClient() {
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  {period.isSubstitute && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container mr-2">Sub</span>
+                                  {period.isSubstitute ? (
+                                    <span className="inline-block px-2 py-0.5 rounded-md font-medium"
+                                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                    >
+                                      {period.fullTeacher || period.teacher}
+                                    </span>
+                                  ) : (
+                                    <span>{(period.fullTeacher || period.teacher)}</span>
                                   )}
-                                  <span>{(period.fullTeacher || period.teacher)} • {period.room}</span>
+                                  <span className="mx-2">•</span>
+                                  <span>{period.room}</span>
                                 </div>
                               </div>
                             </div>
