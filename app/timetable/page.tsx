@@ -53,27 +53,26 @@ export default function TimetablePage() {
     }
   }
 
-  // Use provider-selected date by default
-  const getSelectedDayName = () => {
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    // If the provider's selected date is today and it's after school hours or a weekend,
-    // display the next school day instead (this mirrors home view behaviour).
+  // Compute a single display date object used for the header and for
+  // selecting the timetable rows. If the provider's selected date is
+  // today and it's after school hours (or a weekend), show the next
+  // school day instead so the header and content remain consistent.
+  const getDisplayDateObject = () => {
     try {
       const now = new Date()
       const sameDate = selectedDateObject.toDateString() === now.toDateString()
-      const isWeekend = now.getDay() === 0 || now.getDay() === 6
-      if (sameDate && (isWeekend || isSchoolDayOver())) {
-        const next = getNextSchoolDay(now)
-        return days[next.getDay()]
+      const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
+      if (sameDate && (isWeekendNow || isSchoolDayOver())) {
+        return getNextSchoolDay(now)
       }
     } catch (e) {}
-    return days[selectedDateObject.getDay()]
+    return selectedDateObject
   }
 
+  const displayDateObject = getDisplayDateObject()
   const formatSelectedDate = () => {
-    // Show weekday and date+month (no year) as requested: "Monday, 1 December"
     const opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }
-    return selectedDateObject.toLocaleDateString('en-US', opts)
+    return displayDateObject.toLocaleDateString('en-US', opts)
   }
 
   // Navigate dates by updating the provider's selected date object so
@@ -147,7 +146,8 @@ export default function TimetablePage() {
     return period.room || ''
   }
 
-  const selectedDayName = getSelectedDayName()
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+  const selectedDayName = days[displayDateObject.getDay()]
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
   const todaysTimetableRaw = timetableData[selectedDayName] || []
 
