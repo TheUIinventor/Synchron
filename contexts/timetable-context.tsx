@@ -1269,9 +1269,32 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const j = await r.json()
           if (j && j.timetable) {
             if (payloadHasNoTimetable(j)) {
+              // Even when the payload reports "no timetable", try to
+              // salvage any bell schedules the server may have provided
+              // (either in `bellTimes` or embedded `upstream` structures).
+              try {
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore extraction errors and preserve any previously-seen bells
+              }
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
-              setExternalBellTimes(null)
+              // Do not clear previously discovered bell times when upstream
+              // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
@@ -1433,9 +1456,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (j == null) return
           if (payloadHasNoTimetable(j)) {
             if (!cancelled) {
+              try {
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore
+              }
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
-              setExternalBellTimes(null)
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
@@ -1680,9 +1721,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (cancelled) return
           if (j && payloadHasNoTimetable(j)) {
             if (!cancelled) {
+              try {
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore
+              }
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
-              setExternalBellTimes(null)
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
