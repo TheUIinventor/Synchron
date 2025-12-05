@@ -340,35 +340,29 @@ export default function HomeClient() {
                 {/* Divider and adaptive class links row */}
                 <div className="mt-4">
                   <div className="border-t border-outline-variant" />
-                                <div className="flex items-center gap-3">
-                                  <p className="font-medium text-sm truncate">{period.subject}</p>
-                                </div>
-                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span>
-                                      {period.isSubstitute ? (
-                                        <span
-                                          className="inline-block px-2 py-0.5 rounded-md font-medium"
-                                          style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                        >
-                                          {period.fullTeacher || period.teacher}
-                                        </span>
-                                      ) : (
-                                        <span>{period.fullTeacher || period.teacher}</span>
-                                      )}
-                                    </span>
-                                    <span>•</span>
-                                    <span>{period.room}</span>
-                                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    {(() => {
+                      const subject = (currentPeriod?.subject ?? "").trim()
+                      // Normalize subject: remove digits/punctuation and lower-case
+                      const cleaned = subject.replace(/[^a-zA-Z\s]/g, "").toLowerCase()
+                      const tokens = cleaned.split(/\s+/).filter(Boolean)
+                      const first = tokens[0] ?? ""
+
+                      const mapping: Record<string, { label: string; url: string }> = {
+                        chinese: { label: "Junqi", url: "https://www.junqi.app/en/game/ZGIV?mode=private" },
+                        ved: { label: "Wellio", url: "https://app.wellioeducation.com/" },
+                        va: { label: "SmartHistory", url: "https://smarthistory.org/" },
+                        math: { label: "Dictionary", url: "https://www.mathsisfun.com/definitions/" },
+                      }
+
+                      const codeMap: Record<string, string> = {
                         chi: "chinese",
                         chin: "chinese",
                         chinese: "chinese",
-                        // VED
                         ved: "ved",
-                        // Visual Art
                         va: "va",
                         visual: "va",
                         art: "va",
-                        // Math codes
                         math: "math",
                         maths: "math",
                         mat: "math",
@@ -378,7 +372,6 @@ export default function HomeClient() {
                       let canonical: string | null = null
                       if (codeMap[first]) canonical = codeMap[first]
                       else {
-                        // Fallback to contains checks on the cleaned subject
                         if (cleaned.includes("chinese") || cleaned.includes("chin")) canonical = "chinese"
                         else if (cleaned.includes("ved")) canonical = "ved"
                         else if (/\bva\b/.test(cleaned) || cleaned.includes("visual") || cleaned.includes(" art")) canonical = "va"
@@ -387,7 +380,6 @@ export default function HomeClient() {
 
                       const matched = canonical ? mapping[canonical as keyof typeof mapping] ?? null : null
 
-                      // Render three boxes; centre one contains the adaptive link when available.
                       return [0, 1, 2].map((i) => {
                         const isCenter = i === 1
                         if (isCenter && matched) {
