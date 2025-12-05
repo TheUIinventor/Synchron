@@ -440,19 +440,18 @@ export default function TimetablePage() {
                             })()}
                           </div>
                           <div className="flex-1">
-                            <div className="bg-surface-container-high p-3 rounded-xl">
-                              <div className="min-w-0">
+                            <div className="bg-surface-container-high p-3 rounded-xl flex items-center justify-between">
+                              <div className="min-w-0 pr-4">
                                 <div className="text-lg font-semibold text-on-surface truncate">{getDisplaySubject(period)}</div>
-                                <div className="text-sm text-on-surface-variant mt-1 flex items-center gap-3 truncate">
-                                  {/* Teacher (highlight only when substitute/casual) */}
-                                  {period.isSubstitute ? (
-                                    <span className="bg-primary-foreground/20 px-2 py-0.5 rounded-md text-sm truncate">{period.fullTeacher || period.teacher}</span>
-                                  ) : (
-                                    <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
-                                  )}
-                                  <span className="text-on-surface-variant">•</span>
-                                  <span className="text-sm text-on-surface-variant truncate">{period.room}</span>
-                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                                {/* Teacher (highlight only when substitute/casual) - slightly darker than card */}
+                                {period.isSubstitute ? (
+                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/30 text-primary-foreground truncate">{period.fullTeacher || period.teacher}</span>
+                                ) : (
+                                  <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
+                                )}
+                                <span className="text-sm text-on-surface-variant truncate">{period.room}</span>
                               </div>
                             </div>
                           </div>
