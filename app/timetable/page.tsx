@@ -17,7 +17,7 @@ export default function TimetablePage() {
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek } = useTimetable()
+  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt } = useTimetable()
   // debug values
   const { lastFetchedDate, lastFetchedPayloadSummary } = useTimetable()
 
@@ -62,7 +62,15 @@ export default function TimetablePage() {
       const now = new Date()
       const sameDate = selectedDateObject.toDateString() === now.toDateString()
       const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
-      if (sameDate && (isWeekendNow || isSchoolDayOver())) {
+      // Respect a recent manual user selection (2 minute grace) so when the
+      // user explicitly navigates to today we don't immediately auto-advance
+      // to the next school day. `lastUserSelectedAt` is provided by the
+      // TimetableProvider and updated when the user sets the date/day.
+      const GRACE_MS = 2 * 60 * 1000
+      const nowMs = Date.now()
+      const userSelectedRecently = lastUserSelectedAt && (nowMs - lastUserSelectedAt) < GRACE_MS
+
+      if (sameDate && (isWeekendNow || isSchoolDayOver()) && !userSelectedRecently) {
         return getNextSchoolDay(now)
       }
     } catch (e) {}

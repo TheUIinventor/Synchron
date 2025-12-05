@@ -403,6 +403,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [lastUserSelectedAt, setLastUserSelectedAt] = useState<number | null>(null)
 
   // Start a simple mount->ready timer so we can measure app load time
   useEffect(() => {
@@ -1808,11 +1809,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Wrapped setters that record a user selection timestamp so automatic
   // time-based updates can respect manual choices for a short grace period.
   const userSetSelectedDay = (day: string) => {
-    lastUserSelectedRef.current = Date.now()
+    const ts = Date.now()
+    lastUserSelectedRef.current = ts
+    setLastUserSelectedAt(ts)
     setSelectedDay(day)
   }
   const userSetSelectedDateObject = (d: Date) => {
-    lastUserSelectedRef.current = Date.now()
+    const ts = Date.now()
+    lastUserSelectedRef.current = ts
+    setLastUserSelectedAt(ts)
     setSelectedDateObject(d)
   }
 
@@ -1827,6 +1832,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         selectedDateObject, // Provide the new state
         setSelectedDay: userSetSelectedDay,
         setSelectedDateObject: userSetSelectedDateObject,
+        lastUserSelectedAt,
         timetableData,
         currentMomentPeriodInfo, // Provide the new state
         // Backwards-compatible alias for older components
