@@ -17,7 +17,7 @@ export default function TimetablePage() {
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt } = useTimetable()
+  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
   // debug values
   const { lastFetchedDate, lastFetchedPayloadSummary } = useTimetable()
 
@@ -440,14 +440,14 @@ export default function TimetablePage() {
                             })()}
                           </div>
                           <div className="flex-1">
-                            <div className={`p-3 rounded-xl flex items-center justify-between ${period.isSubstitute ? 'bg-primary/20' : 'bg-surface-container-high'}`}>
+                            <div className={`p-3 rounded-xl flex items-center justify-between ${period.isSubstitute ? 'bg-primary/30' : 'bg-surface-container-high'}`}>
                               <div className="min-w-0 pr-4">
                                 <div className={`text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
                               <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-                                {/* Teacher (highlight only when substitute/casual) - darker pill when substitute */}
+                                {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {period.isSubstitute ? (
-                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/60 text-primary-foreground truncate">{period.fullTeacher || period.teacher}</span>
+                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-primary-foreground truncate">{period.fullTeacher || period.teacher}</span>
                                 ) : (
                                   <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
                                 )}
@@ -509,8 +509,24 @@ export default function TimetablePage() {
                             // Prefer provider's grouped data if available
                             try {
                               const itemsA = tt && tt[day] && Array.isArray(tt[day].A) ? tt[day].A : (timetableData[day] || [])
-                              return itemsA.filter((p: any) => p.subject !== 'Break').map((period: any) => (
+                              const bucketA = bellTimes ? (day === 'Friday' ? bellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
+                              return itemsA.filter((p: any) => p.subject !== 'Break').map((period: any, idx: number) => (
                                 <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
+                                  <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                    {(() => {
+                                      try {
+                                        if (period.time) {
+                                          const { start } = parseTimeRange(period.time || '')
+                                          return formatTo12Hour(start)
+                                        }
+                                        if (bucketA && bucketA[idx] && bucketA[idx].time) {
+                                          const { start } = parseTimeRange(bucketA[idx].time || '')
+                                          return formatTo12Hour(start)
+                                        }
+                                      } catch (e) {}
+                                      return ''
+                                    })()}
+                                  </div>
                                   <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
                                     {getSubjectAbbr(period.subject)}
                                   </div>
@@ -541,8 +557,24 @@ export default function TimetablePage() {
                                 // no grouped data available; indicate there's only one week available
                                 return <div className="text-xs text-on-surface-variant">Only one week available</div>
                               }
-                              return itemsB.filter((p: any) => p.subject !== 'Break').map((period: any) => (
+                              const bucketB = bellTimes ? (day === 'Friday' ? bellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
+                              return itemsB.filter((p: any) => p.subject !== 'Break').map((period: any, idx: number) => (
                                 <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
+                                  <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                    {(() => {
+                                      try {
+                                        if (period.time) {
+                                          const { start } = parseTimeRange(period.time || '')
+                                          return formatTo12Hour(start)
+                                        }
+                                        if (bucketB && bucketB[idx] && bucketB[idx].time) {
+                                          const { start } = parseTimeRange(bucketB[idx].time || '')
+                                          return formatTo12Hour(start)
+                                        }
+                                      } catch (e) {}
+                                      return ''
+                                    })()}
+                                  </div>
                                   <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
                                     {getSubjectAbbr(period.subject)}
                                   </div>
