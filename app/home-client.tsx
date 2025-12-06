@@ -193,6 +193,8 @@ export default function HomeClient() {
   // Helper to determine which teacher name to display for a period, preferring full names.
   const displayTeacher = (p: any) => {
     if (!p) return null
+    // If this period has a casual/substitute with a provided surname, show only that surname per UX request
+    if (p.isSubstitute && (p as any).casualSurname) return (p as any).casualSurname
     return p.fullTeacher || p.teacher || null
   }
 

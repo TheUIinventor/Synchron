@@ -525,7 +525,7 @@ export default function TimetablePage() {
                               <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {period.isSubstitute ? (
-                                    <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-black truncate">{period.fullTeacher || period.teacher}</span>
+                                    <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-black truncate">{(period as any).casualSurname || period.fullTeacher || period.teacher}</span>
                                 ) : (
                                   <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
                                 )}
