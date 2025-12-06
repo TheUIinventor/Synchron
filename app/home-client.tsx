@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils";
+import { getNextBell } from "@/utils/bell-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -131,6 +132,7 @@ export default function HomeClient() {
   // Get today's periods for the sidebar - prefer selectedDay (context), otherwise use the displayDate's weekday
   const dayName = selectedDay || format(displayDate, "EEEE");
   const todaysPeriodsRaw = timetableData[dayName] || [];
+  const bellsForDay = (bellTimes && (bellTimes as any)[dayName]) || [];
 
   // Helper: normalize period label for comparison
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
@@ -238,6 +240,22 @@ export default function HomeClient() {
     }
   }
 
+  // Format milliseconds to HH:MM:SS (always show hours)
+  const formatMsHHMMSS = (ms: number) => {
+    const total = Math.max(0, Math.floor(ms / 1000))
+    const hours = Math.floor(total / 3600)
+    const minutes = Math.floor((total % 3600) / 60)
+    const seconds = total % 60
+    const hh = String(hours).padStart(2, '0')
+    const mm = String(minutes).padStart(2, '0')
+    const ss = String(seconds).padStart(2, '0')
+    return `${hh}:${mm}:${ss}`
+  }
+
+  // Compute bell state for the display day
+  const bellState = getNextBell(bellsForDay as any);
+  const noClassesByBells = !bellsForDay || (Array.isArray(bellsForDay) && bellsForDay.length === 0) || (!bellState.nextBell && !bellState.isCurrentlyInPeriod);
+
   return (
     <div className="space-y-4 pb-6 md:pb-6 animate-in fade-in duration-700">
       
@@ -281,8 +299,16 @@ export default function HomeClient() {
             {/* Mobile-only compact pill (shows countdown and next period) */}
             <Link href="/timetable" className="block sm:hidden w-full">
               <div className="mx-auto max-w-[680px] px-3 py-2 rounded-full bg-primary text-primary-foreground font-medium flex items-center justify-between shadow-sm">
-                <span className="text-sm md:text-base truncate">{remainingLabel()} to {nextPeriod?.subject || currentPeriod?.subject || 'Next'}</span>
-                <ArrowRight className="ml-3 h-4 w-4 opacity-90" />
+                {noClassesByBells ? (
+                  <span className="text-sm md:text-base truncate">No classes today!</span>
+                ) : (
+                  <>
+                    <span className="text-sm md:text-base truncate">
+                      {formatMsHHMMSS(bellState.timeUntil)} to {bellState.isCurrentlyInPeriod ? (bellState.currentPeriod?.period || 'class') : (bellState.nextBell?.period || 'next bell')}
+                    </span>
+                    <ArrowRight className="ml-3 h-4 w-4 opacity-90" />
+                  </>
+                )}
               </div>
             </Link>
 
