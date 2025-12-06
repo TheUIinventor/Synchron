@@ -42,7 +42,7 @@ export default function HomeClient() {
     return () => clearInterval(t);
   }, []);
 
-  
+  useEffect(() => {
     try {
       const raw = localStorage.getItem('synchron-canvas-links')
       if (raw) {
