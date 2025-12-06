@@ -554,7 +554,7 @@ export default function HomeClient() {
                                     {period.isSubstitute && (
                                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                                     )}
-                                    <span>{period.fullTeacher || period.teacher}</span>
+                                    <span>{displayTeacher(period)}</span>
                                     <span>•</span>
                                     <span>{period.room}</span>
                                   </div>
@@ -564,10 +564,10 @@ export default function HomeClient() {
                                     <span className="inline-block px-2 py-0.5 rounded-md font-medium"
                                       style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                     >
-                                      {period.fullTeacher || period.teacher}
+                                      {displayTeacher(period)}
                                     </span>
                                   ) : (
-                                    <span>{(period.fullTeacher || period.teacher)}</span>
+                                    <span>{displayTeacher(period)}</span>
                                   )}
                                     <span className="mx-2">•</span>
                                     {(() => {

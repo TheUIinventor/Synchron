@@ -27,6 +27,15 @@ export default function CombinedStatus() {
     return period.subject
   }, [])
 
+  // Helper to display teacher: if substitute and casualSurname provided,
+  // show only the casualSurname per UX request. Otherwise prefer fullTeacher
+  // then teacher.
+  const displayTeacher = useCallback((p: any) => {
+    if (!p) return ''
+    if (p.isSubstitute && (p as any).casualSurname) return (p as any).casualSurname
+    return p.fullTeacher || p.teacher || ''
+  }, [])
+
   useEffect(() => {
     const updateStatus = () => {
       setCurrentTime(getCurrentTime())
@@ -65,10 +74,10 @@ export default function CombinedStatus() {
                   <span className="inline-block px-2 py-0.5 rounded-md font-medium"
                     style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                   >
-                    {nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher}
+                    {displayTeacher(nextPeriodInfo.currentPeriod)}
                   </span>
                 ) : (
-                  <span>{nextPeriodInfo.currentPeriod.fullTeacher || nextPeriodInfo.currentPeriod.teacher}</span>
+                  <span>{displayTeacher(nextPeriodInfo.currentPeriod)}</span>
                 )}
                 <span>•</span>
                 <span>{nextPeriodInfo.currentPeriod.room}</span>
@@ -90,10 +99,10 @@ export default function CombinedStatus() {
                     <span className="inline-block px-2 py-0.5 rounded-md font-medium"
                       style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                     >
-                      {nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher}
+                      {displayTeacher(nextPeriodInfo.nextPeriod)}
                     </span>
                   ) : (
-                    <span>{nextPeriodInfo.nextPeriod.fullTeacher || nextPeriodInfo.nextPeriod.teacher}</span>
+                    <span>{displayTeacher(nextPeriodInfo.nextPeriod)}</span>
                   )}
                   <span>•</span>
                   <span>{nextPeriodInfo.nextPeriod.room}</span>
