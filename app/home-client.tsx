@@ -37,6 +37,12 @@ export default function HomeClient() {
   })
 
   useEffect(() => {
+    // keep clock updated every second so countdowns refresh on mobile pill
+    const t = setInterval(() => setCurrentDate(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  
     try {
       const raw = localStorage.getItem('synchron-canvas-links')
       if (raw) {
@@ -272,7 +278,16 @@ export default function HomeClient() {
         <div className="md:col-span-8 space-y-3 flex flex-col md:h-full">
             
             {/* Primary Status Card */}
-            <div className="relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
+            {/* Mobile-only compact pill (shows countdown and next period) */}
+            <Link href="/timetable" className="block sm:hidden w-full">
+              <div className="mx-auto max-w-[680px] px-3 py-2 rounded-full bg-primary text-primary-foreground font-medium flex items-center justify-between shadow-sm">
+                <span className="text-sm md:text-base truncate">{remainingLabel()} to {nextPeriod?.subject || currentPeriod?.subject || 'Next'}</span>
+                <ArrowRight className="ml-3 h-4 w-4 opacity-90" />
+              </div>
+            </Link>
+
+            {/* Desktop / tablet expressive card (hidden on small screens) */}
+            <div className="hidden sm:block relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
               {/* Background Blob (hidden on small screens to avoid overflow) */}
               <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20" />
               
