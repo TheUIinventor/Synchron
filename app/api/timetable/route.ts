@@ -197,13 +197,74 @@ export async function GET(req: NextRequest) {
     }
 
     const responses = [dayRes, fullRes, bellsRes]
+    // Helper: attempt to build normalized bellSchedules from any available
+    // response JSON (bells.json, day.bells inside day/full responses, etc.)
+    const buildBellSchedulesFromResponses = (dayR: any, fullR: any, bellsR: any) => {
+      try {
+        const schedules: Record<string, { period: string; time: string }[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] }
+        const sources: Record<string, string> = { 'Mon/Tues': 'empty', 'Wed/Thurs': 'empty', Fri: 'empty' }
+        const bj = bellsR && bellsR.json ? bellsR.json : null
+        const tryExtractBells = (src: any) => {
+          if (!src) return []
+          if (Array.isArray(src)) return src
+          if (src.bells && Array.isArray(src.bells)) return src.bells
+          if (src.periods && Array.isArray(src.periods)) return src.periods
+          if (src.day && src.day.bells && Array.isArray(src.day.bells)) return src.day.bells
+          return []
+        }
+        const bellsArr = tryExtractBells(bj).length ? tryExtractBells(bj) : (tryExtractBells(fullR && fullR.json).length ? tryExtractBells(fullR.json) : tryExtractBells(dayR && dayR.json))
+        if (!bellsArr || !bellsArr.length) return { schedules, sources }
+        const bellLabelMap: Record<string, string> = { 'RC': 'Roll Call', 'R': 'Recess', 'MTL1': 'Lunch 1', 'MTL2': 'Lunch 2', 'MTL': 'Lunch', 'L': 'Lunch' }
+        // if top-level day exists, map entire array to that bucket
+        const topLevelDayRaw = (bj && (bj.day || bj.date || bj.dayName || bj.dayname)) ? String(bj.day || bj.date || bj.dayName || bj.dayname).toLowerCase() : null
+        if (topLevelDayRaw) {
+          const target = topLevelDayRaw.includes('fri') ? 'Fri' : (topLevelDayRaw.includes('wed') || topLevelDayRaw.includes('thu') || topLevelDayRaw.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+          const mappedAll = (bellsArr || []).map((b: any) => {
+            const rawLabel = String(b.period || b.name || b.title || b.bellDisplay || '').trim()
+            const key = rawLabel.toUpperCase()
+            const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
+            const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
+            const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
+            const timeStr = [bs, be].filter(Boolean).join(' - ')
+            return { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
+          })
+          schedules[target] = schedules[target].concat(mappedAll)
+          sources[target] = 'api'
+        } else {
+          for (const b of bellsArr) {
+            const rawLabel = String(b.period || b.name || b.title || b.bellDisplay || '').trim()
+            const key = rawLabel.toUpperCase()
+            const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
+            const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
+            const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
+            const timeStr = [bs, be].filter(Boolean).join(' - ')
+            const entry = { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
+            const pattern = (b.dayPattern || b.pattern || b.day || '').toString().toLowerCase()
+            if (pattern.includes('mon') || pattern.includes('tue')) { schedules['Mon/Tues'].push(entry); sources['Mon/Tues'] = 'api' }
+            else if (pattern.includes('wed') || pattern.includes('thu') || pattern.includes('thur')) { schedules['Wed/Thurs'].push(entry); sources['Wed/Thurs'] = 'api' }
+            else if (pattern.includes('fri')) { schedules['Fri'].push(entry); sources['Fri'] = 'api' }
+            else { schedules['Mon/Tues'].push(entry); if (sources['Mon/Tues'] === 'empty') sources['Mon/Tues'] = 'api' }
+          }
+        }
+        return { schedules, sources }
+      } catch (e) {
+        return { schedules: { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] }, sources: { 'Mon/Tues': 'empty', 'Wed/Thurs': 'empty', Fri: 'empty' } }
+      }
+    }
     const authError = responses.find((r: any) => r && (r.status === 401 || r.status === 403))
     if (authError) {
       const payload = authError.json ?? authError.text ?? authError.html ?? null
+      // Try to salvage bell schedules from any available responses so clients
+      // can still render breaks when the portal requires authentication.
+      const { schedules: _schedules, sources: _sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
+      const maybeBellSchedules = (_schedules && (Object.values(_schedules).some((a: any) => Array.isArray(a) && a.length))) ? _schedules : undefined
+      const maybeBellSources = (_sources && (Object.values(_sources).some((a: any) => a !== 'empty'))) ? _sources : undefined
       return NextResponse.json(
         {
           error: 'Unauthorized from SBHS timetable API',
           details: payload,
+          bellTimes: maybeBellSchedules,
+          bellTimesSources: maybeBellSources,
           diagnostics: {
             hasAccessToken: !!accessToken,
             forwardedCookies: incomingCookie ? true : false,
@@ -222,10 +283,15 @@ export async function GET(req: NextRequest) {
       return message.includes('unauth') || message.includes('token') || message.includes('expired')
     })
     if (explicitError) {
+      const { schedules: _schedules, sources: _sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
+      const maybeBellSchedules = (_schedules && (Object.values(_schedules).some((a: any) => Array.isArray(a) && a.length))) ? _schedules : undefined
+      const maybeBellSources = (_sources && (Object.values(_sources).some((a: any) => a !== 'empty'))) ? _sources : undefined
       return NextResponse.json(
         {
           error: 'SBHS timetable API reported an authorization problem',
           details: explicitError.json,
+          bellTimes: maybeBellSchedules,
+          bellTimesSources: maybeBellSources,
           diagnostics: {
             hasAccessToken: !!accessToken,
             forwardedCookies: incomingCookie ? true : false,

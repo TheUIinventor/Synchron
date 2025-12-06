@@ -442,10 +442,11 @@ export default function TimetablePage() {
                           <div className="w-24 text-sm font-medium text-on-surface-variant">
                               {(() => {
                                 try {
-                                  const timeSrc = (period.time || '') || findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
+                                  const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
+                                  const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
                                   const { start } = parseTimeRange(timeSrc || '')
                                   return formatTo12Hour(start)
-                                } catch (e) { return ((period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx) || '').split(' - ')[0] || '') }
+                                } catch (e) { return ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '') }
                               })()}
                           </div>
                           <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
@@ -454,12 +455,13 @@ export default function TimetablePage() {
                         <div key={period.id ?? period.period} className="flex items-start gap-4 py-2">
                           <div className="w-24 text-sm font-medium text-on-surface-variant">
                               {(() => {
-                                try {
-                                  const timeSrc = (period.time || '') || findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
-                                  const { start } = parseTimeRange(timeSrc || '')
-                                  return formatTo12Hour(start)
-                                } catch (e) { return ((period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx) || '').split(' - ')[0] || '') }
-                              })()}
+                                  try {
+                                    const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
+                                    const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                                    const { start } = parseTimeRange(timeSrc || '')
+                                    return formatTo12Hour(start)
+                                  } catch (e) { return ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '') }
+                                })()}
                           </div>
                           <div className="flex-1">
                               <div className={`p-3 rounded-xl flex items-center justify-between bg-surface-container-high`}>
@@ -538,7 +540,8 @@ export default function TimetablePage() {
                                     <div className="w-16 text-sm font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
-                                          const timeSrc = (period.time || '') || findBellTimeForPeriod(period, bucketA, idx) || ''
+                                          const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''
+                                          const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
                                           const { start } = parseTimeRange(timeSrc || '')
                                           return formatTo12Hour(start)
                                         } catch (e) { return ((period.time || (bucketA && bucketA[idx] && bucketA[idx].time) || '').split(' - ')[0] || '') }
@@ -555,11 +558,16 @@ export default function TimetablePage() {
                                             const { start } = parseTimeRange(period.time || '')
                                             return formatTo12Hour(start)
                                           }
-                                          const timeSrc = findBellTimeForPeriod(period, bucketA, idx) || ''
-                                          if (timeSrc) {
-                                            const { start } = parseTimeRange(timeSrc || '')
-                                            return formatTo12Hour(start)
-                                          }
+                                            try {
+                                              const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''
+                                              const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                                              if (timeSrc) {
+                                                const { start } = parseTimeRange(timeSrc || '')
+                                                return formatTo12Hour(start)
+                                              }
+                                            } catch (e) {}
+                                        
+                                          return ''
                                         } catch (e) {}
                                         return ''
                                       })()}
@@ -602,7 +610,8 @@ export default function TimetablePage() {
                                     <div className="w-16 text-sm font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
-                                          const timeSrc = (period.time || '') || findBellTimeForPeriod(period, bucketB, idx) || ''
+                                          const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
+                                          const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
                                           const { start } = parseTimeRange(timeSrc || '')
                                           return formatTo12Hour(start)
                                         } catch (e) { return ((period.time || (bucketB && bucketB[idx] && bucketB[idx].time) || '').split(' - ')[0] || '') }
@@ -619,11 +628,15 @@ export default function TimetablePage() {
                                             const { start } = parseTimeRange(period.time || '')
                                             return formatTo12Hour(start)
                                           }
-                                          const timeSrc = findBellTimeForPeriod(period, bucketB, idx) || ''
-                                          if (timeSrc) {
-                                            const { start } = parseTimeRange(timeSrc || '')
-                                            return formatTo12Hour(start)
-                                          }
+                                            try {
+                                              const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
+                                              const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                                              if (timeSrc) {
+                                                const { start } = parseTimeRange(timeSrc || '')
+                                                return formatTo12Hour(start)
+                                              }
+                                            } catch (e) {}
+                                            return ''
                                         } catch (e) {}
                                         return ''
                                       })()}
