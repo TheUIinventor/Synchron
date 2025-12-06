@@ -36,6 +36,15 @@ export default function CombinedStatus() {
     return p.fullTeacher || p.teacher || ''
   }, [])
 
+  const getDisplayRoom = useCallback((period: any) => {
+    if (!period) return ''
+    try {
+      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom || (period as any).to
+      if (display && String(display).trim()) return String(display)
+    } catch (e) {}
+    return period.room || ''
+  }, [])
+
   useEffect(() => {
     const updateStatus = () => {
       setCurrentTime(getCurrentTime())
@@ -80,7 +89,7 @@ export default function CombinedStatus() {
                   <span>{displayTeacher(nextPeriodInfo.currentPeriod)}</span>
                 )}
                 <span>•</span>
-                <span>{nextPeriodInfo.currentPeriod.room}</span>
+                <span>{getDisplayRoom(nextPeriodInfo.currentPeriod)}</span>
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400 font-mono bg-white/50 dark:bg-black/20 px-2 py-1 rounded-full inline-block">
                 {nextPeriodInfo.timeUntil}
@@ -105,7 +114,7 @@ export default function CombinedStatus() {
                     <span>{displayTeacher(nextPeriodInfo.nextPeriod)}</span>
                   )}
                   <span>•</span>
-                  <span>{nextPeriodInfo.nextPeriod.room}</span>
+                  <span>{getDisplayRoom(nextPeriodInfo.nextPeriod)}</span>
                 </div>
               </div>
             )}

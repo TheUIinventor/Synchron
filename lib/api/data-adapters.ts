@@ -198,11 +198,14 @@ export function applySubstitutionsToTimetable(
           if (toRoomProvided) {
             const candidateRoom = String(sub.toRoom).trim()
             if (normalizeRoom(candidateRoom) !== normalizeRoom(period.room)) {
+              // Do not overwrite the original `room` value from the API.
+              // Instead, set a non-destructive `displayRoom` field which the
+              // UI will prefer when rendering destination rooms.
               period.isRoomChange = true
               const prevRoom = period.room
-              period.room = candidateRoom
+              ;(period as any).displayRoom = candidateRoom
               changed = true
-              if (options?.debug) console.debug(`Applied room change (toRoom): ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+              if (options?.debug) console.debug(`Applied room change (toRoom) -> displayRoom: ${prevRoom} -> ${candidateRoom} (day=${day} period=${period.period} subject=${period.subject})`)
             }
           } else {
             // For debugging: if a substitution provides `room` or `fromRoom`
@@ -211,12 +214,13 @@ export function applySubstitutionsToTimetable(
               (typeof sub.fromRoom !== 'undefined' && sub.fromRoom !== null && String(sub.fromRoom).trim().length > 0 ? String(sub.fromRoom).trim() : undefined)
             if (fallbackRoom) {
               if (normalizeRoom(fallbackRoom) !== normalizeRoom(period.room)) {
-                // Apply the fallback replacement but do not mark as an
-                // `isRoomChange` because the upstream did not supply `toRoom`.
+                // Do not overwrite the original `room`. Store the fallback
+                // in `displayRoom` for UI-only rendering. Do NOT mark
+                // `isRoomChange` because there's no explicit `toRoom`.
                 const prevRoom = period.room
-                period.room = fallbackRoom
+                ;(period as any).displayRoom = fallbackRoom
                 changed = true
-                if (options?.debug) console.debug(`Applied room replacement (fallback field): ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+                if (options?.debug) console.debug(`Applied room replacement (fallback) -> displayRoom: ${prevRoom} -> ${fallbackRoom} (day=${day} period=${period.period} subject=${period.subject})`)
               } else if (options?.debug) {
                 console.debug(`Fallback room provided but equal to scheduled room: ${fallbackRoom} (day=${day} period=${period.period})`)
               }

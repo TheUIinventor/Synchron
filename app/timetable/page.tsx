@@ -155,8 +155,8 @@ export default function TimetablePage() {
   const getDisplayRoom = (period: any) => {
     try {
       if (!period) return ''
-      const cand = (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom || (period as any).to
-      if (cand && String(cand).trim()) return String(cand)
+      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom || (period as any).to
+      if (display && String(display).trim()) return String(display)
     } catch (e) {}
     return period.room || ''
   }
@@ -637,8 +637,8 @@ export default function TimetablePage() {
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className="text-xs text-on-surface-variant hidden md:block">{period.room}</div>
-                                        <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room}</div>
+                                        <div className="text-xs text-on-surface-variant hidden md:block">{getDisplayRoom(period)}</div>
+                                        <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>
@@ -706,8 +706,8 @@ export default function TimetablePage() {
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className="text-xs text-on-surface-variant hidden md:block">{period.room}</div>
-                                        <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{period.room}</div>
+                                        <div className="text-xs text-on-surface-variant hidden md:block">{getDisplayRoom(period)}</div>
+                                        <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>

@@ -551,7 +551,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const candStr = String(candidate).trim()
               const roomStr = String(p.room || '').trim()
               if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                return { ...p, room: candStr, isRoomChange: true }
+                // Do not mutate `room` coming from the upstream JSON. Use a
+                // non-destructive `displayRoom` field which the UI will
+                // prefer when rendering. Keep `isRoomChange` to signal
+                // that the displayed destination differs from the schedule.
+                return { ...p, displayRoom: candStr, isRoomChange: true }
               }
             }
 
@@ -559,9 +563,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // was no explicit destination provided on the incoming period.
             // This avoids showing stale highlights from persisted objects.
             if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom && !(p as any).to) {
-              if ((p as any).isRoomChange) {
+              if ((p as any).isRoomChange || (p as any).displayRoom) {
                 const clean = { ...p }
                 delete (clean as any).isRoomChange
+                delete (clean as any).displayRoom
                 return clean
               }
             }
