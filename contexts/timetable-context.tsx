@@ -408,13 +408,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(raw)
         if (!parsed) return null
         // Support either the payload shape { timetable: {...} } or a plain day->period map
-        if (parsed.timetable && typeof parsed.timetable === 'object') return parsed.timetable
-        // If the stored object looks like { Monday: [...], Tuesday: [...] } treat it as the timetable directly
-        const keys = Object.keys(parsed)
-        const daySet = new Set(['monday','tuesday','wednesday','thursday','friday'])
-        const lcKeys = keys.map(k => String(k).toLowerCase())
-        const hasDayKeys = lcKeys.some(k => daySet.has(k))
-        if (hasDayKeys) return parsed as Record<string, Period[]>
+        const extractMap = (maybe: any): Record<string, Period[]> | null => {
+          if (!maybe || typeof maybe !== 'object') return null
+          if (maybe.timetable && typeof maybe.timetable === 'object') return maybe.timetable
+          const keys = Object.keys(maybe)
+          const daySet = new Set(['monday','tuesday','wednesday','thursday','friday'])
+          const lcKeys = keys.map(k => String(k).toLowerCase())
+          const hasDayKeys = lcKeys.some(k => daySet.has(k))
+          if (hasDayKeys) return maybe as Record<string, Period[]>
+          return null
+        }
+
+        const rawMap = extractMap(parsed)
+        if (rawMap) {
+          // Defensive cleanup: remove stale `isRoomChange` flags from persisted
+          // timetable entries unless an explicit destination field exists.
+          try {
+            const cleaned: Record<string, Period[]> = {}
+            for (const day of Object.keys(rawMap)) {
+              cleaned[day] = (rawMap[day] || []).map((p) => {
+                const hasDest = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to
+                if (!hasDest && (p as any).isRoomChange) {
+                  const c = { ...p }
+                  delete (c as any).isRoomChange
+                  return c
+                }
+                return p
+              })
+            }
+            return cleaned
+          } catch (e) {
+            return rawMap
+          }
+        }
       }
     } catch (e) {
       // ignore parse errors
@@ -526,6 +552,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const roomStr = String(p.room || '').trim()
               if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
                 return { ...p, room: candStr, isRoomChange: true }
+              }
+            }
+
+            // Defensive: clear any pre-existing `isRoomChange` flag if there
+            // was no explicit destination provided on the incoming period.
+            // This avoids showing stale highlights from persisted objects.
+            if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom && !(p as any).to) {
+              if ((p as any).isRoomChange) {
+                const clean = { ...p }
+                delete (clean as any).isRoomChange
+                return clean
               }
             }
             return p

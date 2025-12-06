@@ -202,7 +202,24 @@ export function applySubstitutionsToTimetable(
               const prevRoom = period.room
               period.room = candidateRoom
               changed = true
-              if (options?.debug) console.debug(`Applied room change: ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+              if (options?.debug) console.debug(`Applied room change (toRoom): ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+            }
+          } else {
+            // For debugging: if a substitution provides `room` or `fromRoom`
+            // but not an explicit `toRoom`, report this when debug enabled.
+            const fallbackRoom = typeof sub.room !== 'undefined' && sub.room !== null && String(sub.room).trim().length > 0 ? String(sub.room).trim() :
+              (typeof sub.fromRoom !== 'undefined' && sub.fromRoom !== null && String(sub.fromRoom).trim().length > 0 ? String(sub.fromRoom).trim() : undefined)
+            if (fallbackRoom) {
+              if (normalizeRoom(fallbackRoom) !== normalizeRoom(period.room)) {
+                // Apply the fallback replacement but do not mark as an
+                // `isRoomChange` because the upstream did not supply `toRoom`.
+                const prevRoom = period.room
+                period.room = fallbackRoom
+                changed = true
+                if (options?.debug) console.debug(`Applied room replacement (fallback field): ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+              } else if (options?.debug) {
+                console.debug(`Fallback room provided but equal to scheduled room: ${fallbackRoom} (day=${day} period=${period.period})`)
+              }
             }
           }
 
