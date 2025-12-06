@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Send, Type, Home, ChevronLeft, Calendar, Bell, Clipboard, Award } from "lucide-react"
+import { Type, Home, ChevronLeft, Calendar, Bell, Clipboard, Award } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import ThemeToggle from "@/components/theme-toggle"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation"
 import { useUserSettings, type ColorTheme, type FontTheme } from "@/components/theme-provider"
 import { useTimetable } from "@/contexts/timetable-context"
 import { useToast } from "@/hooks/use-toast"
-import { Textarea } from "@/components/ui/textarea"
+// Feedback is now an embedded Google Form iframe; no local textarea needed
 // NavItem removed - navigation tabs control is no longer user-configurable
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
@@ -144,8 +144,6 @@ function CanvasLinksEditor() {
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"appearance" | "integrations" | "feedback">("appearance")
-  const [feedbackText, setFeedbackText] = useState("")
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [appearanceTabClicks, setAppearanceTabClicks] = useState(0)
   const [showFontSelector, setShowFontSelector] = useState(false)
   const router = useRouter()
@@ -171,15 +169,7 @@ export default function SettingsPage() {
     setFontTheme(theme)
   }
 
-  const handleFeedbackSubmit = () => {
-    console.log("Feedback submitted:", feedbackText)
-    setFeedbackSubmitted(true)
-    setFeedbackText("")
-
-    setTimeout(() => {
-      setFeedbackSubmitted(false)
-    }, 3000)
-  }
+  // Feedback is submitted via the embedded Google Form; no client-side handler required.
 
   // Appearance tab easter egg handler
   const handleAppearanceTabClick = () => {
@@ -392,31 +382,21 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Send Feedback</CardTitle>
                 <CardDescription className="text-on-surface-variant">
-                  Let us know how we can improve the app
+                  Please use the form below to submit feedback about the app.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Textarea
-                  placeholder="Type your feedback here..."
-                  className="min-h-[120px] bg-surface-container-high border-none focus-visible:ring-primary resize-none rounded-xl"
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                />
-
-                <Button
-                  className="w-full rounded-full"
-                  onClick={handleFeedbackSubmit}
-                  disabled={!feedbackText.trim() || feedbackSubmitted}
-                >
-                  {feedbackSubmitted ? (
-                    "Thank you!"
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Feedback
-                    </>
-                  )}
-                </Button>
+                <div className="w-full h-[600px] max-h-[75vh]">
+                  <iframe
+                    title="Synchron Feedback Form"
+                    src="https://docs.google.com/forms/d/e/1FAIpQLSfAS4FVqpjbWbzFDS5FShU6eKTrgXNARhZvz8r6PALqOQb6zQ/viewform?embedded=true"
+                    className="w-full h-full border-0 rounded-xl"
+                    frameBorder={0}
+                    marginHeight={0}
+                    marginWidth={0}
+                    allowFullScreen
+                  />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
