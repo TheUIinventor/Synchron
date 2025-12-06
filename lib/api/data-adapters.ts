@@ -190,14 +190,20 @@ export function applySubstitutionsToTimetable(
             changed = true
           }
 
-          // Prefer explicit toRoom, then room, then fromRoom as replacement
-          const newRoom = sub.toRoom || sub.room || sub.fromRoom
-          if (newRoom && newRoom !== period.room) {
-            period.isRoomChange = true
-            const prevRoom = period.room
-            period.room = newRoom
-            changed = true
-            if (options?.debug) console.debug(`Applied room change: ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+          // Prefer explicit toRoom as the authoritative destination. Only
+          // treat this as a room change when `toRoom` is explicitly provided
+          // and differs from the scheduled room (compare trimmed, case-insensitive).
+          const toRoomProvided = typeof sub.toRoom !== 'undefined' && sub.toRoom !== null && String(sub.toRoom).trim().length > 0
+          const normalizeRoom = (r?: string) => (r || '').toString().trim().toLowerCase()
+          if (toRoomProvided) {
+            const candidateRoom = String(sub.toRoom).trim()
+            if (normalizeRoom(candidateRoom) !== normalizeRoom(period.room)) {
+              period.isRoomChange = true
+              const prevRoom = period.room
+              period.room = candidateRoom
+              changed = true
+              if (options?.debug) console.debug(`Applied room change: ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+            }
           }
 
           if (options?.debug && !changed) {

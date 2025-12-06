@@ -518,8 +518,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // Check several common variant keys that might exist on the
             // incoming period object.
             const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to || undefined
-            if (candidate && String(candidate).trim() && candidate !== p.room) {
-              return { ...p, room: String(candidate), isRoomChange: true }
+            // Only treat as a change when a non-empty candidate exists and the
+            // normalized value differs from the scheduled room. This avoids
+            // false positives caused by casing or surrounding whitespace.
+            if (candidate && String(candidate).trim()) {
+              const candStr = String(candidate).trim()
+              const roomStr = String(p.room || '').trim()
+              if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+                return { ...p, room: candStr, isRoomChange: true }
+              }
             }
             return p
           })
