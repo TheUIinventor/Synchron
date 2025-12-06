@@ -529,7 +529,12 @@ export default function TimetablePage() {
                                 ) : (
                                   <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
                                 )}
-                                <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate`}>{period.room}</span>
+                                {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
+                                {period.isRoomChange ? (
+                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-black truncate">{getDisplayRoom(period)}</span>
+                                ) : (
+                                  <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate`}>{getDisplayRoom(period)}</span>
+                                )}
                               </div>
                             </div>
                           </div>

@@ -505,7 +505,15 @@ export default function HomeClient() {
                                     )}
                                   </span>
                                   <span>•</span>
-                                  <span>{(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
+                                  {/* Room: prefer destination room fields when present; highlight if a room change */}
+                                  {(() => {
+                                    const displayRoom = (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
+                                    return period.isRoomChange ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayRoom}</span>
+                                    ) : (
+                                      <span>{displayRoom}</span>
+                                    )
+                                  })()}
                                 </div>
                               </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
@@ -517,7 +525,14 @@ export default function HomeClient() {
                                     )}
                                   </span>
                                   <span className="mx-2">•</span>
-                                  <span>{(period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room}</span>
+                                  {(() => {
+                                    const displayRoom = (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
+                                    return period.isRoomChange ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayRoom}</span>
+                                    ) : (
+                                      <span>{displayRoom}</span>
+                                    )
+                                  })()}
                                 </div>
                             </a>
                           ) : (
@@ -552,8 +567,15 @@ export default function HomeClient() {
                                   ) : (
                                     <span>{(period.fullTeacher || period.teacher)}</span>
                                   )}
-                                  <span className="mx-2">•</span>
-                                  <span>{period.room}</span>
+                                    <span className="mx-2">•</span>
+                                    {(() => {
+                                      const displayRoom = (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
+                                      return period.isRoomChange ? (
+                                        <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayRoom}</span>
+                                      ) : (
+                                        <span>{displayRoom}</span>
+                                      )
+                                    })()}
                                 </div>
                               </div>
                             </div>
