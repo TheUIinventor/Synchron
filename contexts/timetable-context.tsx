@@ -539,13 +539,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
-        // If the server provided bell times at all, always prefer the API's
-        // bucket for that day and respect its ordering. Only fall back to the
-        // built-in `bellTimesData` when no `externalBellTimes` object exists.
+        // Only use API-provided bell buckets; do not fall back to hardwired data.
         if (useExternalBellTimes) {
           return dayName === 'Friday' ? useExternalBellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues']) || []
         }
-        return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
+        return []
       }
       
 
@@ -626,13 +624,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
-        const source = useExternalBellTimes || bellTimesData
-        const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
-        const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
-        if (!hasBreakLike && useExternalBellTimes) {
-          return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
-        }
-        return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
+        // Use only API-provided buckets when available; otherwise return empty.
+        const source = useExternalBellTimes
+        const bucket = dayName === 'Friday' ? source?.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source?.['Wed/Thurs'] : source?.['Mon/Tues'])
+        return bucket || []
       }
 
       const parseStartMinutes = (timeStr: string) => {
@@ -718,13 +713,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       for (const [day, periods] of Object.entries(sample)) filtered[day] = (periods || []).slice()
 
       const getBellForDay = (dayName: string) => {
-        const source = useExternalBellTimes || bellTimesData
-        const bucket = dayName === 'Friday' ? source.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source['Wed/Thurs'] : source['Mon/Tues'])
-        const hasBreakLike = Array.isArray(bucket) && bucket.some((b) => /(?:recess|lunch|break)/i.test(String(b?.period || '')))
-        if (!hasBreakLike && useExternalBellTimes) {
-          return dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues'])
-        }
-        return bucket || (dayName === 'Friday' ? bellTimesData.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimesData['Wed/Thurs'] : bellTimesData['Mon/Tues']))
+        // Only respect API-provided bell buckets here; if none exist, don't insert hardcoded breaks.
+        const source = useExternalBellTimes
+        const bucket = dayName === 'Friday' ? source?.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source?.['Wed/Thurs'] : source?.['Mon/Tues'])
+        return bucket || []
       }
 
       for (const day of Object.keys(filtered)) {

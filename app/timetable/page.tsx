@@ -172,29 +172,83 @@ export default function TimetablePage() {
   // Keep Roll Call / Period 0 and Break rows visible — show all raw entries
   const todaysTimetable = todaysTimetableRaw
 
-  // Helper to find bell time by matching labels in the bucket, falling back
-  // to index lookup when no label match found.
+  // Helper: normalize labels and build a canonical key for matching.
+  const normalizeLabel = (s?: string) => {
+    if (!s) return ''
+    let t = String(s).trim().toLowerCase()
+    // common token aliases
+    t = t.replace(/^rc$/,'roll call')
+    t = t.replace(/^r$/,'recess')
+    t = t.replace(/^eod$/,'end of day')
+    t = t.replace(/^mtl1$/,'lunch 1')
+    t = t.replace(/^mtl2$/,'lunch 2')
+    // remove punctuation and collapse whitespace
+    t = t.replace(/[^a-z0-9 ]+/g, ' ')
+    t = t.replace(/\s+/g, ' ').trim()
+    return t
+  }
+
+  // Robust finder: prefer exact normalized label matches, then stricter fuzzy rules,
+  // then numeric-only matches, then fall back to a sorted-by-start-time index lookup.
   const findBellTimeForPeriod = (p: any, bucket: any[] | null, index: number) => {
     try {
-      if (!bucket || !Array.isArray(bucket)) return ''
-      const label = String(p?.period || p?.title || '').trim()
-      if (label) {
-        const found = bucket.find((b: any) => {
-          const bLabel = String(b?.originalPeriod || b?.period || b?.bell || b?.bellDisplay || '').trim()
-          if (!bLabel) return false
-          if (bLabel.toLowerCase() === label.toLowerCase()) return true
-          if (bLabel.toLowerCase().includes(label.toLowerCase())) return true
-          if (label.toLowerCase().includes(bLabel.toLowerCase())) return true
-          const n1 = (label.match(/\d+/) || [])[0]
-          const n2 = (bLabel.match(/\d+/) || [])[0]
-          if (n1 && n2 && n1 === n2) return true
-          if ((/^(rc|roll call)$/i).test(label) && /rc|roll/i.test(bLabel)) return true
-          return false
-        })
-        if (found) return found.time || (found.startTime ? (found.startTime + (found.endTime ? ' - ' + found.endTime : '')) : '')
+      if (!bucket || !Array.isArray(bucket) || bucket.length === 0) return ''
+
+      const periodLabelRaw = String(p?.period || p?.title || p?.bell || '').trim()
+      const periodKey = normalizeLabel(periodLabelRaw)
+
+      // Build normalized lookup map from bucket entries (preserve original ordering)
+      const entries = bucket.map((b: any, i: number) => {
+        const labels = [b?.originalPeriod, b?.period, b?.bellDisplay, b?.bell, b?.title]
+          .filter(Boolean)
+          .map((x: any) => normalizeLabel(String(x)))
+        const time = b?.time || (b?.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : '')
+        // parse start for sorting
+        let start: string | null = null
+        try {
+          const parsed = parseTimeRange(time || '')
+          start = parsed.start ? parsed.start.toISOString() : null
+        } catch (e) { start = null }
+        return { index: i, labels, raw: b, time, start }
+      })
+
+      // Exact normalized label match
+      if (periodKey) {
+        for (const e of entries) {
+          if (e.labels.includes(periodKey)) return e.time || ''
+        }
       }
-      const byIndex = bucket[index]
-      if (byIndex) return byIndex.time || (byIndex.startTime ? (byIndex.startTime + (byIndex.endTime ? ' - ' + byIndex.endTime : '')) : '')
+
+      // Word-boundary contains match (both directions) to avoid accidental numeric substring matches
+      if (periodKey) {
+        for (const e of entries) {
+          for (const lbl of e.labels) {
+            if (lbl && (` ${lbl} `).includes(` ${periodKey} `)) return e.time || ''
+            if (periodKey && (` ${periodKey} `).includes(` ${lbl} `)) return e.time || ''
+          }
+        }
+      }
+
+      // Strict numeric match: only if both are simple numbers (e.g., '1' vs '1')
+      const pNum = (periodLabelRaw.match(/^\s*(\d+)\s*$/) || [])[1]
+      if (pNum) {
+        for (const e of entries) {
+          for (const lbl of e.labels) {
+            const eNum = (lbl.match(/^(\d+)$/) || [])[1]
+            if (eNum && eNum === pNum) return e.time || ''
+          }
+        }
+      }
+
+      // As a last resort: sort entries by parsed start time and pick by index if available
+      const sorted = entries.slice().sort((a, b) => {
+        if (a.start && b.start) return a.start < b.start ? -1 : a.start > b.start ? 1 : 0
+        if (a.start) return -1
+        if (b.start) return 1
+        return a.index - b.index
+      })
+      if (index >= 0 && index < sorted.length) return sorted[index].time || ''
+
     } catch (e) {}
     return ''
   }
