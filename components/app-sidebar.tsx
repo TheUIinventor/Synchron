@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Calendar, Bell, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTimetable } from "@/contexts/timetable-context";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -56,6 +57,53 @@ export function AppSidebar() {
           );
         })}
       </div>
+      {/* Bell times widget */}
+      <div className="w-full px-2 mt-3">
+        <BellTimesSidebar />
+      </div>
     </aside>
   );
+}
+
+function BellTimesSidebar() {
+  const tt = useTimetable() as any;
+  const dateObj: Date = tt?.selectedDateObject || new Date()
+
+  const day = dateObj.getDay()
+  // Map JS day -> bucket
+  const bucket = day === 5 ? "Fri" : (day === 3 || day === 4) ? "Wed/Thurs" : (day === 1 || day === 2) ? "Mon/Tues" : "Mon/Tues"
+
+  const bellTimes: { period: string; time: string }[] = (tt?.bellTimes && tt.bellTimes[bucket]) || []
+
+  // Show only breaks and lunches allocation prominently
+  const breaks = bellTimes.filter((b: any) => /recess|break|lunch|end of day|end-of-day|endofday|end of day/i.test(String(b.period)))
+
+  if (!bellTimes || bellTimes.length === 0) return (
+    <div className="w-full text-center text-[11px] text-muted-foreground">No bell times</div>
+  )
+
+  return (
+    <div className="w-full flex flex-col items-center gap-1">
+      <div className="text-[11px] font-medium text-muted-foreground">Today</div>
+      <div className="w-full mt-1 rounded-md bg-surface-2/80 p-2">
+        {bellTimes.slice(0, 6).map((b: any, i: number) => (
+          <div key={i} className="flex justify-between text-[12px] text-foreground/90">
+            <div className="truncate">{b.period}</div>
+            <div className="ml-2 text-muted-foreground">{b.time}</div>
+          </div>
+        ))}
+        {breaks.length > 0 && (
+          <div className="mt-2 border-t border-border/30 pt-1 text-[11px] text-muted-foreground">
+            <div className="font-medium">Breaks</div>
+            {breaks.map((b: any, i: number) => (
+              <div key={i} className="flex justify-between text-[12px]">
+                <div>{b.period}</div>
+                <div className="text-muted-foreground">{b.time}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
