@@ -257,7 +257,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="container max-w-6xl mx-auto px-4 py-6 pb-24">
+      <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 py-6 pb-24">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -265,7 +265,7 @@ export default function TimetablePage() {
           >
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-2xl font-bold text-on-surface md:text-center md:flex-1">My Synchron</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-on-surface md:text-center md:flex-1">My Synchron</h1>
           {/* Data source badge and manual refresh */}
           <div className="flex items-center gap-2">
             <div className="text-xs text-on-surface-variant flex items-center gap-2">
@@ -313,7 +313,7 @@ export default function TimetablePage() {
         {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
         {timetableSource === 'fallback-sample' && (
           <div className="w-full mb-6">
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
+            <Card className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
                   <div className="font-medium text-on-surface">Can't load your live timetable</div>
@@ -428,14 +428,14 @@ export default function TimetablePage() {
             )}
 
             {/* Daily Schedule (wide format) */}
-            <div className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4 max-w-6xl mx-auto">
+            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4">
               <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-on-surface">{selectedDayName} Schedule</h2>
-                  <p className="text-sm text-on-surface-variant">{formatSelectedDate()}</p>
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-semibold text-on-surface truncate">{selectedDayName} Schedule</h2>
+                  <p className="text-xs sm:text-sm text-on-surface-variant truncate">{formatSelectedDate()}</p>
                 </div>
               </div>
 
@@ -492,8 +492,8 @@ export default function TimetablePage() {
                   <div className="space-y-3">
                     {todaysTimetable.map((period, idx) => (
                       period.subject === "Break" ? (
-                        <div key={period.id ?? period.period} className="flex items-start gap-4 py-2">
-                          <div className="w-24 text-sm font-medium text-on-surface-variant">
+                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-2">
+                          <div className="w-20 sm:w-24 text-sm font-medium text-on-surface-variant">
                               {(() => {
                                 try {
                                   const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
@@ -518,22 +518,22 @@ export default function TimetablePage() {
                                 })()}
                           </div>
                           <div className="flex-1">
-                              <div className={`p-3 rounded-xl flex items-center justify-between bg-surface-container-high`}>
-                              <div className="min-w-0 pr-4">
-                                <div className={`text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
+                              <div className={`p-2 sm:p-3 rounded-xl flex items-center justify-between bg-surface-container-high`}> 
+                              <div className="min-w-0 pr-2">
+                                <div className={`text-base sm:text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
-                              <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                              <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {period.isSubstitute ? (
-                                    <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-black truncate">{(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}</span>
+                                    <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[120px]">{(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}</span>
                                 ) : (
-                                  <span className="text-sm text-on-surface-variant truncate">{period.fullTeacher || period.teacher}</span>
+                                  <span className="text-sm text-on-surface-variant truncate max-w-[120px]">{period.fullTeacher || period.teacher}</span>
                                 )}
                                 {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
                                 {period.isRoomChange ? (
-                                  <span className="px-3 py-1 rounded-md text-sm bg-primary/80 text-black truncate">{getDisplayRoom(period)}</span>
+                                  <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[80px]">{getDisplayRoom(period)}</span>
                                 ) : (
-                                  <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate`}>{getDisplayRoom(period)}</span>
+                                  <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate max-w-[80px]`}>{getDisplayRoom(period)}</span>
                                 )}
                               </div>
                             </div>
@@ -567,7 +567,7 @@ export default function TimetablePage() {
                 </div>
 
                 {/* Days Header */}
-                <div className="grid grid-cols-5 gap-6 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 mb-6">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
                     <div key={day} className="text-center">
                       <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}</h3>
@@ -596,7 +596,7 @@ export default function TimetablePage() {
                               return itemsA.map((period: any, idx: number) => (
                                 period.subject === 'Break' ? (
                                   <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                    <div className="w-14 sm:w-16 text-sm font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
                                           const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''

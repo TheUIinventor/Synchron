@@ -272,9 +272,9 @@ export default function HomeClient() {
         <div className="md:col-span-8 space-y-3 flex flex-col md:h-full">
             
             {/* Primary Status Card */}
-            <div className="relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group mx-auto w-[92%] max-w-[720px] md:mx-0 md:w-full md:max-w-none">
-              {/* Background Blob */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/20" />
+            <div className="relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
+              {/* Background Blob (hidden on small screens to avoid overflow) */}
+              <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20" />
               
               <div className="relative z-10 flex flex-col h-full justify-between min-h-[150px]">
                 <div className="flex justify-between items-start">
@@ -285,7 +285,7 @@ export default function HomeClient() {
                 </div>
                 
                 <div className="mt-3">
-                  <h2 className="text-3xl md:text-5xl font-serif leading-tight mb-2">
+                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-serif leading-tight mb-2">
                     {currentPeriod?.subject ? (
                       canvasLinks[currentPeriod.subject] ? (
                         <a href={canvasLinks[currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
@@ -328,7 +328,7 @@ export default function HomeClient() {
             </div>
 
             {/* Quick Links (replaces Up Next card) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 mx-auto w-[92%] max-w-[720px] md:mx-0 md:w-full md:max-w-none md:items-stretch">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 w-full md:w-full md:items-stretch">
               <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-container-highest transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
                 <div className="flex flex-wrap items-center gap-3">
                   <a
