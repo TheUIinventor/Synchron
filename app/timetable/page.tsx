@@ -428,7 +428,7 @@ export default function TimetablePage() {
             )}
 
             {/* Daily Schedule (wide format) */}
-            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4">
+            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4 mx-auto max-w-[680px]">
               <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
@@ -493,7 +493,7 @@ export default function TimetablePage() {
                     {todaysTimetable.map((period, idx) => (
                       period.subject === "Break" ? (
                         <div key={period.id ?? period.period} className="flex items-start gap-3 py-2">
-                          <div className="w-20 sm:w-24 text-sm font-medium text-on-surface-variant">
+                          <div className="w-16 sm:w-20 text-sm font-medium text-on-surface-variant">
                               {(() => {
                                 try {
                                   const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
@@ -506,8 +506,8 @@ export default function TimetablePage() {
                           <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                         </div>
                       ) : (
-                        <div key={period.id ?? period.period} className="flex items-start gap-4 py-2">
-                          <div className="w-24 text-sm font-medium text-on-surface-variant">
+                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-2">
+                          <div className="w-16 sm:w-20 text-sm font-medium text-on-surface-variant">
                               {(() => {
                                   try {
                                     const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
@@ -518,22 +518,22 @@ export default function TimetablePage() {
                                 })()}
                           </div>
                           <div className="flex-1">
-                              <div className={`p-2 sm:p-3 rounded-xl flex items-center justify-between bg-surface-container-high`}> 
-                              <div className="min-w-0 pr-2">
+                              <div className={`p-2 sm:p-3 rounded-xl flex items-center bg-surface-container-high`}> 
+                              <div className="min-w-0 pr-1">
                                 <div className={`text-base sm:text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
-                              <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                              <div className="flex items-center gap-2 ml-1 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {period.isSubstitute ? (
-                                    <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[120px]">{(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}</span>
+                                    <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[100px]">{(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}</span>
                                 ) : (
-                                  <span className="text-sm text-on-surface-variant truncate max-w-[120px]">{period.fullTeacher || period.teacher}</span>
+                                  <span className="text-sm text-on-surface-variant truncate max-w-[100px]">{period.fullTeacher || period.teacher}</span>
                                 )}
                                 {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
                                 {period.isRoomChange ? (
-                                  <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[80px]">{getDisplayRoom(period)}</span>
+                                  <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[72px]">{getDisplayRoom(period)}</span>
                                 ) : (
-                                  <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate max-w-[80px]`}>{getDisplayRoom(period)}</span>
+                                  <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate max-w-[72px]`}>{getDisplayRoom(period)}</span>
                                 )}
                               </div>
                             </div>
@@ -576,7 +576,7 @@ export default function TimetablePage() {
                 </div>
 
                 {/* Timetable Grid: each day shows Week A then Week B */}
-                <div className="grid grid-cols-5 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
                     // prefer grouped timetableByWeek when available
                     // fall back to showing the current week's data if grouped data isn't present.
