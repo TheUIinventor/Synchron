@@ -60,32 +60,10 @@ export async function GET(req: NextRequest) {
   if (!accessToken && !refreshToken) {
     return NextResponse.json({ success: false, error: 'Missing SBHS access token' }, { status: 401 })
   }
-  // If we have an access token that appears to be a JWT, try to decode it
-  // and extract common name claims as a fast fallback. This does not verify
-  // the token signature; it's only used to populate a friendly greeting when
-  // the portal doesn't return JSON and scraping fails.
-  try {
-
-    if (accessToken && typeof accessToken === 'string') {
-      const parts = accessToken.split('.')
-      if (parts.length === 3) {
-        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-        try {
-          const decoded = Buffer.from(payload.padEnd(payload.length + (4 - (payload.length % 4)) % 4, '='), 'base64').toString('utf8')
-          const claims = JSON.parse(decoded)
-          const possibleName = claims.given_name || claims.givenName || claims.name || claims.preferred_username || claims.email || null
-          if (possibleName && isProbableName(possibleName)) {
-            const given = (typeof possibleName === 'string' && possibleName.split) ? String(possibleName).split(/\s+/)[0] : null
-            return NextResponse.json({ success: true, data: { givenName: given, rawClaims: { sub: claims.sub || null } }, source: 'token' })
-          }
-        } catch (e) {
-          // ignore decode errors and continue to proxy/fallback
-        }
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
+  // NOTE: Do not introspect access tokens (JWTs). Access tokens may change
+  // format or content and should not be relied upon for user identity.
+  // If user identity is required, obtain an ID token via OpenID Connect or
+  // call the portal's userinfo endpoint using the bearer token.
   try {
     // Build headers: include Authorization when we have a bearer token and also forward cookies
     const headers: Record<string,string> = {
@@ -326,32 +304,16 @@ export async function GET(req: NextRequest) {
           // ignore any scraping errors and continue to diagnostics
         }
 
-        // If scraping didn't yield a name, try a final JWT decode fallback that
-        // returns all token claims as the response payload. This gives the app
-        // full token data to extract a name client-side if present.
-        try {
-          if (accessToken && typeof accessToken === 'string') {
-            const parts = accessToken.split('.')
-            if (parts.length >= 2) {
-              const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-              try {
-                const decoded = Buffer.from(payload.padEnd(payload.length + (4 - (payload.length % 4)) % 4, '='), 'base64').toString('utf8')
-                const claims = JSON.parse(decoded)
-                const possibleName = claims.given_name || claims.givenName || claims.name || claims.preferred_username || null
-                const valid = possibleName && isProbableName(possibleName) ? String(possibleName).trim() : null
-                const given = valid ? valid.split(/\s+/)[0] : null
-                const payload: any = { tokenClaims: claims }
-                if (valid) payload.givenName = given
-                if (valid) payload.fullName = valid
-                return NextResponse.json({ success: true, data: payload, source: 'token:claims' })
-              } catch (e) {
-                // ignore decode errors and continue to diagnostics
-              }
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
+        // Do NOT attempt to decode or introspect access tokens here.
+        // Access tokens may change format or contents and should not be
+        // relied upon for user identity. If identity claims are required
+        // the correct approaches are:
+        //  - Obtain an ID Token via an OpenID Connect flow and read claims
+        //    from that ID Token, or
+        //  - Call the upstream userinfo endpoint using the bearer token
+        //    (already attempted above) which returns authoritative JSON.
+        // As a result we intentionally avoid any JWT parsing here and
+        // continue to the diagnostic probes below.
 
         // Additionally probe a few other endpoints to see which ones accept the session
         const probePaths = ['/notices', '/awards', '/timetable']

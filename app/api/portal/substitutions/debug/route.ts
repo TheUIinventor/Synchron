@@ -65,21 +65,9 @@ export async function GET(req: Request) {
       apiResults.push(await probeEndpoint(url, { ...baseHeaders }))
     }
 
-    // Try to decode JWT payload for visibility (not verified)
-    let accessTokenPayload: any = null
-    if (accessTokenPresent && accessTokenValue) {
-      try {
-        const parts = accessTokenValue.split('.')
-        if (parts.length >= 2) {
-          const payload = parts[1]
-          const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=')
-          const decoded = Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
-          accessTokenPayload = JSON.parse(decoded)
-        }
-      } catch (e) {
-        accessTokenPayload = { error: 'unable to decode token payload', message: String(e) }
-      }
-    }
+    // Do not decode or introspect access tokens here. Token formats can change
+    // and should not be parsed for meaning. Keep payload null for safety.
+    const accessTokenPayload: any = null
 
     // Shorten Authorization value for safety
     const forwardedHeaders = { ...baseHeaders }
