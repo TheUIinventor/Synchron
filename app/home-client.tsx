@@ -297,20 +297,18 @@ export default function HomeClient() {
             
             {/* Primary Status Card */}
             {/* Mobile-only compact pill (shows countdown and next period) */}
-            <Link href="/timetable" className="block sm:hidden w-full">
-              <div className="mx-auto max-w-[680px] px-3 py-2 rounded-full bg-primary text-primary-foreground font-medium flex items-center justify-between shadow-sm">
-                {noClassesByBells ? (
-                  <span className="text-sm md:text-base truncate">No classes today!</span>
-                ) : (
+            {!noClassesByBells && (
+              <Link href="/timetable" className="block sm:hidden w-full">
+                <div className="mx-auto max-w-[680px] px-3 py-2 rounded-full bg-primary text-primary-foreground font-medium flex items-center justify-between shadow-sm">
                   <>
                     <span className="text-sm md:text-base truncate">
                       {formatMsHHMMSS(bellState.timeUntil)} to {bellState.isCurrentlyInPeriod ? (bellState.currentPeriod?.period || 'class') : (bellState.nextBell?.period || 'next bell')}
                     </span>
                     <ArrowRight className="ml-3 h-4 w-4 opacity-90" />
                   </>
-                )}
-              </div>
-            </Link>
+                </div>
+              </Link>
+            )}
 
             {/* Desktop / tablet expressive card (hidden on small screens) */}
             <div className="hidden sm:block relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
