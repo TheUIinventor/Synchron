@@ -398,6 +398,31 @@ const timetableWeekB = {
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
   const [currentWeek, setCurrentWeek] = useState<"A" | "B" | null>(null)
+  // Attempt a single synchronous read of the last-persisted timetable so we
+  // can synchronously show cached data and avoid a loading spinner on first
+  // render when a cache exists.
+  let __initialRawCache: string | null = null
+  try {
+    if (typeof window !== 'undefined') __initialRawCache = localStorage.getItem('synchron-last-timetable')
+  } catch (e) {
+    __initialRawCache = null
+  }
+  const __extractMapFromCache = (raw: any): Record<string, Period[]> | null => {
+    try {
+      if (!raw) return null
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (!parsed) return null
+      const maybe = parsed.timetable && typeof parsed.timetable === 'object' ? parsed.timetable : parsed
+      if (!maybe || typeof maybe !== 'object') return null
+      const keys = Object.keys(maybe)
+      const daySet = new Set(['monday','tuesday','wednesday','thursday','friday'])
+      const lcKeys = keys.map(k => String(k).toLowerCase())
+      const hasDayKeys = lcKeys.some(k => daySet.has(k))
+      if (hasDayKeys) return maybe as Record<string, Period[]>
+    } catch (e) {}
+    return null
+  }
+  const __initialExternalTimetable = __extractMapFromCache(__initialRawCache)
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
@@ -417,44 +442,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // can display cached data instantly while we fetch fresh data in the background.
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(() => {
     try {
-      const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-last-timetable') : null
-      try { if (raw) { console.debug('[timetable.provider] found synchron-last-timetable in storage') } } catch (e) {}
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (!parsed) return null
-        // Support either the payload shape { timetable: {...} } or a plain day->period map
-        const extractMap = (maybe: any): Record<string, Period[]> | null => {
-          if (!maybe || typeof maybe !== 'object') return null
-          if (maybe.timetable && typeof maybe.timetable === 'object') return maybe.timetable
-          const keys = Object.keys(maybe)
-          const daySet = new Set(['monday','tuesday','wednesday','thursday','friday'])
-          const lcKeys = keys.map(k => String(k).toLowerCase())
-          const hasDayKeys = lcKeys.some(k => daySet.has(k))
-          if (hasDayKeys) return maybe as Record<string, Period[]>
-          return null
-        }
-
-        const rawMap = extractMap(parsed)
-        if (rawMap) {
-          // Defensive cleanup: remove stale `isRoomChange` flags from persisted
-          // timetable entries unless an explicit destination field exists.
-          try {
-            const cleaned: Record<string, Period[]> = {}
-            for (const day of Object.keys(rawMap)) {
-              cleaned[day] = (rawMap[day] || []).map((p) => {
-                const hasDest = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to
-                if (!hasDest && (p as any).isRoomChange) {
-                  const c = { ...p }
-                  delete (c as any).isRoomChange
-                  return c
-                }
-                return p
-              })
-            }
-            return cleaned
-          } catch (e) {
-            return rawMap
+      if (__initialExternalTimetable) {
+        try { console.debug('[timetable.provider] found synchron-last-timetable in storage (init)') } catch (e) {}
+        const rawMap = __initialExternalTimetable
+        try {
+          const cleaned: Record<string, Period[]> = {}
+          for (const day of Object.keys(rawMap)) {
+            cleaned[day] = (rawMap[day] || []).map((p) => {
+              const hasDest = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to
+              if (!hasDest && (p as any).isRoomChange) {
+                const c = { ...p }
+                delete (c as any).isRoomChange
+                return c
+              }
+              return p
+            })
           }
+          return cleaned
+        } catch (e) {
+          return rawMap
         }
       }
     } catch (e) {
@@ -474,7 +480,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // If we have an initial cached timetable, avoid showing the global loading
+  // spinner — show cached data immediately while we refresh in the
+  // background.
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    try {
+      return !Boolean(__initialExternalTimetable)
+    } catch (e) {
+      return true
+    }
+  })
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [lastUserSelectedAt, setLastUserSelectedAt] = useState<number | null>(null)
