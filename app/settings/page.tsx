@@ -441,7 +441,6 @@ export default function SettingsPage() {
             <div>
               <InstallAppButton />
             </div>
-          </TabsContent>
         </Tabs>
 
         {/* Easter Egg Area - Link to new page */}
