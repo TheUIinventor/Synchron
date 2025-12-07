@@ -19,8 +19,6 @@ export default function TimetablePage() {
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
   const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
-  // debug values
-  const { lastFetchedDate, lastFetchedPayloadSummary } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -282,48 +280,8 @@ export default function TimetablePage() {
             <ChevronLeft className="h-6 w-6" />
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold text-on-surface md:text-center md:flex-1">My Synchron</h1>
-          {/* Data source badge and manual refresh */}
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-on-surface-variant flex items-center gap-2">
-              {timetableSource === 'fallback-sample' ? (
-                <span className="px-2 py-1 rounded-full bg-tertiary-container text-on-tertiary-container">Using sample data</span>
-              ) : timetableSource ? (
-                <span className="px-2 py-1 rounded-full bg-primary-container text-on-primary-container">Live data</span>
-              ) : null}
-              {/* Debug badge showing authoritative API week vs provider currentWeek */}
-              {externalWeekType ? (
-                <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">API week: {externalWeekType}</span>
-              ) : (
-                <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">API week: —</span>
-              )}
-              <span className="px-2 py-1 rounded-full bg-surface-200 text-on-surface text-xs">UI week: {currentWeek ?? '—'}</span>
-              {/* Small debug info about last fetch */}
-              <div className="ml-2 text-xs text-on-surface-variant">
-                <div>fetched: {lastFetchedDate ?? '—'}</div>
-                <div>payload: {lastFetchedPayloadSummary ? JSON.stringify(lastFetchedPayloadSummary) : '—'}</div>
-              </div>
-            </div>
-            <button
-              onClick={async () => {
-                try {
-                  if (refreshExternal) await refreshExternal()
-                } catch (e) {
-                  // ignore user-facing errors here — provider will fall back to sample if needed
-                }
-              }}
-              className="hidden md:inline-flex px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm hover:bg-surface-container-highest transition-colors"
-              title="Retry loading live timetable"
-            >
-              Refresh
-            </button>
-            <button
-              onClick={() => fetchDiagnostics()}
-              className="hidden md:inline-flex px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm hover:bg-surface-container-highest transition-colors"
-              title="Run portal diagnostics"
-            >
-              {diagLoading ? 'Checking...' : 'Diagnostics'}
-            </button>
-          </div>
+          {/* Debug badges & manual refresh removed per UX request */}
+          <div className="w-6 hidden md:block" />
           <div className="w-6 hidden md:block"></div>
         </div>
         {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
@@ -450,7 +408,7 @@ export default function TimetablePage() {
                   <CalendarIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base sm:text-lg font-semibold text-on-surface truncate">{selectedDayName} Schedule</h2>
+                  <h2 className="text-base sm:text-lg font-semibold text-on-surface truncate">{selectedDayName}{(externalWeekType ?? currentWeek) ? ` ${externalWeekType ?? currentWeek}` : ''} Schedule</h2>
                   <p className="text-xs sm:text-sm text-on-surface-variant truncate">{formatSelectedDate()}</p>
                 </div>
               </div>
@@ -586,7 +544,7 @@ export default function TimetablePage() {
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 mb-6">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
                     <div key={day} className="text-center">
-                      <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}</h3>
+                      <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}{(externalWeekType ?? currentWeek) ? ` ${externalWeekType ?? currentWeek}` : ''}</h3>
                     </div>
                   ))}
                 </div>

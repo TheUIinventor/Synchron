@@ -583,7 +583,7 @@ export default function HomeClient() {
                                   <div className="flex items-center gap-2">
                                     <p className="font-medium text-sm truncate">{period.subject}</p>
                                     {period.isSubstitute && (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                                      <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                                     )}
                                     {period.isRoomChange && (
                                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
@@ -591,7 +591,7 @@ export default function HomeClient() {
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {period.isSubstitute && (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                                      <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
                                     )}
                                     <span>{displayTeacher(period)}</span>
                                     <span>•</span>
