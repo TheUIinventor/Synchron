@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 // NavItem removed - navigation tabs control is no longer user-configurable
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
+import InstallAppButton from "@/components/install-app-button"
 
 const CANVAS_LINKS_KEY = "synchron-canvas-links"
 
@@ -414,6 +415,10 @@ export default function SettingsPage() {
                 <CanvasLinksEditor />
               </CardContent>
             </Card>
+            {/* Install App action shown in Settings only */}
+            <div>
+              <InstallAppButton />
+            </div>
           </TabsContent>
         </Tabs>
 

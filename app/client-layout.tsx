@@ -21,6 +21,40 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       .catch(err => console.debug('auth refresh error', err))
   }, [])
 
+  // Register service worker and capture install prompt for PWA
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Register SW in production-like environments
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        // console.debug('ServiceWorker registered', reg)
+      }).catch((err) => {
+        // console.debug('SW registration failed', err)
+      })
+    }
+
+    // Capture the beforeinstallprompt event so the UI can trigger prompt later
+    function onBeforeInstall(e: any) {
+      // Prevent the default mini-infobar from showing
+      e.preventDefault()
+      // Store the event for later use (components can read window.__synchron_deferredInstall)
+      try { (window as any).__synchron_deferredInstall = e } catch (err) {}
+      // Optionally, dispatch a custom event so any UI can show an install button
+      window.dispatchEvent(new CustomEvent('synchron:beforeinstallprompt', { detail: {} }))
+    }
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstall as EventListener)
+    window.addEventListener('appinstalled', () => {
+      try { delete (window as any).__synchron_deferredInstall } catch (e) {}
+      window.dispatchEvent(new CustomEvent('synchron:appinstalled'))
+    })
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener)
+    }
+  }, [])
+
   // Dynamic scaler: adjust root UI scale slightly when vertical space is constrained
   useEffect(() => {
     let raf = 0

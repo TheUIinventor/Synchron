@@ -21,6 +21,15 @@ export default function InstallAppButton() {
       setShowButton(false);
     });
 
+    // If another part of the app saved the deferred prompt, use it
+    try {
+      const saved = (window as any).__synchron_deferredInstall
+      if (saved) {
+        setDeferredPrompt(saved)
+        setShowButton(true)
+      }
+    } catch (e) {}
+
     // iOS Safari: check for standalone mode
     if (typeof window !== 'undefined') {
       const nav: any = window.navigator;

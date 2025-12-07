@@ -45,6 +45,7 @@ export default function Head() {
       <meta property="og:title" content={siteName} />
       <meta property="og:description" content="A modern, expressive timetable app for SBHS students." />
       <meta property="og:image" content={logoPath} />
+      <meta name="theme-color" content="#6750A4" />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={siteName} />
       <meta name="twitter:description" content="A modern, expressive timetable app for SBHS students." />
