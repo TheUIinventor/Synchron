@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react"
+import { useToast } from "@/hooks/use-toast"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay } from "@/utils/time-utils"
@@ -51,6 +52,7 @@ type TimetableContextType = {
   isShowingNextDay: boolean // Indicates if the main timetable is showing next day
   timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
   isLoading: boolean
+  isRefreshing?: boolean
   error: string | null
   // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
   refreshExternal?: () => Promise<void>
@@ -399,13 +401,17 @@ const timetableWeekB = {
 export function TimetableProvider({ children }: { children: ReactNode }) {
   const [currentWeek, setCurrentWeek] = useState<"A" | "B" | null>(null)
   // Attempt a single synchronous read of the last-persisted timetable so we
-  // can synchronously show cached data and avoid a loading spinner on first
-  // render when a cache exists.
+  // can synchronously show cached data (including bell times and by-week
+  // groupings) and avoid a loading spinner on first render when a cache
+  // exists.
   let __initialRawCache: string | null = null
+  let __initialParsedCache: any = null
   try {
     if (typeof window !== 'undefined') __initialRawCache = localStorage.getItem('synchron-last-timetable')
+    if (__initialRawCache) __initialParsedCache = JSON.parse(__initialRawCache)
   } catch (e) {
     __initialRawCache = null
+    __initialParsedCache = null
   }
   const __extractMapFromCache = (raw: any): Record<string, Period[]> | null => {
     try {
@@ -422,7 +428,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
     return null
   }
-  const __initialExternalTimetable = __extractMapFromCache(__initialRawCache)
+  const __initialExternalTimetable = __extractMapFromCache(__initialParsedCache)
+  const __initialExternalTimetableByWeek = ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] } | null> | null => {
+    try {
+      if (!__initialParsedCache) return null
+      if (__initialParsedCache.timetableByWeek && typeof __initialParsedCache.timetableByWeek === 'object') return __initialParsedCache.timetableByWeek
+    } catch (e) {}
+    return null
+  })()
+  const __initialExternalBellTimes = ((): Record<string, { period: string; time: string }[]> | null => {
+    try {
+      if (!__initialParsedCache) return null
+      if (__initialParsedCache.bellTimes && typeof __initialParsedCache.bellTimes === 'object') return __initialParsedCache.bellTimes
+    } catch (e) {}
+    return null
+  })()
+  const __initialTimetableSource = ((): string | null => {
+    try { return __initialParsedCache?.source ?? null } catch (e) { return null }
+  })()
+  const __initialWeekType = ((): "A" | "B" | null => {
+    try { const w = __initialParsedCache?.weekType; return (w === 'A' || w === 'B') ? w : null } catch (e) { return null }
+  })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
@@ -469,17 +495,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return null
   })
   const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
-  const [timetableSource, setTimetableSource] = useState<string | null>(null)
-  const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
+  const [timetableSource, setTimetableSource] = useState<string | null>(() => __initialTimetableSource)
+  const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(() => {
+    try { return __initialExternalTimetableByWeek || null } catch (e) { return null }
+  })
   const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(externalTimetableByWeek)
   // Record the authoritative week type provided by the server (A/B) when available
-  const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(null)
+  const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(() => __initialWeekType)
   // Debug: record last fetched date and a small payload summary for diagnostics
   const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null)
   const [lastFetchedPayloadSummary, setLastFetchedPayloadSummary] = useState<any | null>(null)
-  const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(null)
+  const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
+  // Hydrate last-seen bell refs from the initial cache so components that
+  // read `lastSeenBellTimesRef` synchronously can access bell buckets.
+  try {
+    if (typeof window !== 'undefined' && __initialExternalBellTimes) {
+      lastSeenBellTimesRef.current = __initialExternalBellTimes
+      lastSeenBellTsRef.current = __initialParsedCache?.savedAt ? Date.parse(__initialParsedCache.savedAt) : Date.now()
+    }
+  } catch (e) {}
   // If we have an initial cached timetable, avoid showing the global loading
   // spinner — show cached data immediately while we refresh in the
   // background.
@@ -490,6 +526,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return true
     }
   })
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
+  const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [lastUserSelectedAt, setLastUserSelectedAt] = useState<number | null>(null)
@@ -1251,7 +1289,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const hadCache = Boolean(externalTimetable || lastRecordedTimetable)
     if (!hadCache) setIsLoading(true)
     // Mark that a background refresh is in progress for logging/debug
-    const isRefreshingRef = { current: true }
+    setIsRefreshing(true)
     try { console.time('[timetable] refreshExternal') } catch (e) {}
     setError(null)
     // First try the server-scraped homepage endpoint
@@ -1390,11 +1428,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (r.status === 401) {
           if (!attemptedRefresh) {
             try {
-              await fetch('/api/auth/refresh', { credentials: 'include' })
+              const rr = await fetch('/api/auth/refresh', { credentials: 'include' })
+              if (!rr || !rr.ok) {
+                try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
+                try { setIsAuthenticated(false) } catch (e) {}
+              }
             } catch (e) {
-              // ignore
+              try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
             }
-              return refreshExternal(true)
+            return refreshExternal(true)
           }
         }
         const rctype = r.headers.get('content-type') || ''
@@ -1428,6 +1470,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       setCurrentWeek(parsedCache.weekType)
                     }
                     try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ cached: true }) } catch (e) {}
+                    try { setIsRefreshing(false) } catch (e) {}
                     // Only clear the global loading flag if we previously set it
                     // because there was no cache. Otherwise keep showing the
                     // cached UI while the live refresh continues.
@@ -1616,6 +1659,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   } catch (e) {}
                 }
               } catch (e) {}
+              try { setIsRefreshing(false) } catch (e) {}
               // Intentionally not overriding `selectedDateObject` here for
               // the reasons described above.
               setTimetableSource(j.source ?? 'external')
@@ -1656,11 +1700,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
           if (!attemptedRefresh) {
             try {
-              await fetch('/api/auth/refresh', { credentials: 'include' })
+              const rr = await fetch('/api/auth/refresh', { credentials: 'include' })
+              if (!rr || !rr.ok) {
+                try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
+                try { setIsAuthenticated(false) } catch (e) {}
+              }
             } catch (e) {
-              // ignore
+              try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
             }
-              return refreshExternal(true)
+            return refreshExternal(true)
           }
         }
         const rctype2 = r2.headers.get('content-type') || ''
@@ -1813,7 +1861,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
-      setIsLoading(false)
+      try { setIsRefreshing(false) } catch (e) {}
+      // Only clear the global loading flag if we initially showed it
+      // because there was no cache; otherwise keep cached UI visible.
+      try { if (!hadCache) setIsLoading(false) } catch (e) { setIsLoading(false) }
     }
   }
 
@@ -2118,7 +2169,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         timetableByWeek: lastRecordedTimetableByWeek || externalTimetableByWeek || undefined,
         externalWeekType,
         isLoading,
-        isShowingCachedWhileLoading: Boolean(isLoading && lastRecordedTimetable),
+        isRefreshing,
+        isShowingCachedWhileLoading: Boolean((isLoading || isRefreshing) && lastRecordedTimetable),
         error,
         refreshExternal,
       }}

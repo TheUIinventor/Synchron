@@ -17,6 +17,7 @@ export default function HomeClient() {
     timetableData, 
     currentMomentPeriodInfo, 
     isLoading, 
+    isRefreshing,
     error, 
     refreshExternal,
     selectedDay,
@@ -269,7 +270,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-3">
             {/* Sync indicator placed left of the settings icon. Spinner while loading, cloud+check when synced. */}
             <div className="flex items-center">
-              {isLoading ? (
+              {(isLoading || isRefreshing) ? (
                 <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
               ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
                 <div className="relative w-5 h-5" title="Synced to cloud">
