@@ -262,7 +262,7 @@ export default function HomeClient() {
       {/* Header Section */}
       <div className="flex items-start justify-between gap-4 pt-4 md:pt-0">
         <div className="flex flex-col gap-1">
-          <h2 className="mt-[10px] text-3xl md:text-4xl font-medium text-foreground">{givenName ? `Hello, ${givenName}!` : 'Hello!'}</h2>
+          <h2 className="mt-[10px] text-2xl sm:text-3xl md:text-4xl font-medium text-foreground leading-tight truncate">{givenName ? `Hello, ${givenName}!` : 'Hello!'}</h2>
           {/* Page title and date removed per user preference; greeting shown above */}
         </div>
 
