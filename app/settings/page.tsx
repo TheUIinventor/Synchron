@@ -147,6 +147,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"appearance" | "integrations" | "feedback">("appearance")
   const [appearanceTabClicks, setAppearanceTabClicks] = useState(0)
   const [showFontSelector, setShowFontSelector] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const router = useRouter()
   const { colorTheme, setColorTheme, fontTheme, setFontTheme } = useUserSettings()
 
@@ -159,6 +160,20 @@ export default function SettingsPage() {
     // Reset font easter egg on page load - don't persist it
     setShowFontSelector(false)
     setAppearanceTabClicks(0)
+  }, [])
+
+  // Detect small/mobile screens (Tailwind `sm` breakpoint = 640px)
+  useEffect(() => {
+    function check() {
+      try {
+        setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 640 : false)
+      } catch (e) {
+        setIsMobile(false)
+      }
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
   }, [])
 
   const handleColorThemeChange = (theme: ColorTheme) => {
@@ -241,12 +256,15 @@ export default function SettingsPage() {
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger 
-                value="integrations" 
-                className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
-              >
-                Integrations
-              </TabsTrigger>
+              {/* Hide Integrations tab on small/mobile screens */}
+              {!isMobile && (
+                <TabsTrigger 
+                  value="integrations" 
+                  className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+                >
+                  Integrations
+                </TabsTrigger>
+              )}
               <TabsTrigger 
                 value="feedback" 
                 className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
@@ -402,7 +420,9 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="integrations" className="space-y-4 mt-0">
+          {/* Integrations content hidden on mobile */}
+          {!isMobile && (
+            <TabsContent value="integrations" className="space-y-4 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Canvas Links</CardTitle>
@@ -415,6 +435,8 @@ export default function SettingsPage() {
                 <CanvasLinksEditor />
               </CardContent>
             </Card>
+            </TabsContent>
+          )}
             {/* Install App action shown in Settings only */}
             <div>
               <InstallAppButton />

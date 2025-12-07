@@ -14,6 +14,7 @@ import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } fro
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
+  const [isPhone, setIsPhone] = useState(false)
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
@@ -24,6 +25,21 @@ export default function TimetablePage() {
   useEffect(() => {
     setMounted(true)
     trackSectionUsage("timetable")
+  }, [])
+
+  // Detect phone devices (exclude tablets which may be portrait but are tablets)
+  useEffect(() => {
+    function detect() {
+      try {
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
+        const isTabletUA = /iPad|Tablet|Android(?!.*Mobile)|Silk|Kindle/i.test(ua) || (typeof navigator !== 'undefined' && (navigator as any).maxTouchPoints && window.innerWidth >= 600 && window.innerWidth <= 1024)
+        const phone = typeof window !== 'undefined' ? (window.innerWidth < 640 && !isTabletUA) : false
+        setIsPhone(phone)
+      } catch (e) { setIsPhone(false) }
+    }
+    detect()
+    window.addEventListener('resize', detect)
+    return () => window.removeEventListener('resize', detect)
   }, [])
 
   const [showDiag, setShowDiag] = useState(false)
@@ -518,7 +534,7 @@ export default function TimetablePage() {
                                 })()}
                           </div>
                           <div className="flex-1">
-                              <div className={`p-2 sm:p-3 rounded-xl flex items-center bg-surface-container-high`}> 
+                              <div className={`p-2 sm:p-3 rounded-xl flex items-center bg-surface-container-high transition-all hover:shadow-md ${isPhone ? '' : 'active:scale-95'}`}> 
                               <div className="min-w-0 pr-1">
                                 <div className={`text-base sm:text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
