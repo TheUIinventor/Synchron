@@ -191,6 +191,21 @@ const buildBellTimesFromPayload = (payload: any) => {
   return result
 }
 
+// Lightweight deterministic hash for JSON payloads (djb2 on stringified input)
+const computePayloadHash = (input: any) => {
+  try {
+    const s = typeof input === 'string' ? input : JSON.stringify(input)
+    let h = 5381
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) + h) + s.charCodeAt(i)
+      h = h & 0xffffffff
+    }
+    return String(h >>> 0)
+  } catch (e) {
+    return null
+  }
+}
+
 // Try to parse a fetch Response for bell times and apply them to state.
 const extractBellTimesFromResponse = async (res: Response | null) => {
   if (!res) return
@@ -1364,6 +1379,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const rctype = r.headers.get('content-type') || ''
         if (rctype.includes('application/json')) {
           const j = await r.json()
+          // Compute a lightweight hash for this payload and try to reuse
+          // any previously-processed result stored under that hash. This
+          // allows the UI to show a fully-processed timetable instantly
+          // while we optionally refresh in the background.
+          let _payloadHash: string | null = null
+          try {
+            _payloadHash = computePayloadHash(j)
+          } catch (e) { _payloadHash = null }
+          if (_payloadHash && typeof window !== 'undefined') {
+            try {
+              const cached = localStorage.getItem(`synchron-processed-${_payloadHash}`)
+              if (cached) {
+                const parsedCache = JSON.parse(cached)
+                if (parsedCache && parsedCache.timetable) {
+                  try {
+                    setExternalTimetable(parsedCache.timetable)
+                    setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
+                    if (parsedCache.bellTimes) {
+                      setExternalBellTimes(parsedCache.bellTimes)
+                      lastSeenBellTimesRef.current = parsedCache.bellTimes
+                      lastSeenBellTsRef.current = parsedCache.savedAt || Date.now()
+                    }
+                    setTimetableSource(parsedCache.source || 'external-cache')
+                    if (parsedCache.weekType === 'A' || parsedCache.weekType === 'B') {
+                      setExternalWeekType(parsedCache.weekType)
+                      setCurrentWeek(parsedCache.weekType)
+                    }
+                    try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ cached: true }) } catch (e) {}
+                    setIsLoading(false)
+                    return
+                  } catch (e) {
+                    // fallthrough to normal processing
+                  }
+                }
+              }
+            } catch (e) {
+              // ignore cache errors
+            }
+          }
           if (j && j.timetable) {
             if (payloadHasNoTimetable(j)) {
               // Even when the payload reports "no timetable", try to
@@ -1468,6 +1522,26 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
+              // Persist the processed result keyed by payload-hash so future
+              // loads can reuse the fully-applied timetable without re-extraction.
+              try {
+                if (_payloadHash && typeof window !== 'undefined') {
+                  try {
+                    const persisted = {
+                      timetable: finalTimetable,
+                      timetableByWeek: finalByWeek || null,
+                      bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      source: j.source ?? 'external',
+                      weekType: j.weekType ?? null,
+                      savedAt: Date.now(),
+                    }
+                    localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                    try { console.debug('[timetable.provider] cached processed payload', _payloadHash) } catch (e) {}
+                  } catch (e) {
+                    // ignore storage errors
+                  }
+                }
+              } catch (e) {}
               // Note: do not override provider-selected date here. The
               // `selectedDateObject` is driven by user choice and time-based
               // auto-selection logic; forcing it from a general `/api/timetable`
@@ -1501,6 +1575,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 byDay[day].push(p)
               }
               setExternalTimetable(byDay)
+              // Also persist processed result for array-shaped payloads
+              try {
+                if (_payloadHash && typeof window !== 'undefined') {
+                  try {
+                    const persisted = {
+                      timetable: byDay,
+                      timetableByWeek: null,
+                      bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      source: j.source ?? 'external',
+                      weekType: j.weekType ?? null,
+                      savedAt: Date.now(),
+                    }
+                    localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                    try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
+                  } catch (e) {}
+                }
+              } catch (e) {}
               // Intentionally not overriding `selectedDateObject` here for
               // the reasons described above.
               setTimetableSource(j.source ?? 'external')
