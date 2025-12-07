@@ -1245,7 +1245,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Expose a refresh function so UI can trigger a retry without reloading the page
   async function refreshExternal(attemptedRefresh = false): Promise<void> {
-    setIsLoading(true)
+    // If we already have a cached timetable, avoid showing the global
+    // loading spinner — keep cached content visible and refresh in the
+    // background. Only show the loading state when there is no cached data.
+    const hadCache = Boolean(externalTimetable || lastRecordedTimetable)
+    if (!hadCache) setIsLoading(true)
+    // Mark that a background refresh is in progress for logging/debug
+    const isRefreshingRef = { current: true }
     try { console.time('[timetable] refreshExternal') } catch (e) {}
     setError(null)
     // First try the server-scraped homepage endpoint
@@ -1422,7 +1428,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       setCurrentWeek(parsedCache.weekType)
                     }
                     try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ cached: true }) } catch (e) {}
-                    setIsLoading(false)
+                    // Only clear the global loading flag if we previously set it
+                    // because there was no cache. Otherwise keep showing the
+                    // cached UI while the live refresh continues.
+                    if (!hadCache) setIsLoading(false)
                     return
                   } catch (e) {
                     // fallthrough to normal processing
