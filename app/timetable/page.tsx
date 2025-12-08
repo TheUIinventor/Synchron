@@ -499,13 +499,17 @@ export default function TimetablePage() {
                               <div className="flex items-center gap-2 ml-1 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {/* Teacher: highlight when substitute instead of showing a status pill */}
-                                <span className={`text-sm truncate max-w-[100px] ${period.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
-                                  {(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}
-                                </span>
+                                {period.isSubstitute ? (
+                                  <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                    style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                  >
+                                    {(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}
+                                  </span>
+                                ) : (
+                                  <span className="text-on-surface-variant truncate max-w-[100px]">{(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}</span>
+                                )}
                                 {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
-                                <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : (period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
-                                  {getDisplayRoom(period)}
-                                </span>
+                                <span className="truncate max-w-[72px] text-sm text-on-surface-variant">{getDisplayRoom(period)}</span>
                               </div>
                             </div>
                           </div>
