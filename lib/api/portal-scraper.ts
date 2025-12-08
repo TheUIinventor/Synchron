@@ -134,6 +134,10 @@ export class PortalScraper {
           originalTeacher: obj.teacher || obj.originalTeacher || obj.teacherName || undefined,
           // Accept casual/replacement fields as substitute identifiers
           substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || obj.casual || undefined,
+          // Preserve casual parts separately when available so downstream logic
+          // can prefer `casualSurname` alone for display.
+          casual: obj.casual || undefined,
+          casualSurname: obj.casualSurname || undefined,
           // Provide a generous guess at the substitute's full name when available
           substituteTeacherFull: obj.casualSurname ? (obj.casual ? `${obj.casual} ${obj.casualSurname}` : obj.casualSurname) : (obj.substituteFullName || obj.substituteFull || undefined),
           fromRoom: obj.fromRoom || obj.from || obj.oldRoom || undefined,

@@ -498,17 +498,14 @@ export default function TimetablePage() {
                               </div>
                               <div className="flex items-center gap-2 ml-1 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
-                                {period.isSubstitute ? (
-                                    <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[100px]">{(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}</span>
-                                ) : (
-                                  <span className="text-sm text-on-surface-variant truncate max-w-[100px]">{period.fullTeacher || period.teacher}</span>
-                                )}
+                                {/* Teacher: highlight when substitute instead of showing a status pill */}
+                                <span className={`text-sm truncate max-w-[100px] ${period.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                                  {(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}
+                                </span>
                                 {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
-                                {period.isRoomChange ? (
-                                  <span className="px-2 py-1 rounded-md text-sm bg-primary/80 text-black truncate max-w-[72px]">{getDisplayRoom(period)}</span>
-                                ) : (
-                                  <span className={`${period.isSubstitute ? 'text-on-primary-foreground' : 'text-sm text-on-surface-variant'} truncate max-w-[72px]`}>{getDisplayRoom(period)}</span>
-                                )}
+                                <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : (period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
+                                  {getDisplayRoom(period)}
+                                </span>
                               </div>
                             </div>
                           </div>

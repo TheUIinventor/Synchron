@@ -539,40 +539,32 @@ export default function HomeClient() {
                                   {/* no separate Sub/Room pills here; teacher will be highlighted when substituted */}
                                 </div>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>
-                                    {period.isSubstitute ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayTeacher(period)}</span>
-                                    ) : (
-                                      <span>{displayTeacher(period)}</span>
-                                    )}
+                                  <span className={`text-sm truncate max-w-[100px] ${period.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                                    {displayTeacher(period)}
                                   </span>
                                   <span>•</span>
                                   {/* Room: prefer destination room fields when present; highlight if a room change */}
                                   {(() => {
                                     const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
-                                    return period.isRoomChange ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayRoom}</span>
-                                    ) : (
-                                      <span>{displayRoom}</span>
+                                    return (
+                                      <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : (period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
+                                        {displayRoom}
+                                      </span>
                                     )
                                   })()}
                                 </div>
                               </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  <span>
-                                    {period.isSubstitute ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayTeacher(period)}</span>
-                                    ) : (
-                                      <span>{displayTeacher(period)}</span>
-                                    )}
+                                  <span className={`text-sm truncate max-w-[100px] ${period.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                                    {displayTeacher(period)}
                                   </span>
                                   <span className="mx-2">•</span>
                                   {(() => {
                                     const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
-                                    return period.isRoomChange ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayRoom}</span>
-                                    ) : (
-                                      <span>{displayRoom}</span>
+                                    return (
+                                      <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : (period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
+                                        {displayRoom}
+                                      </span>
                                     )
                                   })()}
                                 </div>
@@ -583,39 +575,26 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">
                                     <p className="font-medium text-sm truncate">{period.subject}</p>
-                                    {period.isSubstitute && (
-                                      <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                    )}
-                                    {period.isRoomChange && (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                                    )}
+                                    {/* Remove textual 'Sub' and 'Room' pills; use teacher/room highlight styling instead */}
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    {period.isSubstitute && (
-                                      <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                    )}
+                                    {/* removed Sub pill */}
                                     <span>{displayTeacher(period)}</span>
                                     <span>•</span>
                                     <span>{(period as any).displayRoom || period.room}</span>
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  {period.isSubstitute ? (
-                                    <span className="inline-block px-2 py-0.5 rounded-md font-medium"
-                                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                    >
-                                      {displayTeacher(period)}
-                                    </span>
-                                  ) : (
-                                    <span>{displayTeacher(period)}</span>
-                                  )}
+                                  <span className={`text-sm truncate max-w-[100px] ${period.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                                    {displayTeacher(period)}
+                                  </span>
                                     <span className="mx-2">•</span>
                                     {(() => {
                                       const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
-                                      return period.isRoomChange ? (
-                                        <span className="inline-block px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'hsl(var(--accent))', color: '#000' }}>{displayRoom}</span>
-                                      ) : (
-                                        <span>{displayRoom}</span>
+                                      return (
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : (period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
+                                          {displayRoom}
+                                        </span>
                                       )
                                     })()}
                                 </div>

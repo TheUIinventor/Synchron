@@ -79,15 +79,9 @@ export default function CombinedStatus() {
               </div>
               <p className="font-medium mb-1">{getDisplaySubject(nextPeriodInfo.currentPeriod)}</p>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400 mb-2">
-                {nextPeriodInfo.currentPeriod.isSubstitute ? (
-                  <span className="inline-block px-2 py-0.5 rounded-md font-medium"
-                    style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                  >
-                    {displayTeacher(nextPeriodInfo.currentPeriod)}
-                  </span>
-                ) : (
-                  <span>{displayTeacher(nextPeriodInfo.currentPeriod)}</span>
-                )}
+                <span className={`text-sm truncate max-w-[100px] ${nextPeriodInfo.currentPeriod.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                  {displayTeacher(nextPeriodInfo.currentPeriod)}
+                </span>
                 <span>•</span>
                 <span>{getDisplayRoom(nextPeriodInfo.currentPeriod)}</span>
               </div>
@@ -104,15 +98,9 @@ export default function CombinedStatus() {
                 </div>
                 <p className="font-medium text-sm mb-1">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
                 <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  {nextPeriodInfo.nextPeriod.isSubstitute ? (
-                    <span className="inline-block px-2 py-0.5 rounded-md font-medium"
-                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                    >
-                      {displayTeacher(nextPeriodInfo.nextPeriod)}
-                    </span>
-                  ) : (
-                    <span>{displayTeacher(nextPeriodInfo.nextPeriod)}</span>
-                  )}
+                  <span className={`text-sm truncate max-w-[100px] ${nextPeriodInfo.nextPeriod.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                    {displayTeacher(nextPeriodInfo.nextPeriod)}
+                  </span>
                   <span>•</span>
                   <span>{getDisplayRoom(nextPeriodInfo.nextPeriod)}</span>
                 </div>

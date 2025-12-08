@@ -11,6 +11,8 @@ function normalizeVariation(obj: any) {
     subject: obj.subject || obj.class || obj.title || undefined,
     originalTeacher: obj.teacher || obj.originalTeacher || obj.teacherName || undefined,
     substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || obj.casual || undefined,
+    casual: obj.casual || undefined,
+    casualSurname: obj.casualSurname || undefined,
     substituteTeacherFull: obj.casualSurname ? (obj.casual ? `${obj.casual} ${obj.casualSurname}` : obj.casualSurname) : (obj.substituteFullName || obj.substituteFull || undefined),
     fromRoom: obj.fromRoom || obj.from || obj.oldRoom || undefined,
     toRoom: obj.toRoom || obj.to || obj.room || obj.newRoom || undefined,
