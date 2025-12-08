@@ -128,7 +128,9 @@ export default function CombinedStatus() {
           <div className="card-optimized rounded-xl p-4 text-center mb-4 bg-blue-50 dark:bg-blue-900/20">
             <div className="flex items-center justify-center gap-2 mb-2">
               <ArrowRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="font-semibold text-blue-700 dark:text-blue-300">Next period</span>
+              <span className="font-semibold text-blue-700 dark:text-blue-300">
+                {((nextPeriodInfo.nextPeriod as any)?.isRollCallMarker) ? 'School in' : 'Next period'}
+              </span>
             </div>
             <p className="font-medium mb-2">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
             <p className="text-sm text-gray-600 dark:text-gray-400 font-mono bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full inline-block">

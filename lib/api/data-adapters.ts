@@ -180,18 +180,23 @@ export function applySubstitutionsToTimetable(
             // Preserve casualSurname separately when provided by the upstream data.
             // If upstream provides both a casual token (e.g. initial) and a
             // casualSurname, combine them so downstream UI can display the
-            // exact casual form (e.g. "M Finegan").
+            // exact casual form (e.g. "M Finegan"). When a casual surname is
+            // provided we should prefer it for on-screen display even if a
+            // full name is not supplied; this prevents short placeholder codes
+            // from appearing after background refreshes.
             if ((sub as any).casualSurname) {
               const casual = (sub as any).casual ? String((sub as any).casual).trim() : ''
               const surname = String((sub as any).casualSurname).trim()
-              (period as any).casualSurname = casual ? `${casual} ${surname}` : surname
+              const composed = casual ? `${casual} ${surname}` : surname
+              ;(period as any).casualSurname = composed
+              // Make the casual form the authoritative displayed teacher
+              period.teacher = composed
             }
 
-            // Ensure downstream UI sees the casual surname when available;
-            // otherwise fall back to the full teacher name. This prevents
-            // short casual codes from appearing in the UI after refresh.
-            if ((period as any).fullTeacher) {
-              period.teacher = (period as any).casualSurname ? String((period as any).casualSurname) : String((period as any).fullTeacher)
+            // If no casualSurname was provided but a full display name exists,
+            // prefer that for the displayed teacher value.
+            else if ((period as any).fullTeacher) {
+              period.teacher = String((period as any).fullTeacher)
             }
 
             changed = true

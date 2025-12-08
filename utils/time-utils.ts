@@ -151,6 +151,64 @@ export const getTimeUntilNextPeriod = (
   return { nextPeriod, timeUntil, isCurrentlyInClass, currentPeriod }
 }
 
+// Parse a time range but anchored to a specific date. Returns start/end Date on that date.
+export const parseTimeRangeOnDate = (timeRange: string, baseDate: Date): { start: Date; end: Date } => {
+  if (!timeRange || typeof timeRange !== 'string' || !timeRange.includes('-')) {
+    const far = new Date(8640000000000000)
+    return { start: far, end: far }
+  }
+
+  const [startStr, endStr] = timeRange.split(' - ')
+  const startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())
+  const endDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())
+
+  const startParts = startStr.split(':')
+  let startHour = Number.parseInt(startParts[0], 10)
+  const startMinute = Number.parseInt(startParts[1], 10)
+  if (startHour >= 1 && startHour <= 7) startHour += 12
+  startDate.setHours(startHour, startMinute, 0, 0)
+
+  const endParts = endStr.split(':')
+  let endHour = Number.parseInt(endParts[0], 10)
+  const endMinute = Number.parseInt(endParts[1], 10)
+  if (endHour >= 1 && endHour <= 7) endHour += 12
+  endDate.setHours(endHour, endMinute, 0, 0)
+
+  return { start: startDate, end: endDate }
+}
+
+// Given a list of periods for a day and a base date, find the first non-break
+// period and return its start Date and the period object. Returns null if none.
+export const findFirstNonBreakPeriodOnDate = (
+  periods: Array<{ period: string; time: string; subject: string; teacher?: string; room?: string }> | undefined,
+  baseDate: Date,
+): { period: any; start: Date } | null => {
+  try {
+    if (!periods || !Array.isArray(periods)) return null
+    for (const p of periods) {
+      const subj = String(p.subject || p.period || '')
+      if (/(recess|lunch|break|end of day)/i.test(subj)) continue
+      const parsed = parseTimeRangeOnDate(String(p.time || ''), baseDate)
+      if (parsed && parsed.start && parsed.start.getTime() < 8640000000000000) {
+        return { period: p, start: parsed.start }
+      }
+    }
+  } catch (e) {}
+  return null
+}
+
+// Format a duration (ms) into "Xh Ym Zs" style (hours/mins/secs), used for countdowns
+export const formatDurationShort = (ms: number): string => {
+  if (!Number.isFinite(ms) || ms <= 0) return '0s'
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
 // Get day of week
 export const getCurrentDay = (date: Date = new Date()): string => {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]

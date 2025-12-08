@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useMemo, useCallback, u
 import { useToast } from "@/hooks/use-toast"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
-import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay } from "@/utils/time-utils"
+import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
 
 // Define the period type
 export type Period = {
@@ -670,6 +670,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
                 return np
               }
+              // Preserve any prior room-change display fields so a fresh payload
+              // that omits those non-destructive UI-only fields doesn't clear
+              // the user's visible destination. This keeps `displayRoom` and
+              // `isRoomChange` stable across refreshes when upstream omits them.
+              try {
+                if (prevP && !(p as any).displayRoom && (prevP as any).displayRoom) {
+                  const np = { ...(p as any) }
+                  ;(np as any).displayRoom = (prevP as any).displayRoom
+                  ;(np as any).isRoomChange = (prevP as any).isRoomChange || false
+                  return np
+                }
+              } catch (e) {}
             } catch (e) {}
             return p
           })
@@ -1958,6 +1970,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (actualCurrentDayName !== "Sunday" && actualCurrentDayName !== "Saturday") {
       const actualTodayTimetable = timetableData[actualCurrentDayName]
       const info = getTimeUntilNextPeriod(actualTodayTimetable)
+
+      // If we've reached end-of-day (no next period and not currently in class),
+      // show a "School in" countdown pointing at the next school day's roll call
+      // (first non-break period). This prevents extremely large durations being
+      // shown when parsers return far-future sentinel dates.
+      try {
+        if (!info.isCurrentlyInClass && !info.nextPeriod) {
+          const nextDayDate = getNextSchoolDay(new Date())
+          const nextDayName = nextDayDate.toLocaleDateString('en-US', { weekday: 'long' })
+          const nextDayPeriods = timetableData[nextDayName]
+          if (Array.isArray(nextDayPeriods) && nextDayPeriods.length) {
+            const found = findFirstNonBreakPeriodOnDate(nextDayPeriods, nextDayDate)
+            if (found) {
+              const now2 = new Date()
+              const diffMs = found.start.getTime() - now2.getTime()
+              if (diffMs > 0) {
+                // Create a lightweight synthetic period marker for UI use.
+                info.nextPeriod = { ...found.period, isRollCallMarker: true } as any
+                info.timeUntil = `School in ${formatDurationShort(diffMs)} until roll call`
+              }
+            }
+          }
+        }
+      } catch (e) {}
+
       setCurrentMomentPeriodInfo(info)
     } else {
       setCurrentMomentPeriodInfo({
