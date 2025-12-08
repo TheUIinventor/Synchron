@@ -578,7 +578,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // and visible immediately.
     const useExternalTimetable = externalTimetable ?? lastRecordedTimetable
     const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
-    const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
+    // Build a per-bucket merged bell mapping that prefers API-provided
+    // buckets but falls back to cached buckets on a per-bucket basis. This
+    // prevents an API response that contains an empty array for a bucket
+    // from wiping previously-cached bells for that bucket.
+    const useExternalBellTimes = (() => {
+      const ext = externalBellTimes || null
+      const cached = lastSeenBellTimesRef.current || null
+      if (!ext && !cached) return null
+      const keys = ['Mon/Tues', 'Wed/Thurs', 'Fri']
+      const merged: Record<string, { period: string; time: string }[]> = {}
+      for (const k of keys) {
+        const extBucket = ext && Array.isArray(ext[k]) && ext[k].length ? ext[k] : null
+        const cachedBucket = cached && Array.isArray(cached[k]) && cached[k].length ? cached[k] : null
+        merged[k] = extBucket || cachedBucket || []
+      }
+      return merged
+    })()
 
     // Cleanup helper: remove roll-call entries and orphaned period '0' placeholders
     const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
