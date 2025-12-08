@@ -772,9 +772,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const filtered: Record<string, Period[]> = {}
       for (const [day, periods] of Object.entries(useExternalTimetable)) {
         const list = Array.isArray(periods) ? periods : []
-        // Only show entries that explicitly match the API-determined week. Do not
-        // include untagged entries when `currentWeek` is unknown.
-        filtered[day] = (currentWeek === 'A' || currentWeek === 'B') ? list.filter((p) => p.weekType === currentWeek) : []
+        // When the server provides week-tagged entries (A/B), prefer entries
+        // that match the known `currentWeek`. However, many upstream payloads
+        // include UI-only items like Recess/Lunch without a `weekType` — treat
+        // those as applicable to either week so they aren't dropped.
+        if (currentWeek === 'A' || currentWeek === 'B') {
+          filtered[day] = list.filter((p) => !(p as any).weekType || (p as any).weekType === currentWeek)
+        } else {
+          // If we don't yet know the current week, show untagged entries
+          // (commonly Break rows) rather than returning an empty list.
+          filtered[day] = list.filter((p) => !(p as any).weekType)
+        }
       }
       // If the server explicitly reported that there is no timetable for the
       // requested date, return the empty-by-day map as-is (do not insert
