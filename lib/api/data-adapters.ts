@@ -177,14 +177,21 @@ export function applySubstitutionsToTimetable(
               if (options?.debug) console.debug(`Applied substitute teacher (short name only): ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`, sub)
             }
 
-            // Preserve casualSurname separately when provided by the upstream data
+            // Preserve casualSurname separately when provided by the upstream data.
+            // If upstream provides both a casual token (e.g. initial) and a
+            // casualSurname, combine them so downstream UI can display the
+            // exact casual form (e.g. "M Finegan").
             if ((sub as any).casualSurname) {
-              (period as any).casualSurname = String((sub as any).casualSurname)
+              const casual = (sub as any).casual ? String((sub as any).casual).trim() : ''
+              const surname = String((sub as any).casualSurname).trim()
+              (period as any).casualSurname = casual ? `${casual} ${surname}` : surname
             }
 
-            // Ensure downstream UI sees the full name (when available) instead of the short code.
+            // Ensure downstream UI sees the casual surname when available;
+            // otherwise fall back to the full teacher name. This prevents
+            // short casual codes from appearing in the UI after refresh.
             if ((period as any).fullTeacher) {
-              period.teacher = (period as any).fullTeacher
+              period.teacher = (period as any).casualSurname ? String((period as any).casualSurname) : String((period as any).fullTeacher)
             }
 
             changed = true
