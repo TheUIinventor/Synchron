@@ -75,7 +75,7 @@ const bellTimesData = {
     { period: "Lunch 1", time: "1:30 - 1:50" },
     { period: "Lunch 2", time: "1:50 - 2:10" },
     { period: "Period 5", time: "2:10 - 3:10" },
-    { period: "End of Day", time: "3:10" },
+    { period: "End of Day", time: "15:10" },
   ],
   "Wed/Thurs": [
     { period: "Period 1", time: "9:00 - 10:05" },
@@ -86,7 +86,7 @@ const bellTimesData = {
     { period: "Lunch 2", time: "12:45 - 1:05" },
     { period: "Period 4", time: "1:05 - 2:10" },
     { period: "Period 5", time: "2:10 - 3:10" },
-    { period: "End of Day", time: "3:10" },
+    { period: "End of Day", time: "15:10" },
   ],
   Fri: [
     { period: "Period 1", time: "9:25 - 10:20" },
@@ -97,7 +97,7 @@ const bellTimesData = {
     { period: "Lunch 2", time: "12:55 - 1:15" },
     { period: "Period 4", time: "1:15 - 2:15" },
     { period: "Period 5", time: "2:15 - 3:10" },
-    { period: "End of Day", time: "3:10" },
+    { period: "End of Day", time: "15:10" },
   ],
 }
 const canonicalIndex = (label?: string) => {
