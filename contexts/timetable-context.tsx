@@ -672,32 +672,75 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (!fresh) { setExternalTimetable(fresh); return }
         const prev = lastRecordedTimetable || externalTimetable || {}
         const merged: Record<string, Period[]> = {}
+
+        // Helper to build a matching key for a period so we can match entries
+        // across refreshes even when order or indices change. Use period label,
+        // normalized start-minute and subject as a best-effort composite key.
+        const keyFor = (p: any) => {
+          try {
+            const period = String(p?.period || '').trim().toLowerCase()
+            const subj = String(p?.subject || '').trim().toLowerCase()
+            const timePart = String(p?.time || '').split('-')[0].trim()
+            const [hhRaw, mmRaw] = timePart.split(':').map((s: string) => parseInt(s, 10))
+            let hh = Number.isFinite(hhRaw) ? hhRaw : 0
+            const mm = Number.isFinite(mmRaw) ? mmRaw : 0
+            // crude 24h guess: if hh < 8 and there is a morning in prev, bump
+            const hasMorning = (prev && Object.values(prev).flat().some((pp: any) => { try { const ph = parseInt(String((pp as any).time||'').split('-')[0].split(':')[0],10); return Number.isFinite(ph) && ph >= 8 } catch(e){return false} }))
+            if (hh < 8 && hasMorning) hh += 12
+            const startMins = hh * 60 + mm
+            return `${period}|${subj}|${startMins}`
+          } catch (e) { return String(Math.random()) }
+        }
+
+        // Build a lookup of previous periods by key for fast matching
+        const prevMapByDay: Record<string, Record<string, any>> = {}
+        for (const d of Object.keys(prev)) {
+          prevMapByDay[d] = {}
+          const arr = prev[d] || []
+          for (const p of arr) {
+            try { const k = keyFor(p); prevMapByDay[d][k] = p } catch (e) {}
+          }
+        }
+
         for (const day of Object.keys(fresh)) {
-          const prevArr = (prev && prev[day]) || []
-          merged[day] = (fresh[day] || []).map((p, i) => {
+          const freshArr = (fresh[day] || [])
+          merged[day] = freshArr.map((p) => {
             try {
-              const prevP = prevArr[i]
-              if (prevP && (prevP as any).casualSurname && !(p as any).casualSurname) {
-                const np = { ...(p as any) }
-                (np as any).casualSurname = (prevP as any).casualSurname
-                // Keep displayed teacher aligned with casualSurname when present
-                if (!(np as any).teacher || String((np as any).teacher).trim() === '') {
-                  (np as any).teacher = (prevP as any).casualSurname
+              const key = keyFor(p)
+              const prevP = (prevMapByDay[day] && prevMapByDay[day][key]) || null
+              // If we found a strong match, preserve UI-only fields
+              if (prevP) {
+                const np: any = { ...p }
+                if ((prevP as any).casualSurname && !(p as any).casualSurname) {
+                  np.casualSurname = (prevP as any).casualSurname
+                  if (!np.teacher || String(np.teacher).trim() === '') np.teacher = (prevP as any).casualSurname
                 }
+                if ((prevP as any).displayRoom && !(p as any).displayRoom) {
+                  np.displayRoom = (prevP as any).displayRoom
+                  np.isRoomChange = (prevP as any).isRoomChange || false
+                }
+                // Preserve explicit substitute flag
+                if ((prevP as any).isSubstitute && !(p as any).isSubstitute) np.isSubstitute = (prevP as any).isSubstitute
                 return np
               }
-              // Preserve any prior room-change display fields so a fresh payload
-              // that omits those non-destructive UI-only fields doesn't clear
-              // the user's visible destination. This keeps `displayRoom` and
-              // `isRoomChange` stable across refreshes when upstream omits them.
-              try {
-                if (prevP && !(p as any).displayRoom && (prevP as any).displayRoom) {
-                  const np = { ...(p as any) }
-                  ;(np as any).displayRoom = (prevP as any).displayRoom
-                  ;(np as any).isRoomChange = (prevP as any).isRoomChange || false
-                  return np
+
+              // Fallback: try to find by index in the previous array
+              const prevArr = (prev && prev[day]) || []
+              const idx = freshArr.indexOf(p)
+              const prevByIndex = prevArr[idx]
+              if (prevByIndex) {
+                const np: any = { ...p }
+                if ((prevByIndex as any).casualSurname && !(p as any).casualSurname) {
+                  np.casualSurname = (prevByIndex as any).casualSurname
+                  if (!np.teacher || String(np.teacher).trim() === '') np.teacher = (prevByIndex as any).casualSurname
                 }
-              } catch (e) {}
+                if ((prevByIndex as any).displayRoom && !(p as any).displayRoom) {
+                  np.displayRoom = (prevByIndex as any).displayRoom
+                  np.isRoomChange = (prevByIndex as any).isRoomChange || false
+                }
+                if ((prevByIndex as any).isSubstitute && !(p as any).isSubstitute) np.isSubstitute = (prevByIndex as any).isSubstitute
+                return np
+              }
             } catch (e) {}
             return p
           })
@@ -1530,7 +1573,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const parsedCache = JSON.parse(cached)
                 if (parsedCache && parsedCache.timetable) {
                   try {
-                    setExternalTimetable(parsedCache.timetable)
+                    setExternalTimetablePreserving(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
@@ -1852,7 +1895,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               }
             }
-            setExternalTimetable(j.timetable)
+            setExternalTimetablePreserving(j.timetable)
             setTimetableSource(j.source ?? 'external')
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
@@ -1874,7 +1917,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!byDay[day]) byDay[day] = []
               byDay[day].push(p)
             }
-            setExternalTimetable(byDay)
+            setExternalTimetablePreserving(byDay)
             setTimetableSource(j.source ?? 'external')
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
@@ -1888,7 +1931,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const parsed = parseTimetableHtmlLocal(text)
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
           if (hasData) {
-            setExternalTimetable(parsed)
+            setExternalTimetablePreserving(parsed)
             setTimetableSource('external-scraped')
             return
           }
@@ -1904,7 +1947,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
       if (lastRecordedTimetable) {
         // Prefer showing cached real data when available regardless of auth state.
-        setExternalTimetable(lastRecordedTimetable)
+        setExternalTimetablePreserving(lastRecordedTimetable)
         setTimetableSource('cache')
         setError(null)
       } else if (isAuthenticated) {
@@ -1920,7 +1963,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
       if (lastRecordedTimetable) {
-        setExternalTimetable(lastRecordedTimetable)
+        setExternalTimetablePreserving(lastRecordedTimetable)
         setTimetableSource('cache')
         setError(null)
       } else if (isAuthenticated) {
