@@ -646,6 +646,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       return m
     }
+
+    // Merge fresh timetable with previously-seen timetable entries to preserve
+    // casually-provided teacher fields (e.g. `casualSurname`). This ensures
+    // that when a background refresh returns a timetable lacking `casualSurname`
+    // we keep the cached casual display instead of reverting to a short code.
+    const setExternalTimetablePreserving = (fresh: Record<string, Period[]> | null) => {
+      try {
+        if (!fresh) { setExternalTimetable(fresh); return }
+        const prev = lastRecordedTimetable || externalTimetable || {}
+        const merged: Record<string, Period[]> = {}
+        for (const day of Object.keys(fresh)) {
+          const prevArr = (prev && prev[day]) || []
+          merged[day] = (fresh[day] || []).map((p, i) => {
+            try {
+              const prevP = prevArr[i]
+              if (prevP && (prevP as any).casualSurname && !(p as any).casualSurname) {
+                const np = { ...(p as any) }
+                (np as any).casualSurname = (prevP as any).casualSurname
+                // Keep displayed teacher aligned with casualSurname when present
+                if (!(np as any).teacher || String((np as any).teacher).trim() === '') {
+                  (np as any).teacher = (prevP as any).casualSurname
+                }
+                return np
+              }
+            } catch (e) {}
+            return p
+          })
+        }
+        setExternalTimetable(merged)
+      } catch (e) {
+        try { setExternalTimetable(fresh) } catch { /* ignore */ }
+      }
+    }
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
     if (useExternalTimetableByWeek) {
@@ -1178,7 +1211,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             } catch (e) {}
             try { console.debug('[timetable.provider] substitutions applied, substituteCount=', appliedCount) } catch (e) {}
-            setExternalTimetable(applied)
+                    setExternalTimetablePreserving(applied)
             subsAppliedRef.current = Date.now()
           } catch (e) {
             try { console.debug('[timetable.provider] error applying substitutions', e) } catch (err) {}
@@ -1336,7 +1369,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             return
           }
           if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-            setExternalTimetable(jht.timetable)
+            setExternalTimetablePreserving(jht.timetable)
             setTimetableSource(jht.source ?? 'external-homepage')
             if (jht.weekType === 'A' || jht.weekType === 'B') {
               setExternalWeekType(jht.weekType)
@@ -1350,7 +1383,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const parsedHt = parseTimetableHtmlLocal(html)
         const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
         if (hasHt) {
-          setExternalTimetable(parsedHt)
+          setExternalTimetablePreserving(parsedHt)
           setTimetableSource('external-homepage')
           return
         }
@@ -1592,7 +1625,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // ignore substitution extraction errors
               }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-              setExternalTimetable(finalTimetable)
+              setExternalTimetablePreserving(finalTimetable)
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
               try {
@@ -1645,7 +1678,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (!byDay[day]) byDay[day] = []
                 byDay[day].push(p)
               }
-              setExternalTimetable(byDay)
+              setExternalTimetablePreserving(byDay)
               // Also persist processed result for array-shaped payloads
               try {
                 if (_payloadHash && typeof window !== 'undefined') {
@@ -1680,7 +1713,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const parsed = parseTimetableHtmlLocal(text)
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
           if (hasData) {
-            setExternalTimetable(parsed)
+              setExternalTimetablePreserving(parsed)
             setTimetableSource('external-scraped')
             return
           }
@@ -2093,7 +2126,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-            setExternalTimetable(finalTimetable)
+              setExternalTimetablePreserving(finalTimetable)
             setTimetableSource(j.source ?? 'external')
             // record debug summary
             try {
