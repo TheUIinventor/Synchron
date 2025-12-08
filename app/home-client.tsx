@@ -10,7 +10,7 @@ import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } fro
 import { getNextBell } from "@/utils/bell-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, stripLeadingCasualCode } from "@/lib/utils";
 
 export default function HomeClient() {
   const { 
@@ -204,7 +204,9 @@ export default function HomeClient() {
     if (!p) return null
     // If this period has a casual/substitute with a provided surname, show only that surname per UX request
     if (p.isSubstitute && (p as any).casualSurname) return (p as any).casualSurname
-    return p.fullTeacher || p.teacher || null
+    const candidate = p.fullTeacher || p.teacher || null
+    if (p.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
+    return candidate
   }
 
   // Format a concise remaining label to show on the right-hand side of the bar

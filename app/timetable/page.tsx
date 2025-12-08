@@ -11,6 +11,7 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
+import { stripLeadingCasualCode } from "@/lib/utils"
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
@@ -503,7 +504,7 @@ export default function TimetablePage() {
                                   <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
                                     style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                   >
-                                    {(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}
+                                    {(period as any).casualSurname ? (period as any).casualSurname : stripLeadingCasualCode((period.fullTeacher || period.teacher) as string)}
                                   </span>
                                 ) : (
                                   <span className="text-on-surface-variant truncate max-w-[100px]">{(period as any).casualSurname ? (period as any).casualSurname : (period.fullTeacher || period.teacher)}</span>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useTimetable } from "@/contexts/timetable-context"
 import { getCurrentDay, getCurrentTime } from "@/utils/time-utils"
+import { stripLeadingCasualCode } from "@/lib/utils"
 import { Clock, ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -33,7 +34,9 @@ export default function CombinedStatus() {
   const displayTeacher = useCallback((p: any) => {
     if (!p) return ''
     if (p.isSubstitute && (p as any).casualSurname) return (p as any).casualSurname
-    return p.fullTeacher || p.teacher || ''
+    const candidate = p.fullTeacher || p.teacher || ''
+    if (p.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
+    return candidate
   }, [])
 
   const getDisplayRoom = useCallback((period: any) => {
