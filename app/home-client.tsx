@@ -122,18 +122,28 @@ export default function HomeClient() {
 
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = currentMomentPeriodInfo;
   
-  // Determine the date to display: prefer provider's selected date, otherwise local currentDate.
-  // If no user-selected date and it's after school hours or a weekend, show the next school day.
-  const displayDate = selectedDateObject ?? (((): Date => {
+  // Determine the date to display for the HOME page. The home page should
+  // not be influenced by a manual date selection on the timetable page, so
+  // do not use `selectedDateObject` from the provider here. Instead use the
+  // local clock and auto-advance after school hours/weekends.
+  const displayDate = (() => {
     const now = currentDate
     const isWeekend = now.getDay() === 0 || now.getDay() === 6
     if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
     return now
-  })());
-  // Get today's periods for the sidebar - prefer selectedDay (context), otherwise use the displayDate's weekday
-  const dayName = selectedDay || format(displayDate, "EEEE");
+  })()
+
+  // Use the displayDate's weekday to pick today's timetable for the home page.
+  const dayName = format(displayDate, "EEEE");
   const todaysPeriodsRaw = timetableData[dayName] || [];
-  const bellsForDay = (bellTimes && (bellTimes as any)[dayName]) || [];
+
+  // Map provider bell buckets into the day-specific bucket keys used elsewhere.
+  const bellsForDay = (() => {
+    if (!bellTimes) return []
+    if (dayName === 'Friday') return (bellTimes as any).Fri || []
+    if (dayName === 'Wednesday' || dayName === 'Thursday') return (bellTimes as any)['Wed/Thurs'] || []
+    return (bellTimes as any)['Mon/Tues'] || []
+  })()
 
   // Helper: normalize period label for comparison
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
