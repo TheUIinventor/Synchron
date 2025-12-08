@@ -2245,7 +2245,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         currentMomentPeriodInfo, // Provide the new state
         // Backwards-compatible alias for older components
         nextPeriodInfo: currentMomentPeriodInfo,
-        bellTimes: externalBellTimes || lastSeenBellTimesRef.current || bellTimesData,
+        bellTimes: externalBellTimes || lastSeenBellTimesRef.current || null,
         isShowingNextDay,
         timetableSource,
         timetableByWeek: lastRecordedTimetableByWeek || externalTimetableByWeek || undefined,
