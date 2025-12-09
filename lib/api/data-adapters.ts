@@ -185,12 +185,17 @@ export function applySubstitutionsToTimetable(
             // full name is not supplied; this prevents short placeholder codes
             // from appearing after background refreshes.
             if ((sub as any).casualSurname) {
-              const casual = (sub as any).casual ? String((sub as any).casual).trim() : ''
+              // Upstream often provides a short casual token (e.g. a 4-letter
+              // code) *and* a casualSurname (e.g. "V Likourezos"). For UI
+              // clarity we should prefer the casualSurname exactly as provided
+              // rather than prepending the casual token. Store the casual token
+              // separately if present and keep `casualSurname` clean.
+              const casualToken = (sub as any).casual ? String((sub as any).casual).trim() : ''
               const surname = String((sub as any).casualSurname).trim()
-              const composed = casual ? `${casual} ${surname}` : surname
-              ;(period as any).casualSurname = composed
-              // Make the casual form the authoritative displayed teacher
-              period.teacher = composed
+              ;(period as any).casualToken = casualToken || undefined
+              ;(period as any).casualSurname = surname
+              // Make the casual surname the authoritative displayed teacher
+              period.teacher = surname
             }
 
             // If no casualSurname was provided but a full display name exists,

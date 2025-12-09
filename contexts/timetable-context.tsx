@@ -678,7 +678,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   const casual = (clean as any).casualSurname || undefined
                   const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
-                  const dt = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
                   (clean as any).displayTeacher = dt
                 } catch (e) {}
                 return clean
@@ -688,7 +688,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try {
               const casual = (p as any).casualSurname || undefined
               const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
-              const dt = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+              const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
               (p as any).displayTeacher = dt
             } catch (e) {}
             return p
@@ -1040,7 +1040,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               subject: it.subject || it.class || undefined,
               originalTeacher: it.teacher || it.originalTeacher || undefined,
               substituteTeacher: it.substitute || it.replacement || it.casual || it.substituteTeacher || undefined,
-              substituteTeacherFull: it.substituteFullName || it.substituteFull || (it.casual && it.casualSurname ? `${it.casual} ${it.casualSurname}` : undefined) || undefined,
+              substituteTeacherFull: it.substituteFullName || it.substituteFull || (it.casualSurname ? String(it.casualSurname) : undefined) || undefined,
               casual: it.casual || undefined,
               casualSurname: it.casualSurname || undefined,
               fromRoom: it.fromRoom || it.from || undefined,
@@ -1108,7 +1108,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 subject: it.subject || it.class || undefined,
                 originalTeacher: it.teacher || it.originalTeacher || undefined,
                 substituteTeacher: it.substitute || it.replacement || it.casual || it.substituteTeacher || undefined,
-                substituteTeacherFull: it.substituteFullName || it.substituteFull || (it.casual && it.casualSurname ? `${it.casual} ${it.casualSurname}` : undefined) || undefined,
+                substituteTeacherFull: it.substituteFullName || it.substituteFull || (it.casualSurname ? String(it.casualSurname) : undefined) || undefined,
                 casual: it.casual || undefined,
                 casualSurname: it.casualSurname || undefined,
                 fromRoom: it.fromRoom || it.from || undefined,
