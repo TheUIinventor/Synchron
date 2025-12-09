@@ -495,29 +495,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     currentPeriod: null as Period | null,
   })
 
-  // Initialize currentMomentPeriodInfo synchronously from any cached timetable
+  // Initialize currentMomentPeriodInfo from any cached timetable on mount
   // so header cards (Home/CombinedStatus) don't flash before the first tick.
-  try {
-    if (typeof window !== 'undefined') {
-      const init = (() => {
-        try {
-          // Build a simple day->periods map from initial parsed cache if available
-          const map = __initialExternalTimetable || null
-          if (map) {
-            try {
-              // prefer today's day
-              const today = getCurrentDay()
-              const todays = map[today] || []
-              const info = getTimeUntilNextPeriod(todays as any)
-              return info
-            } catch (e) {}
-          }
-        } catch (e) {}
-        return { nextPeriod: null, timeUntil: "", isCurrentlyInClass: false, currentPeriod: null }
-      })()
-      try { setCurrentMomentPeriodInfo(init as any) } catch (e) {}
-    }
-  } catch (e) {}
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const map = __initialExternalTimetable || null
+      if (!map) return
+      try {
+        const today = getCurrentDay()
+        const todays = map[today] || []
+        const info = getTimeUntilNextPeriod(todays as any)
+        setCurrentMomentPeriodInfo(info as any)
+      } catch (e) {
+        // ignore
+      }
+    } catch (e) {}
+  }, [])
 
   // Memoize the current timetable based on selected week
   // Try to synchronously hydrate last-known timetable from localStorage so the UI
