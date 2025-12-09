@@ -4,6 +4,7 @@ import ClientLayout from "./client-layout";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Roboto_Flex } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 
 const roboto = Roboto_Flex({ subsets: ["latin"], display: "swap", variable: "--font-roboto-flex" });
 
@@ -38,6 +39,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <SonnerToaster />
+          <Analytics />
         </ClientLayout>
       </body>
     </html>
