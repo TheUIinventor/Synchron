@@ -678,7 +678,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   const casual = (clean as any).casualSurname || undefined
                   const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
-                  (clean as any).displayTeacher = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+                  const dt = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+                  (clean as any).displayTeacher = dt
                 } catch (e) {}
                 return clean
               }
@@ -687,7 +688,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try {
               const casual = (p as any).casualSurname || undefined
               const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
-              ;(p as any).displayTeacher = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+              const dt = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+              (p as any).displayTeacher = dt
             } catch (e) {}
             return p
           })
