@@ -418,6 +418,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     __initialRawCache = null
     __initialParsedCache = null
   }
+  // Look for any previously-processed payloads cached under
+  // `synchron-processed-<hash>` and prefer the most-recent one for
+  // instant hydration. This allows us to load a fully-applied timetable
+  // (with substitutions/room-changes/bellTimes) synchronously on start.
+  let __initialProcessedCache: any = null
+  try {
+    if (typeof window !== 'undefined') {
+      try {
+        const keys = Object.keys(localStorage || {}).filter(k => k && k.startsWith('synchron-processed-'))
+        let best: { savedAt: number; key: string; parsed: any } | null = null
+        for (const k of keys) {
+          try {
+            const raw = localStorage.getItem(k)
+            if (!raw) continue
+            const parsed = JSON.parse(raw)
+            const when = parsed && (parsed.savedAt || parsed.ts || parsed.savedAt === 0) ? Number(parsed.savedAt || parsed.ts || 0) : 0
+            if (!best || when > (best.savedAt || 0)) best = { savedAt: when, key: k, parsed }
+          } catch (e) { /* ignore parse errors */ }
+        }
+        if (best && best.parsed) __initialProcessedCache = best.parsed
+      } catch (e) {}
+    }
+  } catch (e) {}
   const __extractMapFromCache = (raw: any): Record<string, Period[]> | null => {
     try {
       if (!raw) return null
@@ -434,17 +457,30 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return null
   }
   const __initialExternalTimetable = __extractMapFromCache(__initialParsedCache)
+  // If we found a processed cache, extract its timetable map synchronously
+  try {
+    if (!__initialExternalTimetable && __initialProcessedCache && __initialProcessedCache.timetable) {
+      try {
+        const maybe = __initialProcessedCache.timetable
+        const map = __extractMapFromCache(maybe)
+        if (map) __initialExternalTimetable = map
+      } catch (e) {}
+    }
+  } catch (e) {}
   const __initialExternalTimetableByWeek = ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] } | null> | null => {
     try {
-      if (!__initialParsedCache) return null
-      if (__initialParsedCache.timetableByWeek && typeof __initialParsedCache.timetableByWeek === 'object') return __initialParsedCache.timetableByWeek
+      // Prefer a processed cache payload when available
+      const src = __initialProcessedCache || __initialParsedCache
+      if (!src) return null
+      if (src.timetableByWeek && typeof src.timetableByWeek === 'object') return src.timetableByWeek
     } catch (e) {}
     return null
   })()
   const __initialExternalBellTimes = ((): Record<string, { period: string; time: string }[]> | null => {
     try {
-      if (!__initialParsedCache) return null
-      if (__initialParsedCache.bellTimes && typeof __initialParsedCache.bellTimes === 'object') return __initialParsedCache.bellTimes
+      const src = __initialProcessedCache || __initialParsedCache
+      if (!src) return null
+      if (src.bellTimes && typeof src.bellTimes === 'object') return src.bellTimes
       // Also support a dedicated bell-times cache key for faster hydrate
       if (typeof window !== 'undefined') {
         try {
@@ -479,7 +515,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { return __initialParsedCache?.source ?? null } catch (e) { return null }
   })()
   const __initialWeekType = ((): "A" | "B" | null => {
-    try { const w = __initialParsedCache?.weekType; return (w === 'A' || w === 'B') ? w : null } catch (e) { return null }
+    try { const src = __initialProcessedCache || __initialParsedCache; const w = src?.weekType; return (w === 'A' || w === 'B') ? w : null } catch (e) { return null }
   })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
