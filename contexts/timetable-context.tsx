@@ -456,7 +456,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
     return null
   }
-  const __initialExternalTimetable = __extractMapFromCache(__initialParsedCache)
+  let __initialExternalTimetable = __extractMapFromCache(__initialParsedCache)
   // If we found a processed cache, extract its timetable map synchronously
   try {
     if (!__initialExternalTimetable && __initialProcessedCache && __initialProcessedCache.timetable) {
