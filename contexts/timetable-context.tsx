@@ -1201,29 +1201,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       persistTimerRef.current = window.setTimeout(() => {
           try {
             if (lastRecordedTimetable) {
-              // Sanitize teacher fields before persisting so cached payloads do
-              // not contain composed casual tokens + surname values which
-              // would reappear after a background refresh.
-              const sanitizeMap = (m: Record<string, Period[]>) => {
-                const out: Record<string, Period[]> = {}
-                try {
-                  for (const d of Object.keys(m || {})) {
-                    out[d] = (m[d] || []).map((p) => {
-                      try {
-                        const copy: any = { ...p }
-                        const candidate = (copy as any).casualSurname || (copy as any).fullTeacher || copy.teacher || ''
-                        copy.teacher = stripLeadingCasualCode(String(candidate || ''))
-                        if ((copy as any).fullTeacher) (copy as any).fullTeacher = stripLeadingCasualCode(String((copy as any).fullTeacher))
-                        return copy
-                      } catch (e) { return p }
-                    })
-                  }
-                } catch (e) { return m }
-                return out
-              }
-
               const payload = {
-                timetable: sanitizeMap(lastRecordedTimetable),
+                timetable: lastRecordedTimetable,
                 source: timetableSource ?? 'external',
                 ts: Date.now(),
                 // Persist the last-seen bell times so UI can hydrate them

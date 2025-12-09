@@ -11,7 +11,6 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
-import { stripLeadingCasualCode } from '@/lib/utils'
 
 
 export default function TimetablePage() {
@@ -508,7 +507,7 @@ export default function TimetablePage() {
                                     {(period as any).displayTeacher}
                                   </span>
                                 ) : (
-                                  <span className="text-on-surface-variant truncate max-w-[100px]">{(period as any).displayTeacher || stripLeadingCasualCode((period.fullTeacher || period.teacher) || '')}</span>
+                                  <span className="text-on-surface-variant truncate max-w-[100px]">{(period.fullTeacher || period.teacher) || ''}</span>
                                 )}
                                 {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
                                 <span className="truncate max-w-[72px] text-sm text-on-surface-variant">{getDisplayRoom(period)}</span>
