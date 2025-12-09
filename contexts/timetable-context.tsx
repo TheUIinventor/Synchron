@@ -445,6 +445,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       if (!__initialParsedCache) return null
       if (__initialParsedCache.bellTimes && typeof __initialParsedCache.bellTimes === 'object') return __initialParsedCache.bellTimes
+      // Also support a dedicated bell-times cache key for faster hydrate
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('synchron-last-belltimes')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            if (parsed && typeof parsed === 'object') return parsed
+          }
+        } catch (e) {
+          // ignore parse errors
+        }
+      }
     } catch (e) {}
     return null
   })()
