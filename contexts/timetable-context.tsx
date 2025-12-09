@@ -487,13 +487,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
   const loadTimingStartedRef = useRef(false)
-  const [currentMomentPeriodInfo, setCurrentMomentPeriodInfo] = useState({
-    // For header status
-    nextPeriod: null as Period | null,
-    timeUntil: "",
-    isCurrentlyInClass: false,
-    currentPeriod: null as Period | null,
-  })
+  const _initialMomentInfo = (() => {
+    try {
+      if (!__initialExternalTimetable) return { nextPeriod: null, timeUntil: "", isCurrentlyInClass: false, currentPeriod: null }
+      const today = getCurrentDay()
+      const todays = (__initialExternalTimetable as any)[today] || []
+      try {
+        return getTimeUntilNextPeriod(todays as any)
+      } catch (e) {
+        return { nextPeriod: null, timeUntil: "", isCurrentlyInClass: false, currentPeriod: null }
+      }
+    } catch (e) {
+      return { nextPeriod: null, timeUntil: "", isCurrentlyInClass: false, currentPeriod: null }
+    }
+  })()
+
+  const [currentMomentPeriodInfo, setCurrentMomentPeriodInfo] = useState(() => _initialMomentInfo)
 
   // Initialize currentMomentPeriodInfo from any cached timetable on mount
   // so header cards (Home/CombinedStatus) don't flash before the first tick.
@@ -584,7 +593,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return null
   })
   const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
-  const [timetableSource, setTimetableSource] = useState<string | null>(() => __initialTimetableSource)
+  const [timetableSource, setTimetableSource] = useState<string | null>(() => {
+    try {
+      if (__initialTimetableSource) return __initialTimetableSource
+      if (__initialExternalTimetable) return 'cache'
+    } catch (e) {}
+    return null
+  })
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(() => {
     try { return __initialExternalTimetableByWeek || null } catch (e) { return null }
   })
@@ -1067,7 +1082,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }, [timetableData])
 
   // Track whether substitutions have been applied to the current external timetable
-  const subsAppliedRef = useRef<number | null>(null)
+  const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
   // Track the last date string we requested from /api/timetable to avoid
   // redundant concurrent or repeated fetches for the same date.
   const lastRequestedDateRef = useRef<string | null>(null)
