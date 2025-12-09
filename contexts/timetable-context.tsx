@@ -1223,6 +1223,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [externalTimetable, timetableSource])
 
+  // If we started with cached substitutions and an initial external timetable,
+  // mark substitutions as applied immediately so the provider and UI treat
+  // the cached data as authoritative while background refresh continues.
+  useEffect(() => {
+    try {
+      if (!externalTimetable) return
+      if (!Array.isArray(__initialCachedSubs) || __initialCachedSubs.length === 0) return
+      if (subsAppliedRef.current) return
+      try {
+        subsAppliedRef.current = Date.now()
+        setLastRecordedTimetable(externalTimetable)
+        try { setTimetableSource((s) => s || 'cache') } catch (e) {}
+        try { console.debug('[timetable.provider] marked cached substitutions as applied (init)') } catch (e) {}
+      } catch (e) {
+        // ignore
+      }
+    } catch (e) {}
+  }, [externalTimetable])
+
   // If we hydrated a cached externalTimetable on load, ensure the lastRecorded
   // pointer is set so other fallback logic and persistence pick it up.
   useEffect(() => {
