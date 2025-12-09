@@ -443,6 +443,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
     return null
   })()
+  // Try to hydrate previously-cached substitutions and break-layouts
+  const __initialCachedSubs = ((): any[] | null => {
+    try {
+      if (typeof window === 'undefined') return null
+      const raw = localStorage.getItem('synchron-last-subs')
+      return raw ? JSON.parse(raw) : null
+    } catch (e) { return null }
+  })()
+  const __initialBreakLayouts = ((): Record<string, Period[]> | null => {
+    try {
+      if (typeof window === 'undefined') return null
+      const raw = localStorage.getItem('synchron-break-layouts')
+      return raw ? JSON.parse(raw) : null
+    } catch (e) { return null }
+  })()
   const __initialTimetableSource = ((): string | null => {
     try { return __initialParsedCache?.source ?? null } catch (e) { return null }
   })()
@@ -508,12 +523,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
+  const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
+  const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
+  const lastRefreshTsRef = useRef<number | null>(null)
+
+  // Aggressive background refresh tuning
+  const MIN_REFRESH_MS = 45 * 1000 // never refresh faster than 45s
+  const VISIBLE_REFRESH_MS = 60 * 1000 // target interval while visible
+  const HIDDEN_REFRESH_MS = 5 * 60 * 1000 // target interval while hidden
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
     if (typeof window !== 'undefined' && __initialExternalBellTimes) {
       lastSeenBellTimesRef.current = __initialExternalBellTimes
       lastSeenBellTsRef.current = __initialParsedCache?.savedAt ? Date.parse(__initialParsedCache.savedAt) : Date.now()
+    }
+  } catch (e) {}
+
+  // If we have locally cached substitutions and no fresh substitution run
+  // has occurred yet, we will use them as a best-effort while the live
+  // refresh completes in the background.
+  try {
+    if (typeof window !== 'undefined' && __initialCachedSubs && !subsAppliedRef?.current) {
+      cachedSubsRef.current = __initialCachedSubs
     }
   } catch (e) {}
   // If we have an initial cached timetable, avoid showing the global loading
@@ -918,6 +950,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return currentWeek === "B" ? timetableWeekB : timetableWeekA
   }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading])
 
+  // Persist computed break-layouts (simple heuristic) so we can hydrate
+  // break rows quickly on restart without recomputing from bells immediately.
+  useEffect(() => {
+    try {
+      if (!timetableData) return
+      const layouts: Record<string, Period[]> = {}
+      for (const day of Object.keys(timetableData)) {
+        try {
+          const arr = (timetableData[day] || []).filter((p) => {
+            const subj = String(p.subject || p.period || '').toLowerCase()
+            return subj.includes('break') || subj.includes('recess') || subj.includes('lunch')
+          })
+          layouts[day] = arr.slice()
+        } catch (e) { layouts[day] = [] }
+      }
+      const prev = cachedBreakLayoutsRef.current
+      const prevJson = prev ? JSON.stringify(prev) : null
+      const nowJson = JSON.stringify(layouts)
+      if (prevJson !== nowJson) {
+        try {
+          localStorage.setItem('synchron-break-layouts', nowJson)
+        } catch (e) {}
+        cachedBreakLayoutsRef.current = layouts
+        try { console.debug('[timetable.provider] persisted break-layouts') } catch (e) {}
+      }
+    } catch (e) {}
+  }, [timetableData])
+
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>(null)
   // Track the last date string we requested from /api/timetable to avoid
@@ -1170,6 +1230,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Persist external bellTimes whenever they change so we can hydrate
+  // break layouts quickly on restart.
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      if (!externalBellTimes) return
+      try { localStorage.setItem('synchron-last-belltimes', JSON.stringify(externalBellTimes)) } catch (e) {}
+    } catch (e) {}
+  }, [externalBellTimes])
+
+  // If we have cached substitutions from a previous session, apply them
+  // immediately to the freshly-hydrated external timetable so the UI
+  // benefits from substitutions while the live fetch completes.
+  useEffect(() => {
+    try {
+      if (!externalTimetable) return
+      if (!timetableSource) return
+      if (timetableSource === 'fallback-sample') return
+      if (subsAppliedRef.current) return
+      const cached = cachedSubsRef.current
+      if (!cached || !Array.isArray(cached) || cached.length === 0) return
+
+      try {
+        const applied = applySubstitutionsToTimetable(externalTimetable, cached, { debug: false })
+        try { console.debug('[timetable.provider] applied cached substitutions (hydrate)') } catch (e) {}
+        setExternalTimetable(applied)
+        subsAppliedRef.current = Date.now()
+      } catch (e) {
+        try { console.debug('[timetable.provider] error applying cached subs', e) } catch (err) {}
+      }
+    } catch (e) {}
+  }, [externalTimetable, timetableSource])
+
   useEffect(() => {
     if (!externalTimetable) return
     if (!timetableSource) return
@@ -1196,7 +1289,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             } catch (e) {}
             try { console.debug('[timetable.provider] substitutions applied, substituteCount=', appliedCount) } catch (e) {}
-                    setExternalTimetable(applied)
+            // Persist the substitutions for faster hydrate on next load
+            try {
+              if (typeof window !== 'undefined') {
+                try { localStorage.setItem('synchron-last-subs', JSON.stringify(subs)) } catch (e) {}
+                cachedSubsRef.current = subs
+              }
+            } catch (e) {}
+            setExternalTimetable(applied)
             subsAppliedRef.current = Date.now()
           } catch (e) {
             try { console.debug('[timetable.provider] error applying substitutions', e) } catch (err) {}
@@ -1313,6 +1413,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // Mark that a background refresh is in progress for logging/debug
     setIsRefreshing(true)
     try { console.time('[timetable] refreshExternal') } catch (e) {}
+    // Throttle aggressive refreshes: ensure we don't refresh more often than MIN_REFRESH_MS
+    try {
+      const now = Date.now()
+      if (lastRefreshTsRef.current && (now - lastRefreshTsRef.current) < MIN_REFRESH_MS) {
+        try { console.debug('[timetable.provider] refresh skipped: rate limit') } catch (e) {}
+        setIsRefreshing(false)
+        if (!hadCache) setIsLoading(false)
+        return
+      }
+      lastRefreshTsRef.current = now
+    } catch (e) {}
     setError(null)
     // First try the server-scraped homepage endpoint
     try {
@@ -1714,7 +1825,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // ignore
       }
       // wait briefly
-      await new Promise((res) => setTimeout(res, 900))
+      // short handshake delay — reduced for snappier background refreshes
+      await new Promise((res) => setTimeout(res, 300))
 
       try {
         const r2 = await fetch('/api/timetable', { credentials: 'include' })
@@ -2014,6 +2126,37 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', handleVisibility)
     }
   }, [updateAllTimeStates])
+
+  // Visibility-aware background refresh: poll the server more frequently
+  // when the document is visible, and back off when hidden.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    let intervalId: number | null = null
+
+    const startWithInterval = (ms: number) => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      // Fire a refresh immediately but let refreshExternal enforce MIN_REFRESH_MS
+      void refreshExternal().catch(() => {})
+      intervalId = window.setInterval(() => { void refreshExternal().catch(() => {}) }, ms)
+    }
+
+    function handleVisibility() {
+      try {
+        if (document.visibilityState === 'visible') startWithInterval(VISIBLE_REFRESH_MS)
+        else startWithInterval(HIDDEN_REFRESH_MS)
+      } catch (e) {}
+    }
+
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [refreshExternal])
 
   // When the selected date changes, fetch the authoritative timetable for that date
   useEffect(() => {
