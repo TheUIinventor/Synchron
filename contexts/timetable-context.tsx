@@ -492,18 +492,57 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try { console.debug('[timetable.provider] found synchron-last-timetable in storage (init)') } catch (e) {}
         const rawMap = __initialExternalTimetable
         try {
+          // Clone and normalise cached entries so the UI can use
+          // `displayRoom`/`displayTeacher`/`isRoomChange`/`isSubstitute`
+          // immediately on first render without waiting for effects.
           const cleaned: Record<string, Period[]> = {}
           for (const day of Object.keys(rawMap)) {
             cleaned[day] = (rawMap[day] || []).map((p) => {
-              const hasDest = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to
-              if (!hasDest && (p as any).isRoomChange) {
-                const c = { ...p }
-                delete (c as any).isRoomChange
-                return c
+              const item: any = { ...(p as any) }
+
+              // Normalize explicit destination room fields into `displayRoom`.
+              const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
+              if (candidateDest && String(candidateDest).trim()) {
+                const candStr = String(candidateDest).trim()
+                const roomStr = String(item.room || '').trim()
+                if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+                  item.displayRoom = candStr
+                  item.isRoomChange = true
+                }
               }
-              return p
+
+              // Compute a normalized `displayTeacher` for immediate UI use.
+              try {
+                const casual = item.casualSurname || undefined
+                const candidate = item.fullTeacher || item.teacher || undefined
+                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                item.displayTeacher = dt
+              } catch (e) {}
+
+              // Defensive: remove stale `isRoomChange` if no explicit dest
+              if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) {
+                delete item.isRoomChange
+              }
+
+              return item
             })
           }
+
+          // If we have cached substitutions from a previous run, apply them
+          // synchronously so the UI shows substitutes immediately instead
+          // of waiting for the hydration effect.
+          try {
+            const cached = __initialCachedSubs
+            if (cached && Array.isArray(cached) && cached.length) {
+              try {
+                const applied = applySubstitutionsToTimetable(cleaned, cached, { debug: false })
+                return applied
+              } catch (e) {
+                // fall back to cleaned map on error
+              }
+            }
+          } catch (e) {}
+
           return cleaned
         } catch (e) {
           return rawMap
