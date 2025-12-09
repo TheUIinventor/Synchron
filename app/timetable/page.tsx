@@ -495,14 +495,14 @@ export default function TimetablePage() {
                           <div className="flex-1">
                               <div className={`p-2 sm:p-3 rounded-xl flex items-center bg-surface-container-high transition-all hover:shadow-md ${isPhone ? '' : 'active:scale-95'}`}> 
                               <div className="min-w-0 pr-1">
-                                <div className={`text-base sm:text-lg font-semibold truncate ${period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
+                                <div className={`text-base sm:text-lg font-semibold truncate ${(period.isSubstitute || (period as any).casualSurname) ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
                               <div className="flex items-center gap-2 ml-1 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {/* Teacher: highlight when substitute instead of showing a status pill */}
                                 {(period as any).displayTeacher ? (
-                                  <span className={period.isSubstitute ? "inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]" : "text-on-surface-variant truncate max-w-[100px]"}
-                                    style={period.isSubstitute ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : undefined}
+                                  <span className={(period.isSubstitute || (period as any).casualSurname) ? "inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]" : "text-on-surface-variant truncate max-w-[100px]"}
+                                    style={(period.isSubstitute || (period as any).casualSurname) ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : undefined}
                                   >
                                     {(period as any).displayTeacher}
                                   </span>

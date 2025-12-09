@@ -565,7 +565,7 @@ export default function HomeClient() {
                                   {/* no separate Sub/Room pills here; teacher will be highlighted when substituted */}
                                 </div>
                                 <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  {period.isSubstitute ? (
+                                  {(period.isSubstitute || period.casualSurname) ? (
                                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
                                       style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                     >
@@ -585,7 +585,7 @@ export default function HomeClient() {
                                 </div>
                               </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  {period.isSubstitute ? (
+                                  {(period.isSubstitute || period.casualSurname) ? (
                                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
                                       style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                     >
@@ -619,14 +619,14 @@ export default function HomeClient() {
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  <span className={`text-sm truncate max-w-[100px] ${period.isSubstitute ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                                  <span className={`text-sm truncate max-w-[100px] ${(period.isSubstitute || period.casualSurname) ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
                                     {displayTeacher(period)}
                                   </span>
                                     <span className="mx-2">•</span>
                                     {(() => {
                                       const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
                                       return (
-                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : (period.isSubstitute ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : ((period.isSubstitute || period.casualSurname) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
                                           {displayRoom}
                                         </span>
                                       )

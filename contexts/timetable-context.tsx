@@ -2364,6 +2364,52 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [externalWeekType, currentWeek])
 
+  // Preserve casualSurname from the last recorded timetable when a fresh
+  // externalTimetable arrives that lacks casual markers. This handles the
+  // case where a background refresh returns a bare teacher code (e.g. "LIKZ")
+  // and we want to keep the human-friendly casual name previously applied.
+  useEffect(() => {
+    try {
+      if (!externalTimetable) return
+      if (!lastRecordedTimetable) return
+      let changed = false
+      const merged: Record<string, Period[]> = {}
+      for (const day of Object.keys(externalTimetable)) {
+        const newList = (externalTimetable[day] || []).map((p) => {
+          try {
+            const prevList = (lastRecordedTimetable && lastRecordedTimetable[day]) ? lastRecordedTimetable[day] : []
+            // Try to find a matching previous period by id first, then fall back
+            // to matching by period+subject+time. This covers payloads that may
+            // omit stable ids.
+            const match = prevList.find((q) => {
+              try {
+                if (q && (q as any).id && p && (p as any).id && (q as any).id === (p as any).id) return true
+                if (String(q?.period || '') === String(p?.period || '') && String(q?.subject || '') === String(p?.subject || '') && String(q?.time || '') === String(p?.time || '')) return true
+              } catch (e) {}
+              return false
+            })
+            if (match && !(p as any).casualSurname && (match as any).casualSurname) {
+              const copy = { ...p } as any
+              copy.casualSurname = (match as any).casualSurname
+              changed = true
+              return copy
+            }
+          } catch (e) {
+            // ignore per-item errors
+          }
+          return p
+        })
+        merged[day] = newList
+      }
+      if (changed) {
+        try { console.debug('[timetable.provider] merged casualSurname from cache into refreshed timetable') } catch (e) {}
+        setExternalTimetable(merged)
+      }
+    } catch (e) {
+      // ignore merge errors
+    }
+  }, [externalTimetable, lastRecordedTimetable])
+
   // Wrapped setters that record a user selection timestamp so automatic
   // time-based updates can respect manual choices for a short grace period.
   const userSetSelectedDay = (day: string) => {
