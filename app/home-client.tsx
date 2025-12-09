@@ -223,7 +223,10 @@ export default function HomeClient() {
   // Helper to determine which teacher name to display for a period, preferring full names.
   const displayTeacher = (p: any) => {
     if (!p) return null
-    // If this period has a casual/substitute with a provided surname, show only that surname per UX request
+    // Prefer the provider-computed `displayTeacher` when available which
+    // already prefers `casualSurname` over codes and strips leading casual codes.
+    if ((p as any).displayTeacher) return (p as any).displayTeacher
+    // Fallbacks
     if (p.isSubstitute && (p as any).casualSurname) return (p as any).casualSurname
     const candidate = p.fullTeacher || p.teacher || null
     if (p.isSubstitute && candidate) return stripLeadingCasualCode(candidate)

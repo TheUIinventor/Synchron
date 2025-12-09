@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
+import { stripLeadingCasualCode } from "@/lib/utils"
 
 // Define the period type
 export type Period = {
@@ -17,6 +18,10 @@ export type Period = {
   weekType?: "A" | "B"
   isSubstitute?: boolean // New: Indicates a substitute teacher
   isRoomChange?: boolean // New: Indicates a room change
+  // Optional fields populated during normalization
+  fullTeacher?: string
+  casualSurname?: string
+  displayTeacher?: string
 }
 
 // Define the bell time type
@@ -669,9 +674,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const clean = { ...p }
                 delete (clean as any).isRoomChange
                 delete (clean as any).displayRoom
+                // Also ensure we compute a normalized displayTeacher for the UI
+                try {
+                  const casual = (clean as any).casualSurname || undefined
+                  const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
+                  (clean as any).displayTeacher = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+                } catch (e) {}
                 return clean
               }
             }
+            // Compute a normalized `displayTeacher` property used by the UI.
+            try {
+              const casual = (p as any).casualSurname || undefined
+              const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
+              ;(p as any).displayTeacher = casual ? String(casual) : stripLeadingCasualCode(candidate as any)
+            } catch (e) {}
             return p
           })
         } catch (e) {
