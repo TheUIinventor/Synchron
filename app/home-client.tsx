@@ -145,6 +145,17 @@ export default function HomeClient() {
     return (bellTimes as any)['Mon/Tues'] || []
   })()
 
+  // Debug: log timetable state to help diagnose missing classes on home page
+  if (typeof window !== 'undefined') {
+    try {
+      // keep these logs lightweight and helpful
+      console.debug('[home-client] dayName', dayName)
+      console.debug('[home-client] todaysPeriodsRaw', (todaysPeriodsRaw || []).map(p => ({ period: p.period, subject: p.subject, time: p.time })))
+      console.debug('[home-client] bellTimes', bellTimes)
+      console.debug('[home-client] currentMomentPeriodInfo', currentMomentPeriodInfo)
+    } catch (e) {}
+  }
+
   // Helper: normalize period label for comparison
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
   // Keep roll call and period 0 visible — show all entries
