@@ -2156,7 +2156,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
     }
-  }, [refreshExternal])
+  }, [])
 
   // When the selected date changes, fetch the authoritative timetable for that date
   useEffect(() => {
