@@ -754,8 +754,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     
     if (useExternalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
+      // Determine which week to use: prefer explicit `currentWeek`,
+      // otherwise fall back to authoritative `externalWeekType` when present.
+      const chosenWeek = (currentWeek === 'A' || currentWeek === 'B') ? currentWeek : ((externalWeekType === 'A' || externalWeekType === 'B') ? externalWeekType : null)
       for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
-        const list = ((currentWeek === 'A' || currentWeek === 'B') && groups && Array.isArray(groups[currentWeek])) ? (groups[currentWeek] as Period[]) : []
+        const list = (chosenWeek && groups && Array.isArray(groups[chosenWeek])) ? (groups[chosenWeek] as Period[]) : []
         filtered[day] = list.slice()
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
@@ -1010,7 +1013,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
 
     return currentWeek === "B" ? timetableWeekB : timetableWeekA
-  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading])
+  }, [currentWeek, externalWeekType, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading])
 
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>(null)
