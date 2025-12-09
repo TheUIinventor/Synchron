@@ -1267,18 +1267,41 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (!externalTimetable) return
       if (!timetableSource) return
       if (timetableSource === 'fallback-sample') return
-      if (subsAppliedRef.current) return
+
       const cached = cachedSubsRef.current
       if (!cached || !Array.isArray(cached) || cached.length === 0) return
 
+      // If the newly-arrived external timetable already contains applied
+      // substitutions (marked by `isSubstitute` or `casualSurname`), do
+      // not re-apply cached subs. Otherwise, apply cached subs so the
+      // UI remains highlighted even after a reauth-refresh.
       try {
-        const applied = applySubstitutionsToTimetable(externalTimetable, cached, { debug: false })
-        try { console.debug('[timetable.provider] applied cached substitutions (hydrate)') } catch (e) {}
-        setExternalTimetable(applied)
-        subsAppliedRef.current = Date.now()
-      } catch (e) {
-        try { console.debug('[timetable.provider] error applying cached subs', e) } catch (err) {}
-      }
+        let hasSubs = false
+        for (const d of Object.keys(externalTimetable)) {
+          for (const p of externalTimetable[d] || []) {
+            if ((p as any).isSubstitute) { hasSubs = true; break }
+            if ((p as any).casualSurname) { hasSubs = true; break }
+          }
+          if (hasSubs) break
+        }
+
+        if (hasSubs) {
+          // mark that substitutions are present for this session
+          subsAppliedRef.current = Date.now()
+          try { console.debug('[timetable.provider] externalTimetable already contains substitutions; skipping cached apply') } catch (e) {}
+          return
+        }
+
+        // Otherwise apply cached substitutions to the fresh timetable
+        try {
+          const applied = applySubstitutionsToTimetable(externalTimetable, cached, { debug: false })
+          try { console.debug('[timetable.provider] applied cached substitutions (hydrate/refresh)') } catch (e) {}
+          setExternalTimetable(applied)
+          subsAppliedRef.current = Date.now()
+        } catch (e) {
+          try { console.debug('[timetable.provider] error applying cached subs', e) } catch (err) {}
+        }
+      } catch (e) {}
     } catch (e) {}
   }, [externalTimetable, timetableSource])
 
