@@ -384,14 +384,10 @@ export default function HomeClient() {
                     {currentPeriod?.subject ? (
                       canvasLinks[currentPeriod.subject] ? (
                         <a href={canvasLinks[currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                          <span className="inline md:hidden">{currentPeriod.subject}</span>
-                          <span className="hidden md:inline">{(currentPeriod as any)?.title || currentPeriod.subject}</span>
+                          {currentPeriod.subject}
                         </a>
                       ) : (
-                        <>
-                          <span className="inline md:hidden">{currentPeriod.subject}</span>
-                          <span className="hidden md:inline">{(currentPeriod as any)?.title || currentPeriod.subject}</span>
-                        </>
+                        <>{currentPeriod.subject}</>
                       )
                     ) : (
                       "Free Period"

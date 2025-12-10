@@ -165,7 +165,7 @@ export default function TimetablePage() {
     if (period.subject === "Break") {
       return period.period // Show "Recess", "Lunch 1", etc. instead of "Break"
     }
-    return period.subject
+    return (period as any)?.title || period.subject
   }
 
   const getDisplayRoom = (period: any) => {
