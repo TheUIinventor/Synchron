@@ -22,6 +22,45 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       .catch(err => console.debug('auth refresh error', err))
   }, [])
 
+  // Emergency: attempt a one-time unregister of any active Service Workers
+  // and clear caches to force clients to fetch fresh assets. This is a
+  // defensive recovery for users who may be stuck on an older, broken
+  // client bundle (TDZ/minified runtime errors). It runs only once per
+  // browser session and sets `sessionStorage.synchron:force-update` to avoid
+  // reload loops.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const already = sessionStorage.getItem('synchron:force-update') === 'true'
+      if (already) return
+      if ('serviceWorker' in navigator || 'caches' in window) {
+        ;(async () => {
+          try {
+            if ('serviceWorker' in navigator) {
+              const regs = await navigator.serviceWorker.getRegistrations()
+              for (const r of regs) {
+                try { await r.unregister() } catch (e) {}
+              }
+            }
+            if ('caches' in window) {
+              try {
+                const keys = await caches.keys()
+                for (const k of keys) {
+                  try { await caches.delete(k) } catch (e) {}
+                }
+              } catch (e) {}
+            }
+          } catch (e) {
+            console.debug('emergency sw clear failed', e)
+          } finally {
+            try { sessionStorage.setItem('synchron:force-update', 'true') } catch (e) {}
+            try { location.reload() } catch (e) {}
+          }
+        })()
+      }
+    } catch (e) {}
+  }, [])
+
   // Register service worker and capture install prompt for PWA
   useEffect(() => {
     if (typeof window === 'undefined') return
