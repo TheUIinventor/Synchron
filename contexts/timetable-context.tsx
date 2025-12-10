@@ -1773,6 +1773,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const parsedCache = JSON.parse(cached)
                 if (parsedCache && parsedCache.timetable) {
                   try {
+                    // Attach any available long titles from the cached payload
+                    try {
+                      const subjectsMap = parsedCache.subjects || parsedCache.timetable?.subjects || parsedCache.upstream?.subjects || parsedCache.upstream?.full?.subjects || null
+                      if (subjectsMap && typeof subjectsMap === 'object') {
+                        const shortToTitle: Record<string, string> = {}
+                        for (const k of Object.keys(subjectsMap)) {
+                          try {
+                            const v = subjectsMap[k]
+                            const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                            const title = (v && (v.title || v.name || v.fullTitle)) ? (v.title || v.name || v.fullTitle) : null
+                            if (short && title) shortToTitle[String(short).trim()] = String(title)
+                          } catch (e) {}
+                        }
+                        for (const d of Object.keys(parsedCache.timetable)) {
+                          try {
+                            const arr = parsedCache.timetable[d] || []
+                            for (const p of arr) {
+                              try {
+                                if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                              } catch (e) {}
+                            }
+                          } catch (e) {}
+                        }
+                      }
+                    } catch (e) {}
                     setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
@@ -1801,7 +1826,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore cache errors
             }
           }
-          if (j && j.timetable) {
+              if (j && j.timetable) {
             if (payloadHasNoTimetable(j)) {
               // Even when the payload reports "no timetable", try to
               // salvage any bell schedules the server may have provided
@@ -1903,6 +1928,47 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore substitution extraction errors
               }
+              // Attach long subject titles when available in the upstream payload
+              try {
+                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || null
+                if (subjectsSource && typeof subjectsSource === 'object') {
+                  const shortToTitle: Record<string, string> = {}
+                  for (const k of Object.keys(subjectsSource)) {
+                    try {
+                      const v = subjectsSource[k]
+                      const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                      const title = (v && (v.title || v.name || v.fullTeacher || v.fullTitle)) ? (v.title || v.name || v.fullTeacher || v.fullTitle) : null
+                      if (short && title) shortToTitle[String(short).trim()] = String(title)
+                    } catch (e) {}
+                  }
+                  for (const d of Object.keys(finalTimetable)) {
+                    try {
+                      const arr = finalTimetable[d] || []
+                      for (const p of arr) {
+                        try {
+                          if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                        } catch (e) {}
+                      }
+                    } catch (e) {}
+                  }
+                  if (finalByWeek) {
+                    for (const d of Object.keys(finalByWeek)) {
+                      try {
+                        const groups = finalByWeek[d]
+                        for (const weekKey of ['A','B','unknown']) {
+                          try {
+                            const arr = (groups as any)[weekKey] || []
+                            for (const p of arr) {
+                              try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                            }
+                          } catch (e) {}
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                }
+              } catch (e) {}
+
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
               // Persist the processed result keyed by payload-hash so future
@@ -1957,6 +2023,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (!byDay[day]) byDay[day] = []
                 byDay[day].push(p)
               }
+              // Attach long titles from subjects mapping if available
+              try {
+                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.full?.subjects || null
+                if (subjectsSource && typeof subjectsSource === 'object') {
+                  const shortToTitle: Record<string, string> = {}
+                  for (const k of Object.keys(subjectsSource)) {
+                    try {
+                      const v = subjectsSource[k]
+                      const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                      const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                      if (short && title) shortToTitle[String(short).trim()] = String(title)
+                    } catch (e) {}
+                  }
+                  for (const d of Object.keys(byDay)) {
+                    try {
+                      for (const p of byDay[d]) {
+                        try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                      }
+                    } catch (e) {}
+                  }
+                }
+              } catch (e) {}
+
               setExternalTimetable(byDay)
               // Also persist processed result for array-shaped payloads
               try {
