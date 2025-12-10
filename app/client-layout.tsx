@@ -26,36 +26,9 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Register SW in production-like environments
-    // Attempt one-time cleanup of any old Service Worker registrations and caches
-    // This helps clients pick up the newly-built JS instead of using a stale
-    // cached bundle that can contain the previous runtime error.
-    try {
-      const already = sessionStorage.getItem('synchron:sw-unregistered') === 'true'
-      if ('serviceWorker' in navigator && !already) {
-        navigator.serviceWorker.getRegistrations().then(async (regs) => {
-          if (regs && regs.length) {
-            for (const r of regs) {
-              try { await r.unregister() } catch (e) {}
-            }
-            try { const keys = await caches.keys(); for (const k of keys) await caches.delete(k) } catch (e) {}
-            try { sessionStorage.setItem('synchron:sw-unregistered', 'true') } catch (e) {}
-            // reload to fetch fresh assets after clearing SW and caches
-            location.reload()
-            return
-          }
-          // If none were unregistered, register the current SW (normal flow)
-          try { navigator.serviceWorker.register('/sw.js').catch(() => {}) } catch (e) {}
-        }).catch(() => {
-          try { navigator.serviceWorker.register('/sw.js').catch(() => {}) } catch (e) {}
-        })
-      } else {
-        // Normal registration path when already handled
-        try { navigator.serviceWorker.register('/sw.js').catch(() => {}) } catch (e) {}
-      }
-    } catch (e) {
-      // ignore SW errors
-    }
+    // Service worker registration removed to avoid persistent cached bundles
+    // that can lock clients into old, broken builds. This app relies on
+    // normal HTTP caching; PWAs can be reintroduced with care in future.
 
     // Capture the beforeinstallprompt event so the UI can trigger prompt later
     function onBeforeInstall(e: any) {
@@ -73,22 +46,8 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       window.dispatchEvent(new CustomEvent('synchron:appinstalled'))
     })
 
-    // Listen for messages from the Service Worker so we can reload when a
-    // new SW becomes active and wants clients to refresh assets.
-    const onSWMessage = (ev: MessageEvent) => {
-      try {
-        const d = (ev && (ev as any).data) || {}
-        if (d && d.type === 'sw-activated' && sessionStorage.getItem('synchron:sw-unregistered') !== 'true') {
-          try { sessionStorage.setItem('synchron:sw-unregistered', 'true') } catch (e) {}
-          location.reload()
-        }
-      } catch (e) {}
-    }
-    try { navigator.serviceWorker && navigator.serviceWorker.addEventListener && navigator.serviceWorker.addEventListener('message', onSWMessage) } catch (e) {}
-
     return () => {
       try { window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener) } catch (e) {}
-      try { navigator.serviceWorker && navigator.serviceWorker.removeEventListener && navigator.serviceWorker.removeEventListener('message', onSWMessage) } catch (e) {}
     }
   }, [])
 

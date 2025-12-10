@@ -35,27 +35,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${roboto.variable} font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
-        {/* Inline early-run script: attempt to unregister any old Service Worker
-            and clear caches before the client bundle executes. This helps
-            ensure users who are stuck on a stale/minified bundle get the
-            updated assets on next load. We guard with sessionStorage so we
-            don't loop reloads. */}
-        <script dangerouslySetInnerHTML={{ __html: `(() => {
-          try {
-            if (typeof window === 'undefined') return;
-            if (!('serviceWorker' in navigator)) return;
-            const already = sessionStorage.getItem('synchron:sw-unregistered') === 'true';
-            if (already) return;
-            navigator.serviceWorker.getRegistrations().then((regs) => {
-              if (regs && regs.length) {
-                regs.forEach(r => { try { r.unregister(); } catch (e) {} });
-                try { if (window.caches) { caches.keys().then(keys => keys.forEach(k => { try { caches.delete(k) } catch(e){} })); } } catch(e) {}
-                try { sessionStorage.setItem('synchron:sw-unregistered', 'true') } catch(e) {}
-                try { location.reload(); } catch(e) {}
-              }
-            }).catch(() => {})
-          } catch (e) {}
-        })();` }} />
         <ClientLayout>
           {children}
           <Toaster />
