@@ -649,10 +649,17 @@ export default function HomeClient() {
                                     {/* Remove textual 'Sub' and 'Room' pills; use teacher/room highlight styling instead */}
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    {/* removed Sub pill */}
-                                    <span>{displayTeacher(period)}</span>
+                                    {(isSubstitutePeriod(period)) ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                      >
+                                        {displayTeacher(period)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
+                                    )}
                                     <span>•</span>
-                                    <span>{(period as any).displayRoom || period.room}</span>
+                                    <span className="text-on-surface-variant">{(period as any).displayRoom || period.room}</span>
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
