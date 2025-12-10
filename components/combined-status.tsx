@@ -33,10 +33,18 @@ export default function CombinedStatus() {
   // then teacher.
   const displayTeacher = useCallback((p: any) => {
     if (!p) return ''
-    if (p.isSubstitute && (p as any).casualSurname) return (p as any).casualSurname
+    if (p.isSubstitute && (p as any).casualSurname) return stripLeadingCasualCode((p as any).casualSurname)
     const candidate = p.fullTeacher || p.teacher || ''
     if (p.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
-    return candidate
+    return stripLeadingCasualCode(candidate)
+  }, [])
+
+  const isSubstitutePeriod = useCallback((p: any) => {
+    try {
+      if (!p) return false
+      const changedTeacher = (p as any).originalTeacher && String((p as any).originalTeacher || '').trim() !== String(p.teacher || '').trim()
+      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
+    } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }, [])
 
   const getDisplayRoom = useCallback((period: any) => {
@@ -82,7 +90,7 @@ export default function CombinedStatus() {
               </div>
               <p className="font-medium mb-1">{getDisplaySubject(nextPeriodInfo.currentPeriod)}</p>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400 mb-2">
-                {(nextPeriodInfo.currentPeriod.isSubstitute || (nextPeriodInfo.currentPeriod as any).casualSurname) ? (
+                {(isSubstitutePeriod(nextPeriodInfo.currentPeriod)) ? (
                   <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
                     style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                   >
@@ -107,7 +115,7 @@ export default function CombinedStatus() {
                 </div>
                 <p className="font-medium text-sm mb-1">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
                 <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  {(nextPeriodInfo.nextPeriod.isSubstitute || (nextPeriodInfo.nextPeriod as any).casualSurname) ? (
+                  {(isSubstitutePeriod(nextPeriodInfo.nextPeriod)) ? (
                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
                       style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                     >

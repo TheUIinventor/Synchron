@@ -176,6 +176,14 @@ export default function TimetablePage() {
     return period.room || ''
   }
 
+  const isSubstitutePeriod = (p: any) => {
+    try {
+      if (!p) return false
+      const changedTeacher = (p as any).originalTeacher && String((p as any).originalTeacher || '').trim() !== String(p.teacher || '').trim()
+      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
+    } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
+  }
+
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
   const selectedDayName = days[displayDateObject.getDay()]
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
@@ -495,18 +503,20 @@ export default function TimetablePage() {
                           <div className="flex-1">
                               <div className={`p-2 sm:p-3 rounded-xl flex items-center bg-surface-container-high transition-all hover:shadow-md ${isPhone ? '' : 'active:scale-95'}`}> 
                               <div className="min-w-0 pr-1">
-                                <div className={`text-base sm:text-lg font-semibold truncate ${(period.isSubstitute || (period as any).casualSurname) ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
+                                <div className={`text-base sm:text-lg font-semibold truncate ${isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
                               </div>
                               <div className="flex items-center gap-2 ml-1 flex-shrink-0">
                                 {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
                                 {/* Teacher: highlight when substitute instead of showing a status pill */}
-                                {(period as any).displayTeacher ? (
-                                  <span className={`text-sm truncate max-w-[100px] ${(period.isSubstitute || (period as any).casualSurname) ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
-                                    {(period as any).displayTeacher}
-                                  </span>
-                                ) : (
-                                  <span className="text-on-surface-variant truncate max-w-[100px]">{(period.fullTeacher || period.teacher) || ''}</span>
-                                )}
+                                {(() => {
+                                  const raw = (period as any).displayTeacher || (period.fullTeacher || period.teacher) || ''
+                                  const shown = stripLeadingCasualCode(String(raw))
+                                  return (
+                                    <span className={`text-sm truncate max-w-[100px] ${isSubstitutePeriod(period) ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                                      {shown}
+                                    </span>
+                                  )
+                                })()}
                                 {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
                                 <span className="truncate max-w-[72px] text-sm text-on-surface-variant">{getDisplayRoom(period)}</span>
                               </div>
