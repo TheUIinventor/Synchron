@@ -1775,7 +1775,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try {
                     // Attach any available long titles from the cached payload
                     try {
-                      const subjectsMap = parsedCache.subjects || parsedCache.timetable?.subjects || parsedCache.upstream?.subjects || parsedCache.upstream?.full?.subjects || null
+                      const subjectsMap = parsedCache.subjects || parsedCache.timetable?.subjects || parsedCache.upstream?.subjects || parsedCache.upstream?.day?.timetable?.subjects || parsedCache.upstream?.full?.subjects || null
                       if (subjectsMap && typeof subjectsMap === 'object') {
                         const shortToTitle: Record<string, string> = {}
                         for (const k of Object.keys(subjectsMap)) {
@@ -1930,7 +1930,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               // Attach long subject titles when available in the upstream payload
               try {
-                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || null
+                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
                 if (subjectsSource && typeof subjectsSource === 'object') {
                   const shortToTitle: Record<string, string> = {}
                   for (const k of Object.keys(subjectsSource)) {
@@ -1980,6 +1980,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       timetable: finalTimetable,
                       timetableByWeek: finalByWeek || null,
                       bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null,
                       source: j.source ?? 'external',
                       weekType: j.weekType ?? null,
                       savedAt: Date.now(),
@@ -2025,7 +2026,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               // Attach long titles from subjects mapping if available
               try {
-                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.full?.subjects || null
+                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
                 if (subjectsSource && typeof subjectsSource === 'object') {
                   const shortToTitle: Record<string, string> = {}
                   for (const k of Object.keys(subjectsSource)) {
@@ -2055,6 +2056,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       timetable: byDay,
                       timetableByWeek: null,
                       bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
                       source: j.source ?? 'external',
                       weekType: j.weekType ?? null,
                       savedAt: Date.now(),
