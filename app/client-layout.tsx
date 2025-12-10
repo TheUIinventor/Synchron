@@ -73,8 +73,22 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       window.dispatchEvent(new CustomEvent('synchron:appinstalled'))
     })
 
+    // Listen for messages from the Service Worker so we can reload when a
+    // new SW becomes active and wants clients to refresh assets.
+    const onSWMessage = (ev: MessageEvent) => {
+      try {
+        const d = (ev && (ev as any).data) || {}
+        if (d && d.type === 'sw-activated' && sessionStorage.getItem('synchron:sw-unregistered') !== 'true') {
+          try { sessionStorage.setItem('synchron:sw-unregistered', 'true') } catch (e) {}
+          location.reload()
+        }
+      } catch (e) {}
+    }
+    try { navigator.serviceWorker && navigator.serviceWorker.addEventListener && navigator.serviceWorker.addEventListener('message', onSWMessage) } catch (e) {}
+
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener)
+      try { window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener) } catch (e) {}
+      try { navigator.serviceWorker && navigator.serviceWorker.removeEventListener && navigator.serviceWorker.removeEventListener('message', onSWMessage) } catch (e) {}
     }
   }, [])
 

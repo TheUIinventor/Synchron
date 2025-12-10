@@ -1,5 +1,8 @@
 // Lightweight service worker for offline caching and navigation fallback
-const CACHE_NAME = 'synchron-static-v1'
+// Bump this value on breaking deploys so older service workers and caches
+// are invalidated. Update to a new value for the next build when making
+// runtime-critical fixes.
+const CACHE_NAME = 'synchron-static-v2'
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -16,6 +19,21 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.map((k) => { if (k !== CACHE_NAME) return caches.delete(k); return null }))).then(() => self.clients.claim())
+  )
+})
+
+// Notify clients once this new Service Worker is active so they can reload
+// and pick up the new assets immediately.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const all = await self.clients.matchAll({ includeUncontrolled: true })
+        for (const c of all) {
+          try { c.postMessage({ type: 'sw-activated', cache: CACHE_NAME }) } catch (e) {}
+        }
+      } catch (e) {}
+    })()
   )
 })
 
