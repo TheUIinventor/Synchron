@@ -246,7 +246,10 @@ export default function HomeClient() {
       try {
         const cleanedFull = stripLeadingCasualCode(full || disp || '')
         const cleanedRaw = stripLeadingCasualCode(teacher || '')
-        if (cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
+        // Only treat a cleaned mismatch as a substitute when we already
+        // have an indicator that substitution is possible (original teacher
+        // changed, casual surname present, or already-marked substitute).
+        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
       } catch (e) {}
 
       // If the raw teacher looks like a short ALL-CAPS code but displayTeacher

@@ -50,7 +50,7 @@ export default function CombinedStatus() {
       try {
         const cleanedFull = stripLeadingCasualCode(full || disp || '')
         const cleanedRaw = stripLeadingCasualCode(teacher || '')
-        if (cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
+        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
       } catch (e) {}
       const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
       const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
