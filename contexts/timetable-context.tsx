@@ -6,10 +6,29 @@ import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
-import type { Period, BellTime } from "@/types/timetable"
 
 // Define the period type
-// `Period` and `BellTime` types are defined in `types/timetable.ts`
+export type Period = {
+  id?: number
+  period: string
+  time: string
+  subject: string
+  teacher: string
+  room: string
+  weekType?: "A" | "B"
+  isSubstitute?: boolean // New: Indicates a substitute teacher
+  isRoomChange?: boolean // New: Indicates a room change
+  // Optional fields populated during normalization
+  fullTeacher?: string
+  casualSurname?: string
+  displayTeacher?: string
+}
+
+// Define the bell time type
+export type BellTime = {
+  period: string
+  time: string
+}
 
 // Define the timetable context type
 type TimetableContextType = {
@@ -42,9 +61,6 @@ type TimetableContextType = {
   error: string | null
   // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
   refreshExternal?: () => Promise<void>
-  // Background refresh aggressiveness control (persistent)
-  aggressiveRefresh?: boolean
-  setAggressiveRefresh?: (v: boolean) => void
   // Full A/B grouped timetable when available from the server
   timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
   externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
@@ -540,45 +556,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // ignore
       }
     } catch (e) {}
-  }, [updateAllTimeStates])
+  }, [])
 
   // Memoize the current timetable based on selected week
   // Try to synchronously hydrate last-known timetable from localStorage so the UI
   // can display cached data instantly while we fetch fresh data in the background.
-  // Helper: normalize a timetable map for UI display (displayTeacher, displayRoom, isRoomChange)
-  const normalizeTimetableForDisplay = (rawMap: Record<string, Period[]> | null) => {
-    if (!rawMap) return rawMap
-    try {
-      const cleaned: Record<string, Period[]> = {}
-      for (const day of Object.keys(rawMap)) {
-        cleaned[day] = (rawMap[day] || []).map((p) => {
-          const item: any = { ...(p as any) }
-          // Normalize destination room
-          const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
-          if (candidateDest && String(candidateDest).trim()) {
-            const candStr = String(candidateDest).trim()
-            const roomStr = String(item.room || '').trim()
-            if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-              item.displayRoom = candStr
-              item.isRoomChange = true
-            }
-          }
-          // Normalize teacher display
-          try {
-            const casual = item.casualSurname || undefined
-            const candidate = item.fullTeacher || item.teacher || undefined
-            const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-            item.displayTeacher = dt
-          } catch (e) {}
-          if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) {
-            delete item.isRoomChange
-          }
-          return item
-        })
-      }
-      return cleaned
-    } catch (e) { return rawMap }
-  }
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(() => {
     try {
       if (__initialExternalTimetable) {
@@ -669,48 +651,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
-  // Aggressive refresh toggle persisted to localStorage (default: true)
-  const [aggressiveRefresh, setAggressiveRefresh] = useState<boolean>(() => {
-    try {
-      if (typeof window === 'undefined') return true
-      const raw = localStorage.getItem('synchron-aggressive-refresh')
-      if (raw === 'false') return false
-    } catch (e) {}
-    return true
-  })
-  useEffect(() => {
-    try { localStorage.setItem('synchron-aggressive-refresh', aggressiveRefresh ? 'true' : 'false') } catch (e) {}
-  }, [aggressiveRefresh])
 
-  // Listen for cross-window or in-page toggle events so Settings can update provider
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const handler = (ev: any) => {
-      try {
-        const v = ev?.detail?.value
-        if (typeof v === 'boolean') setAggressiveRefresh(v)
-      } catch (e) {}
-    }
-    const storageHandler = (ev: StorageEvent) => {
-      try {
-        if (ev.key === 'synchron-aggressive-refresh') {
-          setAggressiveRefresh(ev.newValue === 'true')
-        }
-      } catch (e) {}
-    }
-    window.addEventListener('synchron:aggressive-refresh-changed', handler)
-    window.addEventListener('storage', storageHandler)
-    return () => {
-      window.removeEventListener('synchron:aggressive-refresh-changed', handler)
-      window.removeEventListener('storage', storageHandler)
-    }
-  }, [])
-
-  // Background refresh tuning (driven by `aggressiveRefresh` toggle)
+  // Aggressive background refresh tuning
+  // NOTE: reduced intervals to make visible-refresh more responsive.
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  const MIN_REFRESH_MS = aggressiveRefresh ? 3 * 1000 : 45 * 1000
-  const VISIBLE_REFRESH_MS = aggressiveRefresh ? 4 * 1000 : 60 * 1000
-  const HIDDEN_REFRESH_MS = aggressiveRefresh ? 20 * 1000 : 5 * 60 * 1000
+  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
+  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
+  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
@@ -1826,9 +1773,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const parsedCache = JSON.parse(cached)
                 if (parsedCache && parsedCache.timetable) {
                   try {
-                    // Normalize cached processed payload for consistent display
-                    const normalized = normalizeTimetableForDisplay(parsedCache.timetable)
-                    setExternalTimetable(normalized)
+                    setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
@@ -2203,13 +2148,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
       if (lastRecordedTimetable) {
         // Prefer showing cached real data when available regardless of auth state.
-        // Normalize before setting so UI sees display fields consistently.
-        try {
-          const normalized = normalizeTimetableForDisplay(lastRecordedTimetable)
-          setExternalTimetable(normalized)
-        } catch (e) {
-          setExternalTimetable(lastRecordedTimetable)
-        }
+        setExternalTimetable(lastRecordedTimetable)
         setTimetableSource('cache')
         setError(null)
       } else if (isAuthenticated) {
@@ -2401,7 +2340,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
     }
-  }, [aggressiveRefresh])
+  }, [])
 
   // When the selected date changes, fetch the authoritative timetable for that date
   useEffect(() => {
@@ -2654,8 +2593,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         isShowingCachedWhileLoading: Boolean((isLoading || isRefreshing) && lastRecordedTimetable),
         error,
         refreshExternal,
-        aggressiveRefresh,
-        setAggressiveRefresh,
       }}
     >
       {children}
@@ -2670,15 +2607,5 @@ export function useTimetable() {
     throw new Error("useTimetable must be used within a TimetableProvider")
   }
   return context
-}
-
-// Safe hook variant: returns the context or `null` when provider not present.
-export function useTimetableSafe() {
-  try {
-    const context = useContext(TimetableContext)
-    return context ?? null
-  } catch (e) {
-    return null
-  }
 }
 
