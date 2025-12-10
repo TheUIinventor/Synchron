@@ -150,6 +150,8 @@ export default function SettingsPage() {
   const [isMobile, setIsMobile] = useState(false)
   const router = useRouter()
   const { colorTheme, setColorTheme, fontTheme, setFontTheme } = useUserSettings()
+  const timetable = useTimetable()
+  const { aggressiveRefresh = true, setAggressiveRefresh } = timetable
 
   // Navigation tabs are not user-configurable in this build.
 
@@ -286,6 +288,22 @@ export default function SettingsPage() {
                   <div className="text-sm text-on-surface-variant">Appearance</div>
                   <ThemeToggle />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
+                <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-on-surface-variant">Aggressive background refresh</div>
+                  <div className="flex items-center gap-3">
+                    <Switch checked={Boolean(aggressiveRefresh)} onCheckedChange={(v) => { try { setAggressiveRefresh && setAggressiveRefresh(Boolean(v)) } catch (e) {} }} />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-on-surface-variant">When enabled, the app will poll more frequently while visible and immediately refresh when you return to the tab. This may increase network usage.</p>
               </CardContent>
             </Card>
 

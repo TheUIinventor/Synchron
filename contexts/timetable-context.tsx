@@ -61,6 +61,9 @@ type TimetableContextType = {
   error: string | null
   // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
   refreshExternal?: () => Promise<void>
+  // Background refresh aggressiveness control (persistent)
+  aggressiveRefresh?: boolean
+  setAggressiveRefresh?: (v: boolean) => void
   // Full A/B grouped timetable when available from the server
   timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
   externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
@@ -556,7 +559,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // ignore
       }
     } catch (e) {}
-  }, [])
+  }, [updateAllTimeStates])
 
   // Memoize the current timetable based on selected week
   // Try to synchronously hydrate last-known timetable from localStorage so the UI
@@ -651,14 +654,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
+  // Aggressive refresh toggle persisted to localStorage (default: true)
+  const [aggressiveRefresh, setAggressiveRefresh] = useState<boolean>(() => {
+    try {
+      if (typeof window === 'undefined') return true
+      const raw = localStorage.getItem('synchron-aggressive-refresh')
+      if (raw === 'false') return false
+    } catch (e) {}
+    return true
+  })
+  useEffect(() => {
+    try { localStorage.setItem('synchron-aggressive-refresh', aggressiveRefresh ? 'true' : 'false') } catch (e) {}
+  }, [aggressiveRefresh])
 
-  // Aggressive background refresh tuning
-  // Further reduce intervals per request: aim ~3x faster than current.
+  // Background refresh tuning (driven by `aggressiveRefresh` toggle)
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  // Be cautious: browsers throttle background timers for hidden tabs.
-  const MIN_REFRESH_MS = 3 * 1000 // never refresh faster than ~3s
-  const VISIBLE_REFRESH_MS = 4 * 1000 // target interval while visible (~4s)
-  const HIDDEN_REFRESH_MS = 20 * 1000 // target interval while hidden (~20s)
+  const MIN_REFRESH_MS = aggressiveRefresh ? 3 * 1000 : 45 * 1000
+  const VISIBLE_REFRESH_MS = aggressiveRefresh ? 4 * 1000 : 60 * 1000
+  const HIDDEN_REFRESH_MS = aggressiveRefresh ? 20 * 1000 : 5 * 60 * 1000
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
@@ -2341,7 +2354,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
     }
-  }, [])
+  }, [aggressiveRefresh])
 
   // When the selected date changes, fetch the authoritative timetable for that date
   useEffect(() => {
@@ -2594,6 +2607,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         isShowingCachedWhileLoading: Boolean((isLoading || isRefreshing) && lastRecordedTimetable),
         error,
         refreshExternal,
+        aggressiveRefresh,
+        setAggressiveRefresh,
       }}
     >
       {children}
