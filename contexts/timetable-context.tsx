@@ -653,9 +653,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const lastRefreshTsRef = useRef<number | null>(null)
 
   // Aggressive background refresh tuning
-  const MIN_REFRESH_MS = 45 * 1000 // never refresh faster than 45s
-  const VISIBLE_REFRESH_MS = 60 * 1000 // target interval while visible
-  const HIDDEN_REFRESH_MS = 5 * 60 * 1000 // target interval while hidden
+  // NOTE: reduced intervals to make visible-refresh more responsive.
+  // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
+  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
+  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
+  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
@@ -1585,7 +1587,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Expose a refresh function so UI can trigger a retry without reloading the page
-  async function refreshExternal(attemptedRefresh = false): Promise<void> {
+  async function refreshExternal(attemptedRefresh = false, force = false): Promise<void> {
     // If we already have a cached timetable, avoid showing the global
     // loading spinner — keep cached content visible and refresh in the
     // background. Only show the loading state when there is no cached data.
@@ -1597,7 +1599,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // Throttle aggressive refreshes: ensure we don't refresh more often than MIN_REFRESH_MS
     try {
       const now = Date.now()
-      if (lastRefreshTsRef.current && (now - lastRefreshTsRef.current) < MIN_REFRESH_MS) {
+      if (!force && lastRefreshTsRef.current && (now - lastRefreshTsRef.current) < MIN_REFRESH_MS) {
         try { console.debug('[timetable.provider] refresh skipped: rate limit') } catch (e) {}
         setIsRefreshing(false)
         if (!hadCache) setIsLoading(false)
@@ -2316,9 +2318,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     const startWithInterval = (ms: number) => {
       if (intervalId != null) window.clearInterval(intervalId)
-      // Fire a refresh immediately but let refreshExternal enforce MIN_REFRESH_MS
-      void refreshExternal().catch(() => {})
-      intervalId = window.setInterval(() => { void refreshExternal().catch(() => {}) }, ms)
+      // Fire a refresh immediately and allow this visibility-triggered
+      // call to bypass the MIN refresh throttle by passing `force=true`.
+      void refreshExternal(false, true).catch(() => {})
+      intervalId = window.setInterval(() => { void refreshExternal(false, true).catch(() => {}) }, ms)
     }
 
     function handleVisibility() {

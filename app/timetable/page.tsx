@@ -180,7 +180,19 @@ export default function TimetablePage() {
   const isSubstitutePeriod = (p: any) => {
     try {
       if (!p) return false
-      const changedTeacher = (p as any).originalTeacher && String((p as any).originalTeacher || '').trim() !== String(p.teacher || '').trim()
+      const orig = String((p as any).originalTeacher || '').trim()
+      const teacher = String(p.teacher || '').trim()
+      const full = String((p as any).fullTeacher || '').trim()
+      const disp = String((p as any).displayTeacher || '').trim()
+      const changedTeacher = orig && orig !== teacher
+      try {
+        const cleanedFull = stripLeadingCasualCode(full || disp || '')
+        const cleanedRaw = stripLeadingCasualCode(teacher || '')
+        if (cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
+      } catch (e) {}
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
+      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
+      if (rawIsCode && dispLooksName) return true
       return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
