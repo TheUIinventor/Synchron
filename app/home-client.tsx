@@ -384,10 +384,14 @@ export default function HomeClient() {
                     {currentPeriod?.subject ? (
                       canvasLinks[currentPeriod.subject] ? (
                         <a href={canvasLinks[currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                          {currentPeriod.subject}
+                          <span className="inline md:hidden">{currentPeriod.subject}</span>
+                          <span className="hidden md:inline">{(currentPeriod as any)?.title || currentPeriod.subject}</span>
                         </a>
                       ) : (
-                        currentPeriod.subject
+                        <>
+                          <span className="inline md:hidden">{currentPeriod.subject}</span>
+                          <span className="hidden md:inline">{(currentPeriod as any)?.title || currentPeriod.subject}</span>
+                        </>
                       )
                     ) : (
                       "Free Period"
@@ -404,7 +408,15 @@ export default function HomeClient() {
 
                 <div className="mt-6">
                   <div className="flex flex-col items-end text-sm mb-1">
-                    <span className="text-[15px] opacity-90">{nextPeriod?.subject ? `${nextPeriod.subject} in` : ""}</span>
+                    <span className="text-[15px] opacity-90">
+                      {nextPeriod?.subject ? (
+                        <>
+                          <span className="inline md:hidden">{nextPeriod.subject}</span>
+                          <span className="hidden md:inline">{(nextPeriod as any)?.title || nextPeriod.subject}</span>
+                          {" in"}
+                        </>
+                      ) : ""}
+                    </span>
                     <span className="font-bold text-[15px]">{remainingLabel()}</span>
                   </div>
                   <div className="h-2 w-full bg-primary/20 rounded-full overflow-hidden">
