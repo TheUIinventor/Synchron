@@ -348,8 +348,8 @@ export default function HomeClient() {
       {/* Main Expressive Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start md:items-stretch">
         
-        {/* HERO: Current/Next Period - Spans full width on mobile, 8 cols on desktop */}
-        <div className="md:col-span-8 space-y-3 flex flex-col md:h-full">
+        {/* HERO: Current/Next Period - Spans full width on mobile, 6 cols on desktop */}
+        <div className="md:col-span-6 space-y-3 flex flex-col md:h-full">
             
             {/* Primary Status Card */}
             {/* Mobile-only compact pill (shows countdown and next period) */}
@@ -548,8 +548,8 @@ export default function HomeClient() {
             </div>
         </div>
 
-        {/* SIDEBAR: Date & Quick Actions - 4 cols on desktop */}
-        <div className="md:col-span-4 space-y-3">
+        {/* SIDEBAR: Date & Quick Actions - 6 cols on desktop (approx. 50%) */}
+        <div className="md:col-span-6 space-y-3">
           <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
