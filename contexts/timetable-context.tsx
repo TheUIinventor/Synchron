@@ -564,6 +564,40 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Memoize the current timetable based on selected week
   // Try to synchronously hydrate last-known timetable from localStorage so the UI
   // can display cached data instantly while we fetch fresh data in the background.
+  // Helper: normalize a timetable map for UI display (displayTeacher, displayRoom, isRoomChange)
+  const normalizeTimetableForDisplay = (rawMap: Record<string, Period[]> | null) => {
+    if (!rawMap) return rawMap
+    try {
+      const cleaned: Record<string, Period[]> = {}
+      for (const day of Object.keys(rawMap)) {
+        cleaned[day] = (rawMap[day] || []).map((p) => {
+          const item: any = { ...(p as any) }
+          // Normalize destination room
+          const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
+          if (candidateDest && String(candidateDest).trim()) {
+            const candStr = String(candidateDest).trim()
+            const roomStr = String(item.room || '').trim()
+            if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+              item.displayRoom = candStr
+              item.isRoomChange = true
+            }
+          }
+          // Normalize teacher display
+          try {
+            const casual = item.casualSurname || undefined
+            const candidate = item.fullTeacher || item.teacher || undefined
+            const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+            item.displayTeacher = dt
+          } catch (e) {}
+          if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) {
+            delete item.isRoomChange
+          }
+          return item
+        })
+      }
+      return cleaned
+    } catch (e) { return rawMap }
+  }
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(() => {
     try {
       if (__initialExternalTimetable) {
@@ -1787,7 +1821,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const parsedCache = JSON.parse(cached)
                 if (parsedCache && parsedCache.timetable) {
                   try {
-                    setExternalTimetable(parsedCache.timetable)
+                    // Normalize cached processed payload for consistent display
+                    const normalized = normalizeTimetableForDisplay(parsedCache.timetable)
+                    setExternalTimetable(normalized)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
@@ -2162,7 +2198,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
       if (lastRecordedTimetable) {
         // Prefer showing cached real data when available regardless of auth state.
-        setExternalTimetable(lastRecordedTimetable)
+        // Normalize before setting so UI sees display fields consistently.
+        try {
+          const normalized = normalizeTimetableForDisplay(lastRecordedTimetable)
+          setExternalTimetable(normalized)
+        } catch (e) {
+          setExternalTimetable(lastRecordedTimetable)
+        }
         setTimetableSource('cache')
         setError(null)
       } else if (isAuthenticated) {
