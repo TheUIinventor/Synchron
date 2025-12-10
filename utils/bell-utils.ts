@@ -1,4 +1,4 @@
-import type { BellTime } from "@/contexts/timetable-context"
+import type { BellTime } from "@/types/timetable"
 import { isWithinSchoolHours } from "./time-utils"
 
 // Format time to 12-hour format without AM/PM

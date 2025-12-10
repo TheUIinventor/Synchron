@@ -6,29 +6,10 @@ import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
+import type { Period, BellTime } from "@/types/timetable"
 
 // Define the period type
-export type Period = {
-  id?: number
-  period: string
-  time: string
-  subject: string
-  teacher: string
-  room: string
-  weekType?: "A" | "B"
-  isSubstitute?: boolean // New: Indicates a substitute teacher
-  isRoomChange?: boolean // New: Indicates a room change
-  // Optional fields populated during normalization
-  fullTeacher?: string
-  casualSurname?: string
-  displayTeacher?: string
-}
-
-// Define the bell time type
-export type BellTime = {
-  period: string
-  time: string
-}
+// `Period` and `BellTime` types are defined in `types/timetable.ts`
 
 // Define the timetable context type
 type TimetableContextType = {

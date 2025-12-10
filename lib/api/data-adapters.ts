@@ -1,7 +1,7 @@
 "use client"
 
 import type { TimetableEntry, Notice, BellTime, AwardPoint } from "./client"
-import type { Period } from "@/contexts/timetable-context"
+import type { Period } from "@/types/timetable"
 
 // Convert API timetable entries to app format
 export function adaptTimetableData(entries: TimetableEntry[]): Record<string, Period[]> {
