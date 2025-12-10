@@ -653,11 +653,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const lastRefreshTsRef = useRef<number | null>(null)
 
   // Aggressive background refresh tuning
-  // NOTE: reduced intervals to make visible-refresh more responsive.
+  // Further reduce intervals per request: aim ~3x faster than current.
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
-  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
-  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
+  // Be cautious: browsers throttle background timers for hidden tabs.
+  const MIN_REFRESH_MS = 3 * 1000 // never refresh faster than ~3s
+  const VISIBLE_REFRESH_MS = 4 * 1000 // target interval while visible (~4s)
+  const HIDDEN_REFRESH_MS = 20 * 1000 // target interval while hidden (~20s)
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
