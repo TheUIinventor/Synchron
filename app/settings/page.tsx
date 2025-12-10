@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useUserSettings, type ColorTheme, type FontTheme } from "@/components/theme-provider"
-import { useTimetable } from "@/contexts/timetable-context"
+import { useTimetableSafe } from "@/contexts/timetable-context"
 import { useToast } from "@/hooks/use-toast"
 // Feedback is now an embedded Google Form iframe; no local textarea needed
 // NavItem removed - navigation tabs control is no longer user-configurable
@@ -22,7 +22,8 @@ import InstallAppButton from "@/components/install-app-button"
 const CANVAS_LINKS_KEY = "synchron-canvas-links"
 
 function CanvasLinksEditor() {
-  const { timetableData } = useTimetable()
+  const timetableCtx = useTimetableSafe()
+  const timetableData = timetableCtx?.timetableData || {}
   const { toast } = useToast()
   const [links, setLinks] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState<string | null>(null)
@@ -150,8 +151,17 @@ export default function SettingsPage() {
   const [isMobile, setIsMobile] = useState(false)
   const router = useRouter()
   const { colorTheme, setColorTheme, fontTheme, setFontTheme } = useUserSettings()
-  const timetable = useTimetable()
-  const { aggressiveRefresh = true, setAggressiveRefresh } = timetable
+  // Instead of calling `useTimetable` directly (which may throw if provider missing),
+  // read/write localStorage and notify provider via custom event so the provider
+  // can pick up changes when possible.
+  const [aggressiveLocal, setAggressiveLocal] = useState<boolean>(() => {
+    try { const raw = localStorage.getItem('synchron-aggressive-refresh'); return raw === 'false' ? false : true } catch (e) { return true }
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem('synchron-aggressive-refresh', aggressiveLocal ? 'true' : 'false') } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent('synchron:aggressive-refresh-changed', { detail: { value: aggressiveLocal } })) } catch (e) {}
+  }, [aggressiveLocal])
 
   // Navigation tabs are not user-configurable in this build.
 
@@ -300,7 +310,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-on-surface-variant">Aggressive background refresh</div>
                   <div className="flex items-center gap-3">
-                    <Switch checked={Boolean(aggressiveRefresh)} onCheckedChange={(v) => { try { setAggressiveRefresh && setAggressiveRefresh(Boolean(v)) } catch (e) {} }} />
+                    <Switch checked={Boolean(aggressiveLocal)} onCheckedChange={(v) => { try { setAggressiveLocal(Boolean(v)) } catch (e) {} }} />
                   </div>
                 </div>
                 <p className="mt-2 text-xs text-on-surface-variant">When enabled, the app will poll more frequently while visible and immediately refresh when you return to the tab. This may increase network usage.</p>

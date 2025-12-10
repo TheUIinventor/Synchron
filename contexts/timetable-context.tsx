@@ -701,6 +701,30 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem('synchron-aggressive-refresh', aggressiveRefresh ? 'true' : 'false') } catch (e) {}
   }, [aggressiveRefresh])
 
+  // Listen for cross-window or in-page toggle events so Settings can update provider
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = (ev: any) => {
+      try {
+        const v = ev?.detail?.value
+        if (typeof v === 'boolean') setAggressiveRefresh(v)
+      } catch (e) {}
+    }
+    const storageHandler = (ev: StorageEvent) => {
+      try {
+        if (ev.key === 'synchron-aggressive-refresh') {
+          setAggressiveRefresh(ev.newValue === 'true')
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('synchron:aggressive-refresh-changed', handler)
+    window.addEventListener('storage', storageHandler)
+    return () => {
+      window.removeEventListener('synchron:aggressive-refresh-changed', handler)
+      window.removeEventListener('storage', storageHandler)
+    }
+  }, [])
+
   // Background refresh tuning (driven by `aggressiveRefresh` toggle)
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
   const MIN_REFRESH_MS = aggressiveRefresh ? 3 * 1000 : 45 * 1000
@@ -2665,5 +2689,15 @@ export function useTimetable() {
     throw new Error("useTimetable must be used within a TimetableProvider")
   }
   return context
+}
+
+// Safe hook variant: returns the context or `null` when provider not present.
+export function useTimetableSafe() {
+  try {
+    const context = useContext(TimetableContext)
+    return context ?? null
+  } catch (e) {
+    return null
+  }
 }
 
