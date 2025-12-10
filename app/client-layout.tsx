@@ -10,6 +10,7 @@ import { BottomNav } from "@/components/bottom-nav"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider"
 import { TimetableProvider } from "@/contexts/timetable-context"
+import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -26,12 +27,34 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return
 
     // Register SW in production-like environments
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then((reg) => {
-        // console.debug('ServiceWorker registered', reg)
-      }).catch((err) => {
-        // console.debug('SW registration failed', err)
-      })
+    // Attempt one-time cleanup of any old Service Worker registrations and caches
+    // This helps clients pick up the newly-built JS instead of using a stale
+    // cached bundle that can contain the previous runtime error.
+    try {
+      const already = sessionStorage.getItem('synchron:sw-unregistered') === 'true'
+      if ('serviceWorker' in navigator && !already) {
+        navigator.serviceWorker.getRegistrations().then(async (regs) => {
+          if (regs && regs.length) {
+            for (const r of regs) {
+              try { await r.unregister() } catch (e) {}
+            }
+            try { const keys = await caches.keys(); for (const k of keys) await caches.delete(k) } catch (e) {}
+            try { sessionStorage.setItem('synchron:sw-unregistered', 'true') } catch (e) {}
+            // reload to fetch fresh assets after clearing SW and caches
+            location.reload()
+            return
+          }
+          // If none were unregistered, register the current SW (normal flow)
+          try { navigator.serviceWorker.register('/sw.js').catch(() => {}) } catch (e) {}
+        }).catch(() => {
+          try { navigator.serviceWorker.register('/sw.js').catch(() => {}) } catch (e) {}
+        })
+      } else {
+        // Normal registration path when already handled
+        try { navigator.serviceWorker.register('/sw.js').catch(() => {}) } catch (e) {}
+      }
+    } catch (e) {
+      // ignore SW errors
     }
 
     // Capture the beforeinstallprompt event so the UI can trigger prompt later
@@ -128,14 +151,16 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       storageKey="synchron-theme-preference"
     >
       <UserSettingsProvider>
-        <TimetableProvider>
-          {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
-          {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
-          <ConditionalTopRightIcons />
-          <AppSidebar />
-          <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
-          <BottomNav />
-        </TimetableProvider>
+        <ErrorBoundary>
+          <TimetableProvider>
+            {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
+            {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
+            <ConditionalTopRightIcons />
+            <AppSidebar />
+            <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
+            <BottomNav />
+          </TimetableProvider>
+        </ErrorBoundary>
       </UserSettingsProvider>
     </ThemeProvider>
   )
