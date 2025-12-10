@@ -11,6 +11,7 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
+import { stripLeadingCasualCode } from "@/lib/utils"
 
 
 export default function TimetablePage() {
