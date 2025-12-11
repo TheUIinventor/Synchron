@@ -47,11 +47,15 @@ export default function TimetablePage() {
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
 
+  const toLocalIsoDate = (d: Date) => {
+    try { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` } catch (e) { return (new Date()).toISOString().slice(0,10) }
+  }
+
   const fetchDiagnostics = async () => {
     setShowDiag(true)
     setDiagLoading(true)
     try {
-      const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
+      const ds = toLocalIsoDate((selectedDateObject || new Date()))
       const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
       const ctype = res.headers.get('content-type') || ''
       let payload: any
@@ -312,7 +316,7 @@ export default function TimetablePage() {
           <div className="fixed top-4 right-4 z-50 bg-white/90 text-xs text-on-surface border rounded p-2 shadow">
             <div className="font-mono text-[11px]">week: <strong>{String(externalWeekType ?? currentWeek ?? 'null')}</strong></div>
             <div className="font-mono text-[11px]">source: <span className="truncate block max-w-[220px]">{String(timetableSource ?? 'null')}</span></div>
-            <div className="font-mono text-[11px]">selected: <span className="truncate block max-w-[220px]">{(selectedDateObject || new Date()).toISOString().slice(0,10)}</span></div>
+            <div className="font-mono text-[11px]">selected: <span className="truncate block max-w-[220px]">{toLocalIsoDate((selectedDateObject || new Date()))}</span></div>
             <div className="mt-1 flex gap-1">
               <button className="px-2 py-0.5 rounded bg-neutral-100 text-xs" onClick={() => { setShowDiag(false) }}>Hide</button>
               <button className="px-2 py-0.5 rounded bg-neutral-100 text-xs" onClick={() => { void fetchDiagnostics() }}>Fetch</button>
