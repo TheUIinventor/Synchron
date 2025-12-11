@@ -741,6 +741,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // otherwise fall back to the last-seen cached bell times.
     const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
 
+    // If we do not have any authoritative external timetable (neither
+    // a per-day map nor a grouped by-week map), avoid returning the
+    // bundled sample week which may show an incorrect A/B week. Return
+    // an empty timetable map until the provider has authoritative data
+    // (this prevents flashing the wrong week on initial load).
+    if (!useExternalTimetable && !useExternalTimetableByWeek) {
+      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    }
+
     // Cleanup helper: remove roll-call entries and orphaned period '0' placeholders
     const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
     const isRollCallEntry = (p: any) => {
