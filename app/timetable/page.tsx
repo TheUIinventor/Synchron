@@ -7,6 +7,7 @@ import { ChevronLeft, Calendar as CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Calendar as DatePicker } from "@/components/ui/calendar"
+import { getWeek } from 'date-fns'
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
@@ -293,7 +294,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24">
+      <div className="w-full max-w-[90%] mx-auto px-4 sm:px-6 py-6 pb-24">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -379,25 +380,15 @@ export default function TimetablePage() {
               </button>
 
                 <div className="text-center">
-                  <h2 className="font-semibold text-on-surface">{selectedDayName}</h2>
-                  <div className="text-sm text-on-surface-variant">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="px-3 py-1 rounded-md bg-transparent hover:bg-surface-container-highest transition-colors text-sm">
-                          {displayDateObject.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto">
-                        <DatePicker
-                          mode="single"
-                          selected={displayDateObject}
-                          onSelect={(d: Date | undefined) => {
-                            if (d) setSelectedDateObject(d)
-                          }}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <h2 className="font-semibold text-on-surface">
+                    {(() => {
+                      try {
+                        const weekNum = String(getWeek(displayDateObject))
+                        const wt = (externalWeekType || currentWeek) || ''
+                        return `${selectedDayName} ${weekNum}${wt}`
+                      } catch (e) { return selectedDayName }
+                    })()}
+                  </h2>
                 </div>
 
               <button
@@ -488,7 +479,7 @@ export default function TimetablePage() {
                   <div className="space-y-3">
                     {todaysTimetable.map((period, idx) => (
                       period.subject === "Break" ? (
-                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-2">
+                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-1">
                           <div className="w-16 sm:w-20 text-sm font-medium text-on-surface-variant">
                               {(() => {
                                 try {
@@ -501,8 +492,8 @@ export default function TimetablePage() {
                           </div>
                           <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                         </div>
-                      ) : (
-                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-2">
+                        ) : (
+                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-1">
                           <div className="w-16 sm:w-20 text-sm font-medium text-on-surface-variant">
                               {(() => {
                                   try {
@@ -517,7 +508,7 @@ export default function TimetablePage() {
                               <div className={`relative overflow-hidden rounded-xl flex items-center bg-surface-container-high transition-all hover:shadow-md ${isPhone ? '' : 'active:scale-95'}`}>
                                 {/* Left accent bar */}
                                 <div className={`${getSubjectColor(period.subject).split(' ')[0] || 'bg-surface-variant'} w-1 h-full rounded-l-md mr-3`} />
-                                <div className="flex items-center justify-between w-full px-3 py-2 sm:py-3">
+                                <div className="flex items-center justify-between w-full px-3 py-1.5 sm:py-2">
                                   <div className="min-w-0 pr-2">
                                     <div className={`text-base sm:text-lg font-semibold truncate ${isSubstitutePeriod(period) ? 'text-on-surface' : 'text-on-surface-variant'}`}>{getDisplaySubject(period)}</div>
                                     {period?.note && <div className="text-xs text-on-surface-variant mt-0.5 truncate">{period.note}</div>}
