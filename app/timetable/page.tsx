@@ -383,9 +383,12 @@ export default function TimetablePage() {
                   <h2 className="font-semibold text-on-surface">
                     {(() => {
                       try {
-                        const weekNum = String(getWeek(displayDateObject))
+                        const weekday = displayDateObject.toLocaleDateString('en-US', { weekday: 'short' })
+                        const dateShort = displayDateObject.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+                        const weekNum = getWeek(displayDateObject)
                         const wt = (externalWeekType || currentWeek) || ''
-                        return `${selectedDayName} ${weekNum}${wt}`
+                        const weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
+                        return `${weekday}, ${dateShort}${weekPart}`
                       } catch (e) { return selectedDayName }
                     })()}
                   </h2>
