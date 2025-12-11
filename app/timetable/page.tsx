@@ -43,7 +43,7 @@ export default function TimetablePage() {
     return () => window.removeEventListener('resize', detect)
   }, [])
 
-  const [showDiag, setShowDiag] = useState(false)
+  const [showDiag, setShowDiag] = useState(true)
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
 
@@ -307,6 +307,19 @@ export default function TimetablePage() {
           <div className="w-6 hidden md:block" />
           <div className="w-6 hidden md:block"></div>
         </div>
+        {/* Temporary debug overlay to help diagnose week selection/render order */}
+        {showDiag && (
+          <div className="fixed top-4 right-4 z-50 bg-white/90 text-xs text-on-surface border rounded p-2 shadow">
+            <div className="font-mono text-[11px]">week: <strong>{String(externalWeekType ?? currentWeek ?? 'null')}</strong></div>
+            <div className="font-mono text-[11px]">source: <span className="truncate block max-w-[220px]">{String(timetableSource ?? 'null')}</span></div>
+            <div className="font-mono text-[11px]">selected: <span className="truncate block max-w-[220px]">{(selectedDateObject || new Date()).toISOString().slice(0,10)}</span></div>
+            <div className="mt-1 flex gap-1">
+              <button className="px-2 py-0.5 rounded bg-neutral-100 text-xs" onClick={() => { setShowDiag(false) }}>Hide</button>
+              <button className="px-2 py-0.5 rounded bg-neutral-100 text-xs" onClick={() => { void fetchDiagnostics() }}>Fetch</button>
+            </div>
+          </div>
+        )}
+
         {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
         {timetableSource === 'fallback-sample' && (
           <div className="w-full mb-6">
