@@ -213,6 +213,11 @@ const computePayloadHash = (input: any) => {
   }
 }
 
+// Lightweight debug helper for provider state changes
+const providerDebug = (...args: any[]) => {
+  try { console.debug('[timetable.provider.debug]', ...args) } catch (e) {}
+}
+
 // Try to parse a fetch Response for bell times and apply them to state.
 const extractBellTimesFromResponse = async (res: Response | null) => {
   if (!res) return
@@ -1800,9 +1805,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore
               }
+              providerDebug('homepage: no timetable -> external-empty', { jht })
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
+              providerDebug('clearing externalWeekType (homepage no-timetable)')
               setExternalWeekType(null)
               try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
               try { setIsRefreshing(false) } catch (e) {}
@@ -1842,6 +1849,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
                     } catch (e) {}
+                    providerDebug('using processed cache', { key: `synchron-processed-${_payloadHash}`, parsedCacheSummary: { weekType: parsedCache.weekType, source: parsedCache.source } })
                     setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
@@ -2012,6 +2020,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
+              providerDebug('received /api/timetable payload (general)', { weekType: j.weekType, source: j.source })
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
               // Persist the processed result keyed by payload-hash so future
@@ -2053,11 +2062,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary(summary)
               } catch (e) {}
-              setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
-              }
+                    setTimetableSource(j.source ?? 'external')
+                    if (j.weekType === 'A' || j.weekType === 'B') {
+                      providerDebug('setting externalWeekType & currentWeek from payload', j.weekType)
+                      setExternalWeekType(j.weekType)
+                      setCurrentWeek(j.weekType)
+                    }
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -2514,10 +2524,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore
               }
+              providerDebug('date-fetch: payload indicates no timetable for selected date', { j })
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
+              providerDebug('clearing externalWeekType for selected-date no-timetable')
               setExternalWeekType(null)
+              providerDebug('clearing currentWeek for selected-date no-timetable')
               setCurrentWeek(null)
               try {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
@@ -2634,7 +2647,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Keep currentWeek synchronized with the server-provided externalWeekType
   useEffect(() => {
     if (externalWeekType && currentWeek !== externalWeekType) {
-      try { console.log('[timetable.provider] syncing currentWeek to externalWeekType', externalWeekType) } catch (e) {}
+      providerDebug('syncing currentWeek to externalWeekType', externalWeekType)
       setCurrentWeek(externalWeekType)
     }
   }, [externalWeekType, currentWeek])
