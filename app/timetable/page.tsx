@@ -531,7 +531,19 @@ export default function TimetablePage() {
                                         <span className="text-sm text-on-surface-variant truncate max-w-[140px]">{shown}</span>
                                       )
                                     })()}
-                                    <span className="text-sm font-semibold text-on-surface-variant truncate max-w-[72px]">{getDisplayRoom(period)}</span>
+                                    {(() => {
+                                      const room = getDisplayRoom(period)
+                                      if ((period as any).isRoomChange && room) {
+                                        return (
+                                          <span className="inline-block bg-emerald-600 text-white text-sm font-medium px-3 py-1 rounded-full truncate max-w-[120px]">
+                                            {room}
+                                          </span>
+                                        )
+                                      }
+                                      return (
+                                        <span className="text-sm font-semibold text-on-surface-variant truncate max-w-[72px]">{room}</span>
+                                      )
+                                    })()}
                                   </div>
                                 </div>
                               </div>
@@ -635,7 +647,17 @@ export default function TimetablePage() {
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className="text-xs text-on-surface-variant hidden md:block">{getDisplayRoom(period)}</div>
+                                        <div className="text-xs hidden md:block">
+                                          {(() => {
+                                            const room = getDisplayRoom(period)
+                                            if ((period as any).isRoomChange && room) {
+                                              return (
+                                                <span className="inline-block bg-emerald-600 text-white text-xs font-medium px-2 py-1 rounded-full truncate max-w-[120px]">{room}</span>
+                                              )
+                                            }
+                                            return <div className="text-xs text-on-surface-variant">{room}</div>
+                                          })()}
+                                        </div>
                                         <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
