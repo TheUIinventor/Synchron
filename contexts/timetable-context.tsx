@@ -2737,3 +2737,13 @@ export function useTimetable() {
   return context
 }
 
+// Safe variant: returns the context or undefined instead of throwing.
+// Useful in settings or other places that may render outside the provider.
+export function useTimetableSafe() {
+  try {
+    return useContext(TimetableContext)
+  } catch (e) {
+    return undefined
+  }
+}
+
