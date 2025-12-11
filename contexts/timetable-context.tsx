@@ -1766,6 +1766,43 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           try {
             _payloadHash = computePayloadHash(j)
           } catch (e) { _payloadHash = null }
+          // If the live payload explicitly indicates there is no timetable,
+          // treat that as authoritative and do not reuse any previously-
+          // cached processed payload for this hash. This prevents showing
+          // cached classes during school holidays when the upstream has
+          // reported an empty timetable for the requested date.
+          try {
+            if (payloadHasNoTimetable(j)) {
+              try {
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore
+              }
+              setExternalTimetable(emptyByDay)
+              setExternalTimetableByWeek(null)
+              setTimetableSource('external-empty')
+              setExternalWeekType(null)
+              setCurrentWeek(null)
+              try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
+              try { setIsRefreshing(false) } catch (e) {}
+              if (!hadCache) try { setIsLoading(false) } catch (e) {}
+              return
+            }
+          } catch (e) {}
           if (_payloadHash && typeof window !== 'undefined') {
             try {
               const cached = localStorage.getItem(`synchron-processed-${_payloadHash}`)
