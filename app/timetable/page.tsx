@@ -293,7 +293,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 py-6 pb-24">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -514,26 +514,33 @@ export default function TimetablePage() {
                                 })()}
                           </div>
                           <div className="flex-1">
-                              <div className={`p-2 sm:p-3 rounded-xl flex items-center bg-surface-container-high transition-all hover:shadow-md ${isPhone ? '' : 'active:scale-95'}`}> 
-                              <div className="min-w-0 pr-1">
-                                <div className={`text-base sm:text-lg font-semibold truncate ${isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface'}`}>{getDisplaySubject(period)}</div>
+                              <div className={`relative overflow-hidden rounded-xl flex items-center bg-surface-container-high transition-all hover:shadow-md ${isPhone ? '' : 'active:scale-95'}`}>
+                                {/* Left accent bar */}
+                                <div className={`${getSubjectColor(period.subject).split(' ')[0] || 'bg-surface-variant'} w-1 h-full rounded-l-md mr-3`} />
+                                <div className="flex items-center justify-between w-full px-3 py-2 sm:py-3">
+                                  <div className="min-w-0 pr-2">
+                                    <div className={`text-base sm:text-lg font-semibold truncate ${isSubstitutePeriod(period) ? 'text-on-surface' : 'text-on-surface-variant'}`}>{getDisplaySubject(period)}</div>
+                                    {period?.note && <div className="text-xs text-on-surface-variant mt-0.5 truncate">{period.note}</div>}
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-shrink-0">
+                                    {(() => {
+                                      const raw = (period as any).displayTeacher || (period.fullTeacher || period.teacher) || ''
+                                      const shown = stripLeadingCasualCode(String(raw))
+                                      if (isSubstitutePeriod(period)) {
+                                        return (
+                                          <span className="inline-block bg-blue-600 text-white text-sm font-medium px-3 py-1 rounded-full truncate max-w-[160px]">
+                                            {shown}
+                                          </span>
+                                        )
+                                      }
+                                      return (
+                                        <span className="text-sm text-on-surface-variant truncate max-w-[140px]">{shown}</span>
+                                      )
+                                    })()}
+                                    <span className="text-sm font-semibold text-on-surface-variant truncate max-w-[72px]">{getDisplayRoom(period)}</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2 ml-1 flex-shrink-0">
-                                {/* Teacher (highlight only when substitute/casual) - stronger pill when substitute */}
-                                {/* Teacher: highlight when substitute instead of showing a status pill */}
-                                {(() => {
-                                  const raw = (period as any).displayTeacher || (period.fullTeacher || period.teacher) || ''
-                                  const shown = stripLeadingCasualCode(String(raw))
-                                  return (
-                                    <span className={`text-sm truncate max-w-[100px] ${isSubstitutePeriod(period) ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
-                                      {shown}
-                                    </span>
-                                  )
-                                })()}
-                                {/* Room: if the API provided a room variation, show the destination room and highlight it like substitute teacher */}
-                                <span className="truncate max-w-[72px] text-sm text-on-surface-variant">{getDisplayRoom(period)}</span>
-                              </div>
-                            </div>
                           </div>
                         </div>
                       )
