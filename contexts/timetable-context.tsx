@@ -1644,7 +1644,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              setCurrentWeek(null)
             return
           }
           if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
@@ -1796,7 +1795,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              setCurrentWeek(null)
               try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
               try { setIsRefreshing(false) } catch (e) {}
               if (!hadCache) try { setIsLoading(false) } catch (e) {}
@@ -1893,7 +1891,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              setCurrentWeek(null)
               try {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
@@ -2185,7 +2182,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              setCurrentWeek(null)
               try {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
