@@ -520,7 +520,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { return __initialParsedCache?.source ?? null } catch (e) { return null }
   })()
   const __initialWeekType = ((): "A" | "B" | null => {
-    try { const src = __initialProcessedCache || __initialParsedCache; const w = src?.weekType; return (w === 'A' || w === 'B') ? w : null } catch (e) { return null }
+    try {
+      // Do not trust persisted weekType on initial load to avoid showing
+      // stale A/B information before an authoritative date-specific
+      // payload arrives. We'll let the refresh/fetch-for-date logic set
+      // the externalWeekType when the server confirms it.
+      return null
+    } catch (e) { return null }
   })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
@@ -1850,6 +1856,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       }
                     } catch (e) {}
                     providerDebug('using processed cache', { key: `synchron-processed-${_payloadHash}`, parsedCacheSummary: { weekType: parsedCache.weekType, source: parsedCache.source } })
+                    // Apply the cached timetable and bellTimes for faster hydrate,
+                    // but DO NOT apply the cached weekType to `externalWeekType`
+                    // or `currentWeek` because cached weekType can be stale and
+                    // cause the UI to show the wrong A/B week on initial load.
                     setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
@@ -1858,10 +1868,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       lastSeenBellTsRef.current = parsedCache.savedAt || Date.now()
                     }
                     setTimetableSource(parsedCache.source || 'external-cache')
-                    if (parsedCache.weekType === 'A' || parsedCache.weekType === 'B') {
-                      setExternalWeekType(parsedCache.weekType)
-                      setCurrentWeek(parsedCache.weekType)
-                    }
                     try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ cached: true }) } catch (e) {}
                     try { setIsRefreshing(false) } catch (e) {}
                     // Only clear the global loading flag if we previously set it
