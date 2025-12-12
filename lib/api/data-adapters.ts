@@ -225,10 +225,12 @@ export function applySubstitutionsToTimetable(
               if (options?.debug) console.debug(`Applied room change (toRoom) -> displayRoom: ${prevRoom} -> ${candidateRoom} (day=${day} period=${period.period} subject=${period.subject})`)
             }
           } else {
-            // For debugging: if a substitution provides `room` or `fromRoom`
-            // but not an explicit `toRoom`, report this when debug enabled.
-            const fallbackRoom = typeof sub.room !== 'undefined' && sub.room !== null && String(sub.room).trim().length > 0 ? String(sub.room).trim() :
-              (typeof sub.fromRoom !== 'undefined' && sub.fromRoom !== null && String(sub.fromRoom).trim().length > 0 ? String(sub.fromRoom).trim() : undefined)
+            // For debugging: if a substitution provides an explicit `room`
+            // but not an explicit `toRoom`, prefer `room` as a fallback.
+            // Do NOT use `fromRoom` as a fallback because that usually
+            // indicates the original/scheduled room (not the destination)
+            // and using it here can cause the UI to display the wrong room.
+            const fallbackRoom = typeof sub.room !== 'undefined' && sub.room !== null && String(sub.room).trim().length > 0 ? String(sub.room).trim() : undefined
             if (fallbackRoom) {
               if (normalizeRoom(fallbackRoom) !== normalizeRoom(period.room)) {
                 // Do not overwrite the original `room`. Store the fallback
@@ -242,6 +244,7 @@ export function applySubstitutionsToTimetable(
                 console.debug(`Fallback room provided but equal to scheduled room: ${fallbackRoom} (day=${day} period=${period.period})`)
               }
             }
+          }
           }
 
           if (options?.debug && !changed) {
