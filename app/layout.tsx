@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Roboto_Flex } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const roboto = Roboto_Flex({ subsets: ["latin"], display: "swap", variable: "--font-roboto-flex" });
 
@@ -44,6 +45,7 @@ export default function RootLayout({
           <Toaster />
           <SonnerToaster />
           <Analytics />
+          <SpeedInsights />
         </ClientLayout>
       </body>
     </html>
