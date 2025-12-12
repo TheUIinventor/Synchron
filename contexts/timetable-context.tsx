@@ -1951,6 +1951,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               let finalByWeek = j.timetableByWeek || null
               try {
                 const subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+                // If the upstream payload includes a specific day/date (e.g.
+                // `upstream.day.date` or similar), attach that date to any
+                // extracted variations that lack an explicit `date` so they
+                // are applied only to that calendar day instead of being
+                // treated as generic substitutions across both Week A/B.
+                try {
+                  const payloadDate = extractDateFromPayload(j.upstream || j)
+                  if (payloadDate && Array.isArray(subs)) {
+                    subs.forEach((s: any) => {
+                      try { if (s && !s.date) s.date = payloadDate } catch (e) {}
+                    })
+                  }
+                } catch (e) {}
                 if (Array.isArray(subs) && subs.length) {
                     try {
                       try { console.debug('[timetable.provider] applying substitutions from homepage payload', subs.length) } catch (e) {}
