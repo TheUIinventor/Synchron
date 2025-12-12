@@ -204,6 +204,10 @@ export function applySubstitutionsToTimetable(
               ;(period as any).casualSurname = surname
               // Make the casual surname the authoritative displayed teacher
               period.teacher = surname
+              // Ensure UI treats this as a substitute/casual teacher so it
+              // is highlighted even when the `teacher` field was replaced
+              // with the casual surname by upstream data.
+              period.isSubstitute = true
             }
 
             // If no casualSurname was provided but a full display name exists,
