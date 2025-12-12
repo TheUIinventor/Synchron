@@ -16,7 +16,7 @@ export function AppSidebar() {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 z-40 hidden md:flex flex-col items-center w-20 lg:w-24 py-8 bg-surface-container/80 backdrop-blur-md border-r border-border/50">
+    <aside className="fixed left-0 top-0 bottom-0 z-[9999] hidden md:flex flex-col items-center w-20 lg:w-24 py-8 bg-surface-container/80 backdrop-blur-md border-r border-border/50">
       <div className="flex-1 flex flex-col items-center gap-4 w-full">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
