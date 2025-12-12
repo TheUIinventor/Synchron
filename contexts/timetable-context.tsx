@@ -801,11 +801,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
 
     // If we do not have any authoritative external timetable (neither
-    // a per-day map nor a grouped by-week map), avoid returning the
-    // bundled sample week which may show an incorrect A/B week. Return
-    // an empty timetable map until the provider has authoritative data
-    // (this prevents flashing the wrong week on initial load).
+    // a per-day map nor a grouped by-week map), prefer showing the
+    // last-known recorded timetable immediately when available so the
+    // UI doesn't remain blank while network fetches complete. This
+    // preserves the previous UX of displaying cached data quickly
+    // while still avoiding applying stale authoritative week markers.
     if (!useExternalTimetable && !useExternalTimetableByWeek) {
+      if (lastRecordedTimetable) {
+        try { providerDebug('no external yet; returning lastRecordedTimetable for faster UX', countRoomChanges(lastRecordedTimetable)) } catch (e) {}
+        // Return a shallow-cloned/cleaned copy to avoid accidental mutation
+        const clone: Record<string, Period[]> = {}
+        for (const k of Object.keys(lastRecordedTimetable)) clone[k] = (lastRecordedTimetable[k] || []).map(p => ({ ...(p as Period) }))
+        return cleanupMap(clone)
+      }
       return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
     }
 
