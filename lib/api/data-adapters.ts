@@ -222,7 +222,11 @@ export function applySubstitutionsToTimetable(
               const prevRoom = period.room
               ;(period as any).displayRoom = candidateRoom
               changed = true
-              if (options?.debug) console.debug(`Applied room change (toRoom) -> displayRoom: ${prevRoom} -> ${candidateRoom} (day=${day} period=${period.period} subject=${period.subject})`)
+              try {
+                // Always emit a concise debug trace so we can verify transforms
+                // in runtime regardless of options.debug.
+                console.debug('[adapters] applied toRoom -> displayRoom', { day, period: period.period, subject: period.subject, prevRoom, toRoom: candidateRoom })
+              } catch (e) {}
             }
           } else {
             // For debugging: if a substitution provides `room` or `fromRoom`
@@ -237,7 +241,7 @@ export function applySubstitutionsToTimetable(
                 const prevRoom = period.room
                 ;(period as any).displayRoom = fallbackRoom
                 changed = true
-                if (options?.debug) console.debug(`Applied room replacement (fallback) -> displayRoom: ${prevRoom} -> ${fallbackRoom} (day=${day} period=${period.period} subject=${period.subject})`)
+                try { console.debug('[adapters] applied fallback->displayRoom', { day, period: period.period, subject: period.subject, prevRoom, fallbackRoom }) } catch (e) {}
               } else if (options?.debug) {
                 console.debug(`Fallback room provided but equal to scheduled room: ${fallbackRoom} (day=${day} period=${period.period})`)
               }
