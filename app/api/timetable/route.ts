@@ -204,16 +204,34 @@ export async function GET(req: NextRequest) {
       try {
         if (dayRes && (dayRes as any).json) {
           const dj = (dayRes as any).json
-          // Build bell schedules so clients can insert breaks consistently
-          const { schedules: _schedules, sources: _sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
-          const maybeBellSchedules = (_schedules && (Object.values(_schedules).some((a: any) => Array.isArray(a) && a.length))) ? _schedules : undefined
-          const maybeBellSources = (_sources && (Object.values(_sources).some((a: any) => a !== 'empty'))) ? _sources : undefined
-          // Preserve upstream shape but attach helpful metadata used by the provider
-          const out = Object.assign({}, dj)
-          if (!out.source) out.source = 'sbhs-api-day'
-          if (maybeBellSchedules) out.bellTimes = maybeBellSchedules
-          if (maybeBellSources) out.bellTimesSources = maybeBellSources
-          return NextResponse.json(out)
+          // Normalize the day response into the same shape we return for
+          // the aggregated endpoint so clients receive `timetable`.
+          const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+          let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
+          if (!Array.isArray(arr) && dj?.day?.periods) {
+            arr = Array.isArray(dj.day.periods) ? dj.day.periods : null
+          }
+          if (!Array.isArray(arr) && dj?.timetable?.periods) {
+            const maybe = Array.isArray(dj.timetable.periods) ? dj.timetable.periods : null
+            if (maybe) arr = maybe
+          }
+          if (!Array.isArray(arr)) arr = []
+          const dowDate = new Date(dateParam)
+          const dow = (!Number.isNaN(dowDate.getTime())) ? dowDate.toLocaleDateString('en-US', { weekday: 'long' }) : requestedWeekdayString
+          const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
+          if (inferred) detectedWeekType = inferred
+          byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
+
+          const maybeBellTimes = dj.bellTimes || dj.bells || (bellsRes && (bellsRes as any).json) || undefined
+
+          return NextResponse.json({
+            timetable: byDay,
+            timetableByWeek: null,
+            bellTimes: maybeBellTimes || undefined,
+            source: 'sbhs-api-day',
+            weekType: detectedWeekType,
+            upstream: { day: dj, full: fullRes?.json ?? null, bells: bellsRes?.json ?? null },
+          })
         }
       } catch (e) {
         // fallthrough to aggregated handling
