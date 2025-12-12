@@ -717,10 +717,42 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const candStr = String(candidate).trim()
               const roomStr = String((p as any).room || '').trim()
               if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                return { ...(p as any), displayRoom: candStr, isRoomChange: true }
+                const copy = { ...(p as any), displayRoom: candStr, isRoomChange: true }
+                try {
+                  if (!copy.displayTeacher) {
+                    const casual = copy.casualSurname || undefined
+                    const candidateTeacher = copy.fullTeacher || copy.teacher || undefined
+                    const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidateTeacher as any)
+                    copy.displayTeacher = dt
+                  }
+                  // Ensure substitute flag is set when casual/full/original teacher info exists
+                  try {
+                    const orig = (copy as any).originalTeacher || undefined
+                    if ((copy as any).casualSurname || (copy as any).fullTeacher || (orig && String(orig).trim() !== String(copy.teacher || '').trim())) {
+                      (copy as any).isSubstitute = true
+                    }
+                  } catch (e) {}
+                } catch (e) {}
+                return copy
               }
             }
-            return p
+            // Ensure displayTeacher is computed when missing
+            try {
+              const copy = { ...(p as any) }
+              if (!copy.displayTeacher) {
+                const casual = copy.casualSurname || undefined
+                const candidateTeacher = copy.fullTeacher || copy.teacher || undefined
+                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidateTeacher as any)
+                copy.displayTeacher = dt
+              }
+              try {
+                const orig = (copy as any).originalTeacher || undefined
+                if ((copy as any).casualSurname || (copy as any).fullTeacher || (orig && String(orig).trim() !== String(copy.teacher || '').trim())) {
+                  (copy as any).isSubstitute = true
+                }
+              } catch (e) {}
+              return copy
+            } catch (e) { return p }
           } catch (e) { return p }
         })
       }
@@ -743,10 +775,38 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const candStr = String(candidate).trim()
                 const roomStr = String(p?.room || '').trim()
                 if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                  return { ...p, displayRoom: candStr, isRoomChange: true }
+                  const copy = { ...p, displayRoom: candStr, isRoomChange: true }
+                  try {
+                    if (!copy.displayTeacher) {
+                      const casual = copy.casualSurname || undefined
+                      const candidateTeacher = copy.fullTeacher || copy.teacher || undefined
+                      const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidateTeacher as any)
+                      copy.displayTeacher = dt
+                    }
+                    const orig = (copy as any).originalTeacher || undefined
+                    if ((copy as any).casualSurname || (copy as any).fullTeacher || (orig && String(orig).trim() !== String(copy.teacher || '').trim())) {
+                      (copy as any).isSubstitute = true
+                    }
+                  } catch (e) {}
+                  return copy
                 }
               }
-              return p
+              try {
+                const copy = { ...p }
+                if (!copy.displayTeacher) {
+                  const casual = copy.casualSurname || undefined
+                  const candidateTeacher = copy.fullTeacher || copy.teacher || undefined
+                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidateTeacher as any)
+                  copy.displayTeacher = dt
+                }
+                try {
+                  const orig = (copy as any).originalTeacher || undefined
+                  if ((copy as any).casualSurname || (copy as any).fullTeacher || (orig && String(orig).trim() !== String(copy.teacher || '').trim())) {
+                    (copy as any).isSubstitute = true
+                  }
+                } catch (e) {}
+                return copy
+              } catch (e) { return p }
             } catch (e) { return p }
           }) || []
         }
