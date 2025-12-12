@@ -211,22 +211,41 @@ export function applySubstitutionsToTimetable(
           // treat this as a room change when `toRoom` is explicitly provided
           // and differs from the scheduled room (compare trimmed, case-insensitive).
           const toRoomProvided = typeof sub.toRoom !== 'undefined' && sub.toRoom !== null && String(sub.toRoom).trim().length > 0
+          const fromRoomProvided = typeof (sub as any).fromRoom !== 'undefined' && (sub as any).fromRoom !== null && String((sub as any).fromRoom).trim().length > 0
           const normalizeRoom = (r?: string) => (r || '').toString().trim().toLowerCase()
           if (toRoomProvided) {
             const candidateRoom = String(sub.toRoom).trim()
-            if (normalizeRoom(candidateRoom) !== normalizeRoom(period.room)) {
-              // Do not overwrite the original `room` value from the API.
-              // Instead, set a non-destructive `displayRoom` field which the
-              // UI will prefer when rendering destination rooms.
-              period.isRoomChange = true
-              const prevRoom = period.room
-              ;(period as any).displayRoom = candidateRoom
-              changed = true
-              try {
-                // Always emit a concise debug trace so we can verify transforms
-                // in runtime regardless of options.debug.
-                console.debug('[adapters] applied toRoom -> displayRoom', { day, period: period.period, subject: period.subject, prevRoom, toRoom: candidateRoom })
-              } catch (e) {}
+            // If the substitution provides a `fromRoom`, ensure we only
+            // apply this room change when the scheduled room matches the
+            // provided `fromRoom`. This prevents accidental global room
+            // replacements when `toRoom` is present but not intended for
+            // all matching subjects/periods.
+            if (fromRoomProvided) {
+              const providedFrom = String((sub as any).fromRoom).trim()
+              if (normalizeRoom(providedFrom) !== normalizeRoom(period.room)) {
+                // scheduled room differs from fromRoom -> skip
+              } else {
+                if (normalizeRoom(candidateRoom) !== normalizeRoom(period.room)) {
+                  period.isRoomChange = true
+                  const prevRoom = period.room
+                  ;(period as any).displayRoom = candidateRoom
+                  changed = true
+                  try { console.debug('[adapters] applied toRoom -> displayRoom', { day, period: period.period, subject: period.subject, prevRoom, toRoom: candidateRoom }) } catch (e) {}
+                }
+              }
+            } else {
+              if (normalizeRoom(candidateRoom) !== normalizeRoom(period.room)) {
+                // Do not overwrite the original `room` value from the API.
+                // Instead, set a non-destructive `displayRoom` field which the
+                // UI will prefer when rendering destination rooms.
+                period.isRoomChange = true
+                const prevRoom = period.room
+                ;(period as any).displayRoom = candidateRoom
+                changed = true
+                try {
+                  console.debug('[adapters] applied toRoom -> displayRoom', { day, period: period.period, subject: period.subject, prevRoom, toRoom: candidateRoom })
+                } catch (e) {}
+              }
             }
           } else {
             // For debugging: if a substitution provides `room` or `fromRoom`

@@ -1146,6 +1146,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // avoid additional network requests.
       if (payload) {
         try {
+          // If the server provided an authoritative `upstream.day` object for
+          // this specific date, prefer extracting variations strictly from
+          // that object only. This avoids broad recursive heuristics that can
+          // mis-attribute rooms from unrelated payload fields. When a
+          // day-specific payload exists we treat the absence of `roomVariations`
+          // as authoritative (i.e. no room changes) and return an empty array.
+          const daySource = payload.upstream && payload.upstream.day ? payload.upstream.day : null
+          if (daySource) {
+            const fromDay = PortalScraper.extractVariationsFromJson(daySource)
+            if (Array.isArray(fromDay) && fromDay.length) return fromDay
+            // Explicitly return empty when day exists but no variations found.
+            return []
+          }
+
+          // Fallback: when no authoritative day object exists, attempt to
+          // extract variations from upstream or the whole payload as before.
           const fromUpstream = PortalScraper.extractVariationsFromJson(payload.upstream || payload)
           if (Array.isArray(fromUpstream) && fromUpstream.length) return fromUpstream
 
