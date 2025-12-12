@@ -249,6 +249,19 @@ const mergePreserveOverrides = (newMap: Record<string, Period[]> | null, prevMap
               if (match.isSubstitute && !(p as any).isSubstitute) {
                 (p as any).isSubstitute = true
               }
+              // Preserve casual/substitute metadata (casualSurname, casualToken,
+              // originalTeacher) from the previous map when present. This
+              // prevents background refreshes from dropping casual teacher
+              // display which the UI relies on to highlight substitutes.
+              if ((match as any).casualSurname && !(p as any).casualSurname) {
+                (p as any).casualSurname = (match as any).casualSurname
+              }
+              if ((match as any).casualToken && !(p as any).casualToken) {
+                (p as any).casualToken = (match as any).casualToken
+              }
+              if ((match as any).originalTeacher && !(p as any).originalTeacher) {
+                (p as any).originalTeacher = (match as any).originalTeacher
+              }
               if (match.displayTeacher && !(p as any).displayTeacher) {
                 (p as any).displayTeacher = match.displayTeacher
               }
