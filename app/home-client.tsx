@@ -236,29 +236,21 @@ export default function HomeClient() {
   const isSubstitutePeriod = (p: any) => {
     try {
       if (!p) return false
-      const orig = String((p as any).originalTeacher || '').trim()
-      const teacher = String(p.teacher || '').trim()
-      const full = String((p as any).fullTeacher || '').trim()
-      const disp = String((p as any).displayTeacher || '').trim()
-      const changedTeacher = orig && orig !== teacher
-      // If display or full name is present and differs from the raw teacher
-      // (after stripping casual codes), treat as a substitute.
-      try {
-        const cleanedFull = stripLeadingCasualCode(full || disp || '')
-        const cleanedRaw = stripLeadingCasualCode(teacher || '')
-        // Only treat a cleaned mismatch as a substitute when we already
-        // have an indicator that substitution is possible (original teacher
-        // changed, casual surname present, or already-marked substitute).
-        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
-      } catch (e) {}
+      // Only treat a period as a casual/substitute when there's an explicit
+      // casual marker or a deliberate substitution was applied that includes
+      // a casual/full display name. Avoid heuristics that mark every change
+      // of short code -> name as a substitute to prevent over-highlighting.
+      const casualSurname = String((p as any).casualSurname || '').trim()
+      const casualToken = String((p as any).casual || '').trim()
+      const hasFullSub = Boolean((p as any).fullTeacher || (p as any).substituteTeacherFull)
+      const explicitSub = Boolean(p.isSubstitute)
 
-      // If the raw teacher looks like a short ALL-CAPS code but displayTeacher
-      // is a proper name, treat as substitute (covers cases like "LIKV V ...").
-      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
-      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
-      if (rawIsCode && dispLooksName) return true
-
-      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
+      // Highlight when the upstream/substitution clearly provided a casual
+      // surname or token, or when a substitution was applied and a full
+      // display name exists for presentation.
+      if (casualSurname || casualToken) return true
+      if (explicitSub && hasFullSub) return true
+      return false
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 
