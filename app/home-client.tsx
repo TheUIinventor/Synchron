@@ -363,7 +363,7 @@ export default function HomeClient() {
             {/* Desktop / tablet expressive card (hidden on small screens) */}
             <div className="hidden sm:block relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
               {/* Background Blob (hidden on small screens to avoid overflow) */}
-              <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20" />
+              <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20 pointer-events-none" />
               
               <div className="relative z-10 flex flex-col h-full justify-between min-h-[150px]">
                 <div className="flex justify-between items-start">
