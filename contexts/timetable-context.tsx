@@ -2753,15 +2753,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
                     // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
                     const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
-                      const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                      for (const d of Object.keys(transformed)) {
-                        weekMap[d] = transformed[d][weekKey] || []
+                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                        for (const d of Object.keys(transformed)) {
+                          weekMap[d] = transformed[d][weekKey] || []
+                        }
+                        // Only apply substitutions relevant to this week: include
+                        // substitutions that either have no `weekType` (generic)
+                        // or whose `weekType` equals the target week. For the
+                        // `unknown` group, treat it as matching only substitutions
+                        // that explicitly declare `weekType === 'unknown'` or are
+                        // generic (no weekType).
+                        const subsForWeek = (genericSubs || []).filter((s: any) => {
+                          try {
+                            if (!s) return false
+                            const wt = s.weekType || s.week || s.week_type || undefined
+                            if (!wt) return true // generic applies to all weeks
+                            const wts = String(wt).toUpperCase()
+                            if (weekKey === 'unknown') return wts === 'UNKNOWN'
+                            return wts === weekKey
+                          } catch (e) { return false }
+                        })
+                        const applied = applySubstitutionsToTimetable(weekMap, subsForWeek, { debug: true })
+                        for (const d of Object.keys(transformed)) {
+                          transformed[d][weekKey] = applied[d] || []
+                        }
                       }
-                      const applied = applySubstitutionsToTimetable(weekMap, genericSubs, { debug: true })
-                      for (const d of Object.keys(transformed)) {
-                        transformed[d][weekKey] = applied[d] || []
-                      }
-                    }
 
                     applyToWeek('A')
                     applyToWeek('B')
