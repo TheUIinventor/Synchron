@@ -7,6 +7,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const forceApi = (url.searchParams.get('source') || url.searchParams.get('force') || '').toLowerCase() === 'api'
+    const wantDebugRaw = String(url.searchParams.get('debug') || '').toLowerCase() === '1' || String(url.searchParams.get('debug') || '').toLowerCase() === 'true'
     const rawCookie = req.headers.get('cookie') || ''
     // If the app has a stored sbhs_access_token (set by our auth callback), forward it as a Bearer token.
     // This is necessary because browser cookies for student.sbhs.net.au are not available to the server proxy.
@@ -33,10 +34,12 @@ export async function GET(req: Request) {
         try {
           const res = await fetch(`${API_BASE}${p}`, { headers, redirect: 'follow' })
           const ct = res.headers.get('content-type') || ''
-          if (res.ok && ct.includes('application/json')) {
+            if (res.ok && ct.includes('application/json')) {
             const j = await res.json()
             const subs = collectFromJson(j)
-            return NextResponse.json({ substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() })
+            const payload: any = { substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() }
+            if (wantDebugRaw) payload.raw = j
+            return NextResponse.json(payload)
           }
         } catch (e) {
           // ignore and fall back to portal
@@ -52,7 +55,9 @@ export async function GET(req: Request) {
       if (res.ok && ct.includes('application/json')) {
         const j = await res.json()
         const subs = collectFromJson(j)
-        return NextResponse.json({ substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() })
+        const payload: any = { substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() }
+        if (wantDebugRaw) payload.raw = j
+        return NextResponse.json(payload)
       }
     }
 
