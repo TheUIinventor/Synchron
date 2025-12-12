@@ -236,29 +236,11 @@ export default function HomeClient() {
   const isSubstitutePeriod = (p: any) => {
     try {
       if (!p) return false
-      const orig = String((p as any).originalTeacher || '').trim()
-      const teacher = String(p.teacher || '').trim()
-      const full = String((p as any).fullTeacher || '').trim()
-      const disp = String((p as any).displayTeacher || '').trim()
-      const changedTeacher = orig && orig !== teacher
-      // If display or full name is present and differs from the raw teacher
-      // (after stripping casual codes), treat as a substitute.
-      try {
-        const cleanedFull = stripLeadingCasualCode(full || disp || '')
-        const cleanedRaw = stripLeadingCasualCode(teacher || '')
-        // Only treat a cleaned mismatch as a substitute when we already
-        // have an indicator that substitution is possible (original teacher
-        // changed, casual surname present, or already-marked substitute).
-        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
-      } catch (e) {}
-
-      // If the raw teacher looks like a short ALL-CAPS code but displayTeacher
-      // is a proper name, treat as substitute (covers cases like "LIKV V ...").
-      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
-      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
-      if (rawIsCode && dispLooksName) return true
-
-      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
+      // Only treat a period as a substitute-highlight when there is an
+      // explicit casual marker. Avoid inferring substitutes from other
+      // differences to prevent false positives on the Home summary.
+      const hasCasual = Boolean((p as any).casualSurname || (p as any).casual)
+      return hasCasual
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 
@@ -348,8 +330,8 @@ export default function HomeClient() {
       {/* Main Expressive Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start md:items-stretch">
         
-        {/* HERO: Current/Next Period - Spans full width on mobile, 8 cols on desktop */}
-        <div className="md:col-span-8 space-y-3 flex flex-col md:h-full">
+        {/* HERO: Current/Next Period - Spans full width on mobile, 6 cols on desktop */}
+        <div className="md:col-span-6 space-y-3 flex flex-col md:h-full">
             
             {/* Primary Status Card */}
             {/* Mobile-only compact pill (shows countdown and next period) */}
@@ -369,7 +351,7 @@ export default function HomeClient() {
             {/* Desktop / tablet expressive card (hidden on small screens) */}
             <div className="hidden sm:block relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
               {/* Background Blob (hidden on small screens to avoid overflow) */}
-              <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20" />
+              <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20 pointer-events-none" />
               
               <div className="relative z-10 flex flex-col h-full justify-between min-h-[150px]">
                 <div className="flex justify-between items-start">
@@ -387,16 +369,22 @@ export default function HomeClient() {
                           {currentPeriod.subject}
                         </a>
                       ) : (
-                        currentPeriod.subject
+                        <>{currentPeriod.subject}</>
                       )
                     ) : (
                       "Free Period"
                     )}
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
-                    <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
-                      {displayTeacher(currentPeriod) || "Self Study"}
-                    </span>
+                    {isSubstitutePeriod(currentPeriod) ? (
+                      <span className="inline-block bg-blue-600 text-white px-3 py-1 rounded-full">
+                        {displayTeacher(currentPeriod) || "Self Study"}
+                      </span>
+                    ) : (
+                      <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
+                        {displayTeacher(currentPeriod) || "Self Study"}
+                      </span>
+                    )}
                     <span>•</span>
                     <span>{currentPeriod?.room || "Campus"}</span>
                   </div>
@@ -404,7 +392,15 @@ export default function HomeClient() {
 
                 <div className="mt-6">
                   <div className="flex flex-col items-end text-sm mb-1">
-                    <span className="text-[15px] opacity-90">{nextPeriod?.subject ? `${nextPeriod.subject} in` : ""}</span>
+                    <span className="text-[15px] opacity-90">
+                      {nextPeriod?.subject ? (
+                        <>
+                          <span className="inline md:hidden">{nextPeriod.subject}</span>
+                          <span className="hidden md:inline">{(nextPeriod as any)?.title || nextPeriod.subject}</span>
+                          {" in"}
+                        </>
+                      ) : ""}
+                    </span>
                     <span className="font-bold text-[15px]">{remainingLabel()}</span>
                   </div>
                   <div className="h-2 w-full bg-primary/20 rounded-full overflow-hidden">
@@ -548,8 +544,8 @@ export default function HomeClient() {
             </div>
         </div>
 
-        {/* SIDEBAR: Date & Quick Actions - 4 cols on desktop */}
-        <div className="md:col-span-4 space-y-3">
+        {/* SIDEBAR: Date & Quick Actions - 6 cols on desktop (approx. 50%) */}
+        <div className="md:col-span-6 space-y-3">
           <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
@@ -641,10 +637,17 @@ export default function HomeClient() {
                                     {/* Remove textual 'Sub' and 'Room' pills; use teacher/room highlight styling instead */}
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    {/* removed Sub pill */}
-                                    <span>{displayTeacher(period)}</span>
+                                    {(isSubstitutePeriod(period)) ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                      >
+                                        {displayTeacher(period)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
+                                    )}
                                     <span>•</span>
-                                    <span>{(period as any).displayRoom || period.room}</span>
+                                    <span className="text-on-surface-variant">{(period as any).displayRoom || period.room}</span>
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">

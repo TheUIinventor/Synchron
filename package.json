@@ -57,6 +57,17 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2"
+    ,
+    "@tanstack/react-query": "latest",
+    "@tanstack/react-query-persist-client": "latest",
+    "@tanstack/query-sync-storage-persister": "latest",
+    "zustand": "latest"
+  },
+  "dependenciesMeta": {
+    "@tanstack/react-query": { "optional": false },
+    "@tanstack/react-query-persist-client": { "optional": false },
+    "@tanstack/query-sync-storage-persister": { "optional": false },
+    "zustand": { "optional": false }
   },
   "devDependencies": {
     "@types/node": "^22",

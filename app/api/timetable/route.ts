@@ -196,6 +196,48 @@ export async function GET(req: NextRequest) {
       dayRes = dr; fullRes = fr; bellsRes = br
     }
 
+    // If a specific date was requested, and the host returned a day-specific
+    // JSON (`daytimetable.json`), prefer returning that payload directly so
+    // clients that requested `/api/timetable?date=YYYY-MM-DD` receive the
+    // authoritative per-day JSON rather than the aggregated full timetable.
+    if (dateParam) {
+      try {
+        if (dayRes && (dayRes as any).json) {
+          const dj = (dayRes as any).json
+          // Normalize the day response into the same shape we return for
+          // the aggregated endpoint so clients receive `timetable`.
+          const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+          let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
+          if (!Array.isArray(arr) && dj?.day?.periods) {
+            arr = Array.isArray(dj.day.periods) ? dj.day.periods : null
+          }
+          if (!Array.isArray(arr) && dj?.timetable?.periods) {
+            const maybe = Array.isArray(dj.timetable.periods) ? dj.timetable.periods : null
+            if (maybe) arr = maybe
+          }
+          if (!Array.isArray(arr)) arr = []
+          const dowDate = new Date(dateParam)
+          const dow = (!Number.isNaN(dowDate.getTime())) ? dowDate.toLocaleDateString('en-US', { weekday: 'long' }) : requestedWeekdayString
+          const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
+          if (inferred) detectedWeekType = inferred
+          byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
+
+          const maybeBellTimes = dj.bellTimes || dj.bells || (bellsRes && (bellsRes as any).json) || undefined
+
+          return NextResponse.json({
+            timetable: byDay,
+            timetableByWeek: null,
+            bellTimes: maybeBellTimes || undefined,
+            source: 'sbhs-api-day',
+            weekType: detectedWeekType,
+            upstream: { day: dj, full: fullRes?.json ?? null, bells: bellsRes?.json ?? null },
+          })
+        }
+      } catch (e) {
+        // fallthrough to aggregated handling
+      }
+    }
+
     const responses = [dayRes, fullRes, bellsRes]
     // Helper: attempt to build normalized bellSchedules from any available
     // response JSON (bells.json, day.bells inside day/full responses, etc.)
