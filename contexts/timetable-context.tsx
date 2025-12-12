@@ -693,8 +693,37 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { return __initialExternalTimetableByWeek || null } catch (e) { return null }
   })
   const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(externalTimetableByWeek)
+  const selectedWeekRef = useRef<'A' | 'B' | 'unknown' | null>(null)
   // Record the authoritative week type provided by the server (A/B) when available
   const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(() => __initialWeekType)
+  // Debug helper: set and log authoritative week type
+  const debugSetWeekType = (w: "A" | "B" | null) => {
+    try { console.debug('[timetable.provider] debugSetWeekType', { newWeek: w, prevExternalWeekType: externalWeekType, currentWeek }) } catch (e) {}
+    try { setExternalWeekType(w); setCurrentWeek(w) } catch (e) {}
+  }
+  // Safe setter for grouped A/B timetable maps. When the incoming payload
+  // does not include an authoritative top-level `weekType` (A/B) and we
+  // already have a cached `lastRecordedTimetableByWeek`, avoid overwriting
+  // the grouped map. This prevents background refreshes without week
+  // metadata from flipping the selected cycle and reverting correct
+  // destination rooms.
+  const safeSetExternalTimetableByWeek = (payloadWeekType: any, incomingByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null, reason?: string) => {
+    try {
+      const hasCached = Boolean(lastRecordedTimetableByWeek)
+      const hasAuthWeek = payloadWeekType === 'A' || payloadWeekType === 'B'
+      if (!incomingByWeek && hasCached && !hasAuthWeek) {
+        try { console.debug('[timetable.provider] skipping clearing externalTimetableByWeek (no authoritative weekType in payload)', { reason }) } catch (e) {}
+        return
+      }
+      if (incomingByWeek && hasCached && !hasAuthWeek) {
+        try { console.debug('[timetable.provider] skipping externalTimetableByWeek override (no authoritative weekType in payload)', { reason }) } catch (e) {}
+        return
+      }
+      setExternalTimetableByWeek(incomingByWeek)
+    } catch (e) {
+      try { setExternalTimetableByWeek(incomingByWeek) } catch (err) {}
+    }
+  }
   // Debug: record last fetched date and a small payload summary for diagnostics
   const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null)
   const [lastFetchedPayloadSummary, setLastFetchedPayloadSummary] = useState<any | null>(null)
@@ -899,6 +928,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // Previously this code selected A/B per-day which could mix the cycle
       // and produce combined A/B results. Choose one week consistently.
       let selectedWeek: 'A' | 'B' | 'unknown' = 'unknown'
+      // If we've previously selected a week for the grouped view, persist
+      // that choice across background refreshes unless the server explicitly
+      // reports a different `externalWeekType`.
+      if (selectedWeekRef.current && (externalWeekType === null || externalWeekType === undefined)) {
+        selectedWeek = selectedWeekRef.current
+      }
       try {
         if (currentWeek === 'A' || currentWeek === 'B') selectedWeek = currentWeek
         else if (externalWeekType === 'A' || externalWeekType === 'B') selectedWeek = externalWeekType
@@ -952,6 +987,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         selectedWeek = 'A'
       }
+
+      try { selectedWeekRef.current = selectedWeek } catch (e) {}
 
       // Now apply the chosen week consistently across all days
       for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
@@ -1808,7 +1845,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // ignore extraction errors and preserve previously-seen bells
               }
               setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              safeSetExternalTimetableByWeek(jht?.weekType, null, 'homepage-no-timetable')
               // Do not clear previously discovered bell times when upstream
               // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
@@ -1830,7 +1867,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const parsedHt = parseTimetableHtmlLocal(html)
         const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
         if (hasHt) {
-          setExternalTimetable(mergePreserveOverrides(parsedHt, lastRecordedTimetable))
+            try { console.debug('[timetable.provider] setExternalTimetable (homepage parsed)', { days: Object.keys(parsedHt || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+            setExternalTimetable(mergePreserveOverrides(parsedHt, lastRecordedTimetable))
           setTimetableSource('external-homepage')
           return
         }
@@ -1961,7 +1999,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // ignore
               }
               setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              safeSetExternalTimetableByWeek(j?.weekType, null, 'upstream-no-timetable')
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
@@ -2002,8 +2040,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
                     } catch (e) {}
+                    try { console.debug('[timetable.provider] setExternalTimetable (cache parsed)', { days: Object.keys(parsedCache.timetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
                     setExternalTimetable(mergePreserveOverrides(parsedCache.timetable, lastRecordedTimetable))
-                    setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
+                    safeSetExternalTimetableByWeek(parsedCache?.weekType, parsedCache.timetableByWeek || null, 'cache')
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
                       lastSeenBellTimesRef.current = parsedCache.bellTimes
@@ -2055,7 +2094,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // ignore extraction errors and preserve any previously-seen bells
               }
               setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              safeSetExternalTimetableByWeek(j?.weekType, null, 'upstream-no-timetable')
               // Do not clear previously discovered bell times when upstream
               // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
@@ -2190,10 +2229,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // can compute using the correct `currentWeek` immediately
               // (prevents a transient render with the wrong week selection).
               if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
+                try { console.debug('[timetable.provider] payload weekType', j.weekType) } catch (e) {}
+                debugSetWeekType(j.weekType)
               }
-              if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+              if (finalByWeek) {
+                // Defensive: if the incoming payload does NOT include a top-level
+                // authoritative `weekType` and we already have a cached
+                // `lastRecordedTimetableByWeek`, avoid overriding the grouped
+                // A/B map. This prevents background refreshes without week
+                // metadata from flipping the selected cycle.
+                if (!(j && (j.weekType === 'A' || j.weekType === 'B')) && lastRecordedTimetableByWeek) {
+                  try { console.debug('[timetable.provider] skipping externalTimetableByWeek override (no authoritative weekType in payload)') } catch (e) {}
+                  // keep previous lastRecordedTimetableByWeek (do not set)
+                } else {
+                  setExternalTimetableByWeek(finalByWeek)
+                }
+              }
               try {
                 // If the upstream payload includes a specific day with an explicit
                 // weekType (eg. `upstream.day.weekType`), prefer that per-day
@@ -2215,6 +2266,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     } catch (e) {}
                   }
                   if (inferred) {
+                    try {
+                      // If we've inferred the authoritative day week from the
+                      // upstream day object, ensure provider state reflects
+                      // that immediately so downstream selection prefers it.
+                      if (inferred && (externalWeekType === null || externalWeekType === undefined)) {
+                        try { setExternalWeekType(inferred); setCurrentWeek(inferred) } catch (e) {}
+                      }
+                    } catch (e) {}
                     // Resolve a JS weekday key from either an explicit date or a
                     // day label provided by the upstream payload.
                     let dayKey: string | null = null
@@ -2240,6 +2299,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                 }
               } catch (e) {}
+              try { console.debug('[timetable.provider] setExternalTimetable (after subs)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+              try { console.debug('[timetable.provider] setExternalTimetable (final branch)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
               setExternalTimetable(mergePreserveOverrides(finalTimetable, lastRecordedTimetable))
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
@@ -2333,6 +2394,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     } catch (e) {}
                   }
                   if (inferred) {
+                    try {
+                      if (inferred && (externalWeekType === null || externalWeekType === undefined)) {
+                        try { setExternalWeekType(inferred); setCurrentWeek(inferred) } catch (e) {}
+                      }
+                    } catch (e) {}
                     // resolve a day key and filter only that day's entries
                     let dayKey: string | null = null
                     try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
@@ -2459,7 +2525,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // ignore
               }
               setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              safeSetExternalTimetableByWeek(j?.weekType, null, 'refresh-no-timetable')
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               try {
@@ -2478,7 +2544,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
             }
-            if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
+            if (j.timetableByWeek) safeSetExternalTimetableByWeek(j?.weekType, j.timetableByWeek, 'refresh')
             if (j.bellTimes || j.upstream) {
               try {
                 const computed = buildBellTimesFromPayload(j)
@@ -2572,6 +2638,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!byDay[day]) byDay[day] = []
               byDay[day].push(p)
             }
+            try { console.debug('[timetable.provider] setExternalTimetable (array->byDay)', { days: Object.keys(byDay || {}).length, externalWeekType, currentWeek }) } catch (e) {}
             setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
             setTimetableSource(j.source ?? 'external')
             if (j.weekType === 'A' || j.weekType === 'B') {
@@ -2846,7 +2913,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // ignore
               }
               setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              safeSetExternalTimetableByWeek(j?.weekType, null, 'fetch-no-timetable')
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               setCurrentWeek(null)
@@ -2942,7 +3009,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore substitution extraction/apply errors
             }
 
-            if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+            if (finalByWeek) safeSetExternalTimetableByWeek(j?.weekType, finalByWeek, 'fetch-upstream')
               setExternalTimetable(mergePreserveOverrides(finalTimetable, lastRecordedTimetable))
             setTimetableSource(j.source ?? 'external')
             // record debug summary

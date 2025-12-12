@@ -1,0 +1,29 @@
+{
+  "timetable": {
+    "Monday": [
+      { "period": "1", "subject": "ENG B", "room": "401", "weekType": "A" },
+      { "period": "2", "subject": "D&T 1", "room": "503", "weekType": "A" },
+      { "period": "3", "subject": "HIS B", "room": "402", "weekType": "A" },
+      { "period": "4", "subject": "CHI A", "room": "103", "weekType": "A" },
+      { "period": "5", "subject": "MAT A", "room": "107", "weekType": "A" },
+
+      { "period": "1", "subject": "MAT A", "room": "107", "weekType": "B" },
+      { "period": "2", "subject": "D&T 1", "room": "503", "weekType": "B" },
+      { "period": "3", "subject": "HIS B", "room": "904", "weekType": "B" },
+      { "period": "4", "subject": "MUS 1", "room": "201", "weekType": "B" },
+      { "period": "5", "subject": "CHI A", "room": "213", "weekType": "B" }
+    ]
+  },
+  "upstream": {
+    "day": {
+      "date": "2025-12-15",
+      "day": "Monday",
+      "weekType": "B",
+      "timetable": {
+        "periods": {
+          "3": { "title": "HIS B", "room": "904", "teacher": "PAUV" }
+        }
+      }
+    }
+  }
+}
