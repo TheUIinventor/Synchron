@@ -1,8 +1,9 @@
 
 "use client";
+"use client";
 import TopRightActionIcons from "@/components/top-right-action-icons";
 import { useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import type { ReactNode } from "react"
@@ -10,6 +11,7 @@ import { BottomNav } from "@/components/bottom-nav"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider"
 import { TimetableProvider } from "@/contexts/timetable-context"
+import { QueryClientProviderWrapper, hydrateFromProcessedSnapshot } from '@/lib/query-client'
 import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
@@ -22,15 +24,22 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       .catch(err => console.debug('auth refresh error', err))
   }, [])
 
-  // Emergency: attempt a one-time unregister of any active Service Workers
-  // and clear caches to force clients to fetch fresh assets. This is a
-  // defensive recovery for users who may be stuck on an older, broken
-  // client bundle (TDZ/minified runtime errors). It runs only once per
-  // browser session and sets `sessionStorage.synchron:force-update` to avoid
-  // reload loops.
+  // Hydrate the React Query cache from our processed snapshot on mount
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      hydrateFromProcessedSnapshot()
+    } catch (e) {}
+  }, [])
+
+  // Emergency unregister is disabled by default to avoid reload loops that
+  // block navigation and user interactions. To enable temporarily set
+  // `sessionStorage['synchron:do-emergency']= 'true'` from the console.
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
+      const doEmergency = sessionStorage.getItem('synchron:do-emergency') === 'true'
+      if (!doEmergency) return
       const already = sessionStorage.getItem('synchron:force-update') === 'true'
       if (already) return
       if ('serviceWorker' in navigator || 'caches' in window) {
@@ -57,6 +66,28 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
             try { location.reload() } catch (e) {}
           }
         })()
+      }
+    } catch (e) {}
+  }, [])
+
+  // Prefetch core routes to speed up navigation (home, timetable, notices, clipboard, settings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const router = useRouter()
+      const routes = ['/', '/timetable', '/notices', '/clipboard', '/settings']
+      const doPrefetch = () => {
+        try {
+          for (const r of routes) {
+            try { router.prefetch(r) } catch (e) {}
+          }
+        } catch (e) {}
+      }
+      // Use requestIdleCallback if available to avoid blocking critical work
+      if ('requestIdleCallback' in window) {
+        ;(window as any).requestIdleCallback(() => doPrefetch(), { timeout: 2000 })
+      } else {
+        setTimeout(() => doPrefetch(), 1000)
       }
     } catch (e) {}
   }, [])
@@ -164,14 +195,16 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     >
       <UserSettingsProvider>
         <ErrorBoundary>
-          <TimetableProvider>
+          <QueryClientProviderWrapper>
+            <TimetableProvider>
             {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
             {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
             <ConditionalTopRightIcons />
             <AppSidebar />
             <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
             <BottomNav />
-          </TimetableProvider>
+            </TimetableProvider>
+          </QueryClientProviderWrapper>
         </ErrorBoundary>
       </UserSettingsProvider>
     </ThemeProvider>

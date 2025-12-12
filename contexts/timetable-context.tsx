@@ -6,10 +6,29 @@ import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
-import type { Period, BellTime } from "@/types/timetable"
 
 // Define the period type
-// `Period` and `BellTime` types are defined in `types/timetable.ts`
+export type Period = {
+  id?: number
+  period: string
+  time: string
+  subject: string
+  teacher: string
+  room: string
+  weekType?: "A" | "B"
+  isSubstitute?: boolean // New: Indicates a substitute teacher
+  isRoomChange?: boolean // New: Indicates a room change
+  // Optional fields populated during normalization
+  fullTeacher?: string
+  casualSurname?: string
+  displayTeacher?: string
+}
+
+// Define the bell time type
+export type BellTime = {
+  period: string
+  time: string
+}
 
 // Define the timetable context type
 type TimetableContextType = {
@@ -42,9 +61,6 @@ type TimetableContextType = {
   error: string | null
   // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
   refreshExternal?: () => Promise<void>
-  // Background refresh aggressiveness control (persistent)
-  aggressiveRefresh?: boolean
-  setAggressiveRefresh?: (v: boolean) => void
   // Full A/B grouped timetable when available from the server
   timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
   externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
@@ -540,45 +556,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // ignore
       }
     } catch (e) {}
-  }, [updateAllTimeStates])
+  }, [])
 
   // Memoize the current timetable based on selected week
   // Try to synchronously hydrate last-known timetable from localStorage so the UI
   // can display cached data instantly while we fetch fresh data in the background.
-  // Helper: normalize a timetable map for UI display (displayTeacher, displayRoom, isRoomChange)
-  const normalizeTimetableForDisplay = (rawMap: Record<string, Period[]> | null) => {
-    if (!rawMap) return rawMap
-    try {
-      const cleaned: Record<string, Period[]> = {}
-      for (const day of Object.keys(rawMap)) {
-        cleaned[day] = (rawMap[day] || []).map((p) => {
-          const item: any = { ...(p as any) }
-          // Normalize destination room
-          const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
-          if (candidateDest && String(candidateDest).trim()) {
-            const candStr = String(candidateDest).trim()
-            const roomStr = String(item.room || '').trim()
-            if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-              item.displayRoom = candStr
-              item.isRoomChange = true
-            }
-          }
-          // Normalize teacher display
-          try {
-            const casual = item.casualSurname || undefined
-            const candidate = item.fullTeacher || item.teacher || undefined
-            const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-            item.displayTeacher = dt
-          } catch (e) {}
-          if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) {
-            delete item.isRoomChange
-          }
-          return item
-        })
-      }
-      return cleaned
-    } catch (e) { return rawMap }
-  }
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(() => {
     try {
       if (__initialExternalTimetable) {
@@ -669,48 +651,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
-  // Aggressive refresh toggle persisted to localStorage (default: true)
-  const [aggressiveRefresh, setAggressiveRefresh] = useState<boolean>(() => {
-    try {
-      if (typeof window === 'undefined') return true
-      const raw = localStorage.getItem('synchron-aggressive-refresh')
-      if (raw === 'false') return false
-    } catch (e) {}
-    return true
-  })
-  useEffect(() => {
-    try { localStorage.setItem('synchron-aggressive-refresh', aggressiveRefresh ? 'true' : 'false') } catch (e) {}
-  }, [aggressiveRefresh])
 
-  // Listen for cross-window or in-page toggle events so Settings can update provider
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const handler = (ev: any) => {
-      try {
-        const v = ev?.detail?.value
-        if (typeof v === 'boolean') setAggressiveRefresh(v)
-      } catch (e) {}
-    }
-    const storageHandler = (ev: StorageEvent) => {
-      try {
-        if (ev.key === 'synchron-aggressive-refresh') {
-          setAggressiveRefresh(ev.newValue === 'true')
-        }
-      } catch (e) {}
-    }
-    window.addEventListener('synchron:aggressive-refresh-changed', handler)
-    window.addEventListener('storage', storageHandler)
-    return () => {
-      window.removeEventListener('synchron:aggressive-refresh-changed', handler)
-      window.removeEventListener('storage', storageHandler)
-    }
-  }, [])
-
-  // Background refresh tuning (driven by `aggressiveRefresh` toggle)
+  // Aggressive background refresh tuning
+  // NOTE: reduced intervals to make visible-refresh more responsive.
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  const MIN_REFRESH_MS = aggressiveRefresh ? 3 * 1000 : 45 * 1000
-  const VISIBLE_REFRESH_MS = aggressiveRefresh ? 4 * 1000 : 60 * 1000
-  const HIDDEN_REFRESH_MS = aggressiveRefresh ? 20 * 1000 : 5 * 60 * 1000
+  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
+  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
+  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
@@ -739,6 +686,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   })
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
+  // Debug hooks: when sessionStorage['synchron:debug-refresh'] === 'true',
+  // install temporary capture/bubble listeners during refresh to diagnose
+  // click/pointer swallowing that may occur while a background refresh runs.
+  const refreshDebugHandlersRef = useRef<{ capture?: any; bubble?: any } | null>(null)
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
@@ -841,14 +792,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             }
 
-            // Defensive: clear any pre-existing `isRoomChange` flag if there
-            // was no explicit destination provided on the incoming period.
-            // This avoids showing stale highlights from persisted objects.
+            // Defensive: clear any stale `isRoomChange` flag only when there
+            // was no explicit destination provided on the incoming period
+            // and there is no `displayRoom` already present. We must not
+            // remove a `displayRoom` that was applied earlier by
+            // `applySubstitutionsToTimetable` or other normalization logic.
             if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom && !(p as any).to) {
-              if ((p as any).isRoomChange || (p as any).displayRoom) {
+              // If a `displayRoom` is present, assume it is intentional and
+              // preserve it. Only remove the stale `isRoomChange` flag when
+              // there is no display override to show.
+              if ((p as any).isRoomChange && !(p as any).displayRoom) {
                 const clean = { ...p }
                 delete (clean as any).isRoomChange
-                delete (clean as any).displayRoom
                 // Also ensure we compute a normalized displayTeacher for the UI
                 try {
                   const casual = (clean as any).casualSurname || undefined
@@ -1191,6 +1146,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // avoid additional network requests.
       if (payload) {
         try {
+          // If the server provided an authoritative `upstream.day` object for
+          // this specific date, prefer extracting variations strictly from
+          // that object only. This avoids broad recursive heuristics that can
+          // mis-attribute rooms from unrelated payload fields. When a
+          // day-specific payload exists we treat the absence of `roomVariations`
+          // as authoritative (i.e. no room changes) and return an empty array.
+          const daySource = payload.upstream && payload.upstream.day ? payload.upstream.day : null
+          if (daySource) {
+            const fromDay = PortalScraper.extractVariationsFromJson(daySource)
+            if (Array.isArray(fromDay) && fromDay.length) return fromDay
+            // Explicitly return empty when day exists but no variations found.
+            return []
+          }
+
+          // Fallback: when no authoritative day object exists, attempt to
+          // extract variations from upstream or the whole payload as before.
           const fromUpstream = PortalScraper.extractVariationsFromJson(payload.upstream || payload)
           if (Array.isArray(fromUpstream) && fromUpstream.length) return fromUpstream
 
@@ -1648,6 +1619,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (!hadCache) setIsLoading(true)
     // Mark that a background refresh is in progress for logging/debug
     setIsRefreshing(true)
+    // If developer debugging key is set, attach temporary event listeners
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage && window.sessionStorage.getItem('synchron:debug-refresh') === 'true') {
+        const cap = (e: Event) => {
+          try {
+            const ev = e as PointerEvent
+            const top = document.elementFromPoint(ev.clientX, ev.clientY)
+            console.debug('[timetable.refresh.debug] capture', e.type, 'target=', e.target, 'top=', top)
+            try { console.debug('[timetable.refresh.debug] composedPath', (ev as any).composedPath ? (ev as any).composedPath() : (ev as any).path || []) } catch (err) {}
+          } catch (err) {}
+        }
+        const bub = (e: Event) => {
+          try {
+            const ev = e as PointerEvent
+            const top = document.elementFromPoint(ev.clientX, ev.clientY)
+            console.debug('[timetable.refresh.debug] bubble', e.type, 'target=', e.target, 'defaultPrevented=', (e as any).defaultPrevented, 'top=', top)
+            try { console.debug('[timetable.refresh.debug] composedPath', (ev as any).composedPath ? (ev as any).composedPath() : (ev as any).path || []) } catch (err) {}
+          } catch (err) {}
+        }
+        document.addEventListener('pointerdown', cap, true)
+        document.addEventListener('click', bub, false)
+        refreshDebugHandlersRef.current = { capture: cap, bubble: bub }
+        console.debug('[timetable.refresh.debug] installed debug listeners')
+      }
+    } catch (e) {}
     try { console.time('[timetable] refreshExternal') } catch (e) {}
     // Throttle aggressive refreshes: ensure we don't refresh more often than MIN_REFRESH_MS
     try {
@@ -1697,7 +1693,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              setCurrentWeek(null)
             return
           }
           if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
@@ -1819,6 +1814,42 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           try {
             _payloadHash = computePayloadHash(j)
           } catch (e) { _payloadHash = null }
+          // If the live payload explicitly indicates there is no timetable,
+          // treat that as authoritative and do not reuse any previously-
+          // cached processed payload for this hash. This prevents showing
+          // cached classes during school holidays when the upstream has
+          // reported an empty timetable for the requested date.
+          try {
+            if (payloadHasNoTimetable(j)) {
+              try {
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore
+              }
+              setExternalTimetable(emptyByDay)
+              setExternalTimetableByWeek(null)
+              setTimetableSource('external-empty')
+              setExternalWeekType(null)
+              try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
+              try { setIsRefreshing(false) } catch (e) {}
+              if (!hadCache) try { setIsLoading(false) } catch (e) {}
+              return
+            }
+          } catch (e) {}
           if (_payloadHash && typeof window !== 'undefined') {
             try {
               const cached = localStorage.getItem(`synchron-processed-${_payloadHash}`)
@@ -1826,9 +1857,32 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const parsedCache = JSON.parse(cached)
                 if (parsedCache && parsedCache.timetable) {
                   try {
-                    // Normalize cached processed payload for consistent display
-                    const normalized = normalizeTimetableForDisplay(parsedCache.timetable)
-                    setExternalTimetable(normalized)
+                    // Attach any available long titles from the cached payload
+                    try {
+                      const subjectsMap = parsedCache.subjects || parsedCache.timetable?.subjects || parsedCache.upstream?.subjects || parsedCache.upstream?.day?.timetable?.subjects || parsedCache.upstream?.full?.subjects || null
+                      if (subjectsMap && typeof subjectsMap === 'object') {
+                        const shortToTitle: Record<string, string> = {}
+                        for (const k of Object.keys(subjectsMap)) {
+                          try {
+                            const v = subjectsMap[k]
+                            const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                            const title = (v && (v.title || v.name || v.fullTitle)) ? (v.title || v.name || v.fullTitle) : null
+                            if (short && title) shortToTitle[String(short).trim()] = String(title)
+                          } catch (e) {}
+                        }
+                        for (const d of Object.keys(parsedCache.timetable)) {
+                          try {
+                            const arr = parsedCache.timetable[d] || []
+                            for (const p of arr) {
+                              try {
+                                if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                              } catch (e) {}
+                            }
+                          } catch (e) {}
+                        }
+                      }
+                    } catch (e) {}
+                    setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
@@ -1856,7 +1910,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore cache errors
             }
           }
-          if (j && j.timetable) {
+              if (j && j.timetable) {
             if (payloadHasNoTimetable(j)) {
               // Even when the payload reports "no timetable", try to
               // salvage any bell schedules the server may have provided
@@ -1886,7 +1940,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              setCurrentWeek(null)
               try {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
@@ -1958,6 +2011,47 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore substitution extraction errors
               }
+              // Attach long subject titles when available in the upstream payload
+              try {
+                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
+                if (subjectsSource && typeof subjectsSource === 'object') {
+                  const shortToTitle: Record<string, string> = {}
+                  for (const k of Object.keys(subjectsSource)) {
+                    try {
+                      const v = subjectsSource[k]
+                      const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                      const title = (v && (v.title || v.name || v.fullTeacher || v.fullTitle)) ? (v.title || v.name || v.fullTeacher || v.fullTitle) : null
+                      if (short && title) shortToTitle[String(short).trim()] = String(title)
+                    } catch (e) {}
+                  }
+                  for (const d of Object.keys(finalTimetable)) {
+                    try {
+                      const arr = finalTimetable[d] || []
+                      for (const p of arr) {
+                        try {
+                          if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                        } catch (e) {}
+                      }
+                    } catch (e) {}
+                  }
+                  if (finalByWeek) {
+                    for (const d of Object.keys(finalByWeek)) {
+                      try {
+                        const groups = finalByWeek[d]
+                        for (const weekKey of ['A','B','unknown']) {
+                          try {
+                            const arr = (groups as any)[weekKey] || []
+                            for (const p of arr) {
+                              try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                            }
+                          } catch (e) {}
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                }
+              } catch (e) {}
+
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
               // Persist the processed result keyed by payload-hash so future
@@ -1969,6 +2063,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       timetable: finalTimetable,
                       timetableByWeek: finalByWeek || null,
                       bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null,
                       source: j.source ?? 'external',
                       weekType: j.weekType ?? null,
                       savedAt: Date.now(),
@@ -2012,6 +2107,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (!byDay[day]) byDay[day] = []
                 byDay[day].push(p)
               }
+              // Attach long titles from subjects mapping if available
+              try {
+                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
+                if (subjectsSource && typeof subjectsSource === 'object') {
+                  const shortToTitle: Record<string, string> = {}
+                  for (const k of Object.keys(subjectsSource)) {
+                    try {
+                      const v = subjectsSource[k]
+                      const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                      const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                      if (short && title) shortToTitle[String(short).trim()] = String(title)
+                    } catch (e) {}
+                  }
+                  for (const d of Object.keys(byDay)) {
+                    try {
+                      for (const p of byDay[d]) {
+                        try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                      }
+                    } catch (e) {}
+                  }
+                }
+              } catch (e) {}
+
               setExternalTimetable(byDay)
               // Also persist processed result for array-shaped payloads
               try {
@@ -2021,6 +2139,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       timetable: byDay,
                       timetableByWeek: null,
                       bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
                       source: j.source ?? 'external',
                       weekType: j.weekType ?? null,
                       savedAt: Date.now(),
@@ -2112,7 +2231,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              setCurrentWeek(null)
               try {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
@@ -2203,13 +2321,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
       if (lastRecordedTimetable) {
         // Prefer showing cached real data when available regardless of auth state.
-        // Normalize before setting so UI sees display fields consistently.
-        try {
-          const normalized = normalizeTimetableForDisplay(lastRecordedTimetable)
-          setExternalTimetable(normalized)
-        } catch (e) {
-          setExternalTimetable(lastRecordedTimetable)
-        }
+        setExternalTimetable(lastRecordedTimetable)
         setTimetableSource('cache')
         setError(null)
       } else if (isAuthenticated) {
@@ -2240,6 +2352,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } finally {
       try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
       try { setIsRefreshing(false) } catch (e) {}
+      // Remove debug listeners if present
+      try {
+        const h = refreshDebugHandlersRef.current
+        if (h) {
+          if (h.capture) document.removeEventListener('pointerdown', h.capture, true)
+          if (h.bubble) document.removeEventListener('click', h.bubble, false)
+          refreshDebugHandlersRef.current = null
+          console.debug('[timetable.refresh.debug] removed debug listeners')
+        }
+      } catch (e) {}
       // Only clear the global loading flag if we initially showed it
       // because there was no cache; otherwise keep cached UI visible.
       try { if (!hadCache) setIsLoading(false) } catch (e) { setIsLoading(false) }
@@ -2401,7 +2523,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
     }
-  }, [aggressiveRefresh])
+  }, [])
 
   // When the selected date changes, fetch the authoritative timetable for that date
   useEffect(() => {
@@ -2654,8 +2776,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         isShowingCachedWhileLoading: Boolean((isLoading || isRefreshing) && lastRecordedTimetable),
         error,
         refreshExternal,
-        aggressiveRefresh,
-        setAggressiveRefresh,
       }}
     >
       {children}
@@ -2672,13 +2792,13 @@ export function useTimetable() {
   return context
 }
 
-// Safe hook variant: returns the context or `null` when provider not present.
+// Safe variant: returns the context or undefined instead of throwing.
+// Useful in settings or other places that may render outside the provider.
 export function useTimetableSafe() {
   try {
-    const context = useContext(TimetableContext)
-    return context ?? null
+    return useContext(TimetableContext)
   } catch (e) {
-    return null
+    return undefined
   }
 }
 

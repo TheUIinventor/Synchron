@@ -35,6 +35,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${roboto.variable} font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
+        {/* Emergency inline recovery script removed — caused reload loops and
+          blocked client navigation. If emergency unregister is needed,
+          enable it manually by setting `sessionStorage['synchron:panic-cleared']=true`
+          or reintroducing a controlled script. */}
         <ClientLayout>
           {children}
           <Toaster />

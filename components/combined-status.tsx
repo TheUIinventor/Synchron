@@ -100,7 +100,13 @@ export default function CombinedStatus() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="font-semibold text-green-700 dark:text-green-300 text-sm">Currently in class</span>
               </div>
-              <p className="font-medium mb-1">{getDisplaySubject(nextPeriodInfo.currentPeriod)}</p>
+                <p className="font-medium mb-1">
+                {nextPeriodInfo.currentPeriod?.subject === 'Break' ? (
+                  nextPeriodInfo.currentPeriod.period
+                ) : (
+                  nextPeriodInfo.currentPeriod?.subject
+                )}
+              </p>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400 mb-2">
                 {(isSubstitutePeriod(nextPeriodInfo.currentPeriod)) ? (
                   <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
@@ -125,7 +131,13 @@ export default function CombinedStatus() {
                   <ArrowRight className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                   <span className="font-medium text-blue-700 dark:text-blue-300 text-sm">Next class</span>
                 </div>
-                <p className="font-medium text-sm mb-1">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
+                <p className="font-medium text-sm mb-1">
+                  {nextPeriodInfo.nextPeriod?.subject === 'Break' ? (
+                    nextPeriodInfo.nextPeriod.period
+                  ) : (
+                    nextPeriodInfo.nextPeriod?.subject
+                  )}
+                </p>
                 <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                   {(isSubstitutePeriod(nextPeriodInfo.nextPeriod)) ? (
                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
@@ -152,7 +164,13 @@ export default function CombinedStatus() {
                 {((nextPeriodInfo.nextPeriod as any)?.isRollCallMarker) ? 'School in' : 'Next period'}
               </span>
             </div>
-            <p className="font-medium mb-2">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
+            <p className="font-medium mb-2">
+              {nextPeriodInfo.nextPeriod?.subject === 'Break' ? (
+                nextPeriodInfo.nextPeriod.period
+              ) : (
+                nextPeriodInfo.nextPeriod?.subject
+              )}
+            </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 font-mono bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full inline-block">
               {nextPeriodInfo.timeUntil}
             </p>
