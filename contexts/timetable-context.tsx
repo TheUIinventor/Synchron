@@ -2660,13 +2660,70 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore substitution extraction/apply errors
             }
 
-            // Persist the date-specific processed timetable so the provider
-            // will prefer it when the user has selected this date.
+            // Normalize final timetables: ensure any explicit destination
+            // room fields are mapped into `displayRoom`/`isRoomChange` and
+            // compute a `displayTeacher` for UI consistency. This is defensive
+            // and ensures room-variations survive the processing path.
             try {
-              setSelectedDateTimetable(finalTimetable)
-              setSelectedDateTimetableByWeek(finalByWeek || null)
+              const normalizeMap = (m: Record<string, Period[]> | null) => {
+                if (!m) return m
+                const out: Record<string, Period[]> = {}
+                for (const day of Object.keys(m)) {
+                  try {
+                    out[day] = (m[day] || []).map((p) => {
+                      const item: any = { ...(p as any) }
+                      try {
+                        const candidate = (item as any).toRoom || (item as any).roomTo || (item as any)['room_to'] || (item as any).newRoom || (item as any).to || undefined
+                        if (candidate && String(candidate).trim()) {
+                          const candStr = String(candidate).trim()
+                          const roomStr = String(item.room || '').trim()
+                          if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+                            item.displayRoom = candStr
+                            item.isRoomChange = true
+                          }
+                        }
+                      } catch (e) {}
+                      try {
+                        const casual = (item as any).casualSurname || undefined
+                        const candidate = (item as any).fullTeacher || (item as any).teacher || undefined
+                        const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                        ;(item as any).displayTeacher = dt
+                      } catch (e) {}
+                      return item
+                    })
+                  } catch (e) {
+                    out[day] = m[day] || []
+                  }
+                }
+                return out
+              }
+
+              const cleanedFinalTimetable = normalizeMap(finalTimetable as any)
+              const cleanedFinalByWeek = finalByWeek ? ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> => {
+                const out: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                for (const d of Object.keys(finalByWeek)) {
+                  try {
+                    const groups = finalByWeek[d]
+                    out[d] = {
+                      A: normalizeMap({ [d]: groups.A })[d] || [],
+                      B: normalizeMap({ [d]: groups.B })[d] || [],
+                      unknown: normalizeMap({ [d]: groups.unknown })[d] || [],
+                    }
+                  } catch (e) {
+                    out[d] = { A: groups?.A || [], B: groups?.B || [], unknown: groups?.unknown || [] } as any
+                  }
+                }
+                return out
+              })() : null
+
+              setSelectedDateTimetable(cleanedFinalTimetable)
+              setSelectedDateTimetableByWeek(cleanedFinalByWeek || null)
               setSelectedDateFetchedIso(ds)
               setSelectedDateWeekType(j.weekType === 'A' || j.weekType === 'B' ? j.weekType : null)
+              // Replace the raw objects used for rendering too so the UI sees
+              // the normalized fields immediately.
+              finalTimetable = cleanedFinalTimetable as any
+              finalByWeek = cleanedFinalByWeek
             } catch (e) {}
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
