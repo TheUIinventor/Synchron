@@ -730,7 +730,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const candStr = String(candidate).trim()
               const roomStr = String((p as any).room || '').trim()
               if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                const copy = { ...(p as any), displayRoom: candStr, isRoomChange: true }
+                const copy: any = { ...(p as any), displayRoom: candStr, isRoomChange: true }
                 try {
                   if (!copy.displayTeacher) {
                     const casual = copy.casualSurname || undefined
@@ -745,27 +745,73 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       (copy as any).isSubstitute = true
                     }
                   } catch (e) {}
+                  // Preserve previously-seen casual/substitute metadata from cache
+                  try {
+                    const norm = (s?: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim()
+                    const prevList = lastRecordedTimetable && lastRecordedTimetable[day] ? lastRecordedTimetable[day] : []
+                    const prevMatch = prevList.find((q: any) => {
+                      try {
+                        const qWeek = (q && q.weekType) ? String(q.weekType) : ''
+                        const pWeek = (p && (p as any).weekType) ? String((p as any).weekType) : ''
+                        if (qWeek || pWeek) {
+                          if (qWeek !== pWeek) return false
+                        }
+                        return norm(q.period) === norm(p.period) && norm(q.subject) === norm(p.subject)
+                      } catch (e) { return false }
+                    })
+                    if (prevMatch) {
+                      const _pm: any = prevMatch
+                      if (_pm.casualSurname && !copy.casualSurname) copy.casualSurname = _pm.casualSurname
+                      if (_pm.casualToken && !copy.casualToken) copy.casualToken = _pm.casualToken
+                      if (_pm.originalTeacher && !copy.originalTeacher) copy.originalTeacher = _pm.originalTeacher
+                      if (_pm.isSubstitute && !copy.isSubstitute) copy.isSubstitute = true
+                      if (_pm.displayTeacher && !copy.displayTeacher) copy.displayTeacher = _pm.displayTeacher
+                    }
+                  } catch (e) {}
                 } catch (e) {}
                 return copy
               }
             }
             // Ensure displayTeacher is computed when missing
-            try {
-              const copy = { ...(p as any) }
-              if (!copy.displayTeacher) {
-                const casual = copy.casualSurname || undefined
-                const candidateTeacher = copy.fullTeacher || copy.teacher || undefined
-                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidateTeacher as any)
-                copy.displayTeacher = dt
-              }
               try {
-                const orig = (copy as any).originalTeacher || undefined
-                if ((copy as any).casualSurname || (copy as any).fullTeacher || (orig && String(orig).trim() !== String(copy.teacher || '').trim())) {
-                  (copy as any).isSubstitute = true
+                const copy: any = { ...(p as any) }
+                if (!copy.displayTeacher) {
+                  const casual = copy.casualSurname || undefined
+                  const candidateTeacher = copy.fullTeacher || copy.teacher || undefined
+                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidateTeacher as any)
+                  copy.displayTeacher = dt
                 }
-              } catch (e) {}
-              return copy
-            } catch (e) { return p }
+                try {
+                  const orig = (copy as any).originalTeacher || undefined
+                  if ((copy as any).casualSurname || (copy as any).fullTeacher || (orig && String(orig).trim() !== String(copy.teacher || '').trim())) {
+                    (copy as any).isSubstitute = true
+                  }
+                } catch (e) {}
+                // Preserve previously-seen casual/substitute metadata from cache
+                try {
+                  const norm = (s?: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim()
+                  const prevList = lastRecordedTimetable && lastRecordedTimetable[day] ? lastRecordedTimetable[day] : []
+                  const prevMatch = prevList.find((q: any) => {
+                    try {
+                      const qWeek = (q && q.weekType) ? String(q.weekType) : ''
+                      const pWeek = (p && (p as any).weekType) ? String((p as any).weekType) : ''
+                      if (qWeek || pWeek) {
+                        if (qWeek !== pWeek) return false
+                      }
+                      return norm(q.period) === norm(p.period) && norm(q.subject) === norm(p.subject)
+                    } catch (e) { return false }
+                  })
+                  if (prevMatch) {
+                    const _pm: any = prevMatch
+                    if (_pm.casualSurname && !copy.casualSurname) copy.casualSurname = _pm.casualSurname
+                    if (_pm.casualToken && !copy.casualToken) copy.casualToken = _pm.casualToken
+                    if (_pm.originalTeacher && !copy.originalTeacher) copy.originalTeacher = _pm.originalTeacher
+                    if (_pm.isSubstitute && !copy.isSubstitute) copy.isSubstitute = true
+                    if (_pm.displayTeacher && !copy.displayTeacher) copy.displayTeacher = _pm.displayTeacher
+                  }
+                } catch (e) {}
+                return copy
+              } catch (e) { return p }
           } catch (e) { return p }
         })
       }
