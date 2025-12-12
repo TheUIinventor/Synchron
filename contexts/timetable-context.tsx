@@ -887,6 +887,97 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return out
     } catch (e) { return byWeek }
   }
+
+  // When the server payload includes upstream/class/room variations directly
+  // (e.g. `upstream.day.classVariations` or `upstream.day.roomVariations`),
+  // they may not always be picked up by the adapters. This helper scans the
+  // raw payload and injects casual/substitute and explicit `toRoom` fields
+  // onto the provided timetable map so the UI will show substitutes even
+  // when later refreshes would otherwise omit them.
+  const enrichMapWithUpstreamVariations = (map: Record<string, Period[]> | null, payload: any) => {
+    try {
+      if (!map || !payload) return map
+      const copy: Record<string, Period[]> = {}
+      for (const d of Object.keys(map)) copy[d] = (map[d] || []).map(p => ({ ...(p as any) }))
+
+      // Helper to normalize period key for matching
+      const norm = (s?: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim()
+
+      // Find candidate variations under common payload locations
+      const upstream = payload.upstream || payload.diagnostics?.upstream || payload
+      const dayObj = upstream && upstream.day ? upstream.day : null
+      // classVariations may be an object map keyed by period or an array
+      const collect = (v: any) => {
+        const items: any[] = []
+        if (!v) return items
+        if (Array.isArray(v)) return v.slice()
+        if (typeof v === 'object') {
+          // object map: values may be variation objects
+          for (const k of Object.keys(v)) {
+            try {
+              const it = (v as any)[k]
+              if (it && typeof it === 'object') {
+                const withKey = { ...(it as any), period: it.period || it.key || k }
+                items.push(withKey)
+              }
+            } catch (e) {}
+          }
+        }
+        return items
+      }
+
+      const classVars = collect(dayObj?.classVariations || upstream.classVariations || upstream.class_variations)
+      const roomVars = collect(dayObj?.roomVariations || upstream.roomVariations || upstream.room_variations)
+
+      const all = [...classVars, ...roomVars]
+      if (!all.length) return copy
+
+      for (const v of all) {
+        try {
+          const periodKey = v.period || v.periodName || v.key || v.p || undefined
+          const subj = v.title || v.subject || v.class || undefined
+          const dayDate = (dayObj && (dayObj.date || dayObj.day)) ? String(dayObj.date || dayObj.day) : undefined
+          // Attempt to find a day in map that matches the payload date if present
+          const targetDays = dayDate ? Object.keys(copy).filter(k => k && k.toLowerCase().includes(new Date(dayDate).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase())) : Object.keys(copy)
+          for (const day of targetDays) {
+            const arr = copy[day] || []
+            for (const p of arr) {
+              try {
+                const perMatch = periodKey ? (norm(String(periodKey)) === norm(p.period)) : true
+                const subjMatch = subj ? (norm(String(subj)) === norm(p.subject)) : true
+                if (perMatch && subjMatch) {
+                  // Apply casual/substitute metadata when present
+                  if (v.casualSurname && !(p as any).casualSurname) {
+                    (p as any).casualSurname = String(v.casualSurname)
+                    (p as any).isSubstitute = true
+                    try { (p as any).displayTeacher = stripLeadingCasualCode(String(v.casualSurname)) } catch (e) {}
+                  }
+                  if (v.casual && !(p as any).casualToken) (p as any).casualToken = String(v.casual)
+                  if ((v.substitute || v.replacement || v.substituteTeacher) && !(p as any).isSubstitute) {
+                    (p as any).isSubstitute = true
+                    if (v.substituteTeacher) (p as any).teacher = String(v.substituteTeacher)
+                    if (v.substituteTeacherFull) (p as any).fullTeacher = String(v.substituteTeacherFull)
+                    try { if (!(p as any).displayTeacher && (p as any).fullTeacher) (p as any).displayTeacher = String((p as any).fullTeacher) } catch (e) {}
+                  }
+                  // Apply explicit room destination when provided
+                  const toRoom = v.toRoom || v.roomTo || v.room_to || v.to || v.room || v.newRoom
+                  if (toRoom && String(toRoom).trim()) {
+                    const cand = String(toRoom).trim()
+                    if (!((p as any).displayRoom)) {
+                      (p as any).displayRoom = cand
+                      (p as any).isRoomChange = true
+                    }
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
+
+      return copy
+    } catch (e) { return map }
+  }
   // Safe setter for grouped A/B timetable maps. When the incoming payload
   // does not include an authoritative top-level `weekType` (A/B) and we
   // already have a cached `lastRecordedTimetableByWeek`, avoid overwriting
@@ -2103,7 +2194,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             return
           }
             if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-            setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(jht.timetable, lastRecordedTimetable)))
+            setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(jht.timetable, lastRecordedTimetable), jht)))
             setTimetableSource(jht.source ?? 'external-homepage')
             if (jht.weekType === 'A' || jht.weekType === 'B') {
               setExternalWeekType(jht.weekType)
@@ -2854,18 +2945,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
                     const copy = { ...(j.timetable as any) }
                     copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
-                    setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(copy, lastRecordedTimetable)))
+                    setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(copy, lastRecordedTimetable), j)))
                   } else {
-                    setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(j.timetable, lastRecordedTimetable)))
+                    setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
                   }
                 } else {
-                  setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(j.timetable, lastRecordedTimetable)))
+                  setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
                 }
               } else {
-                setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(j.timetable, lastRecordedTimetable)))
+                setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
               }
             } catch (e) {
-              setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(j.timetable, lastRecordedTimetable)))
+              setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
             }
             setTimetableSource(j.source ?? 'external')
             if (j.weekType === 'A' || j.weekType === 'B') {
