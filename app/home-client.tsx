@@ -236,29 +236,23 @@ export default function HomeClient() {
   const isSubstitutePeriod = (p: any) => {
     try {
       if (!p) return false
-      const orig = String((p as any).originalTeacher || '').trim()
       const teacher = String(p.teacher || '').trim()
       const full = String((p as any).fullTeacher || '').trim()
-      const disp = String((p as any).displayTeacher || '').trim()
-      const changedTeacher = orig && orig !== teacher
-      // If display or full name is present and differs from the raw teacher
-      // (after stripping casual codes), treat as a substitute.
-      try {
-        const cleanedFull = stripLeadingCasualCode(full || disp || '')
-        const cleanedRaw = stripLeadingCasualCode(teacher || '')
-        // Only treat a cleaned mismatch as a substitute when we already
-        // have an indicator that substitution is possible (original teacher
-        // changed, casual surname present, or already-marked substitute).
-        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
-      } catch (e) {}
+      const disp = String((p as any).displayTeacher || full || '').trim()
+      const hasCasual = Boolean((p as any).casualSurname)
+
+      // Explicit substitute or casual surname -> highlight
+      if (p.isSubstitute || hasCasual) return true
 
       // If the raw teacher looks like a short ALL-CAPS code but displayTeacher
       // is a proper name, treat as substitute (covers cases like "LIKV V ...").
+      // Require that the display value looks like a name and is meaningfully
+      // different from the raw code to avoid false positives.
       const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
       const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
-      if (rawIsCode && dispLooksName) return true
+      if (rawIsCode && dispLooksName && disp.toLowerCase() !== teacher.toLowerCase()) return true
 
-      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
+      return false
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 
