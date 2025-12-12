@@ -1,5 +1,6 @@
 
 "use client";
+"use client";
 import TopRightActionIcons from "@/components/top-right-action-icons";
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
