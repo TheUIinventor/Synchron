@@ -460,18 +460,26 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   try {
     if (typeof window !== 'undefined') {
       try {
-        const keys = Object.keys(localStorage || {}).filter(k => k && k.startsWith('synchron-processed-'))
-        let best: { savedAt: number; key: string; parsed: any } | null = null
-        for (const k of keys) {
-          try {
-            const raw = localStorage.getItem(k)
-            if (!raw) continue
-            const parsed = JSON.parse(raw)
-            const when = parsed && (parsed.savedAt || parsed.ts || parsed.savedAt === 0) ? Number(parsed.savedAt || parsed.ts || 0) : 0
-            if (!best || when > (best.savedAt || 0)) best = { savedAt: when, key: k, parsed }
-          } catch (e) { /* ignore parse errors */ }
+        // Prefer a dedicated single-key snapshot when present for fastest
+        // startup hydrate (low-risk). Fall back to scanning per-hash keys.
+        const single = localStorage.getItem('synchron-last-processed')
+        if (single) {
+          try { __initialProcessedCache = JSON.parse(single) } catch (e) { __initialProcessedCache = null }
         }
-        if (best && best.parsed) __initialProcessedCache = best.parsed
+        if (!__initialProcessedCache) {
+          const keys = Object.keys(localStorage || {}).filter(k => k && k.startsWith('synchron-processed-'))
+          let best: { savedAt: number; key: string; parsed: any } | null = null
+          for (const k of keys) {
+            try {
+              const raw = localStorage.getItem(k)
+              if (!raw) continue
+              const parsed = JSON.parse(raw)
+              const when = parsed && (parsed.savedAt || parsed.ts || parsed.savedAt === 0) ? Number(parsed.savedAt || parsed.ts || 0) : 0
+              if (!best || when > (best.savedAt || 0)) best = { savedAt: when, key: k, parsed }
+            } catch (e) { /* ignore parse errors */ }
+          }
+          if (best && best.parsed) __initialProcessedCache = best.parsed
+        }
       } catch (e) {}
     }
   } catch (e) {}
@@ -2102,7 +2110,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       savedAt: Date.now(),
                     }
                     localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
-                    try { console.debug('[timetable.provider] cached processed payload', _payloadHash) } catch (e) {}
+                    try {
+                      // Also write a single-key snapshot for fastest hydrate on next load
+                      try { localStorage.setItem('synchron-last-processed', JSON.stringify(persisted)) } catch (e) {}
+                      console.debug('[timetable.provider] cached processed payload', _payloadHash)
+                    } catch (e) {}
                   } catch (e) {
                     // ignore storage errors
                   }
@@ -2179,7 +2191,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       savedAt: Date.now(),
                     }
                     localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
-                    try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
+                    try {
+                      // Also mirror to single-key snapshot for faster startup
+                      try { localStorage.setItem('synchron-last-processed', JSON.stringify(persisted)) } catch (e) {}
+                      console.debug('[timetable.provider] cached processed (array) payload', _payloadHash)
+                    } catch (e) {}
                   } catch (e) {}
                 }
               } catch (e) {}

@@ -22,11 +22,28 @@ export default function TimetablePage() {
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
   const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
+  const { isLoading, isShowingCachedWhileLoading } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
     trackSectionUsage("timetable")
   }, [])
+
+  // show a simple skeleton when loading and no cached snapshot is available
+  if (isLoading && !isShowingCachedWhileLoading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-surface-container-high rounded-md w-1/3" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="h-36 bg-surface-container-high rounded-md" />
+            <div className="h-36 bg-surface-container-high rounded-md" />
+          </div>
+          <div className="h-48 bg-surface-container-high rounded-md" />
+        </div>
+      </div>
+    )
+  }
 
   // Detect phone devices (exclude tablets which may be portrait but are tablets)
   useEffect(() => {
