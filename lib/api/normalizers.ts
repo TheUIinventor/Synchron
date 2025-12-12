@@ -23,8 +23,10 @@ export function normalizeVariation(v: any) {
     casualSurname: v.casualSurname || undefined,
     substituteTeacher: v.substituteTeacher || v.substitute || v.replacement || v.replacementTeacher || undefined,
     substituteTeacherFull: v.substituteTeacherFull || v.substituteFullName || v.substituteFull || (v.casual ? (v.casualSurname ? `${v.casual} ${v.casualSurname}` : v.casual) : undefined) || undefined,
-    fromRoom: v.fromRoom || v.from || v.oldRoom || undefined,
-    toRoom: v.toRoom || v.to || v.room || v.newRoom || undefined,
+    // Accept a wide variety of room field names used by different
+    // upstream payloads (e.g. `fromRoom`, `roomFrom`, `room_from`, `roomFrom`).
+    fromRoom: v.fromRoom || v.roomFrom || v.room_from || v.from || v.oldRoom || undefined,
+    toRoom: v.toRoom || v.roomTo || v.room_to || v.to || v.room || v.newRoom || undefined,
     reason: v.reason || v.note || v.comment || undefined,
     raw: v.raw || v,
   }

@@ -141,8 +141,10 @@ export class PortalScraper {
           // Provide a generous guess at the substitute's full name when available
           substituteTeacherFull: obj.casualSurname ? (obj.casual ? `${obj.casual} ${obj.casualSurname}` : obj.casualSurname) : (obj.substituteFullName || obj.substituteFull || undefined),
           // Accept multiple naming variants used by different payloads
-          fromRoom: obj.fromRoom || obj.roomFrom || obj.from || obj.oldRoom || undefined,
-          toRoom: obj.toRoom || obj.roomTo || obj.to || obj.room || obj.newRoom || undefined,
+            // Upstream APIs sometimes name room fields `roomFrom`/`roomTo`
+            // or use snake_case. Accept those variants as well.
+            fromRoom: obj.fromRoom || obj.roomFrom || obj.room_from || obj.from || obj.oldRoom || undefined,
+            toRoom: obj.toRoom || obj.roomTo || obj.room_to || obj.to || obj.room || obj.newRoom || undefined,
           reason: obj.reason || obj.note || obj.comment || undefined,
           raw: obj,
         }
