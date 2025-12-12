@@ -164,59 +164,45 @@ export function applySubstitutionsToTimetable(
           const hasShortSub = !!sub.substituteTeacher && String(sub.substituteTeacher).trim().length > 0
           const hasFullSub = !!(sub as any).substituteTeacherFull && String((sub as any).substituteTeacherFull).trim().length > 0
 
-          if (hasShortSub || hasFullSub) {
+          // Preserve existing casual/substitute metadata unless the incoming
+          // substitution explicitly provides new substitute details. This
+          // prevents later room-only substitutions from wiping out casual
+          // display data (a common cause of casuals disappearing after swaps).
+          const existingCasual = (period as any).casualSurname
+          const existingIsSub = !!(period as any).isSubstitute
+
+          if (hasShortSub || hasFullSub || (sub as any).casualSurname) {
             period.isSubstitute = true
             const prev = period.teacher
-            // Preserve the original teacher so UI can show it for other days
             if (!(period as any).originalTeacher) (period as any).originalTeacher = prev
 
-            // If a short substitute identifier is provided, update the `teacher` field
             if (hasShortSub) {
               period.teacher = sub.substituteTeacher as string
             }
 
-            // Prefer an available full name for display
             if (hasFullSub) {
               (period as any).fullTeacher = String((sub as any).substituteTeacherFull)
               if (options?.debug) console.debug(`Applied substitute teacher (full name provided): ${prev} -> ${period.teacher || (period as any).fullTeacher} / ${ (period as any).fullTeacher } (day=${day} period=${period.period} subject=${period.subject})`)
             } else if (hasShortSub) {
-              // No full name provided; use the short substitute for display too
               (period as any).fullTeacher = String(sub.substituteTeacher)
               if (options?.debug) console.debug(`Applied substitute teacher (short name only): ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`, sub)
             }
 
-            // Preserve casualSurname separately when provided by the upstream data.
-            // If upstream provides both a casual token (e.g. initial) and a
-            // casualSurname, combine them so downstream UI can display the
-            // exact casual form (e.g. "M Finegan"). When a casual surname is
-            // provided we should prefer it for on-screen display even if a
-            // full name is not supplied; this prevents short placeholder codes
-            // from appearing after background refreshes.
             if ((sub as any).casualSurname) {
-              // Upstream often provides a short casual token (e.g. a 4-letter
-              // code) *and* a casualSurname (e.g. "V Likourezos"). For UI
-              // clarity we should prefer the casualSurname exactly as provided
-              // rather than prepending the casual token. Store the casual token
-              // separately if present and keep `casualSurname` clean.
               const casualToken = (sub as any).casual ? String((sub as any).casual).trim() : ''
               const surname = String((sub as any).casualSurname).trim()
               ;(period as any).casualToken = casualToken || undefined
               ;(period as any).casualSurname = surname
-              // Make the casual surname the authoritative displayed teacher
               period.teacher = surname
-              // Ensure UI treats this as a substitute/casual teacher so it
-              // is highlighted even when the `teacher` field was replaced
-              // with the casual surname by upstream data.
               period.isSubstitute = true
-            }
-
-            // If no casualSurname was provided but a full display name exists,
-            // prefer that for the displayed teacher value.
-            else if ((period as any).fullTeacher) {
+            } else if ((period as any).fullTeacher) {
               period.teacher = String((period as any).fullTeacher)
             }
 
             changed = true
+          } else if (existingIsSub && existingCasual) {
+            if (options?.debug) console.debug('[adapters] preserving existing casual for period', { day, period: period.period, subject: period.subject, casual: existingCasual })
+            // do not overwrite existing substitute fields
           }
 
           // Prefer explicit toRoom as the authoritative destination. Only
