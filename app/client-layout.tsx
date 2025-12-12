@@ -23,6 +23,14 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       .catch(err => console.debug('auth refresh error', err))
   }, [])
 
+  // Hydrate the React Query cache from our processed snapshot on mount
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      hydrateFromProcessedSnapshot()
+    } catch (e) {}
+  }, [])
+
   // Emergency unregister is disabled by default to avoid reload loops that
   // block navigation and user interactions. To enable temporarily set
   // `sessionStorage['synchron:do-emergency']= 'true'` from the console.
@@ -187,8 +195,6 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       <UserSettingsProvider>
         <ErrorBoundary>
           <QueryClientProviderWrapper>
-            {/* hydrate query cache from processed snapshot for fastest startup */}
-            {typeof window !== 'undefined' ? (hydrateFromProcessedSnapshot(), null) : null}
             <TimetableProvider>
             {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
             {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
@@ -196,7 +202,8 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
             <AppSidebar />
             <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
             <BottomNav />
-          </TimetableProvider>
+            </TimetableProvider>
+          </QueryClientProviderWrapper>
         </ErrorBoundary>
       </UserSettingsProvider>
     </ThemeProvider>
