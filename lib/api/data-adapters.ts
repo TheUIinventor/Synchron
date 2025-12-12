@@ -145,10 +145,13 @@ export function applySubstitutionsToTimetable(
         const subPeriodNorm = normalize(sub.period)
         const periodNorm = normalize(period.period)
 
-        const periodMatch = sub.period ? (subPeriodNorm === periodNorm || periodNorm.endsWith(subPeriodNorm) || subPeriodNorm.endsWith(periodNorm)) : true
+        // Strict matching: require exact normalized equality for period and subject
+        // when those fields are provided by the substitution. Avoid fuzzy
+        // contains-based heuristics which can produce incorrect global matches.
+        const periodMatch = sub.period ? (subPeriodNorm === periodNorm) : true
 
-        // Subject match: fuzzy contains or exact after normalization
-        const subjectMatch = sub.subject ? normalize(period.subject).includes(normalize(sub.subject)) || normalize(sub.subject).includes(normalize(period.subject)) : true
+        // Subject match: require exact normalized equality when provided.
+        const subjectMatch = sub.subject ? (normalize(period.subject) === normalize(sub.subject)) : true
 
         if (periodMatch && subjectMatch) {
           // Track whether we changed anything for debug output
