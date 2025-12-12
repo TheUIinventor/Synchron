@@ -268,7 +268,6 @@ export function applySubstitutionsToTimetable(
               }
             }
           }
-          }
 
           if (options?.debug && !changed) {
             console.debug(`Matched substitution but no field replacements: (day=${day} period=${period.period} subject=${period.subject})`, sub)
