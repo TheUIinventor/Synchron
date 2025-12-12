@@ -852,6 +852,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
+  const lastNormalizeHashRef = useRef<string | null>(null)
 
   // Aggressive background refresh tuning
   // NOTE: reduced intervals to make visible-refresh more responsive.
@@ -895,6 +896,64 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [lastUserSelectedAt, setLastUserSelectedAt] = useState<number | null>(null)
+
+  // Normalize substitute flags across any timetable maps we hold in state.
+  // This is a final catch-all to ensure UI highlight logic sees substitutes
+  // even if some setter path missed applying the substitutions flags.
+  useEffect(() => {
+    try {
+      const computeHash = (o: any) => {
+        try { return JSON.stringify(o) } catch (e) { return null }
+      }
+
+      const normalizeMap = (m: Record<string, Period[]> | null) => {
+        if (!m) return m
+        const out: Record<string, Period[]> = {}
+        for (const d of Object.keys(m)) {
+          out[d] = (m[d] || []).map((p) => {
+            try {
+              const copy: any = { ...(p as any) }
+              // If casualSurname present, ensure substitute flag
+              if (copy.casualSurname) copy.isSubstitute = true
+              // Compute displayTeacher if missing
+              if (!copy.displayTeacher) {
+                try {
+                  const casual = copy.casualSurname || undefined
+                  const candidate = copy.fullTeacher || copy.teacher || undefined
+                  copy.displayTeacher = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                } catch (e) {}
+              }
+              // If displayTeacher differs from teacher after stripping casual code, mark substitute
+              try {
+                const cleanedDisp = stripLeadingCasualCode(String(copy.displayTeacher || ''))
+                const cleanedTeach = stripLeadingCasualCode(String(copy.teacher || ''))
+                if (cleanedDisp && cleanedTeach && cleanedDisp !== cleanedTeach) copy.isSubstitute = true
+              } catch (e) {}
+              return copy
+            } catch (e) { return p }
+          })
+        }
+        return out
+      }
+
+      // Build a combined object to hash so we only update when something really changed
+      const combined = {
+        et: externalTimetable || null,
+        etbw: externalTimetableByWeek || null,
+      }
+      const h = computeHash(combined)
+      if (h && lastNormalizeHashRef.current === h) return
+      lastNormalizeHashRef.current = h
+
+      // Apply normalization only when needed
+      try {
+        const normEt = normalizeMap(externalTimetable)
+        const normEtBw = enforceIncomingDestinationsByWeek(externalTimetableByWeek)
+        if (normEt && JSON.stringify(normEt) !== JSON.stringify(externalTimetable)) setExternalTimetable(normEt)
+        if (normEtBw && JSON.stringify(normEtBw) !== JSON.stringify(externalTimetableByWeek)) safeSetExternalTimetableByWeek(externalWeekType, normEtBw, 'post-normalize')
+      } catch (e) {}
+    } catch (e) {}
+  }, [externalTimetable, externalTimetableByWeek, externalWeekType])
 
   // Start a simple mount->ready timer so we can measure app load time
   useEffect(() => {
