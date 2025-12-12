@@ -196,6 +196,30 @@ export async function GET(req: NextRequest) {
       dayRes = dr; fullRes = fr; bellsRes = br
     }
 
+    // If a specific date was requested, and the host returned a day-specific
+    // JSON (`daytimetable.json`), prefer returning that payload directly so
+    // clients that requested `/api/timetable?date=YYYY-MM-DD` receive the
+    // authoritative per-day JSON rather than the aggregated full timetable.
+    if (dateParam) {
+      try {
+        if (dayRes && (dayRes as any).json) {
+          const dj = (dayRes as any).json
+          // Build bell schedules so clients can insert breaks consistently
+          const { schedules: _schedules, sources: _sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
+          const maybeBellSchedules = (_schedules && (Object.values(_schedules).some((a: any) => Array.isArray(a) && a.length))) ? _schedules : undefined
+          const maybeBellSources = (_sources && (Object.values(_sources).some((a: any) => a !== 'empty'))) ? _sources : undefined
+          // Preserve upstream shape but attach helpful metadata used by the provider
+          const out = Object.assign({}, dj)
+          if (!out.source) out.source = 'sbhs-api-day'
+          if (maybeBellSchedules) out.bellTimes = maybeBellSchedules
+          if (maybeBellSources) out.bellTimesSources = maybeBellSources
+          return NextResponse.json(out)
+        }
+      } catch (e) {
+        // fallthrough to aggregated handling
+      }
+    }
+
     const responses = [dayRes, fullRes, bellsRes]
     // Helper: attempt to build normalized bellSchedules from any available
     // response JSON (bells.json, day.bells inside day/full responses, etc.)
