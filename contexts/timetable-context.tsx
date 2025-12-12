@@ -2119,6 +2119,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
+              // If the payload explicitly reports a week type, set it first
+              // so downstream rendering logic that prefers `timetableByWeek`
+              // can compute using the correct `currentWeek` immediately
+              // (prevents a transient render with the wrong week selection).
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
               // Persist the processed result keyed by payload-hash so future
@@ -2161,10 +2169,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setLastFetchedPayloadSummary(summary)
               } catch (e) {}
               setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
-              }
+              // (weekType already set above if present)
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -2307,6 +2312,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
 
           if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
+            // If the payload reports a week type, set it immediately so that
+            // any `timetableByWeek` application happens with the correct
+            // `currentWeek` value and avoids temporary incorrect renders.
+            if (j.weekType === 'A' || j.weekType === 'B') {
+              setExternalWeekType(j.weekType)
+              setCurrentWeek(j.weekType)
+            }
             if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
             if (j.bellTimes || j.upstream) {
               try {
