@@ -792,14 +792,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             }
 
-            // Defensive: clear any pre-existing `isRoomChange` flag if there
-            // was no explicit destination provided on the incoming period.
-            // This avoids showing stale highlights from persisted objects.
+            // Defensive: clear any stale `isRoomChange` flag only when there
+            // was no explicit destination provided on the incoming period
+            // and there is no `displayRoom` already present. We must not
+            // remove a `displayRoom` that was applied earlier by
+            // `applySubstitutionsToTimetable` or other normalization logic.
             if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom && !(p as any).to) {
-              if ((p as any).isRoomChange || (p as any).displayRoom) {
+              // If a `displayRoom` is present, assume it is intentional and
+              // preserve it. Only remove the stale `isRoomChange` flag when
+              // there is no display override to show.
+              if ((p as any).isRoomChange && !(p as any).displayRoom) {
                 const clean = { ...p }
                 delete (clean as any).isRoomChange
-                delete (clean as any).displayRoom
                 // Also ensure we compute a normalized displayTeacher for the UI
                 try {
                   const casual = (clean as any).casualSurname || undefined
