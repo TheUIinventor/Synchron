@@ -213,23 +213,6 @@ const computePayloadHash = (input: any) => {
   }
 }
 
-// Return an ISO date string for the local date (YYYY-MM-DD) rather than
-// using toISOString which converts to UTC and can produce the previous day
-// for users east of UTC. Use this for date-based fetches and diagnostics.
-const toLocalIsoDate = (d: Date) => {
-  try {
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${dd}`
-  } catch (e) { return (new Date()).toISOString().slice(0,10) }
-}
-
-// Lightweight debug helper for provider state changes
-const providerDebug = (...args: any[]) => {
-  try { console.debug('[timetable.provider.debug]', ...args) } catch (e) {}
-}
-
 // Try to parse a fetch Response for bell times and apply them to state.
 const extractBellTimesFromResponse = async (res: Response | null) => {
   if (!res) return
@@ -532,13 +515,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { return __initialParsedCache?.source ?? null } catch (e) { return null }
   })()
   const __initialWeekType = ((): "A" | "B" | null => {
-    try {
-      // Do not trust persisted weekType on initial load to avoid showing
-      // stale A/B information before an authoritative date-specific
-      // payload arrives. We'll let the refresh/fetch-for-date logic set
-      // the externalWeekType when the server confirms it.
-      return null
-    } catch (e) { return null }
+    try { const src = __initialProcessedCache || __initialParsedCache; const w = src?.weekType; return (w === 'A' || w === 'B') ? w : null } catch (e) { return null }
   })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
@@ -668,15 +645,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Debug: record last fetched date and a small payload summary for diagnostics
   const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null)
   const [lastFetchedPayloadSummary, setLastFetchedPayloadSummary] = useState<any | null>(null)
-  // Date-specific authoritative fetch state: when we fetch `/api/timetable?date=YYYY-MM-DD`
-  // we store the processed per-day timetable and any weekType returned by the
-  // server so the UI can prefer the date-specific payload over the grouped
-  // `timetableByWeek` mapping (prevents showing the wrong A/B week for a
-  // requested calendar date).
-  const [selectedDateTimetable, setSelectedDateTimetable] = useState<Record<string, Period[]> | null>(null)
-  const [selectedDateTimetableByWeek, setSelectedDateTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(null)
-  const [selectedDateWeekType, setSelectedDateWeekType] = useState<"A" | "B" | null>(null)
-  const [selectedDateFetchedIso, setSelectedDateFetchedIso] = useState<string | null>(null)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
@@ -762,35 +730,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 
-    // Prefer the live external timetable when available. Do NOT fall back
-    // to the cached `lastRecordedTimetable` for the main rendered timetable
-    // because cached data can contain stale week-type information which
-    // causes incorrect flashes. We'll only use the cached value for
-    // background merges, not for primary rendering.
-    let useExternalTimetable = externalTimetable
-    let useExternalTimetableByWeek = externalTimetableByWeek
-    // If we have an authoritative date-specific timetable for the
-    // currently-selected date, prefer it over grouped by-week mappings.
-    try {
-      const selIso = selectedDateFetchedIso
-      const curIso = toLocalIsoDate((selectedDateObject || new Date()))
-      if (selIso && selectedDateTimetable && selIso === curIso) {
-        useExternalTimetable = selectedDateTimetable
-        useExternalTimetableByWeek = selectedDateTimetableByWeek || useExternalTimetableByWeek
-      }
-    } catch (e) {}
+    // Prefer the live external timetable when available. The cached
+    // `lastRecordedTimetable` is only a fallback for fast initial rendering
+    // and should not be used when a fresh `externalTimetable` exists so
+    // that live updates (e.g. substitute/casual teachers) are searchable
+    // and visible immediately.
+    const useExternalTimetable = externalTimetable ?? lastRecordedTimetable
+    const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
     const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
-
-    // If we do not have any authoritative external timetable (neither
-    // a per-day map nor a grouped by-week map), avoid returning the
-    // bundled sample week which may show an incorrect A/B week. Return
-    // an empty timetable map until the provider has authoritative data
-    // (this prevents flashing the wrong week on initial load).
-    if (!useExternalTimetable && !useExternalTimetableByWeek) {
-      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-    }
 
     // Cleanup helper: remove roll-call entries and orphaned period '0' placeholders
     const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
@@ -1842,13 +1791,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore
               }
-              providerDebug('homepage: no timetable -> external-empty', { jht })
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
-              providerDebug('clearing externalWeekType (homepage no-timetable)')
               setExternalWeekType(null)
-                try { setLastFetchedDate(toLocalIsoDate(new Date())); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
+              try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
               try { setIsRefreshing(false) } catch (e) {}
               if (!hadCache) try { setIsLoading(false) } catch (e) {}
               return
@@ -1886,11 +1833,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
                     } catch (e) {}
-                    providerDebug('using processed cache', { key: `synchron-processed-${_payloadHash}`, parsedCacheSummary: { weekType: parsedCache.weekType, source: parsedCache.source } })
-                    // Apply the cached timetable and bellTimes for faster hydrate,
-                    // but DO NOT apply the cached weekType to `externalWeekType`
-                    // or `currentWeek` because cached weekType can be stale and
-                    // cause the UI to show the wrong A/B week on initial load.
                     setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
@@ -1899,7 +1841,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       lastSeenBellTsRef.current = parsedCache.savedAt || Date.now()
                     }
                     setTimetableSource(parsedCache.source || 'external-cache')
-                    try { setLastFetchedDate(toLocalIsoDate(new Date())); setLastFetchedPayloadSummary({ cached: true }) } catch (e) {}
+                    if (parsedCache.weekType === 'A' || parsedCache.weekType === 'B') {
+                      setExternalWeekType(parsedCache.weekType)
+                      setCurrentWeek(parsedCache.weekType)
+                    }
+                    try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ cached: true }) } catch (e) {}
                     try { setIsRefreshing(false) } catch (e) {}
                     // Only clear the global loading flag if we previously set it
                     // because there was no cache. Otherwise keep showing the
@@ -1946,7 +1892,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               try {
-                setLastFetchedDate(toLocalIsoDate(new Date()))
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
               } catch (e) {}
               return
@@ -2057,7 +2003,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
-              providerDebug('received /api/timetable payload (general)', { weekType: j.weekType, source: j.source })
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
               // Persist the processed result keyed by payload-hash so future
@@ -2096,15 +2041,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
                     : null,
                 }
-                setLastFetchedDate(toLocalIsoDate(new Date()))
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary(summary)
               } catch (e) {}
-                    setTimetableSource(j.source ?? 'external')
-                    if (j.weekType === 'A' || j.weekType === 'B') {
-                      providerDebug('setting externalWeekType & currentWeek from payload', j.weekType)
-                      setExternalWeekType(j.weekType)
-                      setCurrentWeek(j.weekType)
-                    }
+              setTimetableSource(j.source ?? 'external')
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -2239,7 +2183,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               try {
-                setLastFetchedDate(toLocalIsoDate(new Date()))
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
               } catch (e) {}
             }
@@ -2282,11 +2226,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
             }
-              try {
-                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-                const summary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
-                setLastFetchedDate(toLocalIsoDate(new Date()))
-              setLastFetchedDate(toLocalIsoDate(new Date()))
+            try {
+              const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+              const summary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
+              setLastFetchedDate((new Date()).toISOString().slice(0,10))
               setLastFetchedPayloadSummary(summary)
             } catch (e) {}
             return
@@ -2376,7 +2319,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Function to update all relevant time-based states
   const updateAllTimeStates = useCallback(() => {
-    const currentSelectedIso = toLocalIsoDate((selectedDateObject || new Date()))
+    const currentSelectedIso = (selectedDateObject || new Date()).toISOString().slice(0,10)
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     const now = new Date()
 
@@ -2404,7 +2347,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     if (!shouldRespectUser) {
       const targetDayName = mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName
-      const targetIso = toLocalIsoDate(dayForMainTimetable)
+      const targetIso = dayForMainTimetable.toISOString().slice(0,10)
       // Only update if the selected date actually changed to avoid triggering
       // repeated fetches every tick when the date is identical.
       if (targetIso !== currentSelectedIso) {
@@ -2528,15 +2471,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     const fetchForDate = async () => {
       try {
-        // Clear any previously-stored date-specific payload while we fetch
-        // the authoritative data for the newly-selected date.
-        try {
-          setSelectedDateTimetable(null)
-          setSelectedDateTimetableByWeek(null)
-          setSelectedDateFetchedIso(null)
-          setSelectedDateWeekType(null)
-        } catch (e) {}
-        const ds = toLocalIsoDate((selectedDateObject || new Date()))
+        const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
         // If we've just requested this same date, skip duplicate fetch
         if (lastRequestedDateRef.current === ds) return
         lastRequestedDateRef.current = ds
@@ -2570,22 +2505,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore
               }
-              providerDebug('date-fetch: payload indicates no timetable for selected date', { j })
-              // Persist the authoritative empty timetable for this date so the UI
-              // will not fall back to a grouped-week view for the selected date.
-              setSelectedDateTimetable(emptyByDay)
-              setSelectedDateTimetableByWeek(null)
-              setSelectedDateFetchedIso(ds)
-              setSelectedDateWeekType(null)
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
-              providerDebug('clearing externalWeekType for selected-date no-timetable')
               setExternalWeekType(null)
-              providerDebug('clearing currentWeek for selected-date no-timetable')
               setCurrentWeek(null)
               try {
-                setLastFetchedDate(toLocalIsoDate(new Date()))
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
               } catch (e) {}
             }
@@ -2660,74 +2586,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore substitution extraction/apply errors
             }
 
-            // Normalize final timetables: ensure any explicit destination
-            // room fields are mapped into `displayRoom`/`isRoomChange` and
-            // compute a `displayTeacher` for UI consistency. This is defensive
-            // and ensures room-variations survive the processing path.
-            try {
-              const normalizeMap = (m: Record<string, Period[]> | null) => {
-                if (!m) return m
-                const out: Record<string, Period[]> = {}
-                for (const day of Object.keys(m)) {
-                  try {
-                    out[day] = (m[day] || []).map((p) => {
-                      const item: any = { ...(p as any) }
-                      try {
-                        const candidate = (item as any).toRoom || (item as any).roomTo || (item as any)['room_to'] || (item as any).newRoom || (item as any).to || undefined
-                        if (candidate && String(candidate).trim()) {
-                          const candStr = String(candidate).trim()
-                          const roomStr = String(item.room || '').trim()
-                          if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                            item.displayRoom = candStr
-                            item.isRoomChange = true
-                          }
-                        }
-                      } catch (e) {}
-                      try {
-                        const casual = (item as any).casualSurname || undefined
-                        const candidate = (item as any).fullTeacher || (item as any).teacher || undefined
-                        const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                        ;(item as any).displayTeacher = dt
-                      } catch (e) {}
-                      return item
-                    })
-                  } catch (e) {
-                    out[day] = m[day] || []
-                  }
-                }
-                return out
-              }
-
-              const cleanedFinalTimetable = normalizeMap(finalTimetable as any)
-              const cleanedFinalByWeek = finalByWeek ? ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> => {
-                const out: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
-                for (const d of Object.keys(finalByWeek)) {
-                  try {
-                    const groups = finalByWeek[d]
-                    out[d] = {
-                      A: normalizeMap({ [d]: groups.A })[d] || [],
-                      B: normalizeMap({ [d]: groups.B })[d] || [],
-                      unknown: normalizeMap({ [d]: groups.unknown })[d] || [],
-                    }
-                  } catch (e) {
-                    out[d] = { A: groups?.A || [], B: groups?.B || [], unknown: groups?.unknown || [] } as any
-                  }
-                }
-                return out
-              })() : null
-
-              setSelectedDateTimetable(cleanedFinalTimetable)
-              setSelectedDateTimetableByWeek(cleanedFinalByWeek || null)
-              setSelectedDateFetchedIso(ds)
-              setSelectedDateWeekType(j.weekType === 'A' || j.weekType === 'B' ? j.weekType : null)
-              // Replace the raw objects used for rendering too so the UI sees
-              // the normalized fields immediately.
-              finalTimetable = cleanedFinalTimetable as any
-              finalByWeek = cleanedFinalByWeek
-            } catch (e) {}
-
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-            setExternalTimetable(finalTimetable)
+              setExternalTimetable(finalTimetable)
             setTimetableSource(j.source ?? 'external')
             // record debug summary
             try {
@@ -2738,7 +2598,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   ? { A: finalByWeek[dayName].A?.length || 0, B: finalByWeek[dayName].B?.length || 0, unknown: finalByWeek[dayName].unknown?.length || 0 }
                   : null,
               }
-              setLastFetchedDate(toLocalIsoDate(new Date()))
+              setLastFetchedDate((new Date()).toISOString().slice(0,10))
               setLastFetchedPayloadSummary(summary)
             } catch (e) {}
             if (j.bellTimes) setExternalBellTimes(j.bellTimes)
@@ -2765,7 +2625,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Keep currentWeek synchronized with the server-provided externalWeekType
   useEffect(() => {
     if (externalWeekType && currentWeek !== externalWeekType) {
-      providerDebug('syncing currentWeek to externalWeekType', externalWeekType)
+      try { console.log('[timetable.provider] syncing currentWeek to externalWeekType', externalWeekType) } catch (e) {}
       setCurrentWeek(externalWeekType)
     }
   }, [externalWeekType, currentWeek])

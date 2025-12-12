@@ -43,19 +43,15 @@ export default function TimetablePage() {
     return () => window.removeEventListener('resize', detect)
   }, [])
 
-  const [showDiag, setShowDiag] = useState(true)
+  const [showDiag, setShowDiag] = useState(false)
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
-
-  const toLocalIsoDate = (d: Date) => {
-    try { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` } catch (e) { return (new Date()).toISOString().slice(0,10) }
-  }
 
   const fetchDiagnostics = async () => {
     setShowDiag(true)
     setDiagLoading(true)
     try {
-      const ds = toLocalIsoDate((selectedDateObject || new Date()))
+      const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
       const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
       const ctype = res.headers.get('content-type') || ''
       let payload: any
@@ -185,21 +181,20 @@ export default function TimetablePage() {
   const isSubstitutePeriod = (p: any) => {
     try {
       if (!p) return false
-      // Only treat a period as a casual/substitute when there's an explicit
-      // casual marker or a deliberate substitution was applied that includes
-      // a casual/full display name. Avoid heuristics that mark every change
-      // of short code -> name as a substitute to prevent over-highlighting.
-      const casualSurname = String((p as any).casualSurname || '').trim()
-      const casualToken = String((p as any).casual || '').trim()
-      const hasFullSub = Boolean((p as any).fullTeacher || (p as any).substituteTeacherFull)
-      const explicitSub = Boolean(p.isSubstitute)
-
-      // Highlight when the upstream/substitution clearly provided a casual
-      // surname or token, or when a substitution was applied and a full
-      // display name exists for presentation.
-      if (casualSurname || casualToken) return true
-      if (explicitSub && hasFullSub) return true
-      return false
+      const orig = String((p as any).originalTeacher || '').trim()
+      const teacher = String(p.teacher || '').trim()
+      const full = String((p as any).fullTeacher || '').trim()
+      const disp = String((p as any).displayTeacher || '').trim()
+      const changedTeacher = orig && orig !== teacher
+      try {
+        const cleanedFull = stripLeadingCasualCode(full || disp || '')
+        const cleanedRaw = stripLeadingCasualCode(teacher || '')
+        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
+      } catch (e) {}
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
+      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
+      if (rawIsCode && dispLooksName) return true
+      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 
@@ -312,19 +307,6 @@ export default function TimetablePage() {
           <div className="w-6 hidden md:block" />
           <div className="w-6 hidden md:block"></div>
         </div>
-        {/* Temporary debug overlay to help diagnose week selection/render order */}
-        {showDiag && (
-          <div className="fixed top-4 right-4 z-50 bg-white/90 text-xs text-on-surface border rounded p-2 shadow">
-            <div className="font-mono text-[11px]">week: <strong>{String(externalWeekType ?? currentWeek ?? 'null')}</strong></div>
-            <div className="font-mono text-[11px]">source: <span className="truncate block max-w-[220px]">{String(timetableSource ?? 'null')}</span></div>
-            <div className="font-mono text-[11px]">selected: <span className="truncate block max-w-[220px]">{toLocalIsoDate((selectedDateObject || new Date()))}</span></div>
-            <div className="mt-1 flex gap-1">
-              <button className="px-2 py-0.5 rounded bg-neutral-100 text-xs" onClick={() => { setShowDiag(false) }}>Hide</button>
-              <button className="px-2 py-0.5 rounded bg-neutral-100 text-xs" onClick={() => { void fetchDiagnostics() }}>Fetch</button>
-            </div>
-          </div>
-        )}
-
         {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
         {timetableSource === 'fallback-sample' && (
           <div className="w-full mb-6">
@@ -549,19 +531,7 @@ export default function TimetablePage() {
                                         <span className="text-sm text-on-surface-variant truncate max-w-[140px]">{shown}</span>
                                       )
                                     })()}
-                                    {(() => {
-                                      const room = getDisplayRoom(period)
-                                      if ((period as any).isRoomChange && room) {
-                                        return (
-                                          <span className="inline-block bg-emerald-600 text-white text-sm font-medium px-3 py-1 rounded-full truncate max-w-[120px]">
-                                            {room}
-                                          </span>
-                                        )
-                                      }
-                                      return (
-                                        <span className="text-sm font-semibold text-on-surface-variant truncate max-w-[72px]">{room}</span>
-                                      )
-                                    })()}
+                                    <span className="text-sm font-semibold text-on-surface-variant truncate max-w-[72px]">{getDisplayRoom(period)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -665,17 +635,7 @@ export default function TimetablePage() {
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className="text-xs hidden md:block">
-                                          {(() => {
-                                            const room = getDisplayRoom(period)
-                                            if ((period as any).isRoomChange && room) {
-                                              return (
-                                                <span className="inline-block bg-emerald-600 text-white text-xs font-medium px-2 py-1 rounded-full truncate max-w-[120px]">{room}</span>
-                                              )
-                                            }
-                                            return <div className="text-xs text-on-surface-variant">{room}</div>
-                                          })()}
-                                        </div>
+                                        <div className="text-xs text-on-surface-variant hidden md:block">{getDisplayRoom(period)}</div>
                                         <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>

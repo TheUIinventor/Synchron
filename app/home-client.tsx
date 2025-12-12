@@ -236,32 +236,30 @@ export default function HomeClient() {
   const isSubstitutePeriod = (p: any) => {
     try {
       if (!p) return false
-      // Explicit casual marker (preferred) — highlight these always.
-      if ((p as any).casualSurname || (p as any).casual) return true
+      const orig = String((p as any).originalTeacher || '').trim()
+      const teacher = String(p.teacher || '').trim()
+      const full = String((p as any).fullTeacher || '').trim()
+      const disp = String((p as any).displayTeacher || '').trim()
+      const changedTeacher = orig && orig !== teacher
+      // If display or full name is present and differs from the raw teacher
+      // (after stripping casual codes), treat as a substitute.
+      try {
+        const cleanedFull = stripLeadingCasualCode(full || disp || '')
+        const cleanedRaw = stripLeadingCasualCode(teacher || '')
+        // Only treat a cleaned mismatch as a substitute when we already
+        // have an indicator that substitution is possible (original teacher
+        // changed, casual surname present, or already-marked substitute).
+        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
+      } catch (e) {}
 
-      // If upstream explicitly marks this as a substitute, be stricter:
-      // only highlight when the displayed/full teacher looks meaningfully
-      // different to the raw teacher code/name (to avoid false positives).
-      if (p.isSubstitute) {
-        try {
-          const raw = stripLeadingCasualCode(String(p.teacher || '').trim())
-          const full = stripLeadingCasualCode(String((p as any).fullTeacher || p.displayTeacher || '').trim())
-          if (raw && full && raw !== full) return true
-        } catch (e) {
-          // fall through to additional heuristics below
-        }
-      }
-
-      // Heuristic: if the raw teacher is a short ALL-CAPS code but the
-      // displayed teacher looks like a human name, treat as substitute.
-      const teacherRaw = String(p.teacher || '').trim()
-      const rawIsCode = /^[A-Z]{1,4}$/.test(teacherRaw)
-      const disp = String(p.displayTeacher || '').trim()
+      // If the raw teacher looks like a short ALL-CAPS code but displayTeacher
+      // is a proper name, treat as substitute (covers cases like "LIKV V ...").
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
       const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
       if (rawIsCode && dispLooksName) return true
 
-      return false
-    } catch (e) { return false }
+      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
+    } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 
   // Format a concise remaining label to show on the right-hand side of the bar
