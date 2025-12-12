@@ -5,6 +5,8 @@ const PORTAL_BASE = 'https://student.sbhs.net.au'
 const API_BASE = 'https://api.sbhs.net.au'
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url)
+    const forceApi = (url.searchParams.get('source') || url.searchParams.get('force') || '').toLowerCase() === 'api'
     const rawCookie = req.headers.get('cookie') || ''
     // If the app has a stored sbhs_access_token (set by our auth callback), forward it as a Bearer token.
     // This is necessary because browser cookies for student.sbhs.net.au are not available to the server proxy.
@@ -23,9 +25,10 @@ export async function GET(req: Request) {
     if (rawCookie) headers['Cookie'] = rawCookie
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
-    // Try API host first when we have a bearer token (API may accept token where portal web pages require session cookies)
+    // Try API host first when we have a bearer token or the caller requested the API explicitly.
+    // (Some environments may accept unauthenticated API reads; requesters can force API via ?source=api.)
     const jsonPaths = ['/api/timetable/timetable.json', '/api/timetable/daytimetable.json']
-    if (accessToken) {
+    if (accessToken || forceApi) {
       for (const p of jsonPaths) {
         try {
           const res = await fetch(`${API_BASE}${p}`, { headers, redirect: 'follow' })
