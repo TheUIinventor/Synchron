@@ -236,23 +236,11 @@ export default function HomeClient() {
   const isSubstitutePeriod = (p: any) => {
     try {
       if (!p) return false
-      const teacher = String(p.teacher || '').trim()
-      const full = String((p as any).fullTeacher || '').trim()
-      const disp = String((p as any).displayTeacher || full || '').trim()
-      const hasCasual = Boolean((p as any).casualSurname)
-
-      // Explicit substitute or casual surname -> highlight
-      if (p.isSubstitute || hasCasual) return true
-
-      // If the raw teacher looks like a short ALL-CAPS code but displayTeacher
-      // is a proper name, treat as substitute (covers cases like "LIKV V ...").
-      // Require that the display value looks like a name and is meaningfully
-      // different from the raw code to avoid false positives.
-      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
-      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
-      if (rawIsCode && dispLooksName && disp.toLowerCase() !== teacher.toLowerCase()) return true
-
-      return false
+      // Only treat a period as a substitute-highlight when there is an
+      // explicit casual marker. Avoid inferring substitutes from other
+      // differences to prevent false positives on the Home summary.
+      const hasCasual = Boolean((p as any).casualSurname || (p as any).casual)
+      return hasCasual
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 
