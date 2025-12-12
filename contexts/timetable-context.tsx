@@ -213,6 +213,49 @@ const computePayloadHash = (input: any) => {
   }
 }
 
+// Merge new timetable map with a previously-seen map preserving any
+// non-destructive UI overrides (e.g. `displayRoom`, `isRoomChange`,
+// `isSubstitute`, `displayTeacher`) that may have been applied earlier.
+const mergePreserveOverrides = (newMap: Record<string, Period[]> | null, prevMap: Record<string, Period[]> | null) => {
+  try {
+    if (!newMap) return newMap
+    if (!prevMap) return newMap
+    const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+    const result: Record<string, Period[]> = {}
+    for (const day of Object.keys(newMap)) {
+      const srcArr = Array.isArray(newMap[day]) ? newMap[day].map((p) => ({ ...(p as any) })) : []
+      const prevArr = Array.isArray(prevMap[day]) ? prevMap[day] : []
+      for (const p of srcArr) {
+        try {
+          const pPer = norm((p as any).period)
+          const pSub = norm((p as any).subject)
+          if ((! (p as any).displayRoom || String((p as any).displayRoom || '').trim() === '') && prevArr && prevArr.length) {
+            const match = prevArr.find((q: any) => norm(q.period) === pPer && norm(q.subject) === pSub)
+            if (match) {
+              if (match.displayRoom && !(p as any).displayRoom) {
+                (p as any).displayRoom = match.displayRoom
+                (p as any).isRoomChange = (p as any).isRoomChange || match.isRoomChange || false
+              }
+              if (match.isSubstitute && !(p as any).isSubstitute) {
+                (p as any).isSubstitute = true
+              }
+              if (match.displayTeacher && !(p as any).displayTeacher) {
+                (p as any).displayTeacher = match.displayTeacher
+              }
+            }
+          }
+        } catch (e) {
+          // ignore per-item merge errors
+        }
+      }
+      result[day] = srcArr
+    }
+    return result
+  } catch (e) {
+    return newMap
+  }
+}
+
 // Try to parse a fetch Response for bell times and apply them to state.
 const extractBellTimesFromResponse = async (res: Response | null) => {
   if (!res) return
@@ -1749,8 +1792,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalWeekType(null)
             return
           }
-          if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-            setExternalTimetable(jht.timetable)
+            if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
+            setExternalTimetable(mergePreserveOverrides(jht.timetable, lastRecordedTimetable))
             setTimetableSource(jht.source ?? 'external-homepage')
             if (jht.weekType === 'A' || jht.weekType === 'B') {
               setExternalWeekType(jht.weekType)
@@ -1764,7 +1807,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const parsedHt = parseTimetableHtmlLocal(html)
         const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
         if (hasHt) {
-          setExternalTimetable(parsedHt)
+          setExternalTimetable(mergePreserveOverrides(parsedHt, lastRecordedTimetable))
           setTimetableSource('external-homepage')
           return
         }
@@ -1936,7 +1979,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
                     } catch (e) {}
-                    setExternalTimetable(parsedCache.timetable)
+                    setExternalTimetable(mergePreserveOverrides(parsedCache.timetable, lastRecordedTimetable))
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
@@ -2128,7 +2171,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setCurrentWeek(j.weekType)
               }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-              setExternalTimetable(finalTimetable)
+              setExternalTimetable(mergePreserveOverrides(finalTimetable, lastRecordedTimetable))
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
               try {
@@ -2202,7 +2245,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
-              setExternalTimetable(byDay)
+              setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
               // Also persist processed result for array-shaped payloads
               try {
                 if (_payloadHash && typeof window !== 'undefined') {
@@ -2238,7 +2281,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const parsed = parseTimetableHtmlLocal(text)
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
           if (hasData) {
-              setExternalTimetable(parsed)
+              setExternalTimetable(mergePreserveOverrides(parsed, lastRecordedTimetable))
             setTimetableSource('external-scraped')
             return
           }
@@ -2348,7 +2391,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               }
             }
-            setExternalTimetable(j.timetable)
+            setExternalTimetable(mergePreserveOverrides(j.timetable, lastRecordedTimetable))
             setTimetableSource(j.source ?? 'external')
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
@@ -2370,7 +2413,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!byDay[day]) byDay[day] = []
               byDay[day].push(p)
             }
-            setExternalTimetable(byDay)
+            setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
             setTimetableSource(j.source ?? 'external')
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
@@ -2383,8 +2426,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const text = await r2.text()
           const parsed = parseTimetableHtmlLocal(text)
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
-          if (hasData) {
-            setExternalTimetable(parsed)
+            if (hasData) {
+            setExternalTimetable(mergePreserveOverrides(parsed, lastRecordedTimetable))
             setTimetableSource('external-scraped')
             return
           }
@@ -2725,7 +2768,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-              setExternalTimetable(finalTimetable)
+              setExternalTimetable(mergePreserveOverrides(finalTimetable, lastRecordedTimetable))
             setTimetableSource(j.source ?? 'external')
             // record debug summary
             try {
