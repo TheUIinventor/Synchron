@@ -14,8 +14,8 @@ function normalizeVariation(obj: any) {
     casual: obj.casual || undefined,
     casualSurname: obj.casualSurname || undefined,
     substituteTeacherFull: obj.casualSurname ? (obj.casual ? `${obj.casual} ${obj.casualSurname}` : obj.casualSurname) : (obj.substituteFullName || obj.substituteFull || undefined),
-    fromRoom: obj.fromRoom || obj.from || obj.oldRoom || obj.roomFrom || obj.room_from || undefined,
-    toRoom: obj.toRoom || obj.to || obj.room || obj.newRoom || obj.roomTo || obj.room_to || undefined,
+    fromRoom: obj.fromRoom || obj.from || obj.oldRoom || undefined,
+    toRoom: obj.toRoom || obj.to || obj.room || obj.newRoom || undefined,
     reason: obj.reason || obj.note || obj.comment || undefined,
     raw: obj,
   }
@@ -31,23 +31,10 @@ function collectFromJson(data: any) {
 
   if (Array.isArray(data.variations)) push(data.variations)
   if (Array.isArray(data.classVariations)) push(data.classVariations)
-  // handle object maps like { "3": { ... }, "RC": { ... } }
-  if (data.roomVariations && typeof data.roomVariations === 'object') {
-    if (Array.isArray(data.roomVariations)) push(data.roomVariations)
-    else Object.values(data.roomVariations).forEach((v: any) => push(v))
-  }
-  if (data.classVariations && typeof data.classVariations === 'object') {
-    if (Array.isArray(data.classVariations)) push(data.classVariations)
-    else Object.values(data.classVariations).forEach((v: any) => push(v))
-  }
   if (Array.isArray(data.days)) {
     data.days.forEach((d: any) => {
       if (Array.isArray(d.variations)) push(d.variations)
       if (Array.isArray(d.classVariations)) push(d.classVariations)
-      if (d.roomVariations && typeof d.roomVariations === 'object') {
-        if (Array.isArray(d.roomVariations)) push(d.roomVariations)
-        else Object.values(d.roomVariations).forEach((v: any) => push(v))
-      }
     })
   }
   if (data.timetable && Array.isArray(data.timetable.variations)) push(data.timetable.variations)
@@ -57,12 +44,6 @@ function collectFromJson(data: any) {
     if (!obj || typeof obj !== 'object') return
     for (const k of Object.keys(obj)) {
       const v = obj[k]
-      // if we find keys that indicate a variations map, iterate its values
-      if (k.toLowerCase().includes('roomvariation') || k.toLowerCase().includes('classvariation')) {
-        if (Array.isArray(v)) push(v)
-        else if (typeof v === 'object') Object.values(v).forEach((x: any) => push(x))
-        continue
-      }
       if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') {
         const keys = Object.keys(v[0]).join('|').toLowerCase()
         if (keys.includes('substitute') || keys.includes('variation') || keys.includes('room') || keys.includes('teacher')) push(v)
