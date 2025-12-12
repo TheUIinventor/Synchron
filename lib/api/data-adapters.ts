@@ -110,6 +110,11 @@ export function applySubstitutionsToTimetable(
 
   substitutions.forEach((sub) => {
     if (!sub) return
+    // Skip ambiguous substitutions that provide neither a period nor a subject.
+    // These tended to match everything (periodMatch defaulted to `true`),
+    // causing displayRoom to be applied to unrelated periods. Require at
+    // least one identifying field so we don't accidentally overwrite rooms.
+    if (!sub.period && !sub.subject) return
     // If date is present, try to map to day name; otherwise apply across all days
     const candidateDays = (() => {
       if (sub.date) {
