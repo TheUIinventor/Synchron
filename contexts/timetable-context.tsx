@@ -230,7 +230,17 @@ const mergePreserveOverrides = (newMap: Record<string, Period[]> | null, prevMap
           const pPer = norm((p as any).period)
           const pSub = norm((p as any).subject)
           if ((! (p as any).displayRoom || String((p as any).displayRoom || '').trim() === '') && prevArr && prevArr.length) {
-            const match = prevArr.find((q: any) => norm(q.period) === pPer && norm(q.subject) === pSub)
+            const match = prevArr.find((q: any) => {
+              try {
+                // Require same weekType when either side has a weekType.
+                const qWeek = (q && q.weekType) ? String(q.weekType) : ''
+                const pWeek = (p && (p as any).weekType) ? String((p as any).weekType) : ''
+                if (qWeek || pWeek) {
+                  if (qWeek !== pWeek) return false
+                }
+                return norm(q.period) === pPer && norm(q.subject) === pSub
+              } catch (e) { return false }
+            })
             if (match) {
               if (match.displayRoom && !(p as any).displayRoom) {
                 (p as any).displayRoom = match.displayRoom
