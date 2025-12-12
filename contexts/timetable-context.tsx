@@ -686,6 +686,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   })
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
+  // Debug hooks: when sessionStorage['synchron:debug-refresh'] === 'true',
+  // install temporary capture/bubble listeners during refresh to diagnose
+  // click/pointer swallowing that may occur while a background refresh runs.
+  const refreshDebugHandlersRef = useRef<{ capture?: any; bubble?: any } | null>(null)
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
@@ -1595,6 +1599,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (!hadCache) setIsLoading(true)
     // Mark that a background refresh is in progress for logging/debug
     setIsRefreshing(true)
+    // If developer debugging key is set, attach temporary event listeners
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage && window.sessionStorage.getItem('synchron:debug-refresh') === 'true') {
+        const cap = (e: Event) => {
+          try {
+            const ev = e as PointerEvent
+            const top = document.elementFromPoint(ev.clientX, ev.clientY)
+            console.debug('[timetable.refresh.debug] capture', e.type, 'target=', e.target, 'top=', top)
+            try { console.debug('[timetable.refresh.debug] composedPath', (ev as any).composedPath ? (ev as any).composedPath() : (ev as any).path || []) } catch (err) {}
+          } catch (err) {}
+        }
+        const bub = (e: Event) => {
+          try {
+            const ev = e as PointerEvent
+            const top = document.elementFromPoint(ev.clientX, ev.clientY)
+            console.debug('[timetable.refresh.debug] bubble', e.type, 'target=', e.target, 'defaultPrevented=', (e as any).defaultPrevented, 'top=', top)
+            try { console.debug('[timetable.refresh.debug] composedPath', (ev as any).composedPath ? (ev as any).composedPath() : (ev as any).path || []) } catch (err) {}
+          } catch (err) {}
+        }
+        document.addEventListener('pointerdown', cap, true)
+        document.addEventListener('click', bub, false)
+        refreshDebugHandlersRef.current = { capture: cap, bubble: bub }
+        console.debug('[timetable.refresh.debug] installed debug listeners')
+      }
+    } catch (e) {}
     try { console.time('[timetable] refreshExternal') } catch (e) {}
     // Throttle aggressive refreshes: ensure we don't refresh more often than MIN_REFRESH_MS
     try {
@@ -2303,6 +2332,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } finally {
       try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
       try { setIsRefreshing(false) } catch (e) {}
+      // Remove debug listeners if present
+      try {
+        const h = refreshDebugHandlersRef.current
+        if (h) {
+          if (h.capture) document.removeEventListener('pointerdown', h.capture, true)
+          if (h.bubble) document.removeEventListener('click', h.bubble, false)
+          refreshDebugHandlersRef.current = null
+          console.debug('[timetable.refresh.debug] removed debug listeners')
+        }
+      } catch (e) {}
       // Only clear the global loading flag if we initially showed it
       // because there was no cache; otherwise keep cached UI visible.
       try { if (!hadCache) setIsLoading(false) } catch (e) { setIsLoading(false) }
