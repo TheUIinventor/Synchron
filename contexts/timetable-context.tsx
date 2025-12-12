@@ -229,8 +229,15 @@ const mergePreserveOverrides = (newMap: Record<string, Period[]> | null, prevMap
         try {
           const pPer = norm((p as any).period)
           const pSub = norm((p as any).subject)
-          if ((! (p as any).displayRoom || String((p as any).displayRoom || '').trim() === '') && prevArr && prevArr.length) {
-            const match = prevArr.find((q: any) => {
+
+          // Attempt to find a matching previous entry by normalized period+subject
+          // regardless of whether a `displayRoom` is present. We always want to
+          // preserve casual/substitute metadata from a previously-seen map when
+          // the incoming item lacks it; previously this preservation only ran
+          // when `displayRoom` was absent which allowed casuals to get lost.
+          let match: any = null
+          if (prevArr && prevArr.length) {
+            match = prevArr.find((q: any) => {
               try {
                 // Require same weekType when either side has a weekType.
                 const qWeek = (q && q.weekType) ? String(q.weekType) : ''
@@ -241,30 +248,36 @@ const mergePreserveOverrides = (newMap: Record<string, Period[]> | null, prevMap
                 return norm(q.period) === pPer && norm(q.subject) === pSub
               } catch (e) { return false }
             })
-            if (match) {
-              if (match.displayRoom && !(p as any).displayRoom) {
-                (p as any).displayRoom = match.displayRoom
-                (p as any).isRoomChange = (p as any).isRoomChange || match.isRoomChange || false
-              }
-              if (match.isSubstitute && !(p as any).isSubstitute) {
-                (p as any).isSubstitute = true
-              }
-              // Preserve casual/substitute metadata (casualSurname, casualToken,
-              // originalTeacher) from the previous map when present. This
-              // prevents background refreshes from dropping casual teacher
-              // display which the UI relies on to highlight substitutes.
-              if ((match as any).casualSurname && !(p as any).casualSurname) {
-                (p as any).casualSurname = (match as any).casualSurname
-              }
-              if ((match as any).casualToken && !(p as any).casualToken) {
-                (p as any).casualToken = (match as any).casualToken
-              }
-              if ((match as any).originalTeacher && !(p as any).originalTeacher) {
-                (p as any).originalTeacher = (match as any).originalTeacher
-              }
-              if (match.displayTeacher && !(p as any).displayTeacher) {
-                (p as any).displayTeacher = match.displayTeacher
-              }
+          }
+          if (match) {
+            // Always preserve casual/substitute metadata when incoming item
+            // lacks it. Do this unconditionally so background refreshes that
+            // only adjust rooms won't remove the casual display info.
+            if ((match as any).casualSurname && !(p as any).casualSurname) {
+              (p as any).casualSurname = (match as any).casualSurname
+            }
+            if ((match as any).casualToken && !(p as any).casualToken) {
+              (p as any).casualToken = (match as any).casualToken
+            }
+            if ((match as any).originalTeacher && !(p as any).originalTeacher) {
+              (p as any).originalTeacher = (match as any).originalTeacher
+            }
+            if (match.displayTeacher && !(p as any).displayTeacher) {
+              (p as any).displayTeacher = match.displayTeacher
+            }
+
+            // Preserve substitute flag
+            if (match.isSubstitute && !(p as any).isSubstitute) {
+              (p as any).isSubstitute = true
+            }
+
+            // Only copy `displayRoom`/`isRoomChange` from the previous map when
+            // the incoming period doesn't already provide an explicit display
+            // destination. This keeps previous room overrides intact while not
+            // overriding newer authoritative room changes.
+            if (match.displayRoom && !(p as any).displayRoom) {
+              (p as any).displayRoom = match.displayRoom
+              (p as any).isRoomChange = (p as any).isRoomChange || match.isRoomChange || false
             }
           }
         } catch (e) {
