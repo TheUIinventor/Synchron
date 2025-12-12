@@ -2194,6 +2194,52 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setCurrentWeek(j.weekType)
               }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+              try {
+                // If the upstream payload includes a specific day with an explicit
+                // weekType (eg. `upstream.day.weekType`), prefer that per-day
+                // information and drop any class rows whose `weekType` does not
+                // match the day's week. This prevents combined A/B lists from
+                // showing classes that don't apply to the reported calendar day.
+                const candidateUp = j.upstream || j.diagnostics?.upstream || j
+                const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+                if (dayObj) {
+                  const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                  const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                  let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                  // Fallback: sometimes the day name encodes the letter (eg. "MonB")
+                  if (!inferred) {
+                    try {
+                      const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                      const m = rawName.match(/([AB])$/i)
+                      if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                    } catch (e) {}
+                  }
+                  if (inferred) {
+                    // Resolve a JS weekday key from either an explicit date or a
+                    // day label provided by the upstream payload.
+                    let dayKey: string | null = null
+                    try {
+                      if (dayObj.date) {
+                        const d = new Date(dayObj.date)
+                        if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' })
+                      }
+                    } catch (e) {}
+                    if (!dayKey) {
+                      try {
+                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                        if (rawName.includes('mon')) dayKey = 'Monday'
+                        else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                        else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                        else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                        else if (rawName.includes('fri')) dayKey = 'Friday'
+                      } catch (e) {}
+                    }
+                    if (dayKey && finalTimetable && Array.isArray(finalTimetable[dayKey])) {
+                      finalTimetable[dayKey] = (finalTimetable[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                    }
+                  }
+                }
+              } catch (e) {}
               setExternalTimetable(mergePreserveOverrides(finalTimetable, lastRecordedTimetable))
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
@@ -2268,7 +2314,54 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
-              setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
+              try {
+                // If upstream indicates the calendar day's week letter, filter
+                // the per-day arrays to only include entries that match that
+                // day-level weekType. This handles array-shaped payloads that
+                // may contain both A/B rows in a single list.
+                const candidateUp = j.upstream || j.diagnostics?.upstream || j
+                const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+                if (dayObj) {
+                  const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                  const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                  let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                  if (!inferred) {
+                    try {
+                      const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                      const m = rawName.match(/([AB])$/i)
+                      if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                    } catch (e) {}
+                  }
+                  if (inferred) {
+                    // resolve a day key and filter only that day's entries
+                    let dayKey: string | null = null
+                    try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
+                    if (!dayKey) {
+                      try {
+                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                        if (rawName.includes('mon')) dayKey = 'Monday'
+                        else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                        else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                        else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                        else if (rawName.includes('fri')) dayKey = 'Friday'
+                      } catch (e) {}
+                    }
+                    if (dayKey && byDay && Array.isArray(byDay[dayKey])) {
+                      const copy = { ...byDay }
+                      copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                      setExternalTimetable(mergePreserveOverrides(copy, lastRecordedTimetable))
+                    } else {
+                      setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
+                    }
+                  } else {
+                    setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
+                  }
+                } else {
+                  setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
+                }
+              } catch (e) {
+                setExternalTimetable(mergePreserveOverrides(byDay, lastRecordedTimetable))
+              }
               // Also persist processed result for array-shaped payloads
               try {
                 if (_payloadHash && typeof window !== 'undefined') {
@@ -2414,7 +2507,50 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               }
             }
-            setExternalTimetable(mergePreserveOverrides(j.timetable, lastRecordedTimetable))
+            try {
+              const candidateUp = j.upstream || j.diagnostics?.upstream || j
+              const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+              if (dayObj) {
+                const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                if (!inferred) {
+                  try {
+                    const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                    const m = rawName.match(/([AB])$/i)
+                    if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                  } catch (e) {}
+                }
+                if (inferred) {
+                  // try to resolve day key
+                  let dayKey: string | null = null
+                  try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
+                  if (!dayKey) {
+                    try {
+                      const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                      if (rawName.includes('mon')) dayKey = 'Monday'
+                      else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                      else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                      else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                      else if (rawName.includes('fri')) dayKey = 'Friday'
+                    } catch (e) {}
+                  }
+                  if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
+                    const copy = { ...(j.timetable as any) }
+                    copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                    setExternalTimetable(mergePreserveOverrides(copy, lastRecordedTimetable))
+                  } else {
+                    setExternalTimetable(mergePreserveOverrides(j.timetable, lastRecordedTimetable))
+                  }
+                } else {
+                  setExternalTimetable(mergePreserveOverrides(j.timetable, lastRecordedTimetable))
+                }
+              } else {
+                setExternalTimetable(mergePreserveOverrides(j.timetable, lastRecordedTimetable))
+              }
+            } catch (e) {
+              setExternalTimetable(mergePreserveOverrides(j.timetable, lastRecordedTimetable))
+            }
             setTimetableSource(j.source ?? 'external')
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
