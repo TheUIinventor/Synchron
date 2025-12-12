@@ -230,6 +230,23 @@ const providerDebug = (...args: any[]) => {
   try { console.debug('[timetable.provider.debug]', ...args) } catch (e) {}
 }
 
+// Count how many periods in a timetable map have displayRoom or isRoomChange
+const countRoomChanges = (m: Record<string, Period[]> | null | undefined) => {
+  try {
+    if (!m) return { totalPeriods: 0, withDisplayRoom: 0, withIsRoomChange: 0 }
+    let total = 0, dr = 0, ir = 0
+    for (const d of Object.keys(m)) {
+      const arr = m[d] || []
+      for (const p of arr) {
+        total++
+        if ((p as any).displayRoom || (p as any).toRoom || (p as any).roomTo || (p as any)['room_to'] || (p as any).newRoom || (p as any).to) dr++
+        if ((p as any).isRoomChange) ir++
+      }
+    }
+    return { totalPeriods: total, withDisplayRoom: dr, withIsRoomChange: ir }
+  } catch (e) { return { totalPeriods: 0, withDisplayRoom: 0, withIsRoomChange: 0 } }
+}
+
 // Try to parse a fetch Response for bell times and apply them to state.
 const extractBellTimesFromResponse = async (res: Response | null) => {
   if (!res) return
@@ -1892,6 +1909,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     // or `currentWeek` because cached weekType can be stale and
                     // cause the UI to show the wrong A/B week on initial load.
                     setExternalTimetable(parsedCache.timetable)
+                    try { providerDebug('processed-cache room-change stats', countRoomChanges(parsedCache.timetable)) } catch (e) {}
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
@@ -2060,6 +2078,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               providerDebug('received /api/timetable payload (general)', { weekType: j.weekType, source: j.source })
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               setExternalTimetable(finalTimetable)
+              try { providerDebug('general payload room-change stats', countRoomChanges(finalTimetable)) } catch (e) {}
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
               try {
@@ -2728,6 +2747,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
             setExternalTimetable(finalTimetable)
+            try { providerDebug('date-fetch room-change stats', countRoomChanges(finalTimetable), { selectedDate: ds }) } catch (e) {}
             setTimetableSource(j.source ?? 'external')
             // record debug summary
             try {
