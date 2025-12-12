@@ -73,32 +73,7 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
     subject = String(subject || '').trim()
   } catch (e) {}
 
-  // Preserve common variation/substitution keys when present so downstream
-  // clients can inspect `toRoom`/`casualSurname`/`substituteTeacher` and
-  // compute `displayRoom`/`isRoomChange` or `displayTeacher` as needed.
-  return {
-    period,
-    time,
-    subject,
-    teacher,
-    fullTeacher: fullTeacher || undefined,
-    room,
-    weekType: weekType ?? undefined,
-    // Common room-variation aliases often seen in upstream payloads
-    toRoom: item?.toRoom ?? item?.to ?? item?.room ?? item?.newRoom ?? undefined,
-    roomTo: item?.roomTo ?? undefined,
-    room_to: item?.room_to ?? undefined,
-    newRoom: item?.newRoom ?? undefined,
-    fromRoom: item?.fromRoom ?? item?.from ?? undefined,
-    // Substitute/casual fields
-    casual: item?.casual ?? undefined,
-    casualSurname: item?.casualSurname ?? undefined,
-    substituteTeacher: item?.substitute || item?.replacement || item?.substituteTeacher || undefined,
-    substituteTeacherFull: item?.substituteFullName || item?.substituteFull || undefined,
-    originalTeacher: item?.teacher || item?.originalTeacher || undefined,
-    // keep raw for diagnostics
-    raw: item ?? undefined,
-  }
+  return { period, time, subject, teacher, fullTeacher: fullTeacher || undefined, room, weekType: weekType ?? undefined }
 }
 
 // This route proxies SBHS Timetable API endpoints shown in the portal docs:
