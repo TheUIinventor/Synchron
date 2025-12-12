@@ -901,12 +901,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (currentWeek === 'A' || currentWeek === 'B') {
           list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
         } else {
-          // If the server provided an authoritative externalWeekType, prefer it
-          // rather than attempting heuristic inference. This avoids choosing
-          // the wrong group when the API already indicated the current week.
-          if (externalWeekType === 'A' || externalWeekType === 'B') {
-            list = Array.isArray(groups[externalWeekType]) ? (groups[externalWeekType] as Period[]) : []
-          } else {
           // Try to infer which week (A or B) the grouped timetable should use
           // by comparing available per-day entries in any provided external
           // timetable with the A/B grouped entries. This helps when the
