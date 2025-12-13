@@ -9,7 +9,15 @@ export default function DebugSubsPage() {
 
   useEffect(() => {
     fetch('/api/portal/substitutions?debug=1', { credentials: 'include' })
-      .then(res => res.json())
+      .then(async res => {
+        const contentType = res.headers.get('content-type') || ''
+        if (contentType.includes('application/json')) {
+          return res.json()
+        } else {
+          const text = await res.text()
+          throw new Error(`API returned ${contentType} instead of JSON. You may need to log in. Response starts with: ${text.substring(0, 200)}`)
+        }
+      })
       .then(data => {
         setData(data)
         setLoading(false)

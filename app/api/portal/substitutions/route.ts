@@ -61,11 +61,26 @@ export async function GET(req: Request) {
       }
     }
 
-    // If JSON endpoints not available, fetch HTML timetable page and return as text for client scraping fallback
+    // If JSON endpoints not available, fetch HTML timetable page and parse it
     const htmlRes = await fetch(`${PORTAL_BASE}/timetable`, { headers, redirect: 'follow' })
     const html = await htmlRes.text()
-    // return HTML so client can scrape; also attempt to find variations in JSON within page
-    return new NextResponse(html, { status: htmlRes.ok ? 200 : htmlRes.status, headers: { 'content-type': htmlRes.headers.get('content-type') || 'text/html; charset=utf-8' } })
+    
+    // Try to extract variations from HTML
+    try {
+      const { PortalScraper } = await import('@/lib/api/portal-scraper')
+      const subs = PortalScraper.extractVariationsFromHtml(html)
+      const payload: any = { substitutions: subs, source: `${PORTAL_BASE}/timetable (HTML)`, lastUpdated: new Date().toISOString() }
+      if (wantDebugRaw) payload.raw = { html: html.substring(0, 500) + '...' }
+      return NextResponse.json(payload)
+    } catch (parseErr) {
+      // If parsing fails, return empty substitutions instead of raw HTML
+      return NextResponse.json({ 
+        substitutions: [], 
+        source: `${PORTAL_BASE}/timetable (parse failed)`, 
+        error: String(parseErr),
+        lastUpdated: new Date().toISOString() 
+      })
+    }
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
