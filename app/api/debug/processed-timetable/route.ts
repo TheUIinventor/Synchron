@@ -24,22 +24,18 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const origin = url.origin
-    // Forward the client's cookies when fetching internal endpoints so the
-    // server-side fetch can act on behalf of an authenticated browser session.
     const rawCookie = req.headers.get('cookie') || ''
     const headers: Record<string, string> = { accept: 'application/json' }
     if (rawCookie) headers['cookie'] = rawCookie
 
     let res = await fetch(`${origin}/api/timetable`, { headers })
     let j: any
-    // If /api/timetable requires auth, try the portal substitutions proxy as a fallback
     if (!res.ok && res.status === 401) {
+      // fallback to portal proxy
       try {
         const subsRes = await fetch(`${origin}/api/portal/substitutions?debug=1`, { headers })
         if (subsRes.ok) {
           const subsJson = await subsRes.json()
-          // Build a minimal /api/timetable-shaped payload so the mapping logic
-          // can operate. Put the portal proxy result under `upstream`.
           j = { timetable: subsJson.timetable || {}, upstream: subsJson.raw || subsJson }
         } else {
           return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
@@ -57,12 +53,10 @@ export async function GET(req: Request) {
     const classVars = collect(dayObj?.classVariations || upstream?.classVariations || upstream?.class_variations)
     const roomVars = collect(dayObj?.roomVariations || upstream?.roomVariations || upstream?.room_variations)
 
-    // Build a copy of the timetable map to illustrate mapping
-    const base: Record<string, any[]> = j?.timetable || {}
+    const base: Record<string, any[]> = j?.timetable || { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
     const mapped: Record<string, any[]> = {}
     for (const d of Object.keys(base || {})) mapped[d] = (base[d] || []).map((p: any) => ({ ...(p as any) }))
 
-    const results: any[] = []
     const all = [...classVars, ...roomVars]
     for (const v of all) {
       try {
@@ -74,7 +68,6 @@ export async function GET(req: Request) {
           const arr = mapped[day] || []
           for (const p of arr) {
             try {
-              // tolerant matching: normalized equality, numeric match, or substring
               const perKey = String(periodKey || '')
               const perStr = String(p.period || '')
               const nk = norm(perKey)
@@ -88,8 +81,27 @@ export async function GET(req: Request) {
               const sp = norm(String(p.subject || ''))
               const subjMatch = subj ? ( (sk && sk === sp) || sp.includes(sk) || sk.includes(sp) ) : true
               if (perMatch && subjMatch) {
-                // record mapping
-                results.push({ variation: v, day, matchedPeriod: p.period, matchedSubject: p.subject })
+                // apply casual/substitute metadata when present
+                if (v.casualSurname && !(p as any).casualSurname) {
+                  (p as any).casualSurname = String(v.casualSurname)
+                  (p as any).isSubstitute = true
+                  try { (p as any).displayTeacher = String(v.casualSurname) } catch (e) {}
+                }
+                if (v.casual && !(p as any).casualToken) (p as any).casualToken = String(v.casual)
+                if ((v.substitute || v.replacement || v.substituteTeacher) && !(p as any).isSubstitute) {
+                  (p as any).isSubstitute = true
+                  if (v.substituteTeacher) (p as any).teacher = String(v.substituteTeacher)
+                  if (v.substituteTeacherFull) (p as any).fullTeacher = String(v.substituteTeacherFull)
+                  try { if (!(p as any).displayTeacher && (p as any).fullTeacher) (p as any).displayTeacher = String((p as any).fullTeacher) } catch (e) {}
+                }
+                const toRoom = v.toRoom || v.roomTo || v.room_to || v.to || v.room || v.newRoom
+                if (toRoom && String(toRoom).trim()) {
+                  const cand = String(toRoom).trim()
+                  if (!((p as any).displayRoom)) {
+                    (p as any).displayRoom = cand
+                    (p as any).isRoomChange = true
+                  }
+                }
               }
             } catch (e) {}
           }
@@ -97,7 +109,7 @@ export async function GET(req: Request) {
       } catch (e) {}
     }
 
-    return NextResponse.json({ upstream: upstream || null, classVars, roomVars, mapping: results, timetableHead: Object.keys(base).reduce((acc: any, k) => { acc[k] = (base[k]||[]).slice(0,6); return acc }, {}) })
+    return NextResponse.json({ originalTimetable: base, processedTimetable: mapped, classVars, roomVars })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
