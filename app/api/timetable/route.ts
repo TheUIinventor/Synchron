@@ -900,15 +900,18 @@ export async function GET(req: NextRequest) {
         
         // Apply room variations
         Object.values(roomVars).forEach((v: any) => {
-          if (!v || !v.period || !v.roomTo) return
+          if (!v || !v.period) return
           const targetPeriod = String(v.period).trim()
-          const newRoom = String(v.roomTo).trim()
+          const newRoom = v.roomTo ? String(v.roomTo).trim() : ''
+          
+          if (!newRoom) return
           
           Object.keys(byDay).forEach(day => {
             byDay[day].forEach((p: any) => {
-              if (String(p.period).trim() === targetPeriod) {
+              if (String(p.period).trim() === targetPeriod && p.room !== newRoom) {
                 p.displayRoom = newRoom
                 p.isRoomChange = true
+                console.log(`[API] Applied room change: ${day} P${targetPeriod} ${p.room} -> ${newRoom}`)
               }
             })
           })
@@ -916,7 +919,7 @@ export async function GET(req: NextRequest) {
           Object.keys(timetableByWeek).forEach(day => {
             ['A', 'B', 'unknown'].forEach(week => {
               timetableByWeek[day][week].forEach((p: any) => {
-                if (String(p.period).trim() === targetPeriod) {
+                if (String(p.period).trim() === targetPeriod && p.room !== newRoom) {
                   p.displayRoom = newRoom
                   p.isRoomChange = true
                 }
