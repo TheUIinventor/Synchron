@@ -973,7 +973,7 @@ export async function GET(req: NextRequest) {
                 }
               })
             })
-          })
+          }
         })
       } catch (e) {
         console.error('[API] Failed to apply substitutions:', e)
