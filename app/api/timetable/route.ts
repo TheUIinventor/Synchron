@@ -821,7 +821,11 @@ export async function GET(req: NextRequest) {
     // Prefer explicit upstream `weekType` when present on any of the
     // fetched JSON responses (day/full/bells). This ensures the portal's
     // canonical week marker takes precedence over heuristic inference.
+    // NOTE: SBHS API returns weekType INSIDE dayInfo object, not at root
     const upstreamExplicitWeek = (
+      // Check dayRes.json.dayInfo.weekType first (primary source)
+      (dayRes && (dayRes as any).json?.dayInfo?.weekType) ||
+      // Fallback to root level weekType
       (dayRes && (dayRes as any).json && ((dayRes as any).json.weekType || (dayRes as any).json.week || (dayRes as any).json.week_label)) ||
       (fullRes && (fullRes as any).json && ((fullRes as any).json.weekType || (fullRes as any).json.week || (fullRes as any).json.week_label)) ||
       (bellsRes && (bellsRes as any).json && ((bellsRes as any).json.weekType || (bellsRes as any).json.week || (bellsRes as any).json.week_label))

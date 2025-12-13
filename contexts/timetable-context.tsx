@@ -2290,20 +2290,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     }
                   }
                   
-                  // Cache the substitutions by date
+                  // Cache the substitutions by date - MERGE with existing cache
                   if (typeof window !== 'undefined') {
                     try {
-                      const cached: Record<string, any> = {}
+                      // Start with existing cached data
+                      const mergedCache: Record<string, any> = { ...cachedData }
                       for (const result of results) {
                         if (!result || !result.data) continue
-                        cached[result.date] = {
+                        mergedCache[result.date] = {
                           timetable: result.data.timetable,
                           timetableByWeek: result.data.timetableByWeek,
                           fetchedAt: Date.now()
                         }
                       }
-                      localStorage.setItem('synchron-week-substitutions', JSON.stringify(cached))
-                      console.log('[timetable.provider] Cached substitutions for dates:', Object.keys(cached))
+                      localStorage.setItem('synchron-week-substitutions', JSON.stringify(mergedCache))
+                      console.log('[timetable.provider] Cached substitutions for dates:', Object.keys(mergedCache))
                     } catch (e) {
                       console.error('[timetable.provider] Failed to cache substitutions:', e)
                     }
