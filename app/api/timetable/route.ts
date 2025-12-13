@@ -214,20 +214,126 @@ export async function GET(req: NextRequest) {
           // Normalize the day response into the same shape we return for
           // the aggregated endpoint so clients receive `timetable`.
           const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-          let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
-          if (!Array.isArray(arr) && dj?.day?.periods) {
-            arr = Array.isArray(dj.day.periods) ? dj.day.periods : null
-          }
-          if (!Array.isArray(arr) && dj?.timetable?.periods) {
-            const maybe = Array.isArray(dj.timetable.periods) ? dj.timetable.periods : null
-            if (maybe) arr = maybe
-          }
-          if (!Array.isArray(arr)) arr = []
+          
+          // The SBHS daytimetable.json response structure:
+          // - dj.bells: array of bell times for the day
+          // - dj.timetable.timetable.periods: object keyed by period (e.g., "1", "2", "RC")
+          // - dj.timetable.subjects: object keyed by subject code
+          // - dj.classVariations: object keyed by period - contains substitute teacher info
+          // - dj.roomVariations: object keyed by period - contains room changes
+          
+          // Extract periods - prefer building from bells + periods like competitor does
+          const bells = dj.bells || []
+          const periodsObj = dj?.timetable?.timetable?.periods || dj?.timetable?.periods || {}
+          const subjectsObj = dj?.timetable?.subjects || {}
+          const classVars = !Array.isArray(dj.classVariations) ? (dj.classVariations || {}) : {}
+          const roomVars = !Array.isArray(dj.roomVariations) ? (dj.roomVariations || {}) : {}
+          
           const dowDate = new Date(dateParam)
           const dow = (!Number.isNaN(dowDate.getTime())) ? dowDate.toLocaleDateString('en-US', { weekday: 'long' }) : requestedWeekdayString
           const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
           if (inferred) detectedWeekType = inferred
-          byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
+          
+          // Build periods from bells (like competitor's dttSchema.transform)
+          // This ensures we have proper timing info AND can apply variations
+          if (Array.isArray(bells) && bells.length > 0) {
+            const date = dj.date || dateParam
+            
+            byDay[dow] = bells.map((bell: any) => {
+              const bellKey = bell.bell || bell.period || ''
+              const periodData = periodsObj[bellKey] || {}
+              
+              // Build subject lookup key (year + title)
+              let subjectKey = periodData.title || ''
+              if (periodData.year) {
+                subjectKey = periodData.year + subjectKey
+              }
+              const subjectData = subjectsObj[subjectKey] || {}
+              
+              // Check for class variation (substitute)
+              const classVar = classVars[bellKey] || classVars[bell.period] || null
+              let casualSurname: string | undefined = undefined
+              let isSubstitute = false
+              if (classVar && classVar.type !== 'novariation') {
+                casualSurname = classVar.casualSurname || classVar.casual || undefined
+                isSubstitute = !!casualSurname
+                if (casualSurname) {
+                  console.log(`[API] Applied substitute for P${bellKey}: ${casualSurname}`)
+                }
+              }
+              
+              // Check for room variation
+              const roomVar = roomVars[bellKey] || roomVars[bell.period] || null
+              let displayRoom: string | undefined = undefined
+              let isRoomChange = false
+              if (roomVar && roomVar.roomTo) {
+                displayRoom = roomVar.roomTo
+                isRoomChange = true
+                console.log(`[API] Applied room change for P${bellKey}: -> ${displayRoom}`)
+              }
+              
+              const start = bell.startTime || bell.start || ''
+              const end = bell.endTime || bell.end || ''
+              const time = [start, end].filter(Boolean).join(' - ')
+              
+              return {
+                period: bellKey,
+                time,
+                subject: subjectData.title || periodData.title || bell.bellDisplay || bellKey,
+                teacher: isSubstitute ? casualSurname : (periodData.fullTeacher || periodData.teacher || ''),
+                fullTeacher: periodData.fullTeacher || undefined,
+                room: periodData.room || '',
+                weekType: inferred || undefined,
+                // Substitution info
+                casualSurname: casualSurname,
+                isSubstitute,
+                originalTeacher: isSubstitute ? (periodData.fullTeacher || periodData.teacher) : undefined,
+                displayTeacher: isSubstitute ? casualSurname : undefined,
+                // Room change info
+                displayRoom,
+                isRoomChange,
+              }
+            })
+          } else {
+            // Fallback: extract from periods array/object
+            let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
+            if (!Array.isArray(arr) && dj?.day?.periods) {
+              arr = Array.isArray(dj.day.periods) ? dj.day.periods : []
+            }
+            if (!Array.isArray(arr) && dj?.timetable?.periods) {
+              const maybe = Array.isArray(dj.timetable.periods) ? dj.timetable.periods : null
+              if (maybe) arr = maybe
+            }
+            // If periods is an object, convert to array
+            if (!Array.isArray(arr) && periodsObj && typeof periodsObj === 'object') {
+              arr = Object.entries(periodsObj).map(([key, val]) => ({ period: key, ...(val as any) }))
+            }
+            if (!Array.isArray(arr)) arr = []
+            
+            byDay[dow] = arr.map((entry: any) => {
+              const periodKey = String(entry.period || entry.bell || '')
+              const base = toPeriod(entry, inferred)
+              
+              // Apply class variation
+              const classVar = classVars[periodKey] || null
+              if (classVar && classVar.type !== 'novariation' && classVar.casualSurname) {
+                base.casualSurname = classVar.casualSurname
+                base.isSubstitute = true
+                base.originalTeacher = base.teacher
+                base.teacher = classVar.casualSurname
+                base.displayTeacher = classVar.casualSurname
+              }
+              
+              // Apply room variation
+              const roomVar = roomVars[periodKey] || null
+              if (roomVar && roomVar.roomTo) {
+                base.displayRoom = roomVar.roomTo
+                base.isRoomChange = true
+              }
+              
+              return base
+            })
+          }
 
           const maybeBellTimes = dj.bellTimes || dj.bells || (bellsRes && (bellsRes as any).json) || undefined
 
@@ -241,6 +347,7 @@ export async function GET(req: NextRequest) {
           })
         }
       } catch (e) {
+        console.error('[API] Error in date-specific path:', e)
         // fallthrough to aggregated handling
       }
     }
