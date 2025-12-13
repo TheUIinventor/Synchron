@@ -590,8 +590,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const casual = item.casualSurname || undefined
                 const candidate = item.fullTeacher || item.teacher || undefined
-                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                item.displayTeacher = dt
+                const displayTeacher = casual ? stripLeadingCasualCode(casual) : stripLeadingCasualCode(candidate as any)
+                item.displayTeacher = displayTeacher
               } catch (e) {}
 
               // Defensive: remove stale `isRoomChange` if no explicit dest
@@ -610,7 +610,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const cached = __initialCachedSubs
             if (cached && Array.isArray(cached) && cached.length) {
               try {
-                const applied = applySubstitutionsToTimetable(cleaned, cached, { debug: false })
+                const applied = applySubstitutionsToTimetable(cleaned, cached, { debug: true })
                 return applied
               } catch (e) {
                 // fall back to cleaned map on error
@@ -808,8 +808,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   const casual = (clean as any).casualSurname || undefined
                   const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
-                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                  (clean as any).displayTeacher = dt
+                  const displayTeacher = casual ? stripLeadingCasualCode(casual) : stripLeadingCasualCode(candidate as any)
+                  (clean as any).displayTeacher = displayTeacher
                 } catch (e) {}
                 return clean
               }
@@ -818,8 +818,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try {
               const casual = (p as any).casualSurname || undefined
               const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
-              const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-              (p as any).displayTeacher = dt
+              const displayTeacher = casual ? stripLeadingCasualCode(casual) : stripLeadingCasualCode(candidate as any)
+              (p as any).displayTeacher = displayTeacher
             } catch (e) {}
             return p
           })
