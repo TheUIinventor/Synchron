@@ -24,7 +24,25 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const origin = url.origin
-    const res = await fetch(`${origin}/api/timetable`, { headers: { accept: 'application/json' } })
+    let res = await fetch(`${origin}/api/timetable`, { headers: { accept: 'application/json' } })
+    // If /api/timetable requires auth, try the portal substitutions proxy as a fallback
+    if (!res.ok && res.status === 401) {
+      try {
+        const subsRes = await fetch(`${origin}/api/portal/substitutions?debug=1`, { headers: { accept: 'application/json' } })
+        if (subsRes.ok) {
+          const subsJson = await subsRes.json()
+          // Construct a minimal payload shaped like /api/timetable so downstream
+          // mapping logic can run. If the portal proxy returned { substitutions },
+          // attach those under upstream for consistency.
+          const jsubs: any = { timetable: {}, upstream: subsJson.raw || subsJson }
+          res = { ok: true, status: 200, json: async () => jsubs } as unknown as Response
+        } else {
+          return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
+        }
+      } catch (e) {
+        return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
+      }
+    }
     if (!res.ok) return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
     const j = await res.json()
 
@@ -50,8 +68,19 @@ export async function GET(req: Request) {
           const arr = mapped[day] || []
           for (const p of arr) {
             try {
-              const perMatch = periodKey ? (norm(String(periodKey)) === norm(p.period)) : true
-              const subjMatch = subj ? (norm(String(subj)) === norm(p.subject)) : true
+              // tolerant matching: normalized equality, numeric match, or substring
+              const perKey = String(periodKey || '')
+              const perStr = String(p.period || '')
+              const nk = norm(perKey)
+              const np = norm(perStr)
+              const dk = (perKey.match(/\d+/) || [])[0]
+              const dp = (perStr.match(/\d+/) || [])[0]
+              const perMatch = periodKey
+                ? ( (nk && nk === np) || (dk && dp && dk === dp) || (np.includes(nk) && nk.length>0) || (nk.includes(np) && np.length>0) )
+                : true
+              const sk = norm(String(subj || ''))
+              const sp = norm(String(p.subject || ''))
+              const subjMatch = subj ? ( (sk && sk === sp) || sp.includes(sk) || sk.includes(sp) ) : true
               if (perMatch && subjMatch) {
                 // record mapping
                 results.push({ variation: v, day, matchedPeriod: p.period, matchedSubject: p.subject })
