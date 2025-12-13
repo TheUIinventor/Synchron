@@ -851,28 +851,106 @@ export async function GET(req: NextRequest) {
     }
 
     const hasAny = Object.values(byDay).some(a => a.length)
-    if (hasAny) return NextResponse.json({
-      timetable: byDay,
-      timetableByWeek,
-      bellTimes: typeof bellSchedules !== 'undefined' ? bellSchedules : undefined,
-      bellTimesSources: typeof bellTimesSources !== 'undefined' ? bellTimesSources : undefined,
-      source: 'sbhs-api',
-      weekType: finalWeekType,
-      diagnostics: {
-        detectedWeekType: detectedWeekType ?? null,
-        dominantWeekType: dominantWeekType ?? null,
-        inferredWeekParityFallback: null,
-        weekTally,
-        perDayWeekCounts,
-        weekBreakdown,
-        // Include raw upstream payloads to help diagnose where A/B info may be present
-        upstream: {
-          day: dayRes?.json ?? null,
-          full: fullRes?.json ?? null,
-          bells: bellsRes?.json ?? null,
-        }
+    if (hasAny) {
+      // Apply substitutions from upstream.day.classVariations directly to the timetable
+      try {
+        const classVars = dayRes?.json?.classVariations || {}
+        const roomVars = dayRes?.json?.roomVariations || {}
+        
+        // Apply class variations (teacher substitutions)
+        Object.values(classVars).forEach((v: any) => {
+          if (!v || !v.period) return
+          const targetPeriod = String(v.period).trim()
+          const casualSurname = v.casualSurname ? String(v.casualSurname).trim() : ''
+          const casualToken = v.casual ? String(v.casual).trim() : ''
+          
+          if (!casualSurname) return // Only process if there's a casual surname
+          
+          // Find matching period in byDay and timetableByWeek
+          Object.keys(byDay).forEach(day => {
+            byDay[day].forEach((p: any) => {
+              if (String(p.period).trim() === targetPeriod) {
+                p.casualSurname = casualSurname
+                p.casualToken = casualToken || undefined
+                p.isSubstitute = true
+                p.originalTeacher = p.teacher
+                p.teacher = casualSurname
+                p.displayTeacher = casualSurname
+                console.log(`[API] Applied casual: ${day} P${targetPeriod} -> ${casualSurname}`)
+              }
+            })
+          })
+          
+          // Also apply to timetableByWeek
+          Object.keys(timetableByWeek).forEach(day => {
+            ['A', 'B', 'unknown'].forEach(week => {
+              timetableByWeek[day][week].forEach((p: any) => {
+                if (String(p.period).trim() === targetPeriod) {
+                  p.casualSurname = casualSurname
+                  p.casualToken = casualToken || undefined
+                  p.isSubstitute = true
+                  p.originalTeacher = p.teacher
+                  p.teacher = casualSurname
+                  p.displayTeacher = casualSurname
+                }
+              })
+            })
+          })
+        })
+        
+        // Apply room variations
+        Object.values(roomVars).forEach((v: any) => {
+          if (!v || !v.period || !v.roomTo) return
+          const targetPeriod = String(v.period).trim()
+          const newRoom = String(v.roomTo).trim()
+          
+          Object.keys(byDay).forEach(day => {
+            byDay[day].forEach((p: any) => {
+              if (String(p.period).trim() === targetPeriod) {
+                p.displayRoom = newRoom
+                p.isRoomChange = true
+              }
+            })
+          })
+          
+          Object.keys(timetableByWeek).forEach(day => {
+            ['A', 'B', 'unknown'].forEach(week => {
+              timetableByWeek[day][week].forEach((p: any) => {
+                if (String(p.period).trim() === targetPeriod) {
+                  p.displayRoom = newRoom
+                  p.isRoomChange = true
+                }
+              })
+            })
+          })
+        })
+      } catch (e) {
+        console.error('[API] Failed to apply substitutions:', e)
       }
-    })
+      
+      return NextResponse.json({
+        timetable: byDay,
+        timetableByWeek,
+        bellTimes: typeof bellSchedules !== 'undefined' ? bellSchedules : undefined,
+        bellTimesSources: typeof bellTimesSources !== 'undefined' ? bellTimesSources : undefined,
+        source: 'sbhs-api',
+        weekType: finalWeekType,
+        diagnostics: {
+          detectedWeekType: detectedWeekType ?? null,
+          dominantWeekType: dominantWeekType ?? null,
+          inferredWeekParityFallback: null,
+          weekTally,
+          perDayWeekCounts,
+          weekBreakdown,
+          // Include raw upstream payloads to help diagnose where A/B info may be present
+          upstream: {
+            day: dayRes?.json ?? null,
+            full: fullRes?.json ?? null,
+            bells: bellsRes?.json ?? null,
+          }
+        }
+      })
+    }
 
     return NextResponse.json(
       {
