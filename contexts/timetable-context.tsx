@@ -1756,6 +1756,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const res = await fetch(aiUrl, { credentials: 'include' })
         const ct = res.headers.get('content-type') || ''
+
+        // If the AI endpoint requires authentication (401), try the portal
+        // substitutions proxy as a fallback so we can still extract
+        // variations without needing an authenticated AI response.
+        if (res.status === 401) {
+          try {
+            const subsRes = await fetch('/api/portal/substitutions?debug=1', { credentials: 'include' })
+            const subsCt = subsRes.headers.get('content-type') || ''
+            if (subsRes.ok && subsCt.includes('application/json')) {
+              const jsub = await subsRes.json()
+              const candidates = Array.isArray(jsub.substitutions) ? jsub.substitutions : (jsub.subs || jsub.variations || [])
+              if (Array.isArray(candidates) && candidates.length) return candidates
+            }
+          } catch (e) {
+            // ignore fallback errors and continue to original handling
+          }
+        }
+
         if (res.ok && ct.includes('application/json')) {
           const j = await res.json()
           try { console.debug('[timetable.provider] ai timetable fetched', aiUrl, (j && (Array.isArray(j.variations) ? j.variations.length : (j.substitutions ? j.substitutions.length : undefined)) ) ) } catch (e) {}
