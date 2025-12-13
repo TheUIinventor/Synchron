@@ -611,7 +611,7 @@ export default function HomeClient() {
                                   {(() => {
                                     const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
                                     return (
-                                      <span className="truncate max-w-[72px] text-sm text-on-surface-variant">{displayRoom}</span>
+                                      <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
                                     )
                                   })()}
                                 </div>
@@ -630,7 +630,10 @@ export default function HomeClient() {
                                   {(() => {
                                     const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
                                     return (
-                                      <span className="truncate max-w-[72px] text-sm text-on-surface-variant">{displayRoom}</span>
+                                      <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                        style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
+                                        {displayRoom}
+                                      </span>
                                     )
                                   })()}
                                 </div>
@@ -665,7 +668,8 @@ export default function HomeClient() {
                                     {(() => {
                                       const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
                                       return (
-                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'bg-secondary-container text-on-secondary-container px-2 py-1 rounded-md' : (isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}>
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : (isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}
+                                          style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
                                           {displayRoom}
                                         </span>
                                       )
