@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-type WeekType = 'A' | 'B'
+type WeekType = 'A' | 'B' | 'C'
 
 function normalizeWeekType(value: any): WeekType | null {
   if (value == null) return null
   const str = String(value).trim().toUpperCase()
   if (!str) return null
-  // Exact single-letter values are valid
-  if (str === 'A' || str === 'B') return str as WeekType
+  // Exact single-letter values are valid (A, B, or C for 15-day cycle)
+  if (str === 'A' || str === 'B' || str === 'C') return str as WeekType
 
-  // Prefer explicit mentions like "WEEK A", "WEEK: B", "ROTATION A", etc.
-  const explicit = str.match(/\b(?:WEEK|WEEKTYPE|WEEK_LABEL|CYCLE|ROTATION|ROT)\b[^A-Z0-9]*([AB])\b/)
+  // Prefer explicit mentions like "WEEK A", "WEEK: B", "ROTATION C", etc.
+  const explicit = str.match(/\b(?:WEEK|WEEKTYPE|WEEK_LABEL|CYCLE|ROTATION|ROT)\b[^A-Z0-9]*([ABC])\b/)
   if (explicit && explicit[1]) return explicit[1] as WeekType
 
   // Do NOT match single letters inside longer strings (eg. class names like "MAT A").
@@ -36,14 +36,14 @@ function inferWeekType(dayKey?: any, source?: any): WeekType | null {
     const normalized = normalizeWeekType(c)
     if (normalized) return normalized
   }
-  // Special-case: dayKey values like 'MonA' / 'TueB' encode week letter as last char
+  // Special-case: dayKey values like 'MonA' / 'TueB' / 'WedC' encode week letter as last char
   try {
     if (typeof dayKey === 'string') {
-      const m = dayKey.match(/^[A-Za-z]{3,4}([AB])$/i)
+      const m = dayKey.match(/^[A-Za-z]{3,4}([ABC])$/i)
       if (m && m[1]) return m[1].toUpperCase() as WeekType
     }
     if (source && typeof source === 'object' && typeof source.dayname === 'string') {
-      const m2 = (source.dayname as string).match(/^[A-Za-z]{3,4}([AB])$/i)
+      const m2 = (source.dayname as string).match(/^[A-Za-z]{3,4}([ABC])$/i)
       if (m2 && m2[1]) return m2[1].toUpperCase() as WeekType
     }
   } catch (e) {}
@@ -786,35 +786,45 @@ export async function GET(req: NextRequest) {
       return Array.from(seen.values())
     }
 
-    const timetableByWeek: Record<string, { A: any[]; B: any[]; unknown: any[] }> = {}
+    const timetableByWeek: Record<string, { A: any[]; B: any[]; C: any[]; unknown: any[] }> = {}
     for (const [dayName, periods] of Object.entries(byDay)) {
-      const groups = { A: [] as any[], B: [] as any[], unknown: [] as any[] }
+      const groups = { A: [] as any[], B: [] as any[], C: [] as any[], unknown: [] as any[] }
       for (const p of periods) {
         const wt = normalizeString(p.weekType).toUpperCase()
         if (wt === 'A') groups.A.push(p)
         else if (wt === 'B') groups.B.push(p)
+        else if (wt === 'C') groups.C.push(p)
         else groups.unknown.push(p)
       }
       // Deduplicate inside each group (in case duplicates slipped through)
       groups.A = dedupeArray(groups.A)
       groups.B = dedupeArray(groups.B)
+      groups.C = dedupeArray(groups.C)
       groups.unknown = dedupeArray(groups.unknown)
       timetableByWeek[dayName] = groups
     }
 
-    const weekTally: Record<WeekType, number> = { A: 0, B: 0 }
+    const weekTally: Record<WeekType, number> = { A: 0, B: 0, C: 0 }
     for (const groups of Object.values(timetableByWeek)) {
       weekTally.A += groups.A.length
       weekTally.B += groups.B.length
+      weekTally.C += groups.C.length
     }
 
     let dominantWeekType: WeekType | null = null
-    const taggedTotal = weekTally.A + weekTally.B
+    const taggedTotal = weekTally.A + weekTally.B + weekTally.C
     if (taggedTotal > 0) {
-      if (weekTally.A === weekTally.B) {
-        dominantWeekType = detectedWeekType
+      // Find max among A, B, C
+      if (weekTally.A >= weekTally.B && weekTally.A >= weekTally.C) {
+        dominantWeekType = 'A'
+      } else if (weekTally.B >= weekTally.A && weekTally.B >= weekTally.C) {
+        dominantWeekType = 'B'
       } else {
-        dominantWeekType = weekTally.A > weekTally.B ? 'A' : 'B'
+        dominantWeekType = 'C'
+      }
+      // If there's a tie and we have a detected week, prefer that
+      if ((weekTally.A === weekTally.B || weekTally.B === weekTally.C || weekTally.A === weekTally.C) && detectedWeekType) {
+        dominantWeekType = detectedWeekType
       }
     }
 
@@ -834,9 +844,9 @@ export async function GET(req: NextRequest) {
     let weekType = null as WeekType | null
     if (upstreamExplicitWeek) {
       const s = String(upstreamExplicitWeek).trim().toUpperCase()
-      if (s === 'A' || s === 'B') weekType = s as WeekType
+      if (s === 'A' || s === 'B' || s === 'C') weekType = s as WeekType
       else {
-        const m = s.match(/\b([AB])\b/)
+        const m = s.match(/\b([ABC])\b/)
         if (m && m[1]) weekType = m[1].toUpperCase() as WeekType
       }
     }
@@ -848,16 +858,17 @@ export async function GET(req: NextRequest) {
     const finalWeekType = weekType as WeekType | null
 
     // Build per-day week tag counts for diagnostics using the grouped view
-    const perDayWeekCounts: Record<string, { A: number; B: number; unknown: number }> = {}
+    const perDayWeekCounts: Record<string, { A: number; B: number; C: number; unknown: number }> = {}
     for (const [dayName, groups] of Object.entries(timetableByWeek)) {
-      perDayWeekCounts[dayName] = { A: groups.A.length, B: groups.B.length, unknown: groups.unknown.length }
+      perDayWeekCounts[dayName] = { A: groups.A.length, B: groups.B.length, C: groups.C.length, unknown: groups.unknown.length }
     }
 
-    // Build explicit lists of periods tagged A/B/unknown for debugging from grouped view
-    const weekBreakdown: { A: any[]; B: any[]; unknown: any[] } = { A: [], B: [], unknown: [] }
+    // Build explicit lists of periods tagged A/B/C/unknown for debugging from grouped view
+    const weekBreakdown: { A: any[]; B: any[]; C: any[]; unknown: any[] } = { A: [], B: [], C: [], unknown: [] }
     for (const [dayName, groups] of Object.entries(timetableByWeek)) {
       for (const p of groups.A) weekBreakdown.A.push({ day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room })
       for (const p of groups.B) weekBreakdown.B.push({ day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room })
+      for (const p of groups.C) weekBreakdown.C.push({ day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room })
       for (const p of groups.unknown) weekBreakdown.unknown.push({ day: dayName, period: p.period, time: p.time, subject: p.subject, teacher: p.teacher, room: p.room })
     }
 
@@ -932,7 +943,7 @@ export async function GET(req: NextRequest) {
           
           // Also apply to timetableByWeek - ONLY for dayResDay
           if (timetableByWeek[dayResDay]) {
-            ['A', 'B', 'unknown'].forEach(week => {
+            ['A', 'B', 'C', 'unknown'].forEach(week => {
               timetableByWeek[dayResDay][week].forEach((p: any) => {
                 if (String(p.period).trim() === targetPeriod) {
                   p.casualSurname = casualSurname
@@ -969,7 +980,7 @@ export async function GET(req: NextRequest) {
           }
           
           if (timetableByWeek[dayResDay]) {
-            ['A', 'B', 'unknown'].forEach(week => {
+            ['A', 'B', 'C', 'unknown'].forEach(week => {
               timetableByWeek[dayResDay][week].forEach((p: any) => {
                 if (String(p.period).trim() === targetPeriod && p.room !== newRoom) {
                   p.displayRoom = newRoom
