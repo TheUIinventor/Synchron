@@ -61,31 +61,14 @@ export async function GET(req: Request) {
       }
     }
 
-    // If JSON endpoints not available, fetch HTML timetable page and parse it
-    const htmlRes = await fetch(`${PORTAL_BASE}/timetable`, { headers, redirect: 'follow' })
-    const html = await htmlRes.text()
-    
-    // Try to extract variations from HTML
-    try {
-      const { PortalScraper } = await import('@/lib/api/portal-scraper')
-      const subs = PortalScraper.extractVariationsFromHtml(html)
-      const payload: any = { substitutions: subs, source: `${PORTAL_BASE}/timetable (HTML)`, lastUpdated: new Date().toISOString() }
-      if (wantDebugRaw) {
-        payload.raw = { htmlPreview: html.substring(0, 1000) }
-        payload.parseSuccess = true
-      }
-      return NextResponse.json(payload)
-    } catch (parseErr: any) {
-      // If parsing fails, return empty substitutions with detailed error
-      return NextResponse.json({ 
-        substitutions: [], 
-        source: `${PORTAL_BASE}/timetable (parse failed)`, 
-        error: String(parseErr),
-        errorStack: parseErr?.stack || '',
-        htmlPreview: wantDebugRaw ? html.substring(0, 1000) : undefined,
-        lastUpdated: new Date().toISOString() 
-      })
-    }
+    // If JSON endpoints not available, return empty array
+    // The client-side code should fetch and parse HTML if needed
+    return NextResponse.json({ 
+      substitutions: [], 
+      source: `${PORTAL_BASE} (no JSON endpoint available)`,
+      lastUpdated: new Date().toISOString(),
+      fallbackNeeded: true
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

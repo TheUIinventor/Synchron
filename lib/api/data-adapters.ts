@@ -206,6 +206,7 @@ export function applySubstitutionsToTimetable(
               ;(period as any).casualSurname = surname
               period.teacher = surname
               period.isSubstitute = true
+              console.log(`✅ CASUAL APPLIED: ${day} Period ${period.period} ${period.subject} - casualSurname="${surname}" teacher="${period.teacher}" isSubstitute=${period.isSubstitute}`)
             } else if ((period as any).fullTeacher) {
               period.teacher = String((period as any).fullTeacher)
             }
