@@ -576,8 +576,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const item: any = { ...(p as any) }
 
               // Normalize explicit destination room fields into `displayRoom`.
-              // Only set if not already set by API
-              if (!item.isRoomChange && !item.displayRoom) {
+              // Only set if not already set by API (check for explicit true value)
+              if (item.isRoomChange !== true) {
                 const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
                 if (candidateDest && String(candidateDest).trim()) {
                   const candStr = String(candidateDest).trim()
@@ -777,8 +777,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       for (const day of Object.keys(m)) {
         try {
           m[day] = (m[day] || []).map((p) => {
-            // If API already set isRoomChange/displayRoom, preserve them
-            if ((p as any).isRoomChange || (p as any).displayRoom) {
+            // If API already set isRoomChange to true, preserve it
+            if ((p as any).isRoomChange === true) {
               return p
             }
             
