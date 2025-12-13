@@ -2382,7 +2382,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       }
                     } catch (e) {}
                     try { console.debug('[timetable.provider] setExternalTimetable (cache parsed)', { days: Object.keys(parsedCache.timetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
-                    setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(parsedCache.timetable, lastRecordedTimetable)))
+                    try {
+                      const merged = mergePreserveOverrides(parsedCache.timetable, lastRecordedTimetable)
+                      const enriched = enrichMapWithUpstreamVariations(merged, parsedCache)
+                      setExternalTimetable(enforceIncomingDestinations(enriched))
+                    } catch (e) {
+                      setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(parsedCache.timetable, lastRecordedTimetable)))
+                    }
                     safeSetExternalTimetableByWeek(parsedCache?.weekType, parsedCache.timetableByWeek || null, 'cache')
                     if (parsedCache.bellTimes) {
                       setExternalBellTimes(parsedCache.bellTimes)
