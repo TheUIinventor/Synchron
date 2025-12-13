@@ -243,8 +243,11 @@ export default function HomeClient() {
       const hasCasual = Boolean((p as any).casualSurname || (p as any).casual || (p as any).casualToken)
       const disp = String((p as any).displayTeacher || '').trim()
       const teacher = String(p.teacher || '').trim()
-      const dispDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
-      return Boolean(p.isSubstitute || hasCasual || dispDiff)
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
+      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
+      const displayDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
+      const displayIndicatesSub = (rawIsCode && dispLooksName) || (displayDiff && hasCasual)
+      return Boolean(p.isSubstitute || hasCasual || displayIndicatesSub)
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 

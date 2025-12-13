@@ -197,8 +197,15 @@ export default function TimetablePage() {
       // Defensive: also treat as substitute when casualToken exists or
       // when a displayTeacher is present and differs from the raw `teacher` value.
       const hasCasual = Boolean((p as any).casualSurname || (p as any).casualToken || (p as any).casual)
-      const hasDisplayDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
-      return Boolean(p.isSubstitute || hasCasual || changedTeacher || hasDisplayDiff)
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
+      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
+      const displayDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
+      // Only treat display-name differences as substitution when the raw
+      // teacher looks like a short code (e.g. "LIKV") or when we already
+      // have a casual marker. This avoids highlighting normal teacher
+      // display names that differ by formatting.
+      const displayIndicatesSub = (rawIsCode && dispLooksName) || (displayDiff && hasCasual)
+      return Boolean(p.isSubstitute || hasCasual || changedTeacher || displayIndicatesSub)
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 

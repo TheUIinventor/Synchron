@@ -1422,6 +1422,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // those as applicable to either week so they aren't dropped.
         if (currentWeek === 'A' || currentWeek === 'B') {
           filtered[day] = list.filter((p) => !(p as any).weekType || (p as any).weekType === currentWeek)
+        } else if (externalWeekType === 'A' || externalWeekType === 'B') {
+          // Use authoritative externalWeekType when currentWeek isn't manually set
+          filtered[day] = list.filter((p) => !(p as any).weekType || (p as any).weekType === externalWeekType)
         } else {
           // If we don't yet know the current week, show untagged entries
           // (commonly Break rows) rather than returning an empty list.
@@ -2589,7 +2592,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try { console.debug('[timetable.provider] skipping externalTimetableByWeek override (no authoritative weekType in payload)') } catch (e) {}
                   // keep previous lastRecordedTimetableByWeek (do not set)
                 } else {
-                  setExternalTimetableByWeek(finalByWeek)
+                  try {
+                    // Enrich each week map with upstream variations so room/teacher
+                    // substitutions embedded in `j.upstream` are applied to grouped maps.
+                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                    for (const d of Object.keys(finalByWeek)) {
+                      const groups = finalByWeek[d]
+                      transformed[d] = { A: [], B: [], unknown: [] }
+                      for (const wk of ['A','B','unknown'] as Array<'A'|'B'|'unknown'>) {
+                        try {
+                          const arr = Array.isArray((groups as any)[wk]) ? (groups as any)[wk].map((p: any) => ({ ...(p as any) })) : []
+                          // apply per-day enrichment by wrapping into a temp map
+                          const tempMap: Record<string, Period[]> = {}
+                          tempMap[d] = arr
+                          const enriched = enrichMapWithUpstreamVariations(tempMap, j)
+                          transformed[d][wk] = enriched && Array.isArray(enriched[d]) ? enriched[d] : arr
+                        } catch (e) { transformed[d][wk] = Array.isArray((groups as any)[wk]) ? (groups as any)[wk].slice() : [] }
+                      }
+                    }
+                    setExternalTimetableByWeek(transformed)
+                  } catch (e) {
+                    setExternalTimetableByWeek(finalByWeek)
+                  }
                 }
               }
               try {
@@ -2648,7 +2672,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
               try { console.debug('[timetable.provider] setExternalTimetable (after subs)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
               try { console.debug('[timetable.provider] setExternalTimetable (final branch)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
-              setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(finalTimetable, lastRecordedTimetable)))
+              try {
+                // Merge with lastRecordedTimetable to preserve any prior casual/override metadata
+                const mergedLive = mergePreserveOverrides(finalTimetable, lastRecordedTimetable)
+                // Enrich merged map with any upstream variations found in the payload
+                const enrichedLive = enrichMapWithUpstreamVariations(mergedLive, j)
+                // Enforce incoming destinations deterministically and set
+                setExternalTimetable(enforceIncomingDestinations(enrichedLive))
+              } catch (e) {
+                setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(finalTimetable, lastRecordedTimetable)))
+              }
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
               try {
