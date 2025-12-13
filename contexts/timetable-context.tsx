@@ -2053,48 +2053,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       try { console.debug('[timetable.provider] homepage substitutions applied, count=', appliedCount) } catch (e) {}
                     } catch (e) { try { console.debug('[timetable.provider] homepage substitution apply error', e) } catch (err) {} }
 
-                  // For the cycle/grouped view (timetableByWeek), only apply
-                  // substitutions that do NOT have a specific date attached.
-                  // Date-bound substitutions should only affect the single
-                  // calendar date (daily view), not both Week A and Week B.
-                  const genericSubs = subs.filter((s: any) => !s || !s.date)
-
-                  if (j.timetableByWeek && genericSubs.length) {
-                      try {
-                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>
-                      const transformed: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
-                      // Copy to avoid mutating original
-                      for (const d of Object.keys(byWeekSrc)) {
-                        transformed[d] = {
-                          A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
-                          B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
-                          C: Array.isArray((byWeekSrc[d] as any).C) ? (byWeekSrc[d] as any).C.map((p: any) => ({ ...p })) : [],
-                          unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
-                        }
-                      }
-
-                      // For each week (A/B/C/unknown) build a day->periods map and apply only generic substitutions
-                      const applyToWeek = (weekKey: 'A' | 'B' | 'C' | 'unknown') => {
-                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                        for (const d of Object.keys(transformed)) {
-                          weekMap[d] = (transformed[d] as any)[weekKey] || []
-                        }
-                        const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
-                        for (const d of Object.keys(transformed)) {
-                          (transformed[d] as any)[weekKey] = applied[d] || []
-                        }
-                      }
-
-                      // Apply generic substitutions to grouped week maps (debug enabled)
-                      applyToWeek('A')
-                      applyToWeek('B')
-                      applyToWeek('C')
-                      applyToWeek('unknown')
-
-                      finalByWeek = transformed
-                    } catch (e) {
-                      // ignore by-week substitution failures
-                    }
+                  // NOTE: Following competitor's pattern - timetableByWeek is the CLEAN 15-day cycle
+                  // NEVER apply substitutions to the cycle view. Substitutions are date-specific
+                  // and only belong in the day view (byDay/timetable). The cycle view shows the
+                  // master schedule without any date-bound changes.
+                  
+                  // Keep finalByWeek as-is from the API (already clean without subs)
+                  if (j.timetableByWeek) {
+                    finalByWeek = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>
                   }
                 }
               } catch (e) {
@@ -2839,43 +2805,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
                 } catch (e) { /* ignore substitution apply errors */ }
 
-                const genericSubs = subs.filter((s: any) => !s || !s.date)
-
-                if (j.timetableByWeek && genericSubs.length) {
-                  try {
-                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>
-                    const transformed: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
-                    // Copy to avoid mutating original
-                    for (const d of Object.keys(byWeekSrc)) {
-                      transformed[d] = {
-                        A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
-                        B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
-                        C: Array.isArray((byWeekSrc[d] as any).C) ? (byWeekSrc[d] as any).C.map((p: any) => ({ ...p })) : [],
-                        unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
-                      }
-                    }
-
-                    // For each week (A/B/C/unknown) build a day->periods map and apply only generic substitutions
-                    const applyToWeek = (weekKey: 'A' | 'B' | 'C' | 'unknown') => {
-                      const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                      for (const d of Object.keys(transformed)) {
-                        weekMap[d] = (transformed[d] as any)[weekKey] || []
-                      }
-                      const applied = applySubstitutionsToTimetable(weekMap, genericSubs, { debug: true })
-                      for (const d of Object.keys(transformed)) {
-                        (transformed[d] as any)[weekKey] = applied[d] || []
-                      }
-                    }
-
-                    applyToWeek('A')
-                    applyToWeek('B')
-                    applyToWeek('C')
-                    applyToWeek('unknown')
-
-                    finalByWeek = transformed
-                  } catch (e) {
-                    // ignore by-week substitution failures
-                  }
+                // NOTE: Following competitor's pattern - timetableByWeek is the CLEAN 15-day cycle
+                // NEVER apply substitutions to the cycle view. Substitutions are date-specific
+                // and only belong in the day view (byDay/timetable). The cycle view shows the
+                // master schedule without any date-bound changes.
+                
+                // Keep finalByWeek as-is from the API (already clean without subs)
+                if (j.timetableByWeek) {
+                  finalByWeek = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>
                 }
               }
             } catch (e) {
