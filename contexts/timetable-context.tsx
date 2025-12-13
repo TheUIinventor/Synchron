@@ -15,7 +15,7 @@ export type Period = {
   subject: string
   teacher: string
   room: string
-  weekType?: "A" | "B"
+  weekType?: "A" | "B" | "C"
   isSubstitute?: boolean // New: Indicates a substitute teacher
   isRoomChange?: boolean // New: Indicates a room change
   // Optional fields populated during normalization
@@ -32,7 +32,7 @@ export type BellTime = {
 
 // Define the timetable context type
 type TimetableContextType = {
-  currentWeek: "A" | "B" | null
+  currentWeek: "A" | "B" | "C" | null
   selectedDay: string // Day for the main timetable display (e.g., "Monday")
   selectedDateObject: Date // The actual Date object for the selectedDay
   setSelectedDay: (day: string) => void
@@ -62,8 +62,8 @@ type TimetableContextType = {
   // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
   refreshExternal?: () => Promise<void>
   // Full A/B grouped timetable when available from the server
-  timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-  externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
+  timetableByWeek?: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>
+  externalWeekType?: "A" | "B" | "C" | null // authoritative week type reported by the server
 }
 
 // Create the context
@@ -404,7 +404,7 @@ const timetableWeekB = {
 
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
-  const [currentWeek, setCurrentWeek] = useState<"A" | "B" | null>(null)
+  const [currentWeek, setCurrentWeek] = useState<"A" | "B" | "C" | null>(null)
   // Attempt a single synchronous read of the last-persisted timetable so we
   // can synchronously show cached data (including bell times and by-week
   // groupings) and avoid a loading spinner on first render when a cache
@@ -467,7 +467,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } catch (e) {}
     }
   } catch (e) {}
-  const __initialExternalTimetableByWeek = ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] } | null> | null => {
+  const __initialExternalTimetableByWeek = ((): Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] } | null> | null => {
     try {
       // Prefer a processed cache payload when available
       const src = __initialProcessedCache || __initialParsedCache
@@ -514,8 +514,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const __initialTimetableSource = ((): string | null => {
     try { return __initialParsedCache?.source ?? null } catch (e) { return null }
   })()
-  const __initialWeekType = ((): "A" | "B" | null => {
-    try { const src = __initialProcessedCache || __initialParsedCache; const w = src?.weekType; return (w === 'A' || w === 'B') ? w : null } catch (e) { return null }
+  const __initialWeekType = ((): "A" | "B" | "C" | null => {
+    try { const src = __initialProcessedCache || __initialParsedCache; const w = src?.weekType; return (w === 'A' || w === 'B' || w === 'C') ? w : null } catch (e) { return null }
   })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
@@ -639,12 +639,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
     return null
   })
-  const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(() => {
+  const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> | null>(() => {
     try { return __initialExternalTimetableByWeek || null } catch (e) { return null }
   })
-  const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(externalTimetableByWeek)
-  // Record the authoritative week type provided by the server (A/B) when available
-  const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(() => __initialWeekType)
+  const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> | null>(externalTimetableByWeek)
+  // Record the authoritative week type provided by the server (A/B/C) when available
+  const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | "C" | null>(() => __initialWeekType)
   // Debug: record last fetched date and a small payload summary for diagnostics
   const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null)
   const [lastFetchedPayloadSummary, setLastFetchedPayloadSummary] = useState<any | null>(null)
@@ -849,23 +849,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     
     if (useExternalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
-      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
+      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>)) {
         let list: Period[] = []
 
-        // If an explicit current week is known, use it.
-        if (currentWeek === 'A' || currentWeek === 'B') {
+        // If an explicit current week is known (A, B, or C), use it.
+        if (currentWeek === 'A' || currentWeek === 'B' || currentWeek === 'C') {
           list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
         } else {
-          // Try to infer which week (A or B) the grouped timetable should use
+          // Try to infer which week (A, B, or C) the grouped timetable should use
           // by comparing available per-day entries in any provided external
-          // timetable with the A/B grouped entries. This helps when the
+          // timetable with the A/B/C grouped entries. This helps when the
           // server returned `timetableByWeek` but did not provide an explicit
           // `weekType` value for the current selection; prefer the group that
           // best matches the live/day timetable data.
           try {
             const reference = useExternalTimetable || lastRecordedTimetable || {}
             const refPeriods = Array.isArray((reference as any)[day]) ? (reference as any)[day] as Period[] : []
-            const score = { A: 0, B: 0 }
+            const score = { A: 0, B: 0, C: 0 }
 
             const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
 
@@ -885,22 +885,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     else if (norm(b.period) === rper) { score.B += 1 }
                   }
                 }
+                if (groups && Array.isArray(groups.C)) {
+                  for (const c of groups.C) {
+                    if (norm(c.subject) === rsub && norm(c.period) === rper) { score.C += 2 }
+                    else if (norm(c.period) === rper) { score.C += 1 }
+                  }
+                }
               }
             }
 
-            if (score.A > score.B) list = Array.isArray(groups.A) ? groups.A.slice() : []
-            else if (score.B > score.A) list = Array.isArray(groups.B) ? groups.B.slice() : []
-            else {
-              // No clear match: prefer the non-empty group (A then B), or
-              // fall back to unknown if both are empty.
+            // Find the week with the highest score
+            const maxScore = Math.max(score.A, score.B, score.C)
+            if (maxScore > 0) {
+              if (score.A === maxScore) list = Array.isArray(groups.A) ? groups.A.slice() : []
+              else if (score.B === maxScore) list = Array.isArray(groups.B) ? groups.B.slice() : []
+              else if (score.C === maxScore) list = Array.isArray(groups.C) ? groups.C.slice() : []
+            } else {
+              // No clear match: prefer the non-empty group (A then B then C), or
+              // fall back to unknown if all are empty.
               if (groups.A && groups.A.length) list = groups.A.slice()
               else if (groups.B && groups.B.length) list = groups.B.slice()
+              else if (groups.C && groups.C.length) list = groups.C.slice()
               else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
             }
           } catch (e) {
             // On error, fall back to original behaviour: prefer A if present
             if (groups.A && groups.A.length) list = groups.A.slice()
             else if (groups.B && groups.B.length) list = groups.B.slice()
+            else if (groups.C && groups.C.length) list = groups.C.slice()
             else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
           }
         }
@@ -980,11 +992,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const filtered: Record<string, Period[]> = {}
       for (const [day, periods] of Object.entries(useExternalTimetable)) {
         const list = Array.isArray(periods) ? periods : []
-        // When the server provides week-tagged entries (A/B), prefer entries
+        // When the server provides week-tagged entries (A/B/C), prefer entries
         // that match the known `currentWeek`. However, many upstream payloads
-        // include UI-only items like Recess/Lunch without a `weekType` ΓÇö treat
-        // those as applicable to either week so they aren't dropped.
-        if (currentWeek === 'A' || currentWeek === 'B') {
+        // include UI-only items like Recess/Lunch without a `weekType` — treat
+        // those as applicable to any week so they aren't dropped.
+        if (currentWeek === 'A' || currentWeek === 'B' || currentWeek === 'C') {
           filtered[day] = list.filter((p) => !(p as any).weekType || (p as any).weekType === currentWeek)
         } else {
           // If we don't yet know the current week, show untagged entries
@@ -1760,7 +1772,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
             setExternalTimetable(jht.timetable)
             setTimetableSource(jht.source ?? 'external-homepage')
-            if (jht.weekType === 'A' || jht.weekType === 'B') {
+            if (jht.weekType === 'A' || jht.weekType === 'B' || jht.weekType === 'C') {
               setExternalWeekType(jht.weekType)
               setCurrentWeek(jht.weekType)
             }
@@ -1952,7 +1964,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       lastSeenBellTsRef.current = parsedCache.savedAt || Date.now()
                     }
                     setTimetableSource(parsedCache.source || 'external-cache')
-                    if (parsedCache.weekType === 'A' || parsedCache.weekType === 'B') {
+                    if (parsedCache.weekType === 'A' || parsedCache.weekType === 'B' || parsedCache.weekType === 'C') {
                       setExternalWeekType(parsedCache.weekType)
                       setCurrentWeek(parsedCache.weekType)
                     }
@@ -2049,32 +2061,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
                   if (j.timetableByWeek && genericSubs.length) {
                       try {
-                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-                      const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>
+                      const transformed: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
                       // Copy to avoid mutating original
                       for (const d of Object.keys(byWeekSrc)) {
                         transformed[d] = {
                           A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
                           B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                          C: Array.isArray((byWeekSrc[d] as any).C) ? (byWeekSrc[d] as any).C.map((p: any) => ({ ...p })) : [],
                           unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
                         }
                       }
 
-                      // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
-                      const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                      // For each week (A/B/C/unknown) build a day->periods map and apply only generic substitutions
+                      const applyToWeek = (weekKey: 'A' | 'B' | 'C' | 'unknown') => {
                         const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
                         for (const d of Object.keys(transformed)) {
-                          weekMap[d] = transformed[d][weekKey] || []
+                          weekMap[d] = (transformed[d] as any)[weekKey] || []
                         }
                         const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
                         for (const d of Object.keys(transformed)) {
-                          transformed[d][weekKey] = applied[d] || []
+                          (transformed[d] as any)[weekKey] = applied[d] || []
                         }
                       }
 
                       // Apply generic substitutions to grouped week maps (debug enabled)
                       applyToWeek('A')
                       applyToWeek('B')
+                      applyToWeek('C')
                       applyToWeek('unknown')
 
                       finalByWeek = transformed
@@ -2113,7 +2127,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     for (const d of Object.keys(finalByWeek)) {
                       try {
                         const groups = finalByWeek[d]
-                        for (const weekKey of ['A','B','unknown']) {
+                        for (const weekKey of ['A','B','C','unknown']) {
                           try {
                             const arr = (groups as any)[weekKey] || []
                             for (const p of arr) {
@@ -2131,7 +2145,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // so downstream rendering logic that prefers `timetableByWeek`
               // can compute using the correct `currentWeek` immediately
               // (prevents a transient render with the wrong week selection).
-              if (j.weekType === 'A' || j.weekType === 'B') {
+              if (j.weekType === 'A' || j.weekType === 'B' || j.weekType === 'C') {
                 setExternalWeekType(j.weekType)
                 setCurrentWeek(j.weekType)
               }
@@ -2212,7 +2226,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         
                         // Apply cached data immediately
                         const cachedUpdates: Record<string, Period[]> = {}
-                        const cachedUpdatesByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                        const cachedUpdatesByWeek: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
                         
                         for (const { day, date } of weekDates) {
                           if (cachedData[date]) {
@@ -2274,7 +2288,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   
                   // Merge the results into the current timetable
                   const updates: Record<string, Period[]> = {}
-                  const updatesByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                  const updatesByWeek: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
                   
                   for (const result of results) {
                     if (!result || !result.data) continue
@@ -2382,7 +2396,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // Intentionally not overriding `selectedDateObject` here for
               // the reasons described above.
               setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
+              if (j.weekType === 'A' || j.weekType === 'B' || j.weekType === 'C') {
                 setExternalWeekType(j.weekType)
                 setCurrentWeek(j.weekType)
               }
@@ -2472,7 +2486,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // If the payload reports a week type, set it immediately so that
             // any `timetableByWeek` application happens with the correct
             // `currentWeek` value and avoids temporary incorrect renders.
-            if (j.weekType === 'A' || j.weekType === 'B') {
+            if (j.weekType === 'A' || j.weekType === 'B' || j.weekType === 'C') {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
             }
@@ -2507,7 +2521,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
             setExternalTimetable(j.timetable)
             setTimetableSource(j.source ?? 'external')
-            if (j.weekType === 'A' || j.weekType === 'B') {
+            if (j.weekType === 'A' || j.weekType === 'B' || j.weekType === 'C') {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
             }
@@ -2529,7 +2543,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
             setExternalTimetable(byDay)
             setTimetableSource(j.source ?? 'external')
-            if (j.weekType === 'A' || j.weekType === 'B') {
+            if (j.weekType === 'A' || j.weekType === 'B' || j.weekType === 'C') {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
             }
@@ -2844,31 +2858,33 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
                 if (j.timetableByWeek && genericSubs.length) {
                   try {
-                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }>
+                    const transformed: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
                     // Copy to avoid mutating original
                     for (const d of Object.keys(byWeekSrc)) {
                       transformed[d] = {
                         A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
                         B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                        C: Array.isArray((byWeekSrc[d] as any).C) ? (byWeekSrc[d] as any).C.map((p: any) => ({ ...p })) : [],
                         unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
                       }
                     }
 
-                    // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
-                    const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                    // For each week (A/B/C/unknown) build a day->periods map and apply only generic substitutions
+                    const applyToWeek = (weekKey: 'A' | 'B' | 'C' | 'unknown') => {
                       const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
                       for (const d of Object.keys(transformed)) {
-                        weekMap[d] = transformed[d][weekKey] || []
+                        weekMap[d] = (transformed[d] as any)[weekKey] || []
                       }
                       const applied = applySubstitutionsToTimetable(weekMap, genericSubs, { debug: true })
                       for (const d of Object.keys(transformed)) {
-                        transformed[d][weekKey] = applied[d] || []
+                        (transformed[d] as any)[weekKey] = applied[d] || []
                       }
                     }
 
                     applyToWeek('A')
                     applyToWeek('B')
+                    applyToWeek('C')
                     applyToWeek('unknown')
 
                     finalByWeek = transformed
@@ -2890,14 +2906,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const summary = {
                 weekType: j.weekType ?? null,
                 counts: finalByWeek && finalByWeek[dayName]
-                  ? { A: finalByWeek[dayName].A?.length || 0, B: finalByWeek[dayName].B?.length || 0, unknown: finalByWeek[dayName].unknown?.length || 0 }
+                  ? { A: finalByWeek[dayName].A?.length || 0, B: finalByWeek[dayName].B?.length || 0, C: (finalByWeek[dayName] as any).C?.length || 0, unknown: finalByWeek[dayName].unknown?.length || 0 }
                   : null,
               }
               setLastFetchedDate((new Date()).toISOString().slice(0,10))
               setLastFetchedPayloadSummary(summary)
             } catch (e) {}
             if (j.bellTimes) setExternalBellTimes(j.bellTimes)
-            if (j.weekType === 'A' || j.weekType === 'B') {
+            if (j.weekType === 'A' || j.weekType === 'B' || j.weekType === 'C') {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
             } else {
