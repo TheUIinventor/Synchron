@@ -2178,6 +2178,79 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
               setTimetableSource(j.source ?? 'external')
               // (weekType already set above if present)
+              
+              // Background fetch: load substitutions for all weekdays
+              ;(async () => {
+                try {
+                  console.log('[timetable.provider] Starting background fetch for all weekdays')
+                  const today = new Date()
+                  const currentDay = today.getDay() // 0=Sun, 1=Mon, ..., 5=Fri
+                  
+                  // Get Monday of current week
+                  const daysToMonday = currentDay === 0 ? 6 : (currentDay - 1)
+                  const monday = new Date(today)
+                  monday.setDate(today.getDate() - daysToMonday)
+                  
+                  // Generate dates for Mon-Fri of current week
+                  const weekDates: { day: string, date: string }[] = []
+                  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+                  for (let i = 0; i < 5; i++) {
+                    const d = new Date(monday)
+                    d.setDate(monday.getDate() + i)
+                    const dateStr = d.toISOString().slice(0, 10) // YYYY-MM-DD
+                    weekDates.push({ day: dayNames[i], date: dateStr })
+                  }
+                  
+                  // Fetch all days in parallel
+                  const fetches = weekDates.map(async ({ day, date }) => {
+                    try {
+                      const res = await fetch(`/api/timetable?date=${date}`, { credentials: 'include' })
+                      if (!res.ok) return null
+                      const data = await res.json()
+                      return { day, date, data }
+                    } catch (e) {
+                      console.error(`[timetable.provider] Failed to fetch ${day} (${date}):`, e)
+                      return null
+                    }
+                  })
+                  
+                  const results = await Promise.all(fetches)
+                  
+                  // Merge the results into the current timetable
+                  const updates: Record<string, Period[]> = {}
+                  const updatesByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                  
+                  for (const result of results) {
+                    if (!result || !result.data) continue
+                    const { day, data } = result
+                    
+                    // Extract the day's periods with substitutions already applied by API
+                    if (data.timetable && data.timetable[day]) {
+                      updates[day] = data.timetable[day]
+                    }
+                    
+                    if (data.timetableByWeek && data.timetableByWeek[day]) {
+                      updatesByWeek[day] = data.timetableByWeek[day]
+                    }
+                  }
+                  
+                  // Update state with merged data (only if we got updates)
+                  if (Object.keys(updates).length > 0) {
+                    console.log('[timetable.provider] Applying background-fetched substitutions for days:', Object.keys(updates))
+                    setExternalTimetable(prev => ({ ...prev, ...updates }))
+                  }
+                  
+                  if (Object.keys(updatesByWeek).length > 0) {
+                    setExternalTimetableByWeek(prev => {
+                      if (!prev) return updatesByWeek
+                      return { ...prev, ...updatesByWeek }
+                    })
+                  }
+                } catch (e) {
+                  console.error('[timetable.provider] Background fetch failed:', e)
+                }
+              })()
+              
               return
             }
             if (Array.isArray(j.timetable)) {
