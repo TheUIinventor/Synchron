@@ -777,6 +777,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       for (const day of Object.keys(m)) {
         try {
           m[day] = (m[day] || []).map((p) => {
+            // If API already set isRoomChange/displayRoom, preserve them
+            if ((p as any).isRoomChange || (p as any).displayRoom) {
+              return p
+            }
+            
             // Check several common variant keys that might exist on the
             // incoming period object.
             const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to || undefined
