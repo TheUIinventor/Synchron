@@ -55,7 +55,9 @@ export default function CombinedStatus() {
       const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
       const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
       if (rawIsCode && dispLooksName) return true
-      return Boolean(p.isSubstitute || (p as any).casualSurname || changedTeacher)
+      const hasCasual = Boolean((p as any).casualSurname || (p as any).casualToken || (p as any).casual)
+      const hasDisplayDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
+      return Boolean(p.isSubstitute || hasCasual || changedTeacher || hasDisplayDiff)
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }, [])
 

@@ -237,10 +237,14 @@ export default function HomeClient() {
     try {
       if (!p) return false
       // Only treat a period as a substitute-highlight when there is an
-      // explicit casual marker. Avoid inferring substitutes from other
-      // differences to prevent false positives on the Home summary.
-      const hasCasual = Boolean((p as any).casualSurname || (p as any).casual)
-      return hasCasual
+      // explicit casual marker. To be resilient when `isSubstitute` may
+      // be missing, also consider `casualToken`, `displayTeacher` differing
+      // from `teacher`, or an explicit `isSubstitute` flag.
+      const hasCasual = Boolean((p as any).casualSurname || (p as any).casual || (p as any).casualToken)
+      const disp = String((p as any).displayTeacher || '').trim()
+      const teacher = String(p.teacher || '').trim()
+      const dispDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
+      return Boolean(p.isSubstitute || hasCasual || dispDiff)
     } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
   }
 
