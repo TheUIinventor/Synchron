@@ -936,15 +936,53 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try {
           const periodKey = v.period || v.periodName || v.key || v.p || undefined
           const subj = v.title || v.subject || v.class || undefined
-          const dayDate = (dayObj && (dayObj.date || dayObj.day)) ? String(dayObj.date || dayObj.day) : undefined
-          // Attempt to find a day in map that matches the payload date if present
-          const targetDays = dayDate ? Object.keys(copy).filter(k => k && k.toLowerCase().includes(new Date(dayDate).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase())) : Object.keys(copy)
+          const dayDateRaw = (dayObj && (dayObj.date || dayObj.day)) ? String(dayObj.date || dayObj.day) : undefined
+
+          // Resolve target days robustly: accept ISO dates, full textual day names,
+          // or fall back to all days when parsing fails.
+          let targetDays: string[] = Object.keys(copy)
+          if (dayDateRaw) {
+            try {
+              const tryDate = new Date(dayDateRaw)
+              if (!Number.isNaN(tryDate.getTime())) {
+                const weekday = tryDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+                targetDays = Object.keys(copy).filter(k => k && k.toLowerCase().includes(weekday))
+              } else {
+                // Try to detect a weekday name inside the raw string
+                const low = dayDateRaw.toLowerCase()
+                const names = ['monday','tuesday','wednesday','thursday','friday']
+                const matched = names.filter(n => low.includes(n))
+                if (matched.length) targetDays = Object.keys(copy).filter(k => matched.some(m => k.toLowerCase().includes(m)))
+              }
+            } catch (e) {
+              // keep default all days
+            }
+          }
+
           for (const day of targetDays) {
             const arr = copy[day] || []
             for (const p of arr) {
               try {
-                const perMatch = periodKey ? (norm(String(periodKey)) === norm(p.period)) : true
-                const subjMatch = subj ? (norm(String(subj)) === norm(p.subject)) : true
+                // More tolerant period matching:
+                // - Exact normalized match
+                // - Numeric period match (e.g. '1' vs 'Period 1')
+                // - Substring containment
+                const periodStr = String(p.period || '')
+                const keyStr = periodKey ? String(periodKey) : ''
+                const normKey = norm(keyStr)
+                const normPer = norm(periodStr)
+                const digitsKey = (keyStr.match(/\d+/) || [])[0]
+                const digitsPer = (periodStr.match(/\d+/) || [])[0]
+                const perMatch = periodKey
+                  ? ( (normKey && normKey === normPer) || (digitsKey && digitsPer && digitsKey === digitsPer) || (normPer.includes(normKey) && normKey.length > 0) || (normKey.includes(normPer) && normPer.length > 0) )
+                  : true
+
+                // Subject tolerant match: normalized equality or substring
+                const subjStr = subj ? String(subj) : ''
+                const normSubj = norm(subjStr)
+                const normPSubj = norm(String(p.subject || ''))
+                const subjMatch = subj ? ( (normSubj && normSubj === normPSubj) || (normPSubj.includes(normSubj) && normSubj.length > 0) || (normSubj.includes(normPSubj) && normPSubj.length > 0) ) : true
+
                 if (perMatch && subjMatch) {
                   // Apply casual/substitute metadata when present
                   if (v.casualSurname && !(p as any).casualSurname) {
