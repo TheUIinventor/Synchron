@@ -838,78 +838,73 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return m
     }
 
-    // Merge fresh timetable with previously-seen timetable entries to preserve
-    // casually-provided teacher fields (e.g. `casualSurname`). This ensures
-    // that when a background refresh returns a timetable lacking `casualSurname`
-    // we keep the cached casual display instead of reverting to a short code.
-
-    // Simplified: directly set external timetable without complex preservation.
-    // Reverting the previous experimental merge logic to keep behavior stable.
-    // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
+    // Merge day-specific timetable (with subs/room changes applied) with
+    // the full cycle timetable (clean, no subs). Priority:
+    // 1. If externalTimetable[day] has class periods (not just breaks), use it
+    //    because it has substitutions and room changes already applied for that day.
+    // 2. Otherwise fall back to timetableByWeek[day][currentWeek] which is the
+    //    clean cycle data without day-specific variations.
     
-    if (useExternalTimetableByWeek) {
+    if (useExternalTimetableByWeek || useExternalTimetable) {
       const filtered: Record<string, Period[]> = {}
-      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
+      const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+      
+      // Helper to check if a list has actual class periods (not just breaks)
+      const hasClassPeriods = (list: Period[]) => {
+        if (!Array.isArray(list) || list.length === 0) return false
+        return list.some(p => {
+          const subj = String(p.subject || '').toLowerCase()
+          return subj && !/(break|recess|lunch)/i.test(subj)
+        })
+      }
+      
+      for (const day of allDays) {
         let list: Period[] = []
-
-        // If an explicit current week is known (A or B), use it.
-        if (currentWeek === 'A' || currentWeek === 'B') {
-          list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
-        } else {
-          // Try to infer which week (A or B) the grouped timetable should use
-          // by comparing available per-day entries in any provided external
-          // timetable with the A/B grouped entries. This helps when the
-          // server returned `timetableByWeek` but did not provide an explicit
-          // `weekType` value for the current selection; prefer the group that
-          // best matches the live/day timetable data.
-          try {
-            const reference = useExternalTimetable || lastRecordedTimetable || {}
-            const refPeriods = Array.isArray((reference as any)[day]) ? (reference as any)[day] as Period[] : []
-            const score = { A: 0, B: 0 }
-
-            const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
-
-            if (refPeriods && refPeriods.length) {
-              for (const rp of refPeriods) {
-                const rsub = norm(rp.subject)
-                const rper = norm(rp.period)
-                if (groups && Array.isArray(groups.A)) {
-                  for (const a of groups.A) {
-                    if (norm(a.subject) === rsub && norm(a.period) === rper) { score.A += 2 }
-                    else if (norm(a.period) === rper) { score.A += 1 }
-                  }
-                }
-                if (groups && Array.isArray(groups.B)) {
-                  for (const b of groups.B) {
-                    if (norm(b.subject) === rsub && norm(b.period) === rper) { score.B += 2 }
-                    else if (norm(b.period) === rper) { score.B += 1 }
-                  }
-                }
-              }
-            }
-
-            // Find the week with the highest score
-            const maxScore = Math.max(score.A, score.B)
-            if (maxScore > 0) {
-              if (score.A === maxScore) list = Array.isArray(groups.A) ? groups.A.slice() : []
-              else if (score.B === maxScore) list = Array.isArray(groups.B) ? groups.B.slice() : []
+        
+        // Priority 1: Check if externalTimetable has day-specific data with subs
+        const daySpecific = useExternalTimetable ? (useExternalTimetable as any)[day] : null
+        if (Array.isArray(daySpecific) && hasClassPeriods(daySpecific)) {
+          // Use day-specific data - it has subs and room changes applied
+          // Filter by weekType if known to avoid showing periods from wrong week
+          if (currentWeek === 'A' || currentWeek === 'B') {
+            list = daySpecific.filter((p: any) => !p.weekType || p.weekType === currentWeek)
+          } else {
+            // No known week - show entries without weekType (commonly breaks)
+            // plus all entries since we can't filter properly
+            list = daySpecific.slice()
+          }
+          console.log(`[timetable.provider] Using day-specific timetable for ${day} (has subs/room changes)`)
+        } else if (useExternalTimetableByWeek) {
+          // Priority 2: Fall back to cycle timetable for the current week
+          const groups = (useExternalTimetableByWeek as any)[day] as { A: Period[]; B: Period[]; unknown: Period[] } | undefined
+          if (groups) {
+            if (currentWeek === 'A' || currentWeek === 'B') {
+              list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]).slice() : []
             } else {
-              // No clear match: prefer the non-empty group (A then B), or
-              // fall back to unknown if all are empty.
+              // No known week - prefer A, then B, then unknown
               if (groups.A && groups.A.length) list = groups.A.slice()
               else if (groups.B && groups.B.length) list = groups.B.slice()
               else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
             }
-          } catch (e) {
-            // On error, fall back to original behaviour: prefer A if present
-            if (groups.A && groups.A.length) list = groups.A.slice()
-            else if (groups.B && groups.B.length) list = groups.B.slice()
-            else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
+            console.log(`[timetable.provider] Using cycle timetable for ${day} (Week ${currentWeek || 'unknown'})`)
           }
+        } else if (Array.isArray(daySpecific)) {
+          // Day-specific data exists but only has breaks - still use it
+          list = daySpecific.slice()
         }
-
-        filtered[day] = list.slice()
+        
+        filtered[day] = list
       }
+      
+      // If the server explicitly reported that there is no timetable for the
+      // requested date, return the empty-by-day map as-is (do not insert
+      // Break rows based on bell times). This keeps the UI blank like a
+      // weekend when upstream reports "no timetable".
+      if (timetableSource === 'external-empty') {
+        preferToRoomOnMap(filtered)
+        return cleanupMap(filtered)
+      }
+      
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         // Only use API-provided bell buckets; do not fall back to hardwired data.
@@ -962,106 +957,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-        dayPeriods.sort((a, z) => {
-          const aIsBreak = /(?:recess|lunch|break)/i.test(String(a.subject || a.period || ''))
-          const zIsBreak = /(?:recess|lunch|break)/i.test(String(z.subject || z.period || ''))
-          if (!aIsBreak && !zIsBreak) {
-            const ai = canonicalIndex(a.period)
-            const zi = canonicalIndex(z.period)
-            if (ai < 998 && zi < 998 && ai !== zi) return ai - zi
-          }
-          return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time)
-        })
-        filtered[day] = dayPeriods
-      }
-
-      preferToRoomOnMap(filtered)
-      return cleanupMap(filtered)
-    }
-
-    if (useExternalTimetable) {
-      const filtered: Record<string, Period[]> = {}
-      for (const [day, periods] of Object.entries(useExternalTimetable)) {
-        const list = Array.isArray(periods) ? periods : []
-        // When the server provides week-tagged entries (A/B), prefer entries
-        // that match the known `currentWeek`. However, many upstream payloads
-        // include UI-only items like Recess/Lunch without a `weekType` — treat
-        // those as applicable to any week so they aren't dropped.
-        if (currentWeek === 'A' || currentWeek === 'B') {
-          filtered[day] = list.filter((p) => !(p as any).weekType || (p as any).weekType === currentWeek)
-        } else {
-          // If we don't yet know the current week, show untagged entries
-          // (commonly Break rows) rather than returning an empty list.
-          filtered[day] = list.filter((p) => !(p as any).weekType)
-        }
-      }
-      // If the server explicitly reported that there is no timetable for the
-      // requested date, return the empty-by-day map as-is (do not insert
-      // Break rows based on bell times). This keeps the UI blank like a
-      // weekend when upstream reports "no timetable".
-      if (timetableSource === 'external-empty') {
-        preferToRoomOnMap(filtered)
-        return cleanupMap(filtered)
-      }
-      // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
-      const getBellForDay = (dayName: string) => {
-        // Use only API-provided buckets when available; otherwise return empty.
-        const source = useExternalBellTimes
-        const bucket = dayName === 'Friday' ? source?.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source?.['Wed/Thurs'] : source?.['Mon/Tues'])
-        return bucket || []
-      }
-
-      const parseStartMinutes = (timeStr: string) => {
-        try {
-          const part = (timeStr || '').split('-')[0].trim()
-          const [h, m] = part.split(':').map((s) => parseInt(s, 10))
-          if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m
-        } catch (e) {}
-        return 0
-      }
-
-      for (const day of Object.keys(filtered)) {
-        const bells = getBellForDay(day) || []
-        const dayPeriods = filtered[day]
-
-        // If the server provided an explicit bellTimes object, respect the
-        // original API ordering for that day's bucket. Otherwise, sort bells
-        // into canonical order as a fallback.
-        const externalBucket = useExternalBellTimes ? (day === 'Friday' ? useExternalBellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues'])) : null
-        const shouldRespectApiOrder = !!externalBucket && Array.isArray(externalBucket)
-
-        if (!shouldRespectApiOrder) {
-          bells.sort((a, b) => {
-            const ai = canonicalIndex(a?.period)
-            const bi = canonicalIndex(b?.period)
-            if (ai !== bi) return ai - bi
-            return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
-          })
-        }
-
-        for (const b of bells) {
-          try {
-            const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
-            const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
-            const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
-            const hasMatchingClass = matching.length > 0
-            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
-            if (hasMatchingClass) continue
-            const label = b.period || 'Break'
-            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
-            if (!exists) {
-              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
-            }
-          } catch (e) {
-            const label = b.period
-            if (!/(recess|lunch|break)/i.test(label)) continue
-            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
-            if (!exists) {
-              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
-            }
-          }
-        }
-
         dayPeriods.sort((a, z) => {
           const aIsBreak = /(?:recess|lunch|break)/i.test(String(a.subject || a.period || ''))
           const zIsBreak = /(?:recess|lunch|break)/i.test(String(z.subject || z.period || ''))
