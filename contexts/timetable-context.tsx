@@ -419,7 +419,7 @@ const timetableWeekA = {
   Friday: [
     { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
     { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
+    { id: 3, period: "Recess", time: "11:10 - 11:40" },
     { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
     { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
     { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
@@ -479,6 +479,388 @@ const timetableWeekB = {
     { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
     { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
   ],
+}
+
+const canonicalIndex = (label?: string) => {
+  if (!label) return 999
+  const s = String(label).toLowerCase()
+  if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
+  if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
+  if (/recess|break|interval|morning break/.test(s)) return 2
+  if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
+  if (/lunch\s*1|lunch1/.test(s)) return 4
+  if (/lunch\s*2|lunch2/.test(s)) return 5
+  if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
+  if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
+  return 998
+}
+
+const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
+  try {
+    const part = (timeStr || '').split('-')[0].trim()
+    const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
+    if (!Number.isFinite(hRaw)) return 0
+    const m = Number.isFinite(mRaw) ? mRaw : 0
+    let h = hRaw
+    const hasMorning = dayPeriods.some((p) => {
+      try {
+        const ppart = (p.time || '').split('-')[0].trim()
+        const hh = parseInt(ppart.split(':')[0], 10)
+        return Number.isFinite(hh) && hh >= 8
+      } catch (e) { return false }
+    })
+    if (h < 8 && hasMorning) h += 12
+    return h * 60 + m
+  } catch (e) { return 0 }
+}
+
+// Build a normalized external bellTimes mapping from the server payload.
+// If the server provided explicit `bellTimes`, prefer those. When a
+// bucket is missing or empty, fall back to using `upstream` bell data if
+// available in the payload (same-origin data from the server).
+const buildBellTimesFromPayload = (payload: any) => {
+  const result: Record<string, { period: string; time: string }[]> = {
+    'Mon/Tues': [],
+    'Wed/Thurs': [],
+    'Fri': [],
+  }
+
+  try {
+    const src = payload?.bellTimes || {}
+    if (src['Mon/Tues'] && Array.isArray(src['Mon/Tues']) && src['Mon/Tues'].length) result['Mon/Tues'] = src['Mon/Tues']
+    if (src['Wed/Thurs'] && Array.isArray(src['Wed/Thurs']) && src['Wed/Thurs'].length) result['Wed/Thurs'] = src['Wed/Thurs']
+    if (src['Fri'] && Array.isArray(src['Fri']) && src['Fri'].length) result['Fri'] = src['Fri']
+
+    if ((result['Mon/Tues'] && result['Mon/Tues'].length) && (result['Wed/Thurs'] && result['Wed/Thurs'].length) && (result['Fri'] && result['Fri'].length)) {
+      return result
+    }
+
+    // Try upstream/day bells and map them into the correct bucket. Some
+    // servers include the upstream payload inside `diagnostics.upstream`, so
+    // check that location too. IMPORTANT: only populate the bucket that the
+    // upstream bells actually apply to (e.g. a Wednesday-only bells array
+    // should populate `Wed/Thurs`), instead of duplicating the same array
+    // across all buckets.
+    const candidateUpstream = payload?.upstream || payload?.diagnostics?.upstream || {}
+    try {
+      if (candidateUpstream?.day && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) {
+        const rawDay = String(candidateUpstream.day.dayName || candidateUpstream.day.day || candidateUpstream.day.date || candidateUpstream.day.dayname || '').toLowerCase()
+        const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+        const mapped = (candidateUpstream.day.bells || []).map((b: any) => {
+          const label = b.bellDisplay || b.period || b.bell || String(b.period)
+          const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
+          return { period: String(label), time }
+        })
+        if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
+      } else if (candidateUpstream?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length) {
+        const rawDay = String(candidateUpstream.bells.day || candidateUpstream.bells.date || candidateUpstream.bells.dayName || '').toLowerCase()
+        if (rawDay) {
+          const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+          const mapped = (candidateUpstream.bells.bells || []).map((b: any) => {
+            const label = b.bellDisplay || b.period || b.bell || String(b.period)
+            const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
+            return { period: String(label), time }
+          })
+          if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
+        }
+      }
+    } catch (e) {
+      // ignore and return what we could assemble
+    }
+  } catch (e) {
+    // ignore and return what we could assemble
+  }
+
+  return result
+}
+
+// Lightweight deterministic hash for JSON payloads (djb2 on stringified input)
+const computePayloadHash = (input: any) => {
+  try {
+    const s = typeof input === 'string' ? input : JSON.stringify(input)
+    let h = 5381
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) + h) + s.charCodeAt(i)
+      h = h & 0xffffffff
+    }
+    return String(h >>> 0)
+  } catch (e) {
+    return null
+  }
+}
+
+// Merge new timetable map with a previously-seen map preserving any
+// non-destructive UI overrides (e.g. `displayRoom`, `isRoomChange`,
+// `isSubstitute`, `displayTeacher`) that may have been applied earlier.
+const mergePreserveOverrides = (newMap: Record<string, Period[]> | null, prevMap: Record<string, Period[]> | null) => {
+  try {
+    if (!newMap) return newMap
+    if (!prevMap) return newMap
+    const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+    const result: Record<string, Period[]> = {}
+    for (const day of Object.keys(newMap)) {
+      const srcArr = Array.isArray(newMap[day]) ? newMap[day].map((p) => ({ ...(p as any) })) : []
+      const prevArr = Array.isArray(prevMap[day]) ? prevMap[day] : []
+      for (const p of srcArr) {
+        try {
+          const pPer = norm((p as any).period)
+          const pSub = norm((p as any).subject)
+
+          // Attempt to find a matching previous entry by normalized period+subject
+          // regardless of whether a `displayRoom` is present. We always want to
+          // preserve casual/substitute metadata from a previously-seen map when
+          // the incoming item lacks it; previously this preservation only ran
+          // when `displayRoom` was absent which allowed casuals to get lost.
+          let match: any = null
+          if (prevArr && prevArr.length) {
+            match = prevArr.find((q: any) => {
+              try {
+                // Require same weekType when either side has a weekType.
+                const qWeek = (q && q.weekType) ? String(q.weekType) : ''
+                const pWeek = (p && (p as any).weekType) ? String((p as any).weekType) : ''
+                if (qWeek || pWeek) {
+                  if (qWeek !== pWeek) return false
+                }
+                return norm(q.period) === pPer && norm(q.subject) === pSub
+              } catch (e) { return false }
+            })
+          }
+          if (match) {
+            // Always preserve casual/substitute metadata when incoming item
+            // lacks it. Do this unconditionally so background refreshes that
+            // only adjust rooms won't remove the casual display info.
+            if ((match as any).casualSurname && !(p as any).casualSurname) {
+              (p as any).casualSurname = (match as any).casualSurname
+            }
+            if ((match as any).casualToken && !(p as any).casualToken) {
+              (p as any).casualToken = (match as any).casualToken
+            }
+            if ((match as any).originalTeacher && !(p as any).originalTeacher) {
+              (p as any).originalTeacher = (match as any).originalTeacher
+            }
+            if (match.displayTeacher && !(p as any).displayTeacher) {
+              (p as any).displayTeacher = match.displayTeacher
+            }
+
+            // Preserve substitute flag
+            if (match.isSubstitute && !(p as any).isSubstitute) {
+              (p as any).isSubstitute = true
+            }
+
+            // Only copy `displayRoom`/`isRoomChange` from the previous map when
+            // the incoming period doesn't already provide an explicit display
+            // destination. This keeps previous room overrides intact while not
+            // overriding newer authoritative room changes.
+            if (match.displayRoom && !(p as any).displayRoom) {
+              (p as any).displayRoom = match.displayRoom
+              (p as any).isRoomChange = (p as any).isRoomChange || match.isRoomChange || false
+            }
+          }
+        } catch (e) {
+          // ignore per-item merge errors
+        }
+      }
+      result[day] = srcArr
+    }
+    return result
+  } catch (e) {
+    return newMap
+  }
+}
+
+// Try to parse a fetch Response for bell times and apply them to state.
+const extractBellTimesFromResponse = async (res: Response | null) => {
+  if (!res) return
+  try {
+    const ctype = res.headers.get('content-type') || ''
+    if (!ctype.includes('application/json')) return
+    // clone/parse safely
+    let j: any = null
+    try { j = await res.clone().json() } catch (e) { return }
+    if (!j) return
+    try {
+      const computed = buildBellTimesFromPayload(j)
+      const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+      const src = j.bellTimes || {}
+      for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+        if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+        else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+        else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+        else finalBellTimes[k] = []
+      }
+      const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+      if (hasAny) {
+        try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
+        setExternalBellTimes(finalBellTimes)
+        lastSeenBellTimesRef.current = finalBellTimes
+        lastSeenBellTsRef.current = Date.now()
+      }
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Explicit empty timetable used when the upstream API reports "no timetable".
+const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+
+const payloadHasNoTimetable = (payload: any) => {
+  try {
+    if (!payload) return false
+    if (payload.error) return true
+    if (payload.timetable === false) return true
+    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
+    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
+  } catch (e) {}
+  return false
+}
+
+// Try to extract an authoritative ISO date string from various payload locations
+const extractDateFromPayload = (payload: any): string | null => {
+  try {
+    if (!payload) return null
+    const maybe = (p: any) => {
+      if (!p) return null
+      if (typeof p === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p)) return p
+      if (p.date && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date)) return p.date
+      return null
+    }
+
+    // Common locations seen in API payloads
+    const paths = [
+      payload.date,
+      payload.day,
+      payload.dayInfo && payload.dayInfo.date,
+      payload.upstream && payload.upstream.day && payload.upstream.day.date,
+      payload.upstream && payload.upstream.dayInfo && payload.upstream.dayInfo.date,
+      payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && payload.diagnostics.upstream.day.date,
+      payload.upstream && payload.upstream.full && payload.upstream.full.dayInfo && payload.upstream.full.dayInfo.date,
+    ]
+
+    for (const p of paths) {
+      const found = maybe(p)
+      if (found) return found
+    }
+
+    return null
+  } catch (e) {
+    return null
+  }
+}
+
+// Mock data for the timetable - memoized
+const timetableWeekA = {
+  Monday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
+  Tuesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+  ],
+  Wednesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+  ],
+  Thursday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
+  ],
+  Friday: [
+    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 3, period: "Recess", time: "11:10 - 11:40" },
+    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
+}
+const parseTimetableHtml = (html: string): Record<string, Period[]> => {
+  const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+
+    // 1) Look for sections with day headings followed by a table
+    const headings = Array.from(doc.querySelectorAll('h2, h3, h4'))
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    for (const h of headings) {
+      const text = (h.textContent || '').trim()
+      const matched = dayNames.find((d) => text.toLowerCase().includes(d.toLowerCase()))
+      if (matched) {
+        // try to find next table sibling
+        let next: Element | null = h.nextElementSibling
+        while (next && next.tagName.toLowerCase() !== 'table') next = next.nextElementSibling
+        if (next && next.tagName.toLowerCase() === 'table') {
+          const rows = Array.from(next.querySelectorAll('tr'))
+          for (let i = 0; i < rows.length; i++) {
+            const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
+            if (cols.length >= 3) {
+              byDay[matched].push({ period: cols[0] || '', time: cols[1] || '', subject: cols[2] || '', teacher: cols[3] || '' , room: cols[4] || '' })
+            }
+          }
+        }
+      }
+    }
+
+    // 2) If no per-day tables found, look for a table with class 'timetable' or first table and attempt to parse rows
+    const anyHasData = Object.values(byDay).some((arr) => arr.length > 0)
+    if (!anyHasData) {
+      const table = doc.querySelector('table.timetable, table[class*=timetable], .timetable table, table')
+      if (table) {
+        const rows = Array.from(table.querySelectorAll('tr'))
+        // Try to detect a day column in the table header
+        const headerCols = Array.from(table.querySelectorAll('tr:first-child th, tr:first-child td')).map((h) => (h.textContent || '').toLowerCase())
+        const hasDayCol = headerCols.some((h) => /day|weekday|date/.test(h))
+        for (let i = 1; i < rows.length; i++) {
+          const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
+          if (cols.length >= 3) {
+            let day = 'Monday'
+            if (hasDayCol) {
+              const dayCell = cols[0]
+              const matched = dayNames.find((d) => dayCell.toLowerCase().includes(d.toLowerCase()))
+              if (matched) day = matched
+            } else {
+              // Best-effort: assign to current day
+              day = getCurrentDay()
+            }
+            byDay[day].push({ period: cols[0] || '', time: cols[1] || '', subject: cols[2] || '', teacher: cols[3] || '' , room: cols[4] || '' })
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // parsing failed; return empty map
+  }
+  return byDay
 }
 
 // Create the provider component
@@ -715,10 +1097,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
     return null
   })
-  const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(() => {
+  const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[] }> | null>(() => {
     try { return __initialExternalTimetableByWeek || null } catch (e) { return null }
   })
-  const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(externalTimetableByWeek)
+  const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[] }> | null>(externalTimetableByWeek)
   const selectedWeekRef = useRef<'A' | 'B' | 'unknown' | null>(null)
   // Record the authoritative week type provided by the server (A/B) when available
   const [externalWeekType, setExternalWeekType] = useState<"A" | "B" | null>(() => __initialWeekType)
@@ -1022,7 +1404,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // the grouped map. This prevents background refreshes without week
   // metadata from flipping the selected cycle and reverting correct
   // destination rooms.
-  const safeSetExternalTimetableByWeek = (payloadWeekType: any, incomingByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null, reason?: string) => {
+  const safeSetExternalTimetableByWeek = (payloadWeekType: any, incomingByWeek: Record<string, { A: Period[]; B: Period[] }> | null, reason?: string) => {
     try {
       const hasCached = Boolean(lastRecordedTimetableByWeek)
       const hasAuthWeek = payloadWeekType === 'A' || payloadWeekType === 'B'
@@ -2114,7 +2496,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const rows = Array.from(next.querySelectorAll('tr'))
               for (let i = 0; i < rows.length; i++) {
                 const cols = Array.from(rows[i].querySelectorAll('td, th')).map((c) => (c.textContent || '').trim())
-                if (cols.length >= 3) {
+                if (cols.length >=  3) {
                   byDay[matched].push({ period: cols[0] || '', time: cols[1] || '', subject: cols[2] || '', teacher: cols[3] || '' , room: cols[4] || '' })
                 }
               }
@@ -2396,15 +2778,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   lastSeenBellTsRef.current = Date.now()
                 }
               } catch (e) {
-                // ignore
+                // ignore extraction errors and preserve previously-seen bells
               }
               setExternalTimetable(emptyByDay)
               safeSetExternalTimetableByWeek(j?.weekType, null, 'upstream-no-timetable')
+              // Do not clear previously discovered bell times when upstream
+              // reports no timetable; keep existing bells where available.
               setTimetableSource('external-empty')
               setExternalWeekType(null)
-              try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
-              try { setIsRefreshing(false) } catch (e) {}
-              if (!hadCache) try { setIsLoading(false) } catch (e) {}
+              try {
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+              } catch (e) {}
               return
             }
           } catch (e) {}
@@ -2520,7 +2905,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // `upstream.day.date` or similar), attach that date to any
                 // extracted variations that lack an explicit `date` so they
                 // are applied only to that calendar day instead of being
-                // treated as generic substitutions across both Week A/B.
+                // treated as generic substitutions across both Week A and Week B.
                 try {
                   const payloadDate = extractDateFromPayload(j.upstream || j)
                   if (payloadDate && Array.isArray(subs)) {
@@ -2569,7 +2954,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         for (const d of Object.keys(transformed)) {
                           weekMap[d] = transformed[d][weekKey] || []
                         }
-                        const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
+                        // Only apply substitutions relevant to this week: include
+                        // substitutions that either have no `weekType` (generic)
+                        // or whose `weekType` equals the target week. For the
+                        // `unknown` group, treat it as matching only substitutions
+                        // that explicitly declare `weekType === 'unknown'` or are
+                        // generic (no weekType).
+                        const subsForWeek = (genericSubs || []).filter((s: any) => {
+                          try {
+                            if (!s) return false
+                            const wt = s.weekType || s.week || s.week_type || undefined
+                            if (!wt) return true // generic applies to all weeks
+                            const wts = String(wt).toUpperCase()
+                            if (weekKey === 'unknown') return wts === 'UNKNOWN'
+                            return wts === weekKey
+                          } catch (e) { return false }
+                        })
+                        const applied = applySubstitutionsToTimetable(weekMap, subsForWeek, { debug: true })
                         for (const d of Object.keys(transformed)) {
                           transformed[d][weekKey] = applied[d] || []
                         }
@@ -2598,7 +2999,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     try {
                       const v = subjectsSource[k]
                       const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
-                      const title = (v && (v.title || v.name || v.fullTeacher || v.fullTitle)) ? (v.title || v.name || v.fullTeacher || v.fullTitle) : null
+                      const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
                       if (short && title) shortToTitle[String(short).trim()] = String(title)
                     } catch (e) {}
                   }
@@ -2724,432 +3125,718 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       finalTimetable[dayKey] = (finalTimetable[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
                     }
                   }
+                } catch (e) {}
+                try { console.debug('[timetable.provider] setExternalTimetable (after subs)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+                try { console.debug('[timetable.provider] setExternalTimetable (final branch)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+                try {
+                  // Merge with lastRecordedTimetable to preserve any prior casual/override metadata
+                  const mergedLive = mergePreserveOverrides(finalTimetable, lastRecordedTimetable)
+                  // Enrich merged map with any upstream variations found in the payload
+                  const enrichedLive = enrichMapWithUpstreamVariations(mergedLive, j)
+                  // Enforce incoming destinations deterministically and set
+                  setExternalTimetable(enforceIncomingDestinations(enrichedLive))
+                } catch (e) {
+                  setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(finalTimetable, lastRecordedTimetable)))
                 }
-              } catch (e) {}
-              try { console.debug('[timetable.provider] setExternalTimetable (after subs)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
-              try { console.debug('[timetable.provider] setExternalTimetable (final branch)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
-              try {
-                // Merge with lastRecordedTimetable to preserve any prior casual/override metadata
-                const mergedLive = mergePreserveOverrides(finalTimetable, lastRecordedTimetable)
-                // Enrich merged map with any upstream variations found in the payload
-                const enrichedLive = enrichMapWithUpstreamVariations(mergedLive, j)
-                // Enforce incoming destinations deterministically and set
-                setExternalTimetable(enforceIncomingDestinations(enrichedLive))
-              } catch (e) {
-                setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(finalTimetable, lastRecordedTimetable)))
-              }
-              // Persist the processed result keyed by payload-hash so future
-              // loads can reuse the fully-applied timetable without re-extraction.
-              try {
-                if (_payloadHash && typeof window !== 'undefined') {
-                  try {
-                    const persisted = {
-                      timetable: finalTimetable,
-                      timetableByWeek: finalByWeek || null,
-                      bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
-                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null,
-                      source: j.source ?? 'external',
-                      weekType: j.weekType ?? null,
-                      savedAt: Date.now(),
+                // Persist the processed result keyed by payload-hash so future
+                // loads can reuse the fully-applied timetable without re-extraction.
+                try {
+                  if (_payloadHash && typeof window !== 'undefined') {
+                    try {
+                      const persisted = {
+                        timetable: finalTimetable,
+                        timetableByWeek: finalByWeek || null,
+                        bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                        subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null,
+                        source: j.source ?? 'external',
+                        weekType: j.weekType ?? null,
+                        savedAt: Date.now(),
+                      }
+                      localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                      try { console.debug('[timetable.provider] cached processed payload', _payloadHash) } catch (e) {}
+                    } catch (e) {
+                      // ignore storage errors
                     }
-                    localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
-                    try { console.debug('[timetable.provider] cached processed payload', _payloadHash) } catch (e) {}
-                  } catch (e) {
-                    // ignore storage errors
                   }
-                }
-              } catch (e) {}
-              // Note: do not override provider-selected date here. The
-              // `selectedDateObject` is driven by user choice and time-based
-              // auto-selection logic; forcing it from a general `/api/timetable`
-              // response can produce surprising results (e.g. showing Monday
-              // when the user expects today). If a date-affine fetch was
-              // performed specifically for a requested date, that code path
-              // (fetch-for-date) will handle aligning the provider date.
-              try {
-                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-                const summary = {
-                  weekType: j.weekType ?? null,
-                  counts: j.timetableByWeek && j.timetableByWeek[dayName]
-                    ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
-                    : null,
-                }
-                setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                setLastFetchedPayloadSummary(summary)
-              } catch (e) {}
-              setTimetableSource(j.source ?? 'external')
-              // (weekType already set above if present)
-              return
-            }
-            if (Array.isArray(j.timetable)) {
-              const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-              for (const p of j.timetable) {
-                const day = p.day || p.weekday || 'Monday'
-                if (!byDay[day]) byDay[day] = []
-                byDay[day].push(p)
+                } catch (e) {}
+                // Note: do not override provider-selected date here. The
+                // `selectedDateObject` is driven by user choice and time-based
+                // auto-selection logic; forcing it from a general `/api/timetable`
+                // response can produce surprising results (e.g. showing Monday
+                // when the user expects today). If a date-affine fetch was
+                // performed specifically for a requested date, that code path
+                // (fetch-for-date) will handle aligning the provider date.
+                try {
+                  const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                  const summary = {
+                    weekType: j.weekType ?? null,
+                    counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                      ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                      : null,
+                  }
+                  setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                  setLastFetchedPayloadSummary(summary)
+                } catch (e) {}
+                setTimetableSource(j.source ?? 'external')
+                // (weekType already set above if present)
+                return
               }
-              // Attach long titles from subjects mapping if available
-              try {
-                const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
-                if (subjectsSource && typeof subjectsSource === 'object') {
-                  const shortToTitle: Record<string, string> = {}
-                  for (const k of Object.keys(subjectsSource)) {
-                    try {
-                      const v = subjectsSource[k]
-                      const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
-                      const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
-                      if (short && title) shortToTitle[String(short).trim()] = String(title)
-                    } catch (e) {}
-                  }
-                  for (const d of Object.keys(byDay)) {
-                    try {
-                      for (const p of byDay[d]) {
-                        try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
-                      }
-                    } catch (e) {}
-                  }
+              if (Array.isArray(j.timetable)) {
+                const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                for (const p of j.timetable) {
+                  const day = p.day || p.weekday || 'Monday'
+                  if (!byDay[day]) byDay[day] = []
+                  byDay[day].push(p)
                 }
-              } catch (e) {}
-
-              try {
-                // If upstream indicates the calendar day's week letter, filter
-                // the per-day arrays to only include entries that match that
-                // day-level weekType. This handles array-shaped payloads that
-                // may contain both A/B rows in a single list.
-                const candidateUp = j.upstream || j.diagnostics?.upstream || j
-                const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
-                if (dayObj) {
-                  const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
-                  const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
-                  let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
-                  if (!inferred) {
-                    try {
-                      const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
-                      const m = rawName.match(/([AB])$/i)
-                      if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
-                    } catch (e) {}
-                  }
-                  if (inferred) {
-                    try {
-                      if (inferred && (externalWeekType === null || externalWeekType === undefined)) {
-                        try { setExternalWeekType(inferred); setCurrentWeek(inferred) } catch (e) {}
-                      }
-                    } catch (e) {}
-                    // resolve a day key and filter only that day's entries
-                    let dayKey: string | null = null
-                    try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
-                    if (!dayKey) {
+                // Attach long titles from subjects mapping if available
+                try {
+                  const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
+                  if (subjectsSource && typeof subjectsSource === 'object') {
+                    const shortToTitle: Record<string, string> = {}
+                    for (const k of Object.keys(subjectsSource)) {
                       try {
-                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
-                        if (rawName.includes('mon')) dayKey = 'Monday'
-                        else if (rawName.includes('tue')) dayKey = 'Tuesday'
-                        else if (rawName.includes('wed')) dayKey = 'Wednesday'
-                        else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
-                        else if (rawName.includes('fri')) dayKey = 'Friday'
+                        const v = subjectsSource[k]
+                        const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                        const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                        if (short && title) shortToTitle[String(short).trim()] = String(title)
                       } catch (e) {}
                     }
-                    if (dayKey && byDay && Array.isArray(byDay[dayKey])) {
-                      const copy = { ...byDay }
-                      copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
-                      setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(copy, lastRecordedTimetable)))
+                    for (const d of Object.keys(byDay)) {
+                      try {
+                        for (const p of byDay[d]) {
+                          try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                } catch (e) {}
+
+                try {
+                  // If upstream indicates the calendar day's week letter, filter
+                  // the per-day arrays to only include entries that match that
+                  // day-level weekType. This handles array-shaped payloads that
+                  // may contain both A/B rows in a single list.
+                  const candidateUp = j.upstream || j.diagnostics?.upstream || j
+                  const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+                  if (dayObj) {
+                    const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                    const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                    let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                    if (!inferred) {
+                      try {
+                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                        const m = rawName.match(/([AB])$/i)
+                        if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                      } catch (e) {}
+                    }
+                    if (inferred) {
+                      // try to resolve day key
+                      let dayKey: string | null = null
+                      try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
+                      if (!dayKey) {
+                        try {
+                          const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                          if (rawName.includes('mon')) dayKey = 'Monday'
+                          else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                          else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                          else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                          else if (rawName.includes('fri')) dayKey = 'Friday'
+                        } catch (e) {}
+                      }
+                      if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
+                        const copy = { ...(j.timetable as any) }
+                        copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(copy, lastRecordedTimetable), j)))
+                      } else {
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                      }
                     } else {
-                      setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(byDay, lastRecordedTimetable)))
+                      setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
                     }
-                  } else {
-                    setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(byDay, lastRecordedTimetable)))
-                  }
-                } else {
-                  setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(byDay, lastRecordedTimetable)))
-                }
-              } catch (e) {
-                setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(byDay, lastRecordedTimetable)))
-              }
-              // Also persist processed result for array-shaped payloads
-              try {
-                if (_payloadHash && typeof window !== 'undefined') {
-                  try {
-                    const persisted = {
-                      timetable: byDay,
-                      timetableByWeek: null,
-                      bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
-                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
-                      source: j.source ?? 'external',
-                      weekType: j.weekType ?? null,
-                      savedAt: Date.now(),
-                    }
-                    localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
-                    try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
-                  } catch (e) {}
-                }
-              } catch (e) {}
-              try { setIsRefreshing(false) } catch (e) {}
-              // Intentionally not overriding `selectedDateObject` here for
-              // the reasons described above.
-              setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
-              }
-              return
-            }
-          }
-        }
-        if (rctype.includes('text/html')) {
-          const text = await r.text()
-          const parsed = parseTimetableHtmlLocal(text)
-          const hasData = Object.values(parsed).some((arr) => arr.length > 0)
-          if (hasData) {
-              setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(parsed, lastRecordedTimetable)))
-            setTimetableSource('external-scraped')
-            return
-          }
-        }
-      } catch (e) {
-        // fallthrough to handshake
-      }
-
-      // If not authenticated or no usable timetable, try handshake then refetch once
-      try {
-        await fetch('/api/portal/handshake', { method: 'POST', credentials: 'include' })
-      } catch (e) {
-        // ignore
-      }
-      // wait briefly
-      // short handshake delay — reduced for snappier background refreshes
-      await new Promise((res) => setTimeout(res, 300))
-
-      try {
-        const r2 = await fetch('/api/timetable', { credentials: 'include' })
-        if (r2.status === 401) {
-          try { await extractBellTimesFromResponse(r2) } catch (e) {}
-          if (!attemptedRefresh) {
-            try {
-              const rr = await fetch('/api/auth/refresh', { credentials: 'include' })
-              if (!rr || !rr.ok) {
-                try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
-                try { setIsAuthenticated(false) } catch (e) {}
-              }
-            } catch (e) {
-              try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
-            }
-            return refreshExternal(true)
-          }
-        }
-        const rctype2 = r2.headers.get('content-type') || ''
-        if (rctype2.includes('application/json')) {
-          const j = await r2.json()
-          if (j == null) return
-          if (payloadHasNoTimetable(j)) {
-            if (!cancelled) {
-              try {
-                const computed = buildBellTimesFromPayload(j)
-                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                const src = j.bellTimes || {}
-                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-                  else finalBellTimes[k] = []
-                }
-                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny) {
-                  setExternalBellTimes(finalBellTimes)
-                  lastSeenBellTimesRef.current = finalBellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                }
-              } catch (e) {
-                // ignore
-              }
-              setExternalTimetable(emptyByDay)
-              safeSetExternalTimetableByWeek(j?.weekType, null, 'refresh-no-timetable')
-              setTimetableSource('external-empty')
-              setExternalWeekType(null)
-              try {
-                setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
-              } catch (e) {}
-            }
-            return
-          }
-
-          if (typeof j.timetable === 'object' && !Array.isArray(j.timetable)) {
-            // If the payload reports a week type, set it immediately so that
-            // any `timetableByWeek` application happens with the correct
-            // `currentWeek` value and avoids temporary incorrect renders.
-            if (j.weekType === 'A' || j.weekType === 'B') {
-              setExternalWeekType(j.weekType)
-              setCurrentWeek(j.weekType)
-            }
-            if (j.timetableByWeek) safeSetExternalTimetableByWeek(j?.weekType, j.timetableByWeek, 'refresh')
-            if (j.bellTimes || j.upstream) {
-              try {
-                const computed = buildBellTimesFromPayload(j)
-                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                const src = j.bellTimes || {}
-                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                  else finalBellTimes[k] = []
-                }
-                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny || !lastSeenBellTimesRef.current) {
-                  try { console.log('[timetable.provider] setExternalBellTimes (merged retry)', finalBellTimes) } catch (e) {}
-                  setExternalBellTimes(finalBellTimes)
-                  lastSeenBellTimesRef.current = finalBellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                } else {
-                  try { console.log('[timetable.provider] skipping empty external bellTimes merge (retry)') } catch (e) {}
-                }
-              } catch (e) {
-                if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
-                  try { console.log('[timetable.provider] setExternalBellTimes (raw retry)', j.bellTimes) } catch (e) {}
-                  setExternalBellTimes(j.bellTimes)
-                  lastSeenBellTimesRef.current = j.bellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                }
-              }
-            }
-            try {
-              const candidateUp = j.upstream || j.diagnostics?.upstream || j
-              const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
-              if (dayObj) {
-                const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
-                const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
-                let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
-                if (!inferred) {
-                  try {
-                    const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
-                    const m = rawName.match(/([AB])$/i)
-                    if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
-                  } catch (e) {}
-                }
-                if (inferred) {
-                  // try to resolve day key
-                  let dayKey: string | null = null
-                  try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
-                  if (!dayKey) {
-                    try {
-                      const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
-                      if (rawName.includes('mon')) dayKey = 'Monday'
-                      else if (rawName.includes('tue')) dayKey = 'Tuesday'
-                      else if (rawName.includes('wed')) dayKey = 'Wednesday'
-                      else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
-                      else if (rawName.includes('fri')) dayKey = 'Friday'
-                    } catch (e) {}
-                  }
-                  if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
-                    const copy = { ...(j.timetable as any) }
-                    copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
-                    setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(copy, lastRecordedTimetable), j)))
                   } else {
                     setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
                   }
-                } else {
+                } catch (e) {
                   setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
                 }
-              } else {
-                setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                // Persist the processed result keyed by payload-hash so future
+                // loads can reuse the fully-applied timetable without re-extraction.
+                try {
+                  if (_payloadHash && typeof window !== 'undefined') {
+                    try {
+                      const persisted = {
+                        timetable: byDay,
+                        timetableByWeek: null,
+                        bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                        subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
+                        source: j.source ?? 'external',
+                        weekType: j.weekType ?? null,
+                        savedAt: Date.now(),
+                      }
+                      localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                      try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
+                    } catch (e) {}
+                  }
+                } catch (e) {}
+                // Note: do not override provider-selected date here. The
+                // `selectedDateObject` is driven by user choice and time-based
+                // auto-selection logic; forcing it from a general `/api/timetable`
+                // response can produce surprising results (e.g. showing Monday
+                // when the user expects today). If a date-affine fetch was
+                // performed specifically for a requested date, that code path
+                // (fetch-for-date) will handle aligning the provider date.
+                try {
+                  const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                  const summary = {
+                    weekType: j.weekType ?? null,
+                    counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                      ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                      : null,
+                  }
+                  setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                  setLastFetchedPayloadSummary(summary)
+                } catch (e) {}
+                setTimetableSource(j.source ?? 'external')
+                // (weekType already set above if present)
+                return
+              }
+              if (Array.isArray(j.timetable)) {
+                const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                for (const p of j.timetable) {
+                  const day = p.day || p.weekday || 'Monday'
+                  if (!byDay[day]) byDay[day] = []
+                  byDay[day].push(p)
+                }
+                // Attach long titles from subjects mapping if available
+                try {
+                  const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
+                  if (subjectsSource && typeof subjectsSource === 'object') {
+                    const shortToTitle: Record<string, string> = {}
+                    for (const k of Object.keys(subjectsSource)) {
+                      try {
+                        const v = subjectsSource[k]
+                        const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                        const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                        if (short && title) shortToTitle[String(short).trim()] = String(title)
+                      } catch (e) {}
+                    }
+                    for (const d of Object.keys(byDay)) {
+                      try {
+                        for (const p of byDay[d]) {
+                          try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                } catch (e) {}
+
+                try {
+                  // If upstream indicates the calendar day's week letter, filter
+                  // the per-day arrays to only include entries that match that
+                  // day-level weekType. This handles array-shaped payloads that
+                  // may contain both A/B rows in a single list.
+                  const candidateUp = j.upstream || j.diagnostics?.upstream || j
+                  const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+                  if (dayObj) {
+                    const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                    const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                    let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                    if (!inferred) {
+                      try {
+                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                        const m = rawName.match(/([AB])$/i)
+                        if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                      } catch (e) {}
+                    }
+                    if (inferred) {
+                      // try to resolve day key
+                      let dayKey: string | null = null
+                      try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
+                      if (!dayKey) {
+                        try {
+                          const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                          if (rawName.includes('mon')) dayKey = 'Monday'
+                          else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                          else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                          else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                          else if (rawName.includes('fri')) dayKey = 'Friday'
+                        } catch (e) {}
+                      }
+                      if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
+                        const copy = { ...(j.timetable as any) }
+                        copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(copy, lastRecordedTimetable), j)))
+                      } else {
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                      }
+                    } else {
+                      setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                    }
+                  } else {
+                    setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                  }
+                } catch (e) {
+                  setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                }
+                // Persist the processed result keyed by payload-hash so future
+                // loads can reuse the fully-applied timetable without re-extraction.
+                try {
+                  if (_payloadHash && typeof window !== 'undefined') {
+                    try {
+                      const persisted = {
+                        timetable: byDay,
+                        timetableByWeek: null,
+                        bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                        subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
+                        source: j.source ?? 'external',
+                        weekType: j.weekType ?? null,
+                        savedAt: Date.now(),
+                      }
+                      localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                      try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
+                    } catch (e) {}
+                  }
+                } catch (e) {}
+                // Note: do not override provider-selected date here. The
+                // `selectedDateObject` is driven by user choice and time-based
+                // auto-selection logic; forcing it from a general `/api/timetable`
+                // response can produce surprising results (e.g. showing Monday
+                // when the user expects today). If a date-affine fetch was
+                // performed specifically for a requested date, that code path
+                // (fetch-for-date) will handle aligning the provider date.
+                try {
+                  const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                  const summary = {
+                    weekType: j.weekType ?? null,
+                    counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                      ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                      : null,
+                  }
+                  setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                  setLastFetchedPayloadSummary(summary)
+                } catch (e) {}
+                setTimetableSource(j.source ?? 'external')
+                // (weekType already set above if present)
+                return
+              }
+              if (Array.isArray(j.timetable)) {
+                const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                for (const p of j.timetable) {
+                  const day = p.day || p.weekday || 'Monday'
+                  if (!byDay[day]) byDay[day] = []
+                  byDay[day].push(p)
+                }
+                // Attach long titles from subjects mapping if available
+                try {
+                  const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
+                  if (subjectsSource && typeof subjectsSource === 'object') {
+                    const shortToTitle: Record<string, string> = {}
+                    for (const k of Object.keys(subjectsSource)) {
+                      try {
+                        const v = subjectsSource[k]
+                        const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                        const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                        if (short && title) shortToTitle[String(short).trim()] = String(title)
+                      } catch (e) {}
+                    }
+                    for (const d of Object.keys(byDay)) {
+                      try {
+                        for (const p of byDay[d]) {
+                          try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                } catch (e) {}
+
+                try {
+                  // If upstream indicates the calendar day's week letter, filter
+                  // the per-day arrays to only include entries that match that
+                  // day-level weekType. This handles array-shaped payloads that
+                  // may contain both A/B rows in a single list.
+                  const candidateUp = j.upstream || j.diagnostics?.upstream || j
+                  const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+                  if (dayObj) {
+                    const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                    const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                    let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                    if (!inferred) {
+                      try {
+                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                        const m = rawName.match(/([AB])$/i)
+                        if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                      } catch (e) {}
+                    }
+                    if (inferred) {
+                      // try to resolve day key
+                      let dayKey: string | null = null
+                      try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
+                      if (!dayKey) {
+                        try {
+                          const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                          if (rawName.includes('mon')) dayKey = 'Monday'
+                          else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                          else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                          else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                          else if (rawName.includes('fri')) dayKey = 'Friday'
+                        } catch (e) {}
+                      }
+                      if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
+                        const copy = { ...(j.timetable as any) }
+                        copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(copy, lastRecordedTimetable), j)))
+                      } else {
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                      }
+                    } else {
+                      setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                    }
+                  } else {
+                    setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                  }
+                } catch (e) {
+                  setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                }
+                // Persist the processed result keyed by payload-hash so future
+                // loads can reuse the fully-applied timetable without re-extraction.
+                try {
+                  if (_payloadHash && typeof window !== 'undefined') {
+                    try {
+                      const persisted = {
+                        timetable: byDay,
+                        timetableByWeek: null,
+                        bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                        subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
+                        source: j.source ?? 'external',
+                        weekType: j.weekType ?? null,
+                        savedAt: Date.now(),
+                      }
+                      localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                      try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
+                    } catch (e) {}
+                  }
+                } catch (e) {}
+                // Note: do not override provider-selected date here. The
+                // `selectedDateObject` is driven by user choice and time-based
+                // auto-selection logic; forcing it from a general `/api/timetable`
+                // response can produce surprising results (e.g. showing Monday
+                // when the user expects today). If a date-affine fetch was
+                // performed specifically for a requested date, that code path
+                // (fetch-for-date) will handle aligning the provider date.
+                try {
+                  const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                  const summary = {
+                    weekType: j.weekType ?? null,
+                    counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                      ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                      : null,
+                  }
+                  setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                  setLastFetchedPayloadSummary(summary)
+                } catch (e) {}
+                setTimetableSource(j.source ?? 'external')
+                // (weekType already set above if present)
+                return
+              }
+              if (Array.isArray(j.timetable)) {
+                const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                for (const p of j.timetable) {
+                  const day = p.day || p.weekday || 'Monday'
+                  if (!byDay[day]) byDay[day] = []
+                  byDay[day].push(p)
+                }
+                // Attach long titles from subjects mapping if available
+                try {
+                  const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
+                  if (subjectsSource && typeof subjectsSource === 'object') {
+                    const shortToTitle: Record<string, string> = {}
+                    for (const k of Object.keys(subjectsSource)) {
+                      try {
+                        const v = subjectsSource[k]
+                        const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                        const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                        if (short && title) shortToTitle[String(short).trim()] = String(title)
+                      } catch (e) {}
+                    }
+                    for (const d of Object.keys(byDay)) {
+                      try {
+                        for (const p of byDay[d]) {
+                          try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                } catch (e) {}
+
+                try {
+                  // If upstream indicates the calendar day's week letter, filter
+                  // the per-day arrays to only include entries that match that
+                  // day-level weekType. This handles array-shaped payloads that
+                  // may contain both A/B rows in a single list.
+                  const candidateUp = j.upstream || j.diagnostics?.upstream || j
+                  const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+                  if (dayObj) {
+                    const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                    const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                    let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                    if (!inferred) {
+                      try {
+                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                        const m = rawName.match(/([AB])$/i)
+                        if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                      } catch (e) {}
+                    }
+                    if (inferred) {
+                      // try to resolve day key
+                      let dayKey: string | null = null
+                      try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
+                      if (!dayKey) {
+                        try {
+                          const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                          if (rawName.includes('mon')) dayKey = 'Monday'
+                          else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                          else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                          else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                          else if (rawName.includes('fri')) dayKey = 'Friday'
+                        } catch (e) {}
+                      }
+                      if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
+                        const copy = { ...(j.timetable as any) }
+                        copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(copy, lastRecordedTimetable), j)))
+                      } else {
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                      }
+                    } else {
+                      setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                    }
+                  } else {
+                    setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                  }
+                } catch (e) {
+                  setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                }
+                // Persist the processed result keyed by payload-hash so future
+                // loads can reuse the fully-applied timetable without re-extraction.
+                try {
+                  if (_payloadHash && typeof window !== 'undefined') {
+                    try {
+                      const persisted = {
+                        timetable: byDay,
+                        timetableByWeek: null,
+                        bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                        subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
+                        source: j.source ?? 'external',
+                        weekType: j.weekType ?? null,
+                        savedAt: Date.now(),
+                      }
+                      localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                      try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
+                    } catch (e) {}
+                  }
+                } catch (e) {}
+                // Note: do not override provider-selected date here. The
+                // `selectedDateObject` is driven by user choice and time-based
+                // auto-selection logic; forcing it from a general `/api/timetable`
+                // response can produce surprising results (e.g. showing Monday
+                // when the user expects today). If a date-affine fetch was
+                // performed specifically for a requested date, that code path
+                // (fetch-for-date) will handle aligning the provider date.
+                try {
+                  const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                  const summary = {
+                    weekType: j.weekType ?? null,
+                    counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                      ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                      : null,
+                  }
+                  setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                  setLastFetchedPayloadSummary(summary)
+                } catch (e) {}
+                setTimetableSource(j.source ?? 'external')
+                // (weekType already set above if present)
+                return
+              }
+              if (Array.isArray(j.timetable)) {
+                const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                for (const p of j.timetable) {
+                  const day = p.day || p.weekday || 'Monday'
+                  if (!byDay[day]) byDay[day] = []
+                  byDay[day].push(p)
+                }
+                // Attach long titles from subjects mapping if available
+                try {
+                  const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
+                  if (subjectsSource && typeof subjectsSource === 'object') {
+                    const shortToTitle: Record<string, string> = {}
+                    for (const k of Object.keys(subjectsSource)) {
+                      try {
+                        const v = subjectsSource[k]
+                        const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                        const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                        if (short && title) shortToTitle[String(short).trim()] = String(title)
+                      } catch (e) {}
+                    }
+                    for (const d of Object.keys(byDay)) {
+                      try {
+                        for (const p of byDay[d]) {
+                          try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                } catch (e) {}
+
+                try {
+                  // If upstream indicates the calendar day's week letter, filter
+                  // the per-day arrays to only include entries that match that
+                  // day-level weekType. This handles array-shaped payloads that
+                  // may contain both A/B rows in a single list.
+                  const candidateUp = j.upstream || j.diagnostics?.upstream || j
+                  const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+                  if (dayObj) {
+                    const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                    const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                    let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                    if (!inferred) {
+                      try {
+                        const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                        const m = rawName.match(/([AB])$/i)
+                        if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                      } catch (e) {}
+                    }
+                    if (inferred) {
+                      // try to resolve day key
+                      let dayKey: string | null = null
+                      try { if (dayObj.date) { const d = new Date(dayObj.date); if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' }) } } catch (e) {}
+                      if (!dayKey) {
+                        try {
+                          const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                          if (rawName.includes('mon')) dayKey = 'Monday'
+                          else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                          else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                          else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                          else if (rawName.includes('fri')) dayKey = 'Friday'
+                        } catch (e) {}
+                      }
+                      if (dayKey && j.timetable && Array.isArray((j.timetable as any)[dayKey])) {
+                        const copy = { ...(j.timetable as any) }
+                        copy[dayKey] = (copy[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(copy, lastRecordedTimetable), j)))
+                      } else {
+                        setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                      }
+                    } else {
+                      setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                    }
+                  } else {
+                    setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                  }
+                } catch (e) {
+                  setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+                }
+                // Persist the processed result keyed by payload-hash so future
+                // loads can reuse the fully-applied timetable without re-extraction.
+                try {
+                  if (_payloadHash && typeof window !== 'undefined') {
+                    try {
+                      const persisted = {
+                        timetable: byDay,
+                        timetableByWeek: null,
+                        bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                        subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null,
+                        source: j.source ?? 'external',
+                        weekType: j.weekType ?? null,
+                        savedAt: Date.now(),
+                      }
+                      localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                      try { console.debug('[timetable.provider] cached processed (array) payload', _payloadHash) } catch (e) {}
+                    } catch (e) {}
+                  }
+                } catch (e) {}
+                // Note: do not override provider-selected date here. The
+                // `selectedDateObject` is driven by user choice and time-based
+                // auto-selection logic; forcing it from a general `/api/timetable`
+               
+                // response can produce surprising results (e.g. showing Monday
+                // when the user expects today). If a date-affine fetch was
+                // performed specifically for a requested date, that code path
+                // (fetch-for-date) will handle aligning the provider date.
+                try {
+                  const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                  const summary = {
+                    weekType: j.weekType ?? null,
+                    counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                      ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                      : null,
+                  }
+                  setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                  setLastFetchedPayloadSummary(summary)
+                } catch (e) {}
+                setTimetableSource(j.source ?? 'external')
+                // (weekType already set above if present)
+                return
               }
             } catch (e) {
-              setExternalTimetable(enforceIncomingDestinations(enrichMapWithUpstreamVariations(mergePreserveOverrides(j.timetable, lastRecordedTimetable), j)))
+              // ignore
             }
-            setTimetableSource(j.source ?? 'external')
-            if (j.weekType === 'A' || j.weekType === 'B') {
-              setExternalWeekType(j.weekType)
-              setCurrentWeek(j.weekType)
-            }
-            try {
-              const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-              const summary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
-              setLastFetchedDate((new Date()).toISOString().slice(0,10))
-              setLastFetchedPayloadSummary(summary)
-            } catch (e) {}
-            return
-          }
-
-          if (Array.isArray(j.timetable)) {
-            const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-            for (const p of j.timetable) {
-              const day = p.day || p.weekday || 'Monday'
-              if (!byDay[day]) byDay[day] = []
-              byDay[day].push(p)
-            }
-            try { console.debug('[timetable.provider] setExternalTimetable (array->byDay)', { days: Object.keys(byDay || {}).length, externalWeekType, currentWeek }) } catch (e) {}
-            setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(byDay, lastRecordedTimetable)))
-            setTimetableSource(j.source ?? 'external')
-            if (j.weekType === 'A' || j.weekType === 'B') {
-              setExternalWeekType(j.weekType)
-              setCurrentWeek(j.weekType)
-            }
-            return
+          } catch (e) {
+            // ignore
           }
         }
-        if (rctype2.includes('text/html')) {
-          const text = await r2.text()
-          const parsed = parseTimetableHtmlLocal(text)
-          const hasData = Object.values(parsed).some((arr) => arr.length > 0)
-            if (hasData) {
-            setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(parsed, lastRecordedTimetable)))
-            setTimetableSource('external-scraped')
-            return
-          }
+
+        // If we still don't have live data, fall back to cached timetable for
+        // authenticated users. Do NOT clear previously-discovered
+        // `externalBellTimes` here — preserve bucket information so the UI
+        // continues to follow API-derived break rows.
+        try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
+        if (lastRecordedTimetable) {
+          // Prefer showing cached real data when available regardless of auth state.
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        } else if (isAuthenticated) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
+        } else {
+          // No cached data and auth unknown/false: keep whatever we have and surface an error
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
         }
       } catch (e) {
-        // ignore
-      }
-
-      // If we still don't have live data, fall back to cached timetable for
-      // authenticated users. Do NOT clear previously-discovered
-      // `externalBellTimes` here — preserve bucket information so the UI
-      // continues to follow API-derived break rows.
-      try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
-      if (lastRecordedTimetable) {
-        // Prefer showing cached real data when available regardless of auth state.
-        setExternalTimetable(lastRecordedTimetable)
-        setTimetableSource('cache')
-        setError(null)
-      } else if (isAuthenticated) {
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("Could not refresh timetable. Showing sample data.")
-      } else {
-        // No cached data and auth unknown/false: keep whatever we have and surface an error
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("Could not refresh timetable. Showing sample data.")
-      }
-    } catch (e) {
-      try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
-      if (lastRecordedTimetable) {
-        setExternalTimetable(lastRecordedTimetable)
-        setTimetableSource('cache')
-        setError(null)
-      } else if (isAuthenticated) {
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("An error occurred while refreshing timetable.")
-      } else {
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("An error occurred while refreshing timetable.")
-      }
-    } finally {
-      try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
-      try { setIsRefreshing(false) } catch (e) {}
-      // Remove debug listeners if present
-      try {
-        const h = refreshDebugHandlersRef.current
-        if (h) {
-          if (h.capture) document.removeEventListener('pointerdown', h.capture, true)
-          if (h.bubble) document.removeEventListener('click', h.bubble, false)
-          refreshDebugHandlersRef.current = null
-          console.debug('[timetable.refresh.debug] removed debug listeners')
+        try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
+        if (lastRecordedTimetable) {
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        } else if (isAuthenticated) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
+        } else {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
         }
-      } catch (e) {}
-      // Only clear the global loading flag if we initially showed it
-      // because there was no cache; otherwise keep cached UI visible.
-      try { if (!hadCache) setIsLoading(false) } catch (e) { setIsLoading(false) }
-    }
+      } finally {
+        try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
+        try { setIsRefreshing(false) } catch (e) {}
+        // Remove debug listeners if present
+        try {
+          const h = refreshDebugHandlersRef.current
+          if (h) {
+            if (h.capture) document.removeEventListener('pointerdown', h.capture, true)
+            if (h.bubble) document.removeEventListener('click', h.bubble, false)
+            refreshDebugHandlersRef.current = null
+            console.debug('[timetable.refresh.debug] removed debug listeners')
+          }
+        } catch (e) {}
+        // Only clear the global loading flag if we initially showed it
+        // because there was no cache; otherwise keep cached UI visible.
+        try { if (!hadCache) setIsLoading(false) } catch (e) { setIsLoading(false) }
+      }
   }
 
   // End the mount->ready timer when the provider finishes loading
@@ -3346,7 +4033,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   lastSeenBellTsRef.current = Date.now()
                 }
               } catch (e) {
-                // ignore
+                // ignore extraction errors and preserve previously-seen bells
               }
               setExternalTimetable(emptyByDay)
               safeSetExternalTimetableByWeek(j?.weekType, null, 'fetch-no-timetable')
@@ -3431,6 +4118,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
 
+                    // Apply generic substitutions to grouped week maps (debug enabled)
                     applyToWeek('A')
                     applyToWeek('B')
                     applyToWeek('unknown')
@@ -3445,160 +4133,1101 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore substitution extraction/apply errors
             }
 
-            if (finalByWeek) safeSetExternalTimetableByWeek(j?.weekType, finalByWeek, 'fetch-upstream')
-              setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(finalTimetable, lastRecordedTimetable)))
-            setTimetableSource(j.source ?? 'external')
-            // record debug summary
+            // Attach long subject titles when available in the upstream payload
             try {
-              const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-              const summary = {
-                weekType: j.weekType ?? null,
-                counts: finalByWeek && finalByWeek[dayName]
-                  ? { A: finalByWeek[dayName].A?.length || 0, B: finalByWeek[dayName].B?.length || 0, unknown: finalByWeek[dayName].unknown?.length || 0 }
-                  : null,
+              const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
+              if (subjectsSource && typeof subjectsSource === 'object') {
+                const shortToTitle: Record<string, string> = {}
+                for (const k of Object.keys(subjectsSource)) {
+                  try {
+                    const v = subjectsSource[k]
+                    const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                    const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                    if (short && title) shortToTitle[String(short).trim()] = String(title)
+                  } catch (e) {}
+                }
+                for (const d of Object.keys(finalTimetable)) {
+                  try {
+                    const arr = finalTimetable[d] || []
+                    for (const p of arr) {
+                      try {
+                        if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                      } catch (e) {}
+                    }
+                  } catch (e) {}
+                }
+                if (finalByWeek) {
+                  for (const d of Object.keys(finalByWeek)) {
+                    try {
+                      const groups = finalByWeek[d]
+                      for (const weekKey of ['A','B','unknown']) {
+                        try {
+                          const arr = (groups as any)[weekKey] || []
+                          for (const p of arr) {
+                            try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                          }
+                        } catch (e) {}
+                      }
+                    } catch (e) {}
+                  }
+                }
               }
-              setLastFetchedDate((new Date()).toISOString().slice(0,10))
-              setLastFetchedPayloadSummary(summary)
             } catch (e) {}
-            if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+
+            // If the payload explicitly reports a week type, set it first
+            // so downstream rendering logic that prefers `timetableByWeek`
+            // can compute using the correct `currentWeek` immediately
+            // (prevents a transient render with the wrong week selection).
             if (j.weekType === 'A' || j.weekType === 'B') {
-              setExternalWeekType(j.weekType)
-              setCurrentWeek(j.weekType)
-            } else {
-              // if the API explicitly left weekType null, clear the externalWeekType
-              setExternalWeekType(null)
+              try { console.debug('[timetable.provider] payload weekType', j.weekType) } catch (e) {}
+              debugSetWeekType(j.weekType)
+            }
+            if (finalByWeek) {
+              // Defensive: if the incoming payload does NOT include a top-level
+              // authoritative `weekType` and we already have a cached
+              // `lastRecordedTimetableByWeek`, avoid overriding the grouped
+              // A/B map. This prevents background refreshes without week
+              // metadata from flipping the selected cycle.
+              if (!(j && (j.weekType === 'A' || j.weekType === 'B')) && lastRecordedTimetableByWeek) {
+                try { console.debug('[timetable.provider] skipping externalTimetableByWeek override (no authoritative weekType in payload)') } catch (e) {}
+                // keep previous lastRecordedTimetableByWeek (do not set)
+              } else {
+                try {
+                  // Enrich each week map with upstream variations so room/teacher
+                  // substitutions embedded in `j.upstream` are applied to grouped maps.
+                  const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                  for (const d of Object.keys(finalByWeek)) {
+                    const groups = finalByWeek[d]
+                    transformed[d] = { A: [], B: [], unknown: [] }
+                    for (const wk of ['A','B','unknown'] as Array<'A'|'B'|'unknown'>) {
+                      try {
+                        const arr = Array.isArray((groups as any)[wk]) ? (groups as any)[wk].map((p: any) => ({ ...(p as any) })) : []
+                        // apply per-day enrichment by wrapping into a temp map
+                        const tempMap: Record<string, Period[]> = {}
+                        tempMap[d] = arr
+                        const enriched = enrichMapWithUpstreamVariations(tempMap, j)
+                        transformed[d][wk] = enriched && Array.isArray(enriched[d]) ? enriched[d] : arr
+                      } catch (e) { transformed[d][wk] = Array.isArray((groups as any)[wk]) ? (groups as any)[wk].slice() : [] }
+                    }
+                  }
+                  setExternalTimetableByWeek(transformed)
+                } catch (e) {
+                  setExternalTimetableByWeek(finalByWeek)
+                }
+              }
+            }
+            try {
+              // If the upstream payload includes a specific day with an explicit
+              // weekType (eg. `upstream.day.weekType`), prefer that per-day
+              // information and drop any class rows whose `weekType` does not
+              // match the day's week. This prevents combined A/B lists from
+              // showing classes that don't apply to the reported calendar day.
+              const candidateUp = j.upstream || j.diagnostics?.upstream || j
+              const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+              if (dayObj) {
+                const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                // Fallback: sometimes the day name encodes the letter (eg. "MonB")
+                if (!inferred) {
+                  try {
+                    const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                    const m = rawName.match(/([AB])$/i)
+                    if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                  } catch (e) {}
+                }
+                if (inferred) {
+                  try {
+                    // If we've inferred the authoritative day week from the
+                    // upstream day object, ensure provider state reflects
+                    // that immediately so downstream selection prefers it.
+                    if (inferred && (externalWeekType === null || externalWeekType === undefined)) {
+                      try { setExternalWeekType(inferred); setCurrentWeek(inferred) } catch (e) {}
+                    }
+                  } catch (e) {}
+                  // Resolve a JS weekday key from either an explicit date or a
+                  // day label provided by the upstream payload.
+                  let dayKey: string | null = null
+                  try {
+                    if (dayObj.date) {
+                      const d = new Date(dayObj.date)
+                      if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' })
+                    }
+                  } catch (e) {}
+                  if (!dayKey) {
+                    try {
+                      const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                      if (rawName.includes('mon')) dayKey = 'Monday'
+                      else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                      else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                      else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                      else if (rawName.includes('fri')) dayKey = 'Friday'
+                    } catch (e) {}
+                  }
+                  if (dayKey && finalTimetable && Array.isArray(finalTimetable[dayKey])) {
+                    finalTimetable[dayKey] = (finalTimetable[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                  }
+                }
+              } catch (e) {}
+              try { console.debug('[timetable.provider] setExternalTimetable (after subs)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+              try { console.debug('[timetable.provider] setExternalTimetable (final branch)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+              try {
+                // Merge with lastRecordedTimetable to preserve any prior casual/override metadata
+                const mergedLive = mergePreserveOverrides(finalTimetable, lastRecordedTimetable)
+                // Enrich merged map with any upstream variations found in the payload
+                const enrichedLive = enrichMapWithUpstreamVariations(mergedLive, j)
+                // Enforce incoming destinations deterministically and set
+                setExternalTimetable(enforceIncomingDestinations(enrichedLive))
+              } catch (e) {
+                setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(finalTimetable, lastRecordedTimetable)))
+              }
+              // Persist the processed result keyed by payload-hash so future
+              // loads can reuse the fully-applied timetable without re-extraction.
+              try {
+                if (_payloadHash && typeof window !== 'undefined') {
+                  try {
+                    const persisted = {
+                      timetable: finalTimetable,
+                      timetableByWeek: finalByWeek || null,
+                      bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null,
+                      source: j.source ?? 'external',
+                      weekType: j.weekType ?? null,
+                      savedAt: Date.now(),
+                    }
+                    localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                    try { console.debug('[timetable.provider] cached processed payload', _payloadHash) } catch (e) {}
+                  } catch (e) {
+                    // ignore storage errors
+                  }
+                }
+              } catch (e) {}
+              // Note: do not override provider-selected date here. The
+              // `selectedDateObject` is driven by user choice and time-based
+              // auto-selection logic; forcing it from a general `/api/timetable`
+              // response can produce surprising results (e.g. showing Monday
+              // when the user expects today). If a date-affine fetch was
+              // performed specifically for a requested date, that code path
+              // (fetch-for-date) will handle aligning the provider date.
+              try {
+                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                const summary = {
+                  weekType: j.weekType ?? null,
+                  counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                    ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                    : null,
+                }
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary(summary)
+              } catch (e) {}
+              setTimetableSource(j.source ?? 'external')
+              // (weekType already set above if present)
+              return
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        // If we still don't have live data, fall back to cached timetable for
+        // authenticated users. Do NOT clear previously-discovered
+        // `externalBellTimes` here — preserve bucket information so the UI
+        // continues to follow API-derived break rows.
+        try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
+        if (lastRecordedTimetable) {
+          // Prefer showing cached real data when available regardless of auth state.
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        } else if (isAuthenticated) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
+        } else {
+          // No cached data and auth unknown/false: keep whatever we have and surface an error
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
+        }
+      } catch (e) {
+        try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
+        if (lastRecordedTimetable) {
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        } else if (isAuthenticated) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
+        } else {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
+        }
+      } finally {
+        try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
+        try { setIsRefreshing(false) } catch (e) {}
+        // Remove debug listeners if present
+        try {
+          const h = refreshDebugHandlersRef.current
+          if (h) {
+            if (h.capture) document.removeEventListener('pointerdown', h.capture, true)
+            if (h.bubble) document.removeEventListener('click', h.bubble, false)
+            refreshDebugHandlersRef.current = null
+            console.debug('[timetable.refresh.debug] removed debug listeners')
+          }
+        } catch (e) {}
+        // Only clear the global loading flag if we initially showed it
+        // because there was no cache; otherwise keep cached UI visible.
+        try { if (!hadCache) setIsLoading(false) } catch (e) { setIsLoading(false) }
+      }
+  }
+
+  // End the mount->ready timer when the provider finishes loading
+  useEffect(() => {
+    if (loadTimingStartedRef.current && !isLoading) {
+      try { console.timeEnd('[timetable] mount->ready') } catch (e) {}
+      loadTimingStartedRef.current = false
+    }
+  }, [isLoading])
+
+  // Function to update all relevant time-based states
+  const updateAllTimeStates = useCallback(() => {
+    const currentSelectedIso = (selectedDateObject || new Date()).toISOString().slice(0,10)
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    const now = new Date()
+
+    // 1. Determine day for main timetable display
+      let dayForMainTimetable = now
+      let showingNextDayFlag = false
+
+      // If today is a weekend, show the next school day (e.g., Monday)
+      const todayDow = now.getDay()
+      if (todayDow === 0 || todayDow === 6) {
+        dayForMainTimetable = getNextSchoolDay(now)
+        showingNextDayFlag = true
+      } else if (isSchoolDayOver()) {
+        // If it's a weekday but the school day is over, show tomorrow's school day
+        dayForMainTimetable = getNextSchoolDay(now)
+        showingNextDayFlag = true
+      }
+    const mainTimetableDayName = days[dayForMainTimetable.getDay()]
+    // Respect a recent manual selection by the user: do not override if the user
+    // selected a date within the grace period.
+    const GRACE_MS = 2 * 60 * 1000 // 2 minutes
+    const nowMs = Date.now()
+    const lastUser = lastUserSelectedRef.current
+    const shouldRespectUser = lastUser && (nowMs - lastUser) < GRACE_MS
+
+    if (!shouldRespectUser) {
+      const targetDayName = mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName
+      const targetIso = dayForMainTimetable.toISOString().slice(0,10)
+      // Only update if the selected date actually changed to avoid triggering
+      // repeated fetches every tick when the date is identical.
+      if (targetIso !== currentSelectedIso) {
+        setSelectedDay(targetDayName)
+        setSelectedDateObject(dayForMainTimetable) // Set the actual Date object
+        setIsShowingNextDay(showingNextDayFlag)
+      }
+    }
+
+    // 2. Calculate current moment's period info (always based on actual current day)
+    const actualCurrentDayName = getCurrentDay() // Use getCurrentDay for the actual day
+    if (actualCurrentDayName !== "Sunday" && actualCurrentDayName !== "Saturday") {
+      const actualTodayTimetable = timetableData[actualCurrentDayName]
+      const info = getTimeUntilNextPeriod(actualTodayTimetable)
+
+      // If we've reached end-of-day (no next period and not currently in class),
+      // show a "School in" countdown pointing at the next school day's roll call
+      // (first non-break period). This prevents extremely large durations being
+      // shown when parsers return far-future sentinel dates.
+      try {
+        if (!info.isCurrentlyInClass && !info.nextPeriod) {
+          const nextDayDate = getNextSchoolDay(new Date())
+          const nextDayName = nextDayDate.toLocaleDateString('en-US', { weekday: 'long' })
+          const nextDayPeriods = timetableData[nextDayName]
+          if (Array.isArray(nextDayPeriods) && nextDayPeriods.length) {
+            const found = findFirstNonBreakPeriodOnDate(nextDayPeriods, nextDayDate)
+            if (found) {
+              const now2 = new Date()
+              const diffMs = found.start.getTime() - now2.getTime()
+              if (diffMs > 0) {
+                // Create a lightweight synthetic period marker for UI use.
+                info.nextPeriod = { ...found.period, isRollCallMarker: true } as any
+                info.timeUntil = `School in ${formatDurationShort(diffMs)} until roll call`
+              }
             }
           }
         }
-      } catch (e) {
-        // ignore fetch errors here; provider has existing fallback logic
-      } finally {
-        // Allow subsequent attempts for the same date by clearing the marker
-        try { lastRequestedDateRef.current = null } catch (e) {}
-      }
-    }
-    fetchForDate()
-    return () => { cancelled = true }
-  }, [selectedDateObject])
+      } catch (e) {}
 
-  // Keep currentWeek synchronized with the server-provided externalWeekType
-  useEffect(() => {
-    if (externalWeekType && currentWeek !== externalWeekType) {
-      try { console.log('[timetable.provider] syncing currentWeek to externalWeekType', externalWeekType) } catch (e) {}
-      setCurrentWeek(externalWeekType)
+      setCurrentMomentPeriodInfo(info)
+    } else {
+      setCurrentMomentPeriodInfo({
+        nextPeriod: null,
+        timeUntil: "No classes",
+        isCurrentlyInClass: false,
+        currentPeriod: null,
+      })
     }
-  }, [externalWeekType, currentWeek])
+  }, [timetableData, selectedDateObject]) // include selectedDateObject to compare and avoid redundant updates
 
-  // Preserve casualSurname from the last recorded timetable when a fresh
-  // externalTimetable arrives that lacks casual markers. This handles the
-  // case where a background refresh returns a bare teacher code (e.g. "LIKZ")
-  // and we want to keep the human-friendly casual name previously applied.
+  // Initial update and 1-second interval for all time-based states
   useEffect(() => {
-    try {
-      if (!externalTimetable) return
-      if (!lastRecordedTimetable) return
-      let changed = false
-      const merged: Record<string, Period[]> = {}
-      for (const day of Object.keys(externalTimetable)) {
-        const newList = (externalTimetable[day] || []).map((p) => {
-          try {
-            const prevList = (lastRecordedTimetable && lastRecordedTimetable[day]) ? lastRecordedTimetable[day] : []
-            // Try to find a matching previous period by id first, then fall back
-            // to matching by period+subject+time. This covers payloads that may
-            // omit stable ids.
-            const match = prevList.find((q) => {
+    // Adaptive ticking: update frequently while the document is visible, but
+    // reduce frequency (or pause) when hidden to save CPU and battery.
+    let intervalId: number | null = null
+
+    function startFastTick() {
+      if (intervalId != null) window.clearInterval(intervalId)
+      updateAllTimeStates()
+      intervalId = window.setInterval(updateAllTimeStates, 1000)
+    }
+
+    function startSlowTick() {
+      if (intervalId != null) window.clearInterval(intervalId)
+      // slow update every 15s when tab is hidden
+      intervalId = window.setInterval(updateAllTimeStates, 15000)
+    }
+
+    function handleVisibility() {
+      if (typeof document === 'undefined') return
+      if (document.visibilityState === 'visible') startFastTick()
+      else startSlowTick()
+    }
+
+    // Initialize based on current visibility and keep listeners to adjust.
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [updateAllTimeStates])
+
+  // Visibility-aware background refresh: poll the server more frequently
+  // when the document is visible, and back off when hidden.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    let intervalId: number | null = null
+
+    const startWithInterval = (ms: number) => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      // Fire a refresh immediately and allow this visibility-triggered
+      // call to bypass the MIN refresh throttle by passing `force=true`.
+      void refreshExternal(false, true).catch(() => {})
+      intervalId = window.setInterval(() => { void refreshExternal(false, true).catch(() => {}) }, ms)
+    }
+
+    function handleVisibility() {
+      try {
+        if (document.visibilityState === 'visible') startWithInterval(VISIBLE_REFRESH_MS)
+        else startWithInterval(HIDDEN_REFRESH_MS)
+      } catch (e) {}
+    }
+
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [])
+
+  // When the selected date changes, fetch the authoritative timetable for that date
+  useEffect(() => {
+    let cancelled = false
+    const fetchForDate = async () => {
+      try {
+        const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+        // If we've just requested this same date, skip duplicate fetch
+        if (lastRequestedDateRef.current === ds) return
+        lastRequestedDateRef.current = ds
+        const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
+        const ctype = res.headers.get('content-type') || ''
+        if (!res.ok) {
+          try { await extractBellTimesFromResponse(res) } catch (e) {}
+          return
+        }
+        if (ctype.includes('application/json')) {
+          const j = await res.json()
+          if (cancelled) return
+          if (j && payloadHasNoTimetable(j)) {
+            if (!cancelled) {
               try {
-                if (q && (q as any).id && p && (p as any).id && (q as any).id === (p as any).id) return true
-                if (String(q?.period || '') === String(p?.period || '') && String(q?.subject || '') === String(p?.subject || '') && String(q?.time || '') === String(p?.time || '')) return true
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore extraction errors and preserve previously-seen bells
+              }
+              setExternalTimetable(emptyByDay)
+              safeSetExternalTimetableByWeek(j?.weekType, null, 'fetch-no-timetable')
+              setTimetableSource('external-empty')
+              setExternalWeekType(null)
+              setCurrentWeek(null)
+              try {
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
               } catch (e) {}
-              return false
-            })
-            if (match && !(p as any).casualSurname && (match as any).casualSurname) {
-              const copy = { ...p } as any
-              copy.casualSurname = (match as any).casualSurname
-              changed = true
-              return copy
+            }
+            return
+          }
+          if (j && j.timetable && typeof j.timetable === 'object') {
+            // If the server returned substitutions separately, attempt to fetch
+            // them and apply in-place so the day-by-day timetable JSON includes
+            // substitute teachers and room changes.
+            let finalTimetable = j.timetable
+            let finalByWeek = j.timetableByWeek || null
+            try {
+              // First try to extract variations embedded in the timetable payload
+              let subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+
+    
+              // If none found in upstream, request from the AI timetable endpoint
+              if ((!Array.isArray(subs) || subs.length === 0)) {
+                try {
+                  // Try to extract substitutions from the already-fetched timetable payload
+                  const fetched = await getPortalSubstitutions(j)
+                  if (Array.isArray(fetched) && fetched.length) subs = fetched
+                } catch (e) {
+                  // ignore
+                }
+              }
+
+              if (Array.isArray(subs) && subs.length) {
+                try {
+                  // Apply all substitutions (date-specific + generic) to the per-day timetable
+                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                } catch (e) { /* ignore substitution apply errors */ }
+
+                const genericSubs = subs.filter((s: any) => !s || !s.date)
+
+                if (j.timetableByWeek && genericSubs.length) {
+                  try {
+                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                    // Copy to avoid mutating original
+                    for (const d of Object.keys(byWeekSrc)) {
+                      transformed[d] = {
+                        A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                        B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                        unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
+                      }
+                    }
+
+                    // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
+                    const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                        for (const d of Object.keys(transformed)) {
+                          weekMap[d] = transformed[d][weekKey] || []
+                        }
+                        // Only apply substitutions relevant to this week: include
+                        // substitutions that either have no `weekType` (generic)
+                        // or whose `weekType` equals the target week. For the
+                        // `unknown` group, treat it as matching only substitutions
+                        // that explicitly declare `weekType === 'unknown'` or are
+                        // generic (no weekType).
+                        const subsForWeek = (genericSubs || []).filter((s: any) => {
+                          try {
+                            if (!s) return false
+                            const wt = s.weekType || s.week || s.week_type || undefined
+                            if (!wt) return true // generic applies to all weeks
+                            const wts = String(wt).toUpperCase()
+                            if (weekKey === 'unknown') return wts === 'UNKNOWN'
+                            return wts === weekKey
+                          } catch (e) { return false }
+                        })
+                        const applied = applySubstitutionsToTimetable(weekMap, subsForWeek, { debug: true })
+                        for (const d of Object.keys(transformed)) {
+                          transformed[d][weekKey] = applied[d] || []
+                        }
+                      }
+
+                    // Apply generic substitutions to grouped week maps (debug enabled)
+                    applyToWeek('A')
+                    applyToWeek('B')
+                    applyToWeek('unknown')
+
+                    finalByWeek = transformed
+                  } catch (e) {
+                    // ignore by-week substitution failures
+                  }
+                }
+              }
+            } catch (e) {
+              // ignore substitution extraction/apply errors
+            }
+
+            // Attach long subject titles when available in the upstream payload
+            try {
+              const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
+              if (subjectsSource && typeof subjectsSource === 'object') {
+                const shortToTitle: Record<string, string> = {}
+                for (const k of Object.keys(subjectsSource)) {
+                  try {
+                    const v = subjectsSource[k]
+                    const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                    const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
+                    if (short && title) shortToTitle[String(short).trim()] = String(title)
+                  } catch (e) {}
+                }
+                for (const d of Object.keys(finalTimetable)) {
+                  try {
+                    const arr = finalTimetable[d] || []
+                    for (const p of arr) {
+                      try {
+                        if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                      } catch (e) {}
+                    }
+                  } catch (e) {}
+                }
+                if (finalByWeek) {
+                  for (const d of Object.keys(finalByWeek)) {
+                    try {
+                      const groups = finalByWeek[d]
+                      for (const weekKey of ['A','B','unknown']) {
+                        try {
+                          const arr = (groups as any)[weekKey] || []
+                          for (const p of arr) {
+                            try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                          }
+                        } catch (e) {}
+                      }
+                    } catch (e) {}
+                  }
+                }
+              }
+            } catch (e) {}
+
+            // If the payload explicitly reports a week type, set it first
+            // so downstream rendering logic that prefers `timetableByWeek`
+            // can compute using the correct `currentWeek` immediately
+            // (prevents a transient render with the wrong week selection).
+            if (j.weekType === 'A' || j.weekType === 'B') {
+              try { console.debug('[timetable.provider] payload weekType', j.weekType) } catch (e) {}
+              debugSetWeekType(j.weekType)
+            }
+            if (finalByWeek) {
+              // Defensive: if the incoming payload does NOT include a top-level
+              // authoritative `weekType` and we already have a cached
+              // `lastRecordedTimetableByWeek`, avoid overriding the grouped
+              // A/B map. This prevents background refreshes without week
+              // metadata from flipping the selected cycle.
+              if (!(j && (j.weekType === 'A' || j.weekType === 'B')) && lastRecordedTimetableByWeek) {
+                try { console.debug('[timetable.provider] skipping externalTimetableByWeek override (no authoritative weekType in payload)') } catch (e) {}
+                // keep previous lastRecordedTimetableByWeek (do not set)
+              } else {
+                try {
+                  // Enrich each week map with upstream variations so room/teacher
+                  // substitutions embedded in `j.upstream` are applied to grouped maps.
+                  const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                  for (const d of Object.keys(finalByWeek)) {
+                    const groups = finalByWeek[d]
+                    transformed[d] = { A: [], B: [], unknown: [] }
+                    for (const wk of ['A','B','unknown'] as Array<'A'|'B'|'unknown'>) {
+                      try {
+                        const arr = Array.isArray((groups as any)[wk]) ? (groups as any)[wk].map((p: any) => ({ ...(p as any) })) : []
+                        // apply per-day enrichment by wrapping into a temp map
+                        const tempMap: Record<string, Period[]> = {}
+                        tempMap[d] = arr
+                        const enriched = enrichMapWithUpstreamVariations(tempMap, j)
+                        transformed[d][wk] = enriched && Array.isArray(enriched[d]) ? enriched[d] : arr
+                      } catch (e) { transformed[d][wk] = Array.isArray((groups as any)[wk]) ? (groups as any)[wk].slice() : [] }
+                    }
+                  }
+                  setExternalTimetableByWeek(transformed)
+                } catch (e) {
+                  setExternalTimetableByWeek(finalByWeek)
+                }
+              }
+            }
+            try {
+              // If the upstream payload includes a specific day with an explicit
+              // weekType (eg. `upstream.day.weekType`), prefer that per-day
+              // information and drop any class rows whose `weekType` does not
+              // match the day's week. This prevents combined A/B lists from
+              // showing classes that don't apply to the reported calendar day.
+              const candidateUp = j.upstream || j.diagnostics?.upstream || j
+              const dayObj = candidateUp && candidateUp.day ? candidateUp.day : null
+              if (dayObj) {
+                const rawWeek = (dayObj.weekType || dayObj.week_type || dayObj.week || dayObj.weekLabel || dayObj.rotation || dayObj.cycle) || null
+                const weekLetter = rawWeek ? String(rawWeek).trim().toUpperCase() : null
+                let inferred: 'A' | 'B' | null = (weekLetter === 'A' || weekLetter === 'B') ? (weekLetter as 'A' | 'B') : null
+                // Fallback: sometimes the day name encodes the letter (eg. "MonB")
+                if (!inferred) {
+                  try {
+                    const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || dayObj.title || '').trim()
+                    const m = rawName.match(/([AB])$/i)
+                    if (m && m[1]) inferred = (m[1].toUpperCase() as 'A' | 'B')
+                  } catch (e) {}
+                }
+                if (inferred) {
+                  try {
+                    // If we've inferred the authoritative day week from the
+                    // upstream day object, ensure provider state reflects
+                    // that immediately so downstream selection prefers it.
+                    if (inferred && (externalWeekType === null || externalWeekType === undefined)) {
+                      try { setExternalWeekType(inferred); setCurrentWeek(inferred) } catch (e) {}
+                    }
+                  } catch (e) {}
+                  // Resolve a JS weekday key from either an explicit date or a
+                  // day label provided by the upstream payload.
+                  let dayKey: string | null = null
+                  try {
+                    if (dayObj.date) {
+                      const d = new Date(dayObj.date)
+                      if (!Number.isNaN(d.getTime())) dayKey = d.toLocaleDateString('en-US', { weekday: 'long' })
+                    }
+                  } catch (e) {}
+                  if (!dayKey) {
+                    try {
+                      const rawName = String(dayObj.dayName || dayObj.dayname || dayObj.day || '').toLowerCase()
+                      if (rawName.includes('mon')) dayKey = 'Monday'
+                      else if (rawName.includes('tue')) dayKey = 'Tuesday'
+                      else if (rawName.includes('wed')) dayKey = 'Wednesday'
+                      else if (rawName.includes('thu') || rawName.includes('thur')) dayKey = 'Thursday'
+                      else if (rawName.includes('fri')) dayKey = 'Friday'
+                    } catch (e) {}
+                  }
+                  if (dayKey && finalTimetable && Array.isArray(finalTimetable[dayKey])) {
+                    finalTimetable[dayKey] = (finalTimetable[dayKey] || []).filter((p: any) => !(p && p.weekType) || String(p.weekType).toUpperCase() === inferred)
+                  }
+                }
+              } catch (e) {}
+              try { console.debug('[timetable.provider] setExternalTimetable (after subs)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+              try { console.debug('[timetable.provider] setExternalTimetable (final branch)', { days: Object.keys(finalTimetable || {}).length, externalWeekType, currentWeek }) } catch (e) {}
+              try {
+                // Merge with lastRecordedTimetable to preserve any prior casual/override metadata
+                const mergedLive = mergePreserveOverrides(finalTimetable, lastRecordedTimetable)
+                // Enrich merged map with any upstream variations found in the payload
+                const enrichedLive = enrichMapWithUpstreamVariations(mergedLive, j)
+                // Enforce incoming destinations deterministically and set
+                setExternalTimetable(enforceIncomingDestinations(enrichedLive))
+              } catch (e) {
+                setExternalTimetable(enforceIncomingDestinations(mergePreserveOverrides(finalTimetable, lastRecordedTimetable)))
+              }
+              // Persist the processed result keyed by payload-hash so future
+              // loads can reuse the fully-applied timetable without re-extraction.
+              try {
+                if (_payloadHash && typeof window !== 'undefined') {
+                  try {
+                    const persisted = {
+                      timetable: finalTimetable,
+                      timetableByWeek: finalByWeek || null,
+                      bellTimes: j.bellTimes || buildBellTimesFromPayload(j) || null,
+                      subjects: j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null,
+                      source: j.source ?? 'external',
+                      weekType: j.weekType ?? null,
+                      savedAt: Date.now(),
+                    }
+                    localStorage.setItem(`synchron-processed-${_payloadHash}`, JSON.stringify(persisted))
+                    try { console.debug('[timetable.provider] cached processed payload', _payloadHash) } catch (e) {}
+                  } catch (e) {
+                    // ignore storage errors
+                  }
+                }
+              } catch (e) {}
+              // Note: do not override provider-selected date here. The
+              // `selectedDateObject` is driven by user choice and time-based
+              // auto-selection logic; forcing it from a general `/api/timetable`
+              // response can produce surprising results (e.g. showing Monday
+              // when the user expects today). If a date-affine fetch was
+              // performed specifically for a requested date, that code path
+              // (fetch-for-date) will handle aligning the provider date.
+              try {
+                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                const summary = {
+                  weekType: j.weekType ?? null,
+                  counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                    ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                    : null,
+                }
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary(summary)
+              } catch (e) {}
+              setTimetableSource(j.source ?? 'external')
+              // (weekType already set above if present)
+              return
             }
           } catch (e) {
-            // ignore per-item errors
+            // ignore
           }
-          return p
-        })
-        merged[day] = newList
+        }
+
+        // If we still don't have live data, fall back to cached timetable for
+        // authenticated users. Do NOT clear previously-discovered
+        // `externalBellTimes` here — preserve bucket information so the UI
+        // continues to follow API-derived break rows.
+        try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
+        if (lastRecordedTimetable) {
+          // Prefer showing cached real data when available regardless of auth state.
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        } else if (isAuthenticated) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
+        } else {
+          // No cached data and auth unknown/false: keep whatever we have and surface an error
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
+        }
+      } catch (e) {
+        try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
+        if (lastRecordedTimetable) {
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        } else if (isAuthenticated) {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
+        } else {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
+        }
+      } finally {
+        try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
+        try { setIsRefreshing(false) } catch (e) {}
+        // Remove debug listeners if present
+        try {
+          const h = refreshDebugHandlersRef.current
+          if (h) {
+            if (h.capture) document.removeEventListener('pointerdown', h.capture, true)
+            if (h.bubble) document.removeEventListener('click', h.bubble, false)
+            refreshDebugHandlersRef.current = null
+            console.debug('[timetable.refresh.debug] removed debug listeners')
+          }
+        } catch (e) {}
+        // Only clear the global loading flag if we initially showed it
+        // because there was no cache; otherwise keep cached UI visible.
+        try { if (!hadCache) setIsLoading(false) } catch (e) { setIsLoading(false) }
       }
-      if (changed) {
-        try { console.debug('[timetable.provider] merged casualSurname from cache into refreshed timetable') } catch (e) {}
-        setExternalTimetable(merged)
-      }
-    } catch (e) {
-      // ignore merge errors
+  }
+
+  // End the mount->ready timer when the provider finishes loading
+  useEffect(() => {
+    if (loadTimingStartedRef.current && !isLoading) {
+      try { console.timeEnd('[timetable] mount->ready') } catch (e) {}
+      loadTimingStartedRef.current = false
     }
-  }, [externalTimetable, lastRecordedTimetable])
+  }, [isLoading])
 
-  // Wrapped setters that record a user selection timestamp so automatic
-  // time-based updates can respect manual choices for a short grace period.
-  const userSetSelectedDay = (day: string) => {
-    const ts = Date.now()
-    lastUserSelectedRef.current = ts
-    setLastUserSelectedAt(ts)
-    setSelectedDay(day)
-  }
-  const userSetSelectedDateObject = (d: Date) => {
-    const ts = Date.now()
-    lastUserSelectedRef.current = ts
-    setLastUserSelectedAt(ts)
-    setSelectedDateObject(d)
-  }
+  // Function to update all relevant time-based states
+  const updateAllTimeStates = useCallback(() => {
+    const currentSelectedIso = (selectedDateObject || new Date()).toISOString().slice(0,10)
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    const now = new Date()
 
-  return (
-    <TimetableContext.Provider
-      value={{
-        currentWeek,
-        externalWeekType,
-        lastFetchedDate,
-        lastFetchedPayloadSummary,
-        selectedDay,
-        selectedDateObject, // Provide the new state
-        setSelectedDay: userSetSelectedDay,
-        setSelectedDateObject: userSetSelectedDateObject,
-        lastUserSelectedAt,
-        timetableData,
-        currentMomentPeriodInfo, // Provide the new state
-        // Backwards-compatible alias for older components
-        nextPeriodInfo: currentMomentPeriodInfo,
-        bellTimes: externalBellTimes || lastSeenBellTimesRef.current || null,
-        isShowingNextDay,
-        timetableSource,
-        timetableByWeek: lastRecordedTimetableByWeek || externalTimetableByWeek || undefined,
-        externalWeekType,
-        isLoading,
-        isRefreshing,
-        isShowingCachedWhileLoading: Boolean((isLoading || isRefreshing) && lastRecordedTimetable),
-        error,
-        refreshExternal,
-      }}
-    >
-      {children}
-    </TimetableContext.Provider>
-  )
-}
+    // 1. Determine day for main timetable display
+      let dayForMainTimetable = now
+      let showingNextDayFlag = false
 
-// Create a hook to use the timetable context
-export function useTimetable() {
-  const context = useContext(TimetableContext)
-  if (context === undefined) {
-    throw new Error("useTimetable must be used within a TimetableProvider")
-  }
-  return context
-}
+      // If today is a weekend, show the next school day (e.g., Monday)
+      const todayDow = now.getDay()
+      if (todayDow === 0 || todayDow === 6) {
+        dayForMainTimetable = getNextSchoolDay(now)
+        showingNextDayFlag = true
+      } else if (isSchoolDayOver()) {
+        // If it's a weekday but the school day is over, show tomorrow's school day
+        dayForMainTimetable = getNextSchoolDay(now)
+        showingNextDayFlag = true
+      }
+    const mainTimetableDayName = days[dayForMainTimetable.getDay()]
+    // Respect a recent manual selection by the user: do not override if the user
+    // selected a date within the grace period.
+    const GRACE_MS = 2 * 60 * 1000 // 2 minutes
+    const nowMs = Date.now()
+    const lastUser = lastUserSelectedRef.current
+    const shouldRespectUser = lastUser && (nowMs - lastUser) < GRACE_MS
 
-// Safe variant: returns the context or undefined instead of throwing.
-// Useful in settings or other places that may render outside the provider.
-export function useTimetableSafe() {
-  try {
-    return useContext(TimetableContext)
-  } catch (e) {
-    return undefined
-  }
-}
+    if (!shouldRespectUser) {
+      const targetDayName = mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName
+      const targetIso = dayForMainTimetable.toISOString().slice(0,10)
+      // Only update if the selected date actually changed to avoid triggering
+      // repeated fetches every tick when the date is identical.
+      if (targetIso !== currentSelectedIso) {
+        setSelectedDay(targetDayName)
+        setSelectedDateObject(dayForMainTimetable) // Set the actual Date object
+        setIsShowingNextDay(showingNextDayFlag)
+      }
+    }
 
+    // 2. Calculate current moment's period info (always based on actual current day)
+    const actualCurrentDayName = getCurrentDay() // Use getCurrentDay for the actual day
+    if (actualCurrentDayName !== "Sunday" && actualCurrentDayName !== "Saturday") {
+      const actualTodayTimetable = timetableData[actualCurrentDayName]
+      const info = getTimeUntilNextPeriod(actualTodayTimetable)
+
+      // If we've reached end-of-day (no next period and not currently in class),
+      // show a "School in" countdown pointing at the next school day's roll call
+      // (first non-break period). This prevents extremely large durations being
+      // shown when parsers return far-future sentinel dates.
+      try {
+        if (!info.isCurrentlyInClass && !info.nextPeriod) {
+          const nextDayDate = getNextSchoolDay(new Date())
+          const nextDayName = nextDayDate.toLocaleDateString('en-US', { weekday: 'long' })
+          const nextDayPeriods = timetableData[nextDayName]
+          if (Array.isArray(nextDayPeriods) && nextDayPeriods.length) {
+            const found = findFirstNonBreakPeriodOnDate(nextDayPeriods, nextDayDate)
+            if (found) {
+              const now2 = new Date()
+              const diffMs = found.start.getTime() - now2.getTime()
+              if (diffMs > 0) {
+                // Create a lightweight synthetic period marker for UI use.
+                info.nextPeriod = { ...found.period, isRollCallMarker: true } as any
+                info.timeUntil = `School in ${formatDurationShort(diffMs)} until roll call`
+              }
+            }
+          }
+        }
+      } catch (e) {}
+
+      setCurrentMomentPeriodInfo(info)
+    } else {
+      setCurrentMomentPeriodInfo({
+        nextPeriod: null,
+        timeUntil: "No classes",
+        isCurrentlyInClass: false,
+        currentPeriod: null,
+      })
+    }
+  }, [timetableData, selectedDateObject]) // include selectedDateObject to compare and avoid redundant updates
+
+  // Initial update and 1-second interval for all time-based states
+  useEffect(() => {
+    // Adaptive ticking: update frequently while the document is visible, but
+    // reduce frequency (or pause) when hidden to save CPU and battery.
+    let intervalId: number | null = null
+
+    function startFastTick() {
+      if (intervalId != null) window.clearInterval(intervalId)
+      updateAllTimeStates()
+      intervalId = window.setInterval(updateAllTimeStates, 1000)
+    }
+
+    function startSlowTick() {
+      if (intervalId != null) window.clearInterval(intervalId)
+      // slow update every 15s when tab is hidden
+      intervalId = window.setInterval(updateAllTimeStates, 15000)
+    }
+
+    function handleVisibility() {
+      if (typeof document === 'undefined') return
+      if (document.visibilityState === 'visible') startFastTick()
+      else startSlowTick()
+    }
+
+    // Initialize based on current visibility and keep listeners to adjust.
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [updateAllTimeStates])
+
+  // Visibility-aware background refresh: poll the server more frequently
+  // when the document is visible, and back off when hidden.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    let intervalId: number | null = null
+
+    const startWithInterval = (ms: number) => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      // Fire a refresh immediately and allow this visibility-triggered
+      // call to bypass the MIN refresh throttle by passing `force=true`.
+      void refreshExternal(false, true).catch(() => {})
+      intervalId = window.setInterval(() => { void refreshExternal(false, true).catch(() => {}) }, ms)
+    }
+
+    function handleVisibility() {
+      try {
+        if (document.visibilityState === 'visible') startWithInterval(VISIBLE_REFRESH_MS)
+        else startWithInterval(HIDDEN_REFRESH_MS)
+      } catch (e) {}
+    }
+
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [])
+
+  // When the selected date changes, fetch the authoritative timetable for that date
+  useEffect(() => {
+    let cancelled = false
+    const fetchForDate = async () => {
+      try {
+        const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+        // If we've just requested this same date, skip duplicate fetch
+        if (lastRequestedDateRef.current === ds) return
+        lastRequestedDateRef.current = ds
+        const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
+        const ctype = res.headers.get('content-type') || ''
+        if (!res.ok) {
+          try { await extractBellTimesFromResponse(res) } catch (e) {}
+          return
+        }
+        if (ctype.includes('application/json')) {
+          const j = await res.json()
+          if (cancelled) return
+          if (j && payloadHasNoTimetable(j)) {
+            if (!cancelled) {
+              try {
+                const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                const src = j.bellTimes || {}
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
+                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                if (hasAny) {
+                  setExternalBellTimes(finalBellTimes)
+                  lastSeenBellTimesRef.current = finalBellTimes
+                  lastSeenBellTsRef.current = Date.now()
+                }
+              } catch (e) {
+                // ignore extraction errors and preserve previously-seen bells
+              }
+              setExternalTimetable(emptyByDay)
+              safeSetExternalTimetableByWeek(j?.weekType, null, 'fetch-no-timetable')
+              setTimetableSource('external-empty')
+              setExternalWeekType(null)
+              setCurrentWeek(null)
+              try {
+                setLastFetchedDate((new Date()).toISOString().slice(0,10))
+                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+              } catch (e) {}
+            }
+            return
+          }
+          if (j && j.timetable && typeof j.timetable === 'object') {
+            // If the server returned substitutions separately, attempt to fetch
+            // them and apply in-place so the day-by-day timetable JSON includes
+            // substitute teachers and room changes.
+            let finalTimetable = j.timetable
+            let finalByWeek = j.timetableByWeek || null
+            try {
+              // First try to extract variations embedded in the timetable payload
+              let subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+
+    
+              // If none found in upstream, request from the AI timetable endpoint
+              if ((!Array.isArray(subs) || subs.length === 0)) {
+                try {
+                  // Try to extract substitutions from the already-fetched timetable payload
+                  const fetched = await getPortalSubstitutions(j)
+                  if (Array.isArray(fetched) && fetched.length) subs = fetched
+                } catch (e) {
+                  // ignore
+                }
+              }
+
+              if (Array.isArray(subs) && subs.length) {
+                try {
+                  // Apply all substitutions (date-specific + generic) to the per-day timetable
+                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                } catch (e) { /* ignore substitution apply errors */ }
+
+                const genericSubs = subs.filter((s: any) => !s || !s.date)
+
+                if (j.timetableByWeek && genericSubs.length) {
+                  try {
+                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                    // Copy to avoid mutating original
+                    for (const d of Object.keys(byWeekSrc)) {
+                      transformed[d] = {
+                        A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                        B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                        unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
+                      }
+                    }
+
+                    // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
+                    const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                        for (const d of Object.keys(transformed)) {
+                          weekMap[d] = transformed[d][weekKey] || []
+                        }
+                        // Only apply substitutions relevant to this week: include
+                        // substitutions that either have no `weekType` (generic)
+                        // or whose `weekType` equals the target week. For the
+                        // `unknown` group, treat it as matching only substitutions
+                        // that explicitly declare `weekType === 'unknown'` or are
+                        // generic (no weekType).
+                        const subsForWeek = (genericSubs || []).filter((s: any) => {
+                          try {
+                            if (!s) return false
+                            const wt = s.weekType || s.week || s.week_type || undefined
+                            if (!wt) return true // generic applies to all weeks
+                            const wts = String(wt).toUpperCase()
+                            if (weekKey === 'unknown') return wts === 'UNKNOWN'
+                            return wts === weekKey
+                          } catch (e) { return false }
+                        })
+                        const applied = applySubstitutionsToTimetable(weekMap, subsForWeek, { debug: true })
+                        for (const d of Object.keys(transformed)) {
+                          transformed[d][weekKey] = applied[d] || []
+                        }
+                      }
+
+                    // Apply generic substitutions to grouped week maps (debug enabled)
+                    applyToWeek('A')
+                    applyToWeek('B')
+                    applyToWeek('unknown')
+
+                    finalByWeek = transformed
+                  } catch (e) {
+                    // ignore by-week substitution failures
+                  }
+                }
+              }
+            } catch (e) {
+              // ignore substitution extraction/apply errors
+            }
+
+            // Attach long subject titles when available in the upstream payload
+            try {
+              const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
+              if (subjectsSource && typeof subjectsSource === 'object') {
+                const shortToTitle: Record<string, string> = {}
+                for (const k of Object.keys(subjectsSource)) {
+                  try {
+                    const v = subjectsSource[k]
+                    const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                    const title = (v && (v.title || v.name)) ? (v.title || v.name) : null
