@@ -191,9 +191,7 @@ export default function TimetablePage() {
         const cleanedRaw = stripLeadingCasualCode(teacher || '')
         if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
       } catch (e) {}
-      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
-      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
-      if (rawIsCode && dispLooksName) return true
+      
       // Defensive: also treat as substitute when casualToken exists or
       // when a displayTeacher is present and differs from the raw `teacher` value.
       const hasCasual = Boolean((p as any).casualSurname || (p as any).casualToken || (p as any).casual)
