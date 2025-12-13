@@ -184,9 +184,16 @@ export async function GET(req: NextRequest) {
 
     // Try each host until we get a JSON response
     for (const host of hosts) {
-      const dr = await getJson(`${host}/api/timetable/daytimetable.json`)
+      const dayUrl = dateParam 
+        ? `${host}/api/timetable/daytimetable.json?date=${dateParam}`
+        : `${host}/api/timetable/daytimetable.json`
+      const bellUrl = dateParam
+        ? `${host}/api/timetable/bells.json?date=${dateParam}`
+        : `${host}/api/timetable/bells.json`
+      
+      const dr = await getJson(dayUrl)
       const fr = await getJson(`${host}/api/timetable/timetable.json`)
-      const br = await getJson(`${host}/api/timetable/bells.json`)
+      const br = await getJson(bellUrl)
       // If any of these responded with JSON, adopt them and stop trying further hosts
       if ((dr as any).json || (fr as any).json || (br as any).json) {
         dayRes = dr; fullRes = fr; bellsRes = br
@@ -853,11 +860,49 @@ export async function GET(req: NextRequest) {
     const hasAny = Object.values(byDay).some(a => a.length)
     if (hasAny) {
       // Apply substitutions from upstream.day.classVariations directly to the timetable
+      // BUT ONLY for the specific day that dayRes is for
       try {
-        const classVars = dayRes?.json?.classVariations || {}
-        const roomVars = dayRes?.json?.roomVariations || {}
+        const dj = dayRes?.json
+        if (!dj) throw new Error('No dayRes.json')
         
-        // Apply class variations (teacher substitutions)
+        // Extract the date from the dayRes response itself
+        const dayDate = dj.date || dj.day?.date || dj.dayInfo?.date || dateParam
+        let dayResDay: string | null = null
+        
+        if (dayDate) {
+          // Parse the date string (YYYY-MM-DD format)
+          const parsed = new Date(dayDate)
+          if (!Number.isNaN(parsed.getTime())) {
+            dayResDay = parsed.toLocaleDateString('en-US', { weekday: 'long' })
+          }
+        }
+        
+        // Fallback: try to extract from day name fields
+        if (!dayResDay) {
+          const dayName = dj.dayname || dj.dayName || dj.day?.dayname || dj.day?.dayName || dj.dayInfo?.dayname
+          if (dayName && typeof dayName === 'string') {
+            // Could be "Monday", "MonA", "Mon", etc.
+            const normalized = dayName.replace(/[^a-z]/gi, '').toLowerCase()
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+            const match = days.find(d => normalized.startsWith(d.substring(0, 3)))
+            if (match) {
+              dayResDay = match.charAt(0).toUpperCase() + match.slice(1)
+            }
+          }
+        }
+        
+        // Fallback to today if we still can't determine
+        if (!dayResDay) {
+          const fallbackDate = dateParam ? new Date(dateParam) : new Date()
+          dayResDay = fallbackDate.toLocaleDateString('en-US', { weekday: 'long' })
+        }
+        
+        const classVars = dj.classVariations || {}
+        const roomVars = dj.roomVariations || {}
+        
+        console.log(`[API] Applying substitutions for ${dayResDay} only (date: ${dayDate || 'unknown'})`)
+        
+        // Apply class variations (teacher substitutions) - ONLY to dayResDay
         Object.values(classVars).forEach((v: any) => {
           if (!v || !v.period) return
           const targetPeriod = String(v.period).trim()
@@ -866,9 +911,9 @@ export async function GET(req: NextRequest) {
           
           if (!casualSurname) return // Only process if there's a casual surname
           
-          // Find matching period in byDay and timetableByWeek
-          Object.keys(byDay).forEach(day => {
-            byDay[day].forEach((p: any) => {
+          // Apply ONLY to the specific day (dayResDay)
+          if (byDay[dayResDay]) {
+            byDay[dayResDay].forEach((p: any) => {
               if (String(p.period).trim() === targetPeriod) {
                 p.casualSurname = casualSurname
                 p.casualToken = casualToken || undefined
@@ -876,15 +921,15 @@ export async function GET(req: NextRequest) {
                 p.originalTeacher = p.teacher
                 p.teacher = casualSurname
                 p.displayTeacher = casualSurname
-                console.log(`[API] Applied casual: ${day} P${targetPeriod} -> ${casualSurname}`)
+                console.log(`[API] Applied casual: ${dayResDay} P${targetPeriod} -> ${casualSurname}`)
               }
             })
-          })
+          }
           
-          // Also apply to timetableByWeek
-          Object.keys(timetableByWeek).forEach(day => {
+          // Also apply to timetableByWeek - ONLY for dayResDay
+          if (timetableByWeek[dayResDay]) {
             ['A', 'B', 'unknown'].forEach(week => {
-              timetableByWeek[day][week].forEach((p: any) => {
+              timetableByWeek[dayResDay][week].forEach((p: any) => {
                 if (String(p.period).trim() === targetPeriod) {
                   p.casualSurname = casualSurname
                   p.casualToken = casualToken || undefined
@@ -895,10 +940,10 @@ export async function GET(req: NextRequest) {
                 }
               })
             })
-          })
+          }
         })
         
-        // Apply room variations
+        // Apply room variations - ONLY to dayResDay
         Object.values(roomVars).forEach((v: any) => {
           if (!v || !v.period) return
           const targetPeriod = String(v.period).trim()
@@ -906,24 +951,22 @@ export async function GET(req: NextRequest) {
           
           if (!newRoom) return
           
-          Object.keys(byDay).forEach(day => {
-            byDay[day].forEach((p: any) => {
+          // Apply ONLY to the specific day
+          if (byDay[dayResDay]) {
+            byDay[dayResDay].forEach((p: any) => {
               const pPeriod = String(p.period).trim()
               const pRoom = String(p.room || '').trim()
-              if (pPeriod === targetPeriod) {
-                console.log(`[API] Room check: ${day} P${targetPeriod} current="${pRoom}" new="${newRoom}" match=${pRoom !== newRoom}`)
-                if (pRoom !== newRoom) {
-                  p.displayRoom = newRoom
-                  p.isRoomChange = true
-                  console.log(`[API] ✅ Applied room change: ${day} P${targetPeriod} ${pRoom} -> ${newRoom}`)
-                }
+              if (pPeriod === targetPeriod && pRoom !== newRoom) {
+                p.displayRoom = newRoom
+                p.isRoomChange = true
+                console.log(`[API] ✅ Applied room change: ${dayResDay} P${targetPeriod} ${pRoom} -> ${newRoom}`)
               }
             })
-          })
+          }
           
-          Object.keys(timetableByWeek).forEach(day => {
+          if (timetableByWeek[dayResDay]) {
             ['A', 'B', 'unknown'].forEach(week => {
-              timetableByWeek[day][week].forEach((p: any) => {
+              timetableByWeek[dayResDay][week].forEach((p: any) => {
                 if (String(p.period).trim() === targetPeriod && p.room !== newRoom) {
                   p.displayRoom = newRoom
                   p.isRoomChange = true
