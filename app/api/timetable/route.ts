@@ -941,21 +941,8 @@ export async function GET(req: NextRequest) {
             })
           }
           
-          // Also apply to timetableByWeek - ONLY for dayResDay
-          if (timetableByWeek[dayResDay]) {
-            ['A', 'B', 'C', 'unknown'].forEach(week => {
-              timetableByWeek[dayResDay][week].forEach((p: any) => {
-                if (String(p.period).trim() === targetPeriod) {
-                  p.casualSurname = casualSurname
-                  p.casualToken = casualToken || undefined
-                  p.isSubstitute = true
-                  p.originalTeacher = p.teacher
-                  p.teacher = casualSurname
-                  p.displayTeacher = casualSurname
-                }
-              })
-            })
-          }
+          // NOTE: Do NOT apply to timetableByWeek - that's the clean 15-day cycle view
+          // Substitutions are date-specific and only belong in byDay
         })
         
         // Apply room variations - ONLY to dayResDay
@@ -979,16 +966,8 @@ export async function GET(req: NextRequest) {
             })
           }
           
-          if (timetableByWeek[dayResDay]) {
-            ['A', 'B', 'C', 'unknown'].forEach(week => {
-              timetableByWeek[dayResDay][week].forEach((p: any) => {
-                if (String(p.period).trim() === targetPeriod && p.room !== newRoom) {
-                  p.displayRoom = newRoom
-                  p.isRoomChange = true
-                }
-              })
-            })
-          }
+          // NOTE: Do NOT apply to timetableByWeek - that's the clean 15-day cycle view
+          // Room changes are date-specific and only belong in byDay
         })
       } catch (e) {
         console.error('[API] Failed to apply substitutions:', e)

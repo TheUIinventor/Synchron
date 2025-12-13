@@ -2224,9 +2224,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         cachedData = JSON.parse(cached)
                         console.log('[timetable.provider] Loaded cached substitutions for dates:', Object.keys(cachedData))
                         
-                        // Apply cached data immediately
+                        // Apply cached data immediately - ONLY timetable (day view), NOT timetableByWeek
+                        // timetableByWeek is the clean 15-day cycle and should not have date-specific subs
                         const cachedUpdates: Record<string, Period[]> = {}
-                        const cachedUpdatesByWeek: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
                         
                         for (const { day, date } of weekDates) {
                           if (cachedData[date]) {
@@ -2234,9 +2234,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             if (data.timetable && data.timetable[day]) {
                               cachedUpdates[day] = data.timetable[day]
                             }
-                            if (data.timetableByWeek && data.timetableByWeek[day]) {
-                              cachedUpdatesByWeek[day] = data.timetableByWeek[day]
-                            }
+                            // NOTE: Do NOT apply timetableByWeek from cache - that's the clean cycle view
                           }
                         }
                         
@@ -2244,12 +2242,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                           console.log('[timetable.provider] Applying cached substitutions for:', Object.keys(cachedUpdates))
                           setExternalTimetable(prev => ({ ...prev, ...cachedUpdates }))
                         }
-                        if (Object.keys(cachedUpdatesByWeek).length > 0) {
-                          setExternalTimetableByWeek(prev => {
-                            if (!prev) return cachedUpdatesByWeek
-                            return { ...prev, ...cachedUpdatesByWeek }
-                          })
-                        }
+                        // NOTE: Do NOT apply cachedUpdatesByWeek - timetableByWeek should remain clean
                       }
                     } catch (e) {
                       console.error('[timetable.provider] Failed to load cached substitutions:', e)
@@ -2286,9 +2279,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   
                   const results = await Promise.all(fetches)
                   
-                  // Merge the results into the current timetable
+                  // Merge the results into the current timetable - ONLY day view, NOT cycle view
                   const updates: Record<string, Period[]> = {}
-                  const updatesByWeek: Record<string, { A: Period[]; B: Period[]; C: Period[]; unknown: Period[] }> = {}
                   
                   for (const result of results) {
                     if (!result || !result.data) continue
@@ -2298,13 +2290,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     if (data.timetable && data.timetable[day]) {
                       updates[day] = data.timetable[day]
                     }
-                    
-                    if (data.timetableByWeek && data.timetableByWeek[day]) {
-                      updatesByWeek[day] = data.timetableByWeek[day]
-                    }
+                    // NOTE: Do NOT merge timetableByWeek - that's the clean 15-day cycle
                   }
                   
                   // Cache the substitutions by date - MERGE with existing cache
+                  // NOTE: Only cache timetable (day view with subs), NOT timetableByWeek (clean cycle)
                   if (typeof window !== 'undefined') {
                     try {
                       // Start with existing cached data
@@ -2313,7 +2303,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         if (!result || !result.data) continue
                         mergedCache[result.date] = {
                           timetable: result.data.timetable,
-                          timetableByWeek: result.data.timetableByWeek,
+                          // NOTE: Do NOT cache timetableByWeek - it's the clean cycle view
                           fetchedAt: Date.now()
                         }
                       }
@@ -2325,17 +2315,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                   
                   // Update state with merged data (only if we got updates)
+                  // NOTE: Only update timetable (day view), NOT timetableByWeek (clean cycle)
                   if (Object.keys(updates).length > 0) {
                     console.log('[timetable.provider] Applying background-fetched substitutions for days:', Object.keys(updates))
                     setExternalTimetable(prev => ({ ...prev, ...updates }))
                   }
-                  
-                  if (Object.keys(updatesByWeek).length > 0) {
-                    setExternalTimetableByWeek(prev => {
-                      if (!prev) return updatesByWeek
-                      return { ...prev, ...updatesByWeek }
-                    })
-                  }
+                  // NOTE: Do NOT merge into timetableByWeek - it's the clean 15-day cycle
                 } catch (e) {
                   console.error('[timetable.provider] Background fetch failed:', e)
                 }
