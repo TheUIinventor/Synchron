@@ -2201,8 +2201,64 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     weekDates.push({ day: dayNames[i], date: dateStr })
                   }
                   
+                  // Load cached substitutions first
+                  let cachedData: Record<string, any> = {}
+                  if (typeof window !== 'undefined') {
+                    try {
+                      const cached = localStorage.getItem('synchron-week-substitutions')
+                      if (cached) {
+                        cachedData = JSON.parse(cached)
+                        console.log('[timetable.provider] Loaded cached substitutions for dates:', Object.keys(cachedData))
+                        
+                        // Apply cached data immediately
+                        const cachedUpdates: Record<string, Period[]> = {}
+                        const cachedUpdatesByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                        
+                        for (const { day, date } of weekDates) {
+                          if (cachedData[date]) {
+                            const data = cachedData[date]
+                            if (data.timetable && data.timetable[day]) {
+                              cachedUpdates[day] = data.timetable[day]
+                            }
+                            if (data.timetableByWeek && data.timetableByWeek[day]) {
+                              cachedUpdatesByWeek[day] = data.timetableByWeek[day]
+                            }
+                          }
+                        }
+                        
+                        if (Object.keys(cachedUpdates).length > 0) {
+                          console.log('[timetable.provider] Applying cached substitutions for:', Object.keys(cachedUpdates))
+                          setExternalTimetable(prev => ({ ...prev, ...cachedUpdates }))
+                        }
+                        if (Object.keys(cachedUpdatesByWeek).length > 0) {
+                          setExternalTimetableByWeek(prev => {
+                            if (!prev) return cachedUpdatesByWeek
+                            return { ...prev, ...cachedUpdatesByWeek }
+                          })
+                        }
+                      }
+                    } catch (e) {
+                      console.error('[timetable.provider] Failed to load cached substitutions:', e)
+                    }
+                  }
+                  
+                  // Only fetch days that aren't cached or are stale (>5 minutes old)
+                  const STALE_TIME = 5 * 60 * 1000 // 5 minutes
+                  const datesToFetch = weekDates.filter(({ date }) => {
+                    if (!cachedData[date]) return true
+                    const age = Date.now() - (cachedData[date].fetchedAt || 0)
+                    return age > STALE_TIME
+                  })
+                  
+                  if (datesToFetch.length === 0) {
+                    console.log('[timetable.provider] All substitutions are cached and fresh')
+                    return
+                  }
+                  
+                  console.log('[timetable.provider] Fetching fresh data for:', datesToFetch.map(d => d.date))
+                  
                   // Fetch all days in parallel
-                  const fetches = weekDates.map(async ({ day, date }) => {
+                  const fetches = datesToFetch.map(async ({ day, date }) => {
                     try {
                       const res = await fetch(`/api/timetable?date=${date}`, { credentials: 'include' })
                       if (!res.ok) return null
@@ -2231,6 +2287,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     
                     if (data.timetableByWeek && data.timetableByWeek[day]) {
                       updatesByWeek[day] = data.timetableByWeek[day]
+                    }
+                  }
+                  
+                  // Cache the substitutions by date
+                  if (typeof window !== 'undefined') {
+                    try {
+                      const cached: Record<string, any> = {}
+                      for (const result of results) {
+                        if (!result || !result.data) continue
+                        cached[result.date] = {
+                          timetable: result.data.timetable,
+                          timetableByWeek: result.data.timetableByWeek,
+                          fetchedAt: Date.now()
+                        }
+                      }
+                      localStorage.setItem('synchron-week-substitutions', JSON.stringify(cached))
+                      console.log('[timetable.provider] Cached substitutions for dates:', Object.keys(cached))
+                    } catch (e) {
+                      console.error('[timetable.provider] Failed to cache substitutions:', e)
                     }
                   }
                   
