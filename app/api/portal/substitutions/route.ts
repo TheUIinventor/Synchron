@@ -70,14 +70,19 @@ export async function GET(req: Request) {
       const { PortalScraper } = await import('@/lib/api/portal-scraper')
       const subs = PortalScraper.extractVariationsFromHtml(html)
       const payload: any = { substitutions: subs, source: `${PORTAL_BASE}/timetable (HTML)`, lastUpdated: new Date().toISOString() }
-      if (wantDebugRaw) payload.raw = { html: html.substring(0, 500) + '...' }
+      if (wantDebugRaw) {
+        payload.raw = { htmlPreview: html.substring(0, 1000) }
+        payload.parseSuccess = true
+      }
       return NextResponse.json(payload)
-    } catch (parseErr) {
-      // If parsing fails, return empty substitutions instead of raw HTML
+    } catch (parseErr: any) {
+      // If parsing fails, return empty substitutions with detailed error
       return NextResponse.json({ 
         substitutions: [], 
         source: `${PORTAL_BASE}/timetable (parse failed)`, 
         error: String(parseErr),
+        errorStack: parseErr?.stack || '',
+        htmlPreview: wantDebugRaw ? html.substring(0, 1000) : undefined,
         lastUpdated: new Date().toISOString() 
       })
     }
