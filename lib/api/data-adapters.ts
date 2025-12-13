@@ -144,14 +144,25 @@ export function applySubstitutionsToTimetable(
         // Normalize period identifiers: allow matching "1", "Period 1", "p1"
         const subPeriodNorm = normalize(sub.period)
         const periodNorm = normalize(period.period)
+        const digitsKey = (String(sub.period || '').match(/\d+/) || [])[0]
+        const digitsPer = (String(period.period || '').match(/\d+/) || [])[0]
 
-        // Strict matching: require exact normalized equality for period and subject
-        // when those fields are provided by the substitution. Avoid fuzzy
-        // contains-based heuristics which can produce incorrect global matches.
-        const periodMatch = sub.period ? (subPeriodNorm === periodNorm) : true
+        // Tolerant matching: accept exact normalized equality, numeric match
+        // (e.g. '1' vs 'Period 1'), or substring containment to handle
+        // upstream variations that use shortened labels.
+        const periodMatch = sub.period
+          ? ( (subPeriodNorm && subPeriodNorm === periodNorm)
+              || (digitsKey && digitsPer && digitsKey === digitsPer)
+              || (periodNorm.includes(subPeriodNorm) && subPeriodNorm.length > 0)
+              || (subPeriodNorm.includes(periodNorm) && periodNorm.length > 0)
+            )
+          : true
 
-        // Subject match: require exact normalized equality when provided.
-        const subjectMatch = sub.subject ? (normalize(period.subject) === normalize(sub.subject)) : true
+        // Subject match: prefer exact normalized equality when provided but
+        // accept substring matches as a fallback to improve mapping robustness.
+        const subjectMatch = sub.subject
+          ? ( (normalize(period.subject) === normalize(sub.subject)) || normalize(period.subject).includes(normalize(sub.subject)) || normalize(sub.subject).includes(normalize(period.subject)) )
+          : true
 
         if (periodMatch && subjectMatch) {
           // Track whether we changed anything for debug output
