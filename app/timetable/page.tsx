@@ -540,7 +540,9 @@ export default function TimetablePage() {
                                         <span className="text-sm text-on-surface-variant truncate max-w-[140px]">{shown}</span>
                                       )
                                     })()}
-                                    <span className="text-sm font-semibold text-on-surface-variant truncate max-w-[72px]">{getDisplayRoom(period)}</span>
+                                    <span className={`text-sm font-semibold truncate max-w-[72px] ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full' : 'text-on-surface-variant'}`}>
+                                      {getDisplayRoom(period)}
+                                    </span>
                                   </div>
                                 </div>
                               </div>
@@ -644,8 +646,8 @@ export default function TimetablePage() {
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className="text-xs text-on-surface-variant hidden md:block">{getDisplayRoom(period)}</div>
-                                        <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
+                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>
@@ -713,8 +715,8 @@ export default function TimetablePage() {
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className="text-xs text-on-surface-variant hidden md:block">{getDisplayRoom(period)}</div>
-                                        <div className="md:hidden text-xs text-on-surface-variant mt-1 truncate">{getDisplayRoom(period)}</div>
+                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>
