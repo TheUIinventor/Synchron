@@ -908,10 +908,15 @@ export async function GET(req: NextRequest) {
           
           Object.keys(byDay).forEach(day => {
             byDay[day].forEach((p: any) => {
-              if (String(p.period).trim() === targetPeriod && p.room !== newRoom) {
-                p.displayRoom = newRoom
-                p.isRoomChange = true
-                console.log(`[API] Applied room change: ${day} P${targetPeriod} ${p.room} -> ${newRoom}`)
+              const pPeriod = String(p.period).trim()
+              const pRoom = String(p.room || '').trim()
+              if (pPeriod === targetPeriod) {
+                console.log(`[API] Room check: ${day} P${targetPeriod} current="${pRoom}" new="${newRoom}" match=${pRoom !== newRoom}`)
+                if (pRoom !== newRoom) {
+                  p.displayRoom = newRoom
+                  p.isRoomChange = true
+                  console.log(`[API] ✅ Applied room change: ${day} P${targetPeriod} ${pRoom} -> ${newRoom}`)
+                }
               }
             })
           })
