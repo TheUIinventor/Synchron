@@ -576,13 +576,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const item: any = { ...(p as any) }
 
               // Normalize explicit destination room fields into `displayRoom`.
-              const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
-              if (candidateDest && String(candidateDest).trim()) {
-                const candStr = String(candidateDest).trim()
-                const roomStr = String(item.room || '').trim()
-                if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                  item.displayRoom = candStr
-                  item.isRoomChange = true
+              // Only set if not already set by API
+              if (!item.isRoomChange && !item.displayRoom) {
+                const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
+                if (candidateDest && String(candidateDest).trim()) {
+                  const candStr = String(candidateDest).trim()
+                  const roomStr = String(item.room || '').trim()
+                  if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+                    item.displayRoom = candStr
+                    item.isRoomChange = true
+                  }
                 }
               }
 
