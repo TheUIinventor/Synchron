@@ -229,6 +229,13 @@ export async function GET(req: NextRequest) {
           const classVars = !Array.isArray(dj.classVariations) ? (dj.classVariations || {}) : {}
           const roomVars = !Array.isArray(dj.roomVariations) ? (dj.roomVariations || {}) : {}
           
+          // Debug: Log the raw variations from API
+          console.log(`[API] Raw classVariations type: ${Array.isArray(dj.classVariations) ? 'array' : typeof dj.classVariations}, keys: ${!Array.isArray(dj.classVariations) && dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'none'}`)
+          console.log(`[API] Raw roomVariations type: ${Array.isArray(dj.roomVariations) ? 'array' : typeof dj.roomVariations}, keys: ${!Array.isArray(dj.roomVariations) && dj.roomVariations ? Object.keys(dj.roomVariations).join(',') : 'none'}`)
+          if (!Array.isArray(dj.roomVariations) && dj.roomVariations && Object.keys(dj.roomVariations).length > 0) {
+            console.log(`[API] roomVariations content:`, JSON.stringify(dj.roomVariations))
+          }
+          
           const dowDate = new Date(dateParam)
           const dow = (!Number.isNaN(dowDate.getTime())) ? dowDate.toLocaleDateString('en-US', { weekday: 'long' }) : requestedWeekdayString
           const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)

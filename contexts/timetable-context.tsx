@@ -575,10 +575,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             cleaned[day] = (rawMap[day] || []).map((p) => {
               const item: any = { ...(p as any) }
 
+              // Check for room variation fields from API or cached data
+              const candidateDest = item.displayRoom || item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
+
               // Normalize explicit destination room fields into `displayRoom`.
               // Only set if not already set by API (check for explicit true value)
               if (item.isRoomChange !== true) {
-                const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
                 if (candidateDest && String(candidateDest).trim()) {
                   const candStr = String(candidateDest).trim()
                   const roomStr = String(item.room || '').trim()
@@ -597,8 +599,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 item.displayTeacher = displayTeacher
               } catch (e) {}
 
-              // Defensive: remove stale `isRoomChange` if no explicit dest
-              if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) {
+              // Defensive: remove stale `isRoomChange` ONLY if there's no destination room anywhere
+              if (!candidateDest && item.isRoomChange && !item.displayRoom) {
                 delete item.isRoomChange
               }
 
