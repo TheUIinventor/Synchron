@@ -253,14 +253,15 @@ const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesda
 
 const payloadHasNoTimetable = (payload: any) => {
   try {
-    if (!payload) return false
-    if (payload.error) return true
-    if (payload.timetable === false) return true
-    if (payload.noTimetable === true) return true
-    if (payload.isHoliday === true) return true
-    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
-    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
-  } catch (e) {}
+    if (!payload) { console.log('[DEBUG payloadHasNoTimetable] no payload'); return false }
+    if (payload.error) { console.log('[DEBUG payloadHasNoTimetable] payload.error=', payload.error); return true }
+    if (payload.timetable === false) { console.log('[DEBUG payloadHasNoTimetable] timetable===false'); return true }
+    if (payload.noTimetable === true) { console.log('[DEBUG payloadHasNoTimetable] noTimetable===true'); return true }
+    if (payload.isHoliday === true) { console.log('[DEBUG payloadHasNoTimetable] isHoliday===true'); return true }
+    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG payloadHasNoTimetable] upstream.day issue'); return true }
+    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG payloadHasNoTimetable] diagnostics issue'); return true }
+    console.log('[DEBUG payloadHasNoTimetable] returning FALSE - has timetable', { hasTimetable: !!payload.timetable, keys: Object.keys(payload || {}) })
+  } catch (e) { console.log('[DEBUG payloadHasNoTimetable] exception', e) }
   return false
 }
 
@@ -1836,7 +1837,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           fetchDate = now
         }
         const todayDateStr = fetchDate.toISOString().slice(0, 10)
+        console.log('[DEBUG refreshExternal] fetching for date:', todayDateStr, 'dow=', dow)
         const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
+        console.log('[DEBUG refreshExternal] response status:', r.status)
         if (r.status === 401) {
           if (!attemptedRefresh) {
             try {
@@ -1854,6 +1857,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const rctype = r.headers.get('content-type') || ''
         if (rctype.includes('application/json')) {
           const j = await r.json()
+          console.log('[DEBUG refreshExternal] got JSON response:', { 
+            hasError: !!j?.error, 
+            hasTimetable: !!j?.timetable,
+            isHoliday: j?.isHoliday,
+            noTimetable: j?.noTimetable,
+            source: j?.source,
+            keys: Object.keys(j || {})
+          })
           // Compute a lightweight hash for this payload and try to reuse
           // any previously-processed result stored under that hash. This
           // allows the UI to show a fully-processed timetable instantly
