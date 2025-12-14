@@ -20,6 +20,9 @@ function normalizeWeekType(value: any): WeekType | null {
 }
 
 function inferWeekType(dayKey?: any, source?: any): WeekType | null {
+  // IMPORTANT: Only look at explicit weekType fields, NOT dayname
+  // The dayname (e.g., "MonA", "TueB", "WedC") indicates position in 15-day cycle,
+  // NOT the current A/B week type for display purposes
   const candidates = [
     source?.weekType,
     source?.week_type,
@@ -28,25 +31,14 @@ function inferWeekType(dayKey?: any, source?: any): WeekType | null {
     source?.week_label,
     source?.cycle,
     source?.rotation,
-    source?.dayname,
-    source?.dayName,
-    dayKey,
+    // Removed dayname/dayName from candidates - they contain cycle position, not week type
   ]
   for (const c of candidates) {
     const normalized = normalizeWeekType(c)
     if (normalized) return normalized
   }
-  // Special-case: dayKey values like 'MonA' / 'TueB' / 'WedC' encode week letter as last char
-  try {
-    if (typeof dayKey === 'string') {
-      const m = dayKey.match(/^[A-Za-z]{3,4}([AB])$/i)
-      if (m && m[1]) return m[1].toUpperCase() as WeekType
-    }
-    if (source && typeof source === 'object' && typeof source.dayname === 'string') {
-      const m2 = (source.dayname as string).match(/^[A-Za-z]{3,4}([AB])$/i)
-      if (m2 && m2[1]) return m2[1].toUpperCase() as WeekType
-    }
-  } catch (e) {}
+  // We no longer extract week type from dayname like "MonA"/"TueB" since those
+  // indicate cycle position (days 1-15), not the current A/B week type
   return null
 }
 
@@ -1010,6 +1002,22 @@ export async function GET(req: NextRequest) {
     }
 
     const hasAny = Object.values(byDay).some(a => a.length)
+    
+    // Declare variation debug vars outside try block for access in response
+    let dayResDay: string | null = null
+    let dayPeriodNumbers: string[] = []
+    let variationsDiag: {
+      appliedClassVars: Array<{period: string; teacher: string}>
+      appliedRoomVars: Array<{period: string; room: string}>
+      skippedClassVars: Array<{period: string; reason: string}>
+      skippedRoomVars: Array<{period: string; reason: string}>
+    } = {
+      appliedClassVars: [],
+      appliedRoomVars: [],
+      skippedClassVars: [],
+      skippedRoomVars: []
+    }
+    
     if (hasAny) {
       // Apply substitutions from upstream.day.classVariations directly to the timetable
       // BUT ONLY for the specific day that dayRes is for
@@ -1019,7 +1027,6 @@ export async function GET(req: NextRequest) {
         
         // Extract the date from the dayRes response itself
         const dayDate = dj.date || dj.day?.date || dj.dayInfo?.date || dateParam
-        let dayResDay: string | null = null
         
         if (dayDate) {
           // Parse the date string (YYYY-MM-DD format)
@@ -1052,60 +1059,100 @@ export async function GET(req: NextRequest) {
         const classVars = dj.classVariations || {}
         const roomVars = dj.roomVariations || {}
         
+        // Debug: capture all periods on the target day
+        const dayPeriods = byDay[dayResDay] || []
+        dayPeriodNumbers = dayPeriods.map((p: any) => String(p.period).trim())
+        
         console.log(`[API] Applying substitutions for ${dayResDay} only (date: ${dayDate || 'unknown'})`)
+        console.log(`[API] byDay[${dayResDay}] periods: [${dayPeriodNumbers.join(', ')}]`)
+        console.log(`[API] classVars keys: [${Object.keys(classVars).join(', ')}]`)
+        console.log(`[API] roomVars keys: [${Object.keys(roomVars).join(', ')}]`)
         
         // Apply class variations (teacher substitutions) - ONLY to dayResDay
-        Object.values(classVars).forEach((v: any) => {
-          if (!v || !v.period) return
-          const targetPeriod = String(v.period).trim()
-          const casualSurname = v.casualSurname ? String(v.casualSurname).trim() : ''
-          const casualToken = v.casual ? String(v.casual).trim() : ''
-          
-          if (!casualSurname) return // Only process if there's a casual surname
-          
-          // Apply ONLY to the specific day (dayResDay)
-          if (byDay[dayResDay]) {
-            byDay[dayResDay].forEach((p: any) => {
-              if (String(p.period).trim() === targetPeriod) {
-                p.casualSurname = casualSurname
-                p.casualToken = casualToken || undefined
-                p.isSubstitute = true
-                p.originalTeacher = p.teacher
-                p.teacher = casualSurname
-                p.displayTeacher = casualSurname
-                console.log(`[API] Applied casual: ${dayResDay} P${targetPeriod} -> ${casualSurname}`)
-              }
-            })
+        // IMPORTANT: classVariations is keyed by period number, e.g. {"1": {...}, "2": {...}}
+        // The period key itself IS the period number - we need to iterate entries, not values
+        if (!Array.isArray(classVars) && typeof classVars === 'object') {
+          for (const [periodKey, v] of Object.entries(classVars)) {
+            if (!v || typeof v !== 'object') {
+              variationsDiag.skippedClassVars.push({ period: periodKey, reason: 'not an object' })
+              continue
+            }
+            const vObj = v as any
+            // Skip if type is 'novariation' (means no change)
+            if (vObj.type === 'novariation') {
+              variationsDiag.skippedClassVars.push({ period: periodKey, reason: 'type=novariation' })
+              continue
+            }
+            
+            const casualSurname = vObj.casualSurname ? String(vObj.casualSurname).trim() : ''
+            const casualToken = vObj.casual ? String(vObj.casual).trim() : ''
+            
+            // For 'nocover' type, there's a sub but no casualSurname - use "No Cover"
+            const displayTeacher = casualSurname || (vObj.type === 'nocover' ? 'No Cover' : '')
+            
+            if (!displayTeacher) {
+              variationsDiag.skippedClassVars.push({ period: periodKey, reason: `no display teacher (type=${vObj.type})` })
+              continue
+            }
+            
+            // Apply ONLY to the specific day (dayResDay)
+            let applied = false
+            if (byDay[dayResDay]) {
+              byDay[dayResDay].forEach((p: any) => {
+                if (String(p.period).trim() === String(periodKey).trim()) {
+                  p.casualSurname = casualSurname || undefined
+                  p.casualToken = casualToken || undefined
+                  p.isSubstitute = true
+                  p.originalTeacher = p.teacher
+                  p.teacher = displayTeacher
+                  p.displayTeacher = displayTeacher
+                  console.log(`[API] ✅ Applied casual: ${dayResDay} P${periodKey} -> ${displayTeacher}`)
+                  variationsDiag.appliedClassVars.push({ period: periodKey, teacher: displayTeacher })
+                  applied = true
+                }
+              })
+            }
+            if (!applied) {
+              variationsDiag.skippedClassVars.push({ period: periodKey, reason: `no matching period in byDay[${dayResDay}]` })
+            }
           }
-          
-          // NOTE: Do NOT apply to timetableByWeek - that's the clean 15-day cycle view
-          // Substitutions are date-specific and only belong in byDay
-        })
+        }
         
         // Apply room variations - ONLY to dayResDay
-        Object.values(roomVars).forEach((v: any) => {
-          if (!v || !v.period) return
-          const targetPeriod = String(v.period).trim()
-          const newRoom = v.roomTo ? String(v.roomTo).trim() : ''
-          
-          if (!newRoom) return
-          
-          // Apply ONLY to the specific day
-          if (byDay[dayResDay]) {
-            byDay[dayResDay].forEach((p: any) => {
-              const pPeriod = String(p.period).trim()
-              const pRoom = String(p.room || '').trim()
-              if (pPeriod === targetPeriod && pRoom !== newRoom) {
-                p.displayRoom = newRoom
-                p.isRoomChange = true
-                console.log(`[API] ✅ Applied room change: ${dayResDay} P${targetPeriod} ${pRoom} -> ${newRoom}`)
-              }
-            })
+        // IMPORTANT: roomVariations is keyed by period number, e.g. {"1": {roomTo: "203"}}
+        if (!Array.isArray(roomVars) && typeof roomVars === 'object') {
+          for (const [periodKey, v] of Object.entries(roomVars)) {
+            if (!v || typeof v !== 'object') {
+              variationsDiag.skippedRoomVars.push({ period: periodKey, reason: 'not an object' })
+              continue
+            }
+            const vObj = v as any
+            const newRoom = vObj.roomTo ? String(vObj.roomTo).trim() : ''
+            
+            if (!newRoom) {
+              variationsDiag.skippedRoomVars.push({ period: periodKey, reason: 'no roomTo value' })
+              continue
+            }
+            
+            // Apply ONLY to the specific day
+            let applied = false
+            if (byDay[dayResDay]) {
+              byDay[dayResDay].forEach((p: any) => {
+                const pPeriod = String(p.period).trim()
+                if (pPeriod === String(periodKey).trim()) {
+                  p.displayRoom = newRoom
+                  p.isRoomChange = true
+                  console.log(`[API] ✅ Applied room change: ${dayResDay} P${periodKey} -> ${newRoom}`)
+                  variationsDiag.appliedRoomVars.push({ period: periodKey, room: newRoom })
+                  applied = true
+                }
+              })
+            }
+            if (!applied) {
+              variationsDiag.skippedRoomVars.push({ period: periodKey, reason: `no matching period in byDay[${dayResDay}]` })
+            }
           }
-          
-          // NOTE: Do NOT apply to timetableByWeek - that's the clean 15-day cycle view
-          // Room changes are date-specific and only belong in byDay
-        })
+        }
       } catch (e) {
         console.error('[API] Failed to apply substitutions:', e)
       }
@@ -1124,6 +1171,10 @@ export async function GET(req: NextRequest) {
           weekTally,
           perDayWeekCounts,
           weekBreakdown,
+          // Variation application debug info
+          variations: variationsDiag,
+          variationTargetDay: dayResDay,
+          variationPeriodNumbers: dayPeriodNumbers,
           // Include raw upstream payloads to help diagnose where A/B info may be present
           upstream: {
             day: dayRes?.json ?? null,
