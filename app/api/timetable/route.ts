@@ -13,6 +13,11 @@ function normalizeWeekType(value: any): WeekType | null {
   const explicit = str.match(/\b(?:WEEK|WEEKTYPE|WEEK_LABEL|CYCLE|ROTATION|ROT)\b[^A-Z0-9]*([AB])\b/)
   if (explicit && explicit[1]) return explicit[1] as WeekType
 
+  // Handle dayname patterns like "MonA", "TueB", "WedA", etc.
+  // The week letter is at the end after the day abbreviation
+  const daynameMatch = str.match(/^(?:MON|TUE|WED|THU|FRI|SAT|SUN)[A-Z]*([AB])$/i)
+  if (daynameMatch && daynameMatch[1]) return daynameMatch[1].toUpperCase() as WeekType
+
   // Do NOT match single letters inside longer strings (eg. class names like "MAT A").
   // Only accept an explicit single-letter string which we already handled above.
 
@@ -20,9 +25,7 @@ function normalizeWeekType(value: any): WeekType | null {
 }
 
 function inferWeekType(dayKey?: any, source?: any): WeekType | null {
-  // IMPORTANT: Only look at explicit weekType fields, NOT dayname
-  // The dayname (e.g., "MonA", "TueB", "WedC") indicates position in 15-day cycle,
-  // NOT the current A/B week type for display purposes
+  // Check explicit weekType fields first
   const candidates = [
     source?.weekType,
     source?.week_type,
@@ -31,14 +34,21 @@ function inferWeekType(dayKey?: any, source?: any): WeekType | null {
     source?.week_label,
     source?.cycle,
     source?.rotation,
-    // Removed dayname/dayName from candidates - they contain cycle position, not week type
   ]
   for (const c of candidates) {
     const normalized = normalizeWeekType(c)
     if (normalized) return normalized
   }
-  // We no longer extract week type from dayname like "MonA"/"TueB" since those
-  // indicate cycle position (days 1-15), not the current A/B week type
+  
+  // Also check dayname (e.g., "MonA", "TueB") to extract week type
+  // This is critical for building full timetable from days[] where each day
+  // has a dayname indicating which week it belongs to
+  const dayname = source?.dayname || source?.dayName || source?.day_name
+  if (dayname) {
+    const normalized = normalizeWeekType(dayname)
+    if (normalized) return normalized
+  }
+  
   return null
 }
 
@@ -163,6 +173,9 @@ export async function GET(req: NextRequest) {
       return fallback
     }
     let detectedWeekType: WeekType | null = null
+    // Initialize bell schedules and sources for final response
+    let bellSchedules: Record<string, { period: string; time: string }[]> | undefined = undefined
+    let bellTimesSources: Record<string, string> | undefined = undefined
 
     // Define candidate hosts and paths. If we have a bearer token, prefer the public API host as well.
     const hosts = [
@@ -235,6 +248,14 @@ export async function GET(req: NextRequest) {
           const classVars = !Array.isArray(dj.classVariations) ? (dj.classVariations || {}) : {}
           const roomVars = !Array.isArray(dj.roomVariations) ? (dj.roomVariations || {}) : {}
           
+          // Debug: Log the extracted data structures
+          console.log(`[API] periodsObj source: ${dj?.timetable?.timetable?.periods ? 'timetable.timetable.periods' : dj?.timetable?.periods ? 'timetable.periods' : 'empty fallback'}`)
+          console.log(`[API] periodsObj keys: [${Object.keys(periodsObj).join(', ')}]`)
+          console.log(`[API] subjectsObj keys: [${Object.keys(subjectsObj).join(', ')}]`)
+          if (bells.length > 0) {
+            console.log(`[API] bells sample (first 2):`, JSON.stringify(bells.slice(0, 2)))
+          }
+          
           // Debug: Log the raw variations from API
           console.log(`[API] Raw classVariations type: ${Array.isArray(dj.classVariations) ? 'array' : typeof dj.classVariations}, keys: ${!Array.isArray(dj.classVariations) && dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'none'}`)
           console.log(`[API] Raw roomVariations type: ${Array.isArray(dj.roomVariations) ? 'array' : typeof dj.roomVariations}, keys: ${!Array.isArray(dj.roomVariations) && dj.roomVariations ? Object.keys(dj.roomVariations).join(',') : 'none'}`)
@@ -248,10 +269,26 @@ export async function GET(req: NextRequest) {
           if (inferred) detectedWeekType = inferred
           
           // Check if this is a holiday/no-school day
-          // SBHS returns empty bells/periods during holidays
+          // SBHS returns bells (schedule structure) but empty periods during holidays
+          // The key indicator is whether there are actual class periods, not just bells
           const hasPeriods = Object.keys(periodsObj).length > 0
           const hasBells = Array.isArray(bells) && bells.length > 0
-          const isSchoolDay = hasPeriods || hasBells
+          
+          // Check if periods have actual class data (not just empty objects)
+          // A period with no subject/title/teacher is not a real class
+          const hasRealClasses = Object.values(periodsObj).some((p: any) => 
+            p && (p.title || p.subject || p.teacher || p.room)
+          )
+          
+          // A school day REQUIRES actual class periods with real data
+          // During holidays, SBHS may return bell structure but no periods or empty periods
+          const isSchoolDay = hasPeriods && hasRealClasses
+          
+          console.log(`[API] Holiday check: hasPeriods=${hasPeriods}, hasRealClasses=${hasRealClasses}, hasBells=${hasBells}, isSchoolDay=${isSchoolDay}`)
+          console.log(`[API] periodsObj keys: [${Object.keys(periodsObj).join(', ')}]`)
+          if (hasPeriods && !hasRealClasses) {
+            console.log(`[API] periodsObj values (empty classes):`, JSON.stringify(periodsObj))
+          }
           
           if (!isSchoolDay) {
             console.log(`[API] No classes for ${dateParam} - likely holiday or non-school day`)
@@ -345,7 +382,7 @@ export async function GET(req: NextRequest) {
             
             byDay[dow] = arr.map((entry: any) => {
               const periodKey = String(entry.period || entry.bell || '')
-              const base = toPeriod(entry, inferred)
+              const base: any = toPeriod(entry, inferred)
               
               // Apply class variation
               const classVar = classVars[periodKey] || null
@@ -836,18 +873,15 @@ export async function GET(req: NextRequest) {
         // ignore backfill errors
       }
       // expose schedules variable outside so response can include it
-      var bellSchedules = schedules
-      var bellTimesSources = bellSources
+      bellSchedules = schedules
+      bellTimesSources = bellSources
       try {
         // Helpful debug output during development: show which buckets were
         // populated and whether a top-level day or upstream day bells were
         // observed. The client can then use this to verify API-derived
         // bell times aren't being discarded later in the fetch/retry flow.
-        const _tl = topLevelDayRaw || null
-        // rawDayName may be set further below when upstreamDay is detected;
-        // include it if available.
-        // eslint-disable-next-line no-console
-        console.debug('[timetable.route] bellTimesSources:', bellTimesSources, 'topLevelDay:', _tl, 'bellsCount:', (bellsArr || []).length)
+        // Note: topLevelDayRaw and bellsArr are scoped inside the bell extraction block above
+        console.debug('[timetable.route] bellTimesSources:', bellTimesSources)
       } catch (e) {
         /* ignore logging errors */
       }
@@ -1048,7 +1082,7 @@ export async function GET(req: NextRequest) {
     
     if (hasAny) {
       // Apply substitutions from upstream.day.classVariations directly to the timetable
-      // BUT ONLY for the specific day that dayRes is for
+      // BUT ONLY for the specific day AND week type that dayRes is for
       try {
         const dj = dayRes?.json
         if (!dj) throw new Error('No dayRes.json')
@@ -1056,6 +1090,26 @@ export async function GET(req: NextRequest) {
         // Extract the date from the dayRes response itself
         const dayDate = dj.date || dj.day?.date || dj.dayInfo?.date || dateParam
         
+        // Extract the week type from the dayRes - CRITICAL for applying variations correctly
+        // The dayname field like "MonB" contains both day and week info
+        let dayResWeekType: string | null = null
+        const dayname = dj.timetable?.timetable?.dayname || dj.timetable?.dayInfo?.dayName || dj.dayname || dj.dayName || dj.dayInfo?.dayName
+        if (dayname && typeof dayname === 'string') {
+          // Extract week letter from dayname like "MonA", "TueB", etc.
+          const match = dayname.match(/[AB]$/i)
+          if (match) {
+            dayResWeekType = match[0].toUpperCase()
+          }
+        }
+        // Also check explicit weekType fields
+        if (!dayResWeekType) {
+          const explicitWeekType = dj.timetable?.dayInfo?.weekType || dj.dayInfo?.weekType || dj.weekType
+          if (explicitWeekType && /^[AB]$/i.test(String(explicitWeekType))) {
+            dayResWeekType = String(explicitWeekType).toUpperCase()
+          }
+        }
+        console.log(`[API] Variation week type: ${dayResWeekType || 'unknown'} (from dayname: ${dayname || 'none'})`)
+
         if (dayDate) {
           // Parse the date string (YYYY-MM-DD format)
           const parsed = new Date(dayDate)
@@ -1066,10 +1120,9 @@ export async function GET(req: NextRequest) {
         
         // Fallback: try to extract from day name fields
         if (!dayResDay) {
-          const dayName = dj.dayname || dj.dayName || dj.day?.dayname || dj.day?.dayName || dj.dayInfo?.dayname
-          if (dayName && typeof dayName === 'string') {
+          if (dayname && typeof dayname === 'string') {
             // Could be "Monday", "MonA", "Mon", etc.
-            const normalized = dayName.replace(/[^a-z]/gi, '').toLowerCase()
+            const normalized = dayname.replace(/[^a-z]/gi, '').toLowerCase()
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
             const match = days.find(d => normalized.startsWith(d.substring(0, 3)))
             if (match) {
@@ -1123,11 +1176,19 @@ export async function GET(req: NextRequest) {
               continue
             }
             
-            // Apply ONLY to the specific day (dayResDay)
+            // Apply ONLY to the specific day (dayResDay) AND matching week type
             let applied = false
             if (byDay[dayResDay]) {
               byDay[dayResDay].forEach((p: any) => {
                 if (String(p.period).trim() === String(periodKey).trim()) {
+                  // CRITICAL: Only apply to periods with matching week type
+                  // If dayResWeekType is "B", only apply to periods with weekType "B" or undefined
+                  // This prevents applying Mon B's substitute to Mon A's period
+                  if (dayResWeekType && p.weekType && p.weekType !== dayResWeekType) {
+                    console.log(`[API] ⏭️ Skipping P${periodKey} - week type mismatch: period is ${p.weekType}, variation is for ${dayResWeekType}`)
+                    return // Don't mark as applied - might have another period with matching week
+                  }
+                  
                   // Skip if already has substitute applied (from date-specific path)
                   if (p.isSubstitute && p.casualSurname) {
                     console.log(`[API] ⏭️ Skipping P${periodKey} - already has substitute: ${p.casualSurname}`)
@@ -1168,12 +1229,18 @@ export async function GET(req: NextRequest) {
               continue
             }
             
-            // Apply ONLY to the specific day
+            // Apply ONLY to the specific day AND matching week type
             let applied = false
             if (byDay[dayResDay]) {
               byDay[dayResDay].forEach((p: any) => {
                 const pPeriod = String(p.period).trim()
                 if (pPeriod === String(periodKey).trim()) {
+                  // CRITICAL: Only apply to periods with matching week type
+                  if (dayResWeekType && p.weekType && p.weekType !== dayResWeekType) {
+                    console.log(`[API] ⏭️ Skipping P${periodKey} room change - week type mismatch: period is ${p.weekType}, variation is for ${dayResWeekType}`)
+                    return
+                  }
+                  
                   // Skip if already has room change applied (from date-specific path)
                   if (p.isRoomChange && p.displayRoom) {
                     console.log(`[API] ⏭️ Skipping P${periodKey} room change - already has: ${p.displayRoom}`)

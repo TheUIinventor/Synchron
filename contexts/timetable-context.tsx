@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, startTransition, type ReactNode } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
@@ -2128,12 +2128,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // so downstream rendering logic that prefers `timetableByWeek`
               // can compute using the correct `currentWeek` immediately
               // (prevents a transient render with the wrong week selection).
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
-              }
-              if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-              setExternalTimetable(finalTimetable)
+              // Use startTransition to batch ALL related state updates atomically
+              // to prevent visual flashing during hydration
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
               try {
@@ -2155,6 +2151,30 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                 }
               } catch (e) {}
+              // Compute summary before transitioning to avoid closure issues
+              let fetchSummary: { weekType: string | null; counts: { A: number; B: number; unknown: number } | null } | null = null
+              try {
+                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+                fetchSummary = {
+                  weekType: j.weekType ?? null,
+                  counts: j.timetableByWeek && j.timetableByWeek[dayName]
+                    ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
+                    : null,
+                }
+              } catch (e) {}
+              const computedSource = j.source ?? 'external'
+              const computedDate = (new Date()).toISOString().slice(0,10)
+              startTransition(() => {
+                if (j.weekType === 'A' || j.weekType === 'B') {
+                  setExternalWeekType(j.weekType)
+                  setCurrentWeek(j.weekType)
+                }
+                if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                setExternalTimetable(finalTimetable)
+                setTimetableSource(computedSource)
+                setLastFetchedDate(computedDate)
+                if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
+              })
               // Note: do not override provider-selected date here. The
               // `selectedDateObject` is driven by user choice and time-based
               // auto-selection logic; forcing it from a general `/api/timetable`
@@ -2162,18 +2182,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // when the user expects today). If a date-affine fetch was
               // performed specifically for a requested date, that code path
               // (fetch-for-date) will handle aligning the provider date.
-              try {
-                const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-                const summary = {
-                  weekType: j.weekType ?? null,
-                  counts: j.timetableByWeek && j.timetableByWeek[dayName]
-                    ? { A: j.timetableByWeek[dayName].A?.length || 0, B: j.timetableByWeek[dayName].B?.length || 0, unknown: j.timetableByWeek[dayName].unknown?.length || 0 }
-                    : null,
-                }
-                setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                setLastFetchedPayloadSummary(summary)
-              } catch (e) {}
-              setTimetableSource(j.source ?? 'external')
               // (weekType already set above if present)
               return
             }
@@ -2207,7 +2215,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
-              setExternalTimetable(byDay)
               // Also persist processed result for array-shaped payloads
               try {
                 if (_payloadHash && typeof window !== 'undefined') {
@@ -2226,14 +2233,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   } catch (e) {}
                 }
               } catch (e) {}
-              try { setIsRefreshing(false) } catch (e) {}
+              const computedSourceArr = j.source ?? 'external'
               // Intentionally not overriding `selectedDateObject` here for
               // the reasons described above.
-              setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
-              }
+              // Batch all related state updates atomically
+              startTransition(() => {
+                setExternalTimetable(byDay)
+                setTimetableSource(computedSourceArr)
+                if (j.weekType === 'A' || j.weekType === 'B') {
+                  setExternalWeekType(j.weekType)
+                  setCurrentWeek(j.weekType)
+                }
+                setIsRefreshing(false)
+              })
               return
             }
           }
@@ -2243,8 +2255,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const parsed = parseTimetableHtmlLocal(text)
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
           if (hasData) {
+            // Batch state updates for scraped HTML data
+            startTransition(() => {
               setExternalTimetable(parsed)
-            setTimetableSource('external-scraped')
+              setTimetableSource('external-scraped')
+            })
             return
           }
         }
@@ -2365,18 +2380,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               }
             }
-            setExternalTimetable(j.timetable)
-            setTimetableSource(j.source ?? 'external')
-            if (j.weekType === 'A' || j.weekType === 'B') {
-              setExternalWeekType(j.weekType)
-              setCurrentWeek(j.weekType)
-            }
+            // Compute summary before transitioning
+            let retrySummary: { weekType: string | null; hasByWeek: boolean } | null = null
+            let retryDate = ''
             try {
-              const dayName = (new Date()).toLocaleDateString('en-US', { weekday: 'long' })
-              const summary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
-              setLastFetchedDate((new Date()).toISOString().slice(0,10))
-              setLastFetchedPayloadSummary(summary)
+              retryDate = (new Date()).toISOString().slice(0,10)
+              retrySummary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
             } catch (e) {}
+            // Use startTransition to batch ALL updates and prevent flash
+            startTransition(() => {
+              setExternalTimetable(j.timetable)
+              setTimetableSource(j.source ?? 'external')
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
+              if (retryDate) setLastFetchedDate(retryDate)
+              if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
+            })
             return
           }
 
@@ -2387,12 +2408,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!byDay[day]) byDay[day] = []
               byDay[day].push(p)
             }
-            setExternalTimetable(byDay)
-            setTimetableSource(j.source ?? 'external')
-            if (j.weekType === 'A' || j.weekType === 'B') {
-              setExternalWeekType(j.weekType)
-              setCurrentWeek(j.weekType)
-            }
+            // Use startTransition to batch updates and prevent flash
+            startTransition(() => {
+              setExternalTimetable(byDay)
+              setTimetableSource(j.source ?? 'external')
+              if (j.weekType === 'A' || j.weekType === 'B') {
+                setExternalWeekType(j.weekType)
+                setCurrentWeek(j.weekType)
+              }
+            })
             return
           }
         }
@@ -2401,8 +2425,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const parsed = parseTimetableHtmlLocal(text)
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
           if (hasData) {
-            setExternalTimetable(parsed)
-            setTimetableSource('external-scraped')
+            // Batch state updates for scraped HTML after retry
+            startTransition(() => {
+              setExternalTimetable(parsed)
+              setTimetableSource('external-scraped')
+            })
             return
           }
         }
@@ -2417,33 +2444,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
       if (lastRecordedTimetable) {
         // Prefer showing cached real data when available regardless of auth state.
-        setExternalTimetable(lastRecordedTimetable)
-        setTimetableSource('cache')
-        setError(null)
+        startTransition(() => {
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        })
       } else if (isAuthenticated) {
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("Could not refresh timetable. Showing sample data.")
+        startTransition(() => {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
+        })
       } else {
         // No cached data and auth unknown/false: keep whatever we have and surface an error
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("Could not refresh timetable. Showing sample data.")
+        startTransition(() => {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("Could not refresh timetable. Showing sample data.")
+        })
       }
     } catch (e) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
       if (lastRecordedTimetable) {
-        setExternalTimetable(lastRecordedTimetable)
-        setTimetableSource('cache')
-        setError(null)
+        startTransition(() => {
+          setExternalTimetable(lastRecordedTimetable)
+          setTimetableSource('cache')
+          setError(null)
+        })
       } else if (isAuthenticated) {
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("An error occurred while refreshing timetable.")
+        startTransition(() => {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
+        })
       } else {
-        setExternalTimetable(null)
-        setTimetableSource('fallback-sample')
-        setError("An error occurred while refreshing timetable.")
+        startTransition(() => {
+          setExternalTimetable(null)
+          setTimetableSource('fallback-sample')
+          setError("An error occurred while refreshing timetable.")
+        })
       }
     } finally {
       try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
