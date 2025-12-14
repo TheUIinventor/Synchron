@@ -256,6 +256,8 @@ const payloadHasNoTimetable = (payload: any) => {
     if (!payload) return false
     if (payload.error) return true
     if (payload.timetable === false) return true
+    if (payload.noTimetable === true) return true
+    if (payload.isHoliday === true) return true
     if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
     if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
   } catch (e) {}
@@ -1819,7 +1821,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
       // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
       try {
-        const todayDateStr = new Date().toISOString().slice(0, 10)
+        // Calculate the date we should fetch - always use the next school day logic
+        // to ensure we're fetching for a day that has classes, not weekends
+        const now = new Date()
+        const dow = now.getDay()
+        let fetchDate: Date
+        if (dow === 0 || dow === 6) {
+          // Weekend - use next Monday
+          fetchDate = getNextSchoolDay(now)
+        } else if (isSchoolDayOver()) {
+          // Weekday but school is over - use next school day
+          fetchDate = getNextSchoolDay(now)
+        } else {
+          fetchDate = now
+        }
+        const todayDateStr = fetchDate.toISOString().slice(0, 10)
         const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
         if (r.status === 401) {
           if (!attemptedRefresh) {
@@ -2236,7 +2252,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       await new Promise((res) => setTimeout(res, 300))
 
       try {
-        const todayDateStr2 = new Date().toISOString().slice(0, 10)
+        // Use same date calculation as the first fetch - always target the next school day
+        const now2 = new Date()
+        const dow2 = now2.getDay()
+        let fetchDate2: Date
+        if (dow2 === 0 || dow2 === 6) {
+          fetchDate2 = getNextSchoolDay(now2)
+        } else if (isSchoolDayOver()) {
+          fetchDate2 = getNextSchoolDay(now2)
+        } else {
+          fetchDate2 = now2
+        }
+        const todayDateStr2 = fetchDate2.toISOString().slice(0, 10)
         const r2 = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include' })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
