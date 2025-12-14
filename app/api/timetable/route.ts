@@ -372,16 +372,15 @@ export async function GET(req: NextRequest) {
           // Log summary of what we're returning
           const subsApplied = Object.values(byDay).flat().filter((p: any) => p.isSubstitute || p.casualSurname).length
           const roomChangesApplied = Object.values(byDay).flat().filter((p: any) => p.isRoomChange || p.displayRoom).length
-          console.log(`[API DEBUG] Returning date-specific response: ${Object.values(byDay).flat().length} periods, ${subsApplied} subs, ${roomChangesApplied} room changes`)
+          console.log(`[API DEBUG] Date-specific data extracted: ${Object.values(byDay).flat().length} periods, ${subsApplied} subs, ${roomChangesApplied} room changes`)
 
-          return NextResponse.json({
-            timetable: byDay,
-            timetableByWeek: null,
-            bellTimes: maybeBellTimes || undefined,
-            source: 'sbhs-api-day',
-            weekType: detectedWeekType,
-            upstream: { day: dj, full: fullRes?.json ?? null, bells: bellsRes?.json ?? null },
-          })
+          // DON'T return early - fall through to full timetable processing
+          // The full processing path will:
+          // 1. Build all 15 days from fullRes (timetable.json)
+          // 2. Override the requested day with dayRes data (daytimetable.json)
+          // 3. Apply classVariations/roomVariations to the correct day
+          // This ensures clients get ALL days, not just the requested one
+          console.log(`[API DEBUG] Falling through to full timetable processing for date ${dateParam}`)
         }
       } catch (e) {
         console.error('[API] Error in date-specific path:', e)
