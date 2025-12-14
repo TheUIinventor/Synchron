@@ -256,8 +256,19 @@ const payloadHasNoTimetable = (payload: any) => {
     if (!payload) return false
     if (payload.error) return true
     if (payload.timetable === false) return true
+    // Explicit holiday/no-timetable flags from API
+    if (payload.isHoliday === true) return true
+    if (payload.noTimetable === true) return true
     if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
     if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
+    // Check if timetable object exists but all days are empty arrays
+    if (payload.timetable && typeof payload.timetable === 'object' && !Array.isArray(payload.timetable)) {
+      const allDaysEmpty = Object.values(payload.timetable).every(
+        (dayPeriods: any) => !Array.isArray(dayPeriods) || dayPeriods.length === 0
+      )
+      // Only count as "no timetable" if explicitly marked or all days empty
+      if (allDaysEmpty && (payload.isHoliday || payload.noTimetable)) return true
+    }
   } catch (e) {}
   return false
 }
@@ -1746,8 +1757,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
 
       // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
+      // Include today's date so we get day-specific variations (room changes, substitutes) applied
+      const todayDate = new Date().toISOString().slice(0, 10)
       try {
-        const r = await fetch('/api/timetable', { credentials: 'include' })
+        const r = await fetch(`/api/timetable?date=${todayDate}`, { credentials: 'include' })
         if (r.status === 401) {
           if (!attemptedRefresh) {
             try {
@@ -2264,8 +2277,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // short handshake delay ΓÇö reduced for snappier background refreshes
       await new Promise((res) => setTimeout(res, 300))
 
+      // Include today's date so we get day-specific variations (room changes, substitutes) applied
+      const todayDate2 = new Date().toISOString().slice(0, 10)
       try {
-        const r2 = await fetch('/api/timetable', { credentials: 'include' })
+        const r2 = await fetch(`/api/timetable?date=${todayDate2}`, { credentials: 'include' })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
           if (!attemptedRefresh) {

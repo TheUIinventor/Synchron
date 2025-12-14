@@ -241,6 +241,26 @@ export async function GET(req: NextRequest) {
           const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
           if (inferred) detectedWeekType = inferred
           
+          // Check if this is a holiday/no-school day
+          // SBHS returns empty bells/periods during holidays
+          const hasPeriods = Object.keys(periodsObj).length > 0
+          const hasBells = Array.isArray(bells) && bells.length > 0
+          const isSchoolDay = hasPeriods || hasBells
+          
+          if (!isSchoolDay) {
+            console.log(`[API] No classes for ${dateParam} - likely holiday or non-school day`)
+            return NextResponse.json({
+              timetable: byDay, // Empty timetable
+              timetableByWeek: null,
+              bellTimes: undefined,
+              source: 'sbhs-api-day',
+              weekType: detectedWeekType,
+              isHoliday: true,
+              noTimetable: true,
+              upstream: { day: dj, full: null, bells: null },
+            })
+          }
+          
           // Build periods from bells (like competitor's dttSchema.transform)
           // This ensures we have proper timing info AND can apply variations
           if (Array.isArray(bells) && bells.length > 0) {
