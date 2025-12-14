@@ -182,10 +182,15 @@ export async function GET(req: NextRequest) {
       const bellUrl = dateParam
         ? `${host}/api/timetable/bells.json?date=${dateParam}`
         : `${host}/api/timetable/bells.json`
+      const fullUrl = `${host}/api/timetable/timetable.json`
       
-      const dr = await getJson(dayUrl)
-      const fr = await getJson(`${host}/api/timetable/timetable.json`)
-      const br = await getJson(bellUrl)
+      // OPTIMIZATION: Fetch all 3 endpoints in parallel for faster loading
+      const [dr, fr, br] = await Promise.all([
+        getJson(dayUrl),
+        getJson(fullUrl),
+        getJson(bellUrl)
+      ])
+      
       // If any of these responded with JSON, adopt them and stop trying further hosts
       if ((dr as any).json || (fr as any).json || (br as any).json) {
         dayRes = dr; fullRes = fr; bellsRes = br
@@ -194,6 +199,10 @@ export async function GET(req: NextRequest) {
       // Keep last responses for potential HTML forwarding below
       dayRes = dr; fullRes = fr; bellsRes = br
     }
+
+    // Shared byDay structure - declared once here so date-specific path
+    // can populate it and the aggregated path can extend/use the same data
+    const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
     // If a specific date was requested, and the host returned a day-specific
     // JSON (`daytimetable.json`), prefer returning that payload directly so
@@ -210,7 +219,7 @@ export async function GET(req: NextRequest) {
           console.log(`[API DEBUG] dj.roomVariations keys=${dj.roomVariations ? Object.keys(dj.roomVariations).join(',') : 'none'}`)
           // Normalize the day response into the same shape we return for
           // the aggregated endpoint so clients receive `timetable`.
-          const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+          // NOTE: byDay is declared above this block so we don't shadow it
           
           // The SBHS daytimetable.json response structure:
           // - dj.bells: array of bell times for the day
@@ -495,7 +504,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Normalize into per-day buckets
-    const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    // NOTE: byDay is already declared above - we extend it here, not replace
 
     // If full timetable exists, prefer it to populate multiple days
     if (fullRes && (fullRes as any).json) {
@@ -575,24 +584,43 @@ export async function GET(req: NextRequest) {
     }
 
     // If day timetable returned, merge/override today's entries
+    // BUT ONLY if we don't already have periods from the date-specific path
     if (dayRes && (dayRes as any).json) {
       const dj = (dayRes as any).json
-      let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
-      if (!Array.isArray(arr) && dj?.day?.periods) {
-        arr = Array.isArray(dj.day.periods) ? dj.day.periods : extractPeriods(dj.day.periods) || []
-      }
-      if (!Array.isArray(arr) && dj?.timetable?.periods) {
-        const extracted = extractPeriods(dj.timetable)
-        if (extracted) arr = extracted
-      }
-      if (!Array.isArray(arr)) arr = []
       const dowDate = dateParam ? new Date(dateParam) : new Date()
       const dow = Number.isNaN(dowDate.getTime())
         ? requestedWeekdayString
         : dowDate.toLocaleDateString('en-US', { weekday: 'long' })
-      const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
-      if (inferred) detectedWeekType = inferred
-      byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
+      
+      // Skip if we already have periods for this day (from date-specific path)
+      if (byDay[dow] && byDay[dow].length > 0) {
+        console.log(`[API] Skipping dayRes merge - already have ${byDay[dow].length} periods for ${dow}`)
+      } else {
+        // Try to extract periods from dayRes
+        let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
+        if (!Array.isArray(arr) && dj?.day?.periods) {
+          arr = Array.isArray(dj.day.periods) ? dj.day.periods : extractPeriods(dj.day.periods) || []
+        }
+        if (!Array.isArray(arr) && dj?.timetable?.periods) {
+          const extracted = extractPeriods(dj.timetable)
+          if (extracted) arr = extracted
+        }
+        // Also try the correct SBHS path: timetable.timetable.periods
+        if ((!Array.isArray(arr) || arr.length === 0) && dj?.timetable?.timetable?.periods) {
+          const periodsObj = dj.timetable.timetable.periods
+          if (periodsObj && typeof periodsObj === 'object') {
+            arr = Object.entries(periodsObj).map(([key, val]) => ({ period: key, ...(val as any) }))
+          }
+        }
+        if (!Array.isArray(arr)) arr = []
+        
+        if (arr.length > 0) {
+          const inferred: WeekType | null = inferWeekType(dow, dj.dayInfo || dj.timetable || dj)
+          if (inferred) detectedWeekType = inferred
+          byDay[dow] = arr.map((entry: any) => toPeriod(entry, inferred))
+          console.log(`[API] Merged ${arr.length} periods for ${dow} from dayRes`)
+        }
+      }
     }
 
     // Optionally refine times using bells
@@ -1100,6 +1128,12 @@ export async function GET(req: NextRequest) {
             if (byDay[dayResDay]) {
               byDay[dayResDay].forEach((p: any) => {
                 if (String(p.period).trim() === String(periodKey).trim()) {
+                  // Skip if already has substitute applied (from date-specific path)
+                  if (p.isSubstitute && p.casualSurname) {
+                    console.log(`[API] ⏭️ Skipping P${periodKey} - already has substitute: ${p.casualSurname}`)
+                    applied = true // Count as applied since it's already done
+                    return
+                  }
                   p.casualSurname = casualSurname || undefined
                   p.casualToken = casualToken || undefined
                   p.isSubstitute = true
@@ -1140,6 +1174,12 @@ export async function GET(req: NextRequest) {
               byDay[dayResDay].forEach((p: any) => {
                 const pPeriod = String(p.period).trim()
                 if (pPeriod === String(periodKey).trim()) {
+                  // Skip if already has room change applied (from date-specific path)
+                  if (p.isRoomChange && p.displayRoom) {
+                    console.log(`[API] ⏭️ Skipping P${periodKey} room change - already has: ${p.displayRoom}`)
+                    applied = true
+                    return
+                  }
                   p.displayRoom = newRoom
                   p.isRoomChange = true
                   console.log(`[API] ✅ Applied room change: ${dayResDay} P${periodKey} -> ${newRoom}`)
