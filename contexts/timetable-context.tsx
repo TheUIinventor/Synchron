@@ -253,16 +253,12 @@ const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesda
 
 const payloadHasNoTimetable = (payload: any) => {
   try {
-    if (!payload) { console.log('[DEBUG] payloadHasNoTimetable: payload is null/undefined'); return false }
-    if (payload.error) { console.log('[DEBUG] payloadHasNoTimetable: TRUE - payload.error=', payload.error); return true }
-    if (payload.timetable === false) { console.log('[DEBUG] payloadHasNoTimetable: TRUE - timetable===false'); return true }
-    // Explicit holiday/no-timetable flags from API
-    if (payload.isHoliday === true) { console.log('[DEBUG] payloadHasNoTimetable: TRUE - isHoliday'); return true }
-    if (payload.noTimetable === true) { console.log('[DEBUG] payloadHasNoTimetable: TRUE - noTimetable'); return true }
-    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG] payloadHasNoTimetable: TRUE - upstream.day'); return true }
-    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG] payloadHasNoTimetable: TRUE - diagnostics'); return true }
-    console.log('[DEBUG] payloadHasNoTimetable: FALSE - has timetable data')
-  } catch (e) { console.log('[DEBUG] payloadHasNoTimetable: exception', e) }
+    if (!payload) return false
+    if (payload.error) return true
+    if (payload.timetable === false) return true
+    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
+    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
+  } catch (e) {}
   return false
 }
 
@@ -1715,25 +1711,43 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       lastRefreshTsRef.current = now
     } catch (e) {}
     setError(null)
-    // First try the server-scraped homepage endpoint
-    // NOTE: We no longer return early from home-timetable for ANY case.
-    // The home-timetable scrapes HTML and doesn't have proper variation data.
-    // We ALWAYS continue to /api/timetable to get authoritative data.
+    // First try the server-scraped homepage endpoint as a quick probe.
+    // Note: We intentionally do NOT set any timetable state or return early
+    // here because the home-timetable endpoint lacks classVariations and
+    // roomVariations. We always want to proceed to /api/timetable?date=xxx
+    // which returns the full day timetable with substitute/room changes.
     try {
       const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
       const htctype = ht.headers.get('content-type') || ''
       if (ht.ok && htctype.includes('application/json')) {
         const jht = await ht.json()
-        // Just log what we got - don't set any state or return early
-        console.log('[timetable.provider] home-timetable response:', { 
-          hasError: !!jht?.error, 
-          hasTimetable: !!jht?.timetable,
-          source: jht?.source 
-        })
+        // Extract bell times from home-timetable if available, but do NOT
+        // set timetable state - we'll get the authoritative data from /api/timetable
+        if (jht) {
+          try {
+            const computed = buildBellTimesFromPayload(jht)
+            const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+            const src = jht.bellTimes || {}
+            for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+              if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+              else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+              else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+              else finalBellTimes[k] = []
+            }
+            const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+            if (hasAny) {
+              setExternalBellTimes(finalBellTimes)
+              lastSeenBellTimesRef.current = finalBellTimes
+              lastSeenBellTsRef.current = Date.now()
+            }
+          } catch (e) {
+            // ignore extraction errors
+          }
+        }
+        // Do NOT set externalTimetable or return early - continue to /api/timetable
       }
     } catch (e) {
-      // ignore home-timetable errors and continue to /api/timetable
-      console.log('[timetable.provider] home-timetable fetch failed, continuing to /api/timetable')
+      // ignore and continue to next strategies
     }
 
     // Reuse the parsing logic from above by creating a DOMParser here as well
@@ -1804,14 +1818,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
 
       // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
-      // Include today's date so we get day-specific variations (room changes, substitutes) applied
-      const todayDateStr = new Date().toISOString().slice(0, 10)
-      console.log('[MAIN-FETCH] Starting main timetable fetch for date=', todayDateStr)
-      // Mark this date as being fetched to prevent duplicate fetch from selectedDateObject useEffect
-      lastRequestedDateRef.current = todayDateStr
       try {
-        const r = await fetch(`/api/timetable?date=${todayDateStr}`, { credentials: 'include' })
-        console.log('[MAIN-FETCH] Got response status=', r.status)
+        const todayDateStr = new Date().toISOString().slice(0, 10)
+        const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
         if (r.status === 401) {
           if (!attemptedRefresh) {
             try {
@@ -1844,7 +1853,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           // reported an empty timetable for the requested date.
           try {
             if (payloadHasNoTimetable(j)) {
-              console.log('[CLEAR-1 @ line 1862] payloadHasNoTimetable returned TRUE for main fetch. Payload:', JSON.stringify(j).slice(0,500))
               try {
                 const computed = buildBellTimesFromPayload(j)
                 const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
@@ -1936,7 +1944,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
               if (j && j.timetable) {
             if (payloadHasNoTimetable(j)) {
-              console.log('[CLEAR-2 @ line 1957] payloadHasNoTimetable returned TRUE inside j.timetable block. Payload:', JSON.stringify(j).slice(0,500))
               // Even when the payload reports "no timetable", try to
               // salvage any bell schedules the server may have provided
               // (either in `bellTimes` or embedded `upstream` structures).
@@ -2099,7 +2106,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setCurrentWeek(j.weekType)
               }
               if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-              console.log('[SUCCESS-1 @ line 2098] Applied main fetch timetable:', Object.keys(finalTimetable || {}))
               setExternalTimetable(finalTimetable)
               // Persist the processed result keyed by payload-hash so future
               // loads can reuse the fully-applied timetable without re-extraction.
@@ -2229,10 +2235,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // short handshake delay ΓÇö reduced for snappier background refreshes
       await new Promise((res) => setTimeout(res, 300))
 
-      // Include today's date so we get day-specific variations applied
-      const todayDateStr2 = new Date().toISOString().slice(0, 10)
       try {
-        const r2 = await fetch(`/api/timetable?date=${todayDateStr2}`, { credentials: 'include' })
+        const todayDateStr2 = new Date().toISOString().slice(0, 10)
+        const r2 = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include' })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
           if (!attemptedRefresh) {
@@ -2253,7 +2258,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const j = await r2.json()
           if (j == null) return
           if (payloadHasNoTimetable(j)) {
-            console.log('[CLEAR-3 @ line 2271] payloadHasNoTimetable returned TRUE in background refresh. Payload:', JSON.stringify(j).slice(0,500))
             if (!cancelled) {
               try {
                 const computed = buildBellTimesFromPayload(j)
@@ -2581,19 +2585,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // When the selected date changes, fetch the authoritative timetable for that date
   useEffect(() => {
-    console.log('[EFFECT-selectedDate] FIRING. selectedDateObject=', selectedDateObject?.toISOString?.() ?? 'null')
     let cancelled = false
     const fetchForDate = async () => {
       try {
         const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-        console.log('[EFFECT-selectedDate] fetchForDate called for ds=', ds, 'lastRequestedDateRef=', lastRequestedDateRef.current)
         // If we've just requested this same date, skip duplicate fetch
-        if (lastRequestedDateRef.current === ds) {
-          console.log('[EFFECT-selectedDate] SKIPPING - same date already requested')
-          return
-        }
+        if (lastRequestedDateRef.current === ds) return
         lastRequestedDateRef.current = ds
-        console.log('[EFFECT-selectedDate] Fetching /api/timetable?date=', ds)
         const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
         const ctype = res.headers.get('content-type') || ''
         if (!res.ok) {
@@ -2604,7 +2602,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const j = await res.json()
           if (cancelled) return
           if (j && payloadHasNoTimetable(j)) {
-            console.log('[CLEAR-4 @ line 2617] payloadHasNoTimetable returned TRUE in selectedDate useEffect. Date:', ds, 'Payload:', JSON.stringify(j).slice(0,500))
+            // When the selectedDateObject effect sees "no timetable", do NOT
+            // clear the existing timetable. The main refreshExternal function
+            // is authoritative for clearing. This prevents a race condition
+            // where the effect clears data that was just successfully loaded.
+            // We still extract bell times if available.
             if (!cancelled) {
               try {
                 const computed = buildBellTimesFromPayload(j)
@@ -2625,15 +2627,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore
               }
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
-              setTimetableSource('external-empty')
-              setExternalWeekType(null)
-              setCurrentWeek(null)
-              try {
-                setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
-              } catch (e) {}
+              // DO NOT call setExternalTimetable(emptyByDay) here - let main fetch be authoritative
             }
             return
           }
@@ -2707,7 +2701,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-              console.log('[SUCCESS-4 @ line 2700] Applied selectedDate useEffect timetable:', Object.keys(finalTimetable || {}))
               setExternalTimetable(finalTimetable)
             setTimetableSource(j.source ?? 'external')
             // record debug summary
@@ -2735,8 +2728,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         // ignore fetch errors here; provider has existing fallback logic
       }
-      // NOTE: We intentionally do NOT clear lastRequestedDateRef here.
-      // Clearing it would allow duplicate fetches if React re-renders.
+      // Note: We intentionally do NOT clear lastRequestedDateRef.current here.
+      // Keeping the ref set prevents duplicate fetches for the same date when
+      // the effect re-fires (e.g., due to re-renders or interval ticks).
     }
     fetchForDate()
     return () => { cancelled = true }
