@@ -1657,14 +1657,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalWeekType(null)
             return
           }
+          // NOTE: Do NOT return early here. The home-timetable scrapes HTML 
+          // and does NOT include room/sub variations. Continue to /api/timetable 
+          // which has the proper variations applied from roomVariations/classVariations.
+          // This home-timetable data is only used as a fallback if /api/timetable fails.
           if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-            setExternalTimetable(jht.timetable)
-            setTimetableSource(jht.source ?? 'external-homepage')
-            if (jht.weekType === 'A' || jht.weekType === 'B') {
-              setExternalWeekType(jht.weekType)
-              setCurrentWeek(jht.weekType)
-            }
-            return
+            // Store for fallback use only - don't set as primary or return
           }
         }
       } else if (htctype.includes('text/html')) {
@@ -1672,9 +1670,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const parsedHt = parseTimetableHtmlLocal(html)
         const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
         if (hasHt) {
-          setExternalTimetable(parsedHt)
-          setTimetableSource('external-homepage')
-          return
+          // NOTE: Do NOT set or return here. HTML-parsed data lacks room/sub variations.
+          // Continue to /api/timetable which has proper variations applied.
         }
       }
     } catch (e) {

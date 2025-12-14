@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Force dynamic rendering since we use request.url and cookies
+export const dynamic = 'force-dynamic'
+
 /**
  * Proxies SBHS calendar API endpoints:
  * - calendar/days.json - Returns day info (term, week, weekType, dayNumber, dayName) for date range
