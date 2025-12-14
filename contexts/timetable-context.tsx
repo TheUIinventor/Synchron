@@ -1715,63 +1715,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
     setError(null)
     // First try the server-scraped homepage endpoint
+    // NOTE: We no longer return early from home-timetable for ANY case.
+    // The home-timetable scrapes HTML and doesn't have proper variation data.
+    // We ALWAYS continue to /api/timetable to get authoritative data.
     try {
       const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
       const htctype = ht.headers.get('content-type') || ''
       if (ht.ok && htctype.includes('application/json')) {
         const jht = await ht.json()
-          if (jht) {
-          if (payloadHasNoTimetable(jht)) {
-              // Try to preserve or extract bell times when the homepage
-              // reports "no timetable" so we don't lose previously-hydrated
-              // bell buckets that the UI relies on for showing breaks.
-              try {
-                const computed = buildBellTimesFromPayload(jht)
-                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                const src = jht.bellTimes || {}
-                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-                  else finalBellTimes[k] = []
-                }
-                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny) {
-                  setExternalBellTimes(finalBellTimes)
-                  lastSeenBellTimesRef.current = finalBellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                }
-              } catch (e) {
-                // ignore extraction errors and preserve previously-seen bells
-              }
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
-              // Do not clear previously discovered bell times when upstream
-              // reports no timetable; keep existing bells where available.
-              setTimetableSource('external-empty')
-              setExternalWeekType(null)
-            return
-          }
-          if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-            // NOTE: Do NOT return early here. The home-timetable scrapes HTML 
-            // and does NOT include room/sub variations. Continue to /api/timetable 
-            // which has the proper variations applied from roomVariations/classVariations.
-            // This data is ignored in favor of the proper API response below.
-            console.log('[timetable.provider] home-timetable returned data but skipping - need /api/timetable for variations')
-          }
-        }
-      } else if (htctype.includes('text/html')) {
-        const html = await ht.text()
-        const parsedHt = parseTimetableHtmlLocal(html)
-        const hasHt = Object.values(parsedHt).some((arr) => arr.length > 0)
-        if (hasHt) {
-          // NOTE: Do NOT set or return here. HTML-parsed data lacks room/sub variations.
-          // Continue to /api/timetable which has proper variations applied.
-          console.log('[timetable.provider] parsed HTML timetable but skipping - need /api/timetable for variations')
-        }
+        // Just log what we got - don't set any state or return early
+        console.log('[timetable.provider] home-timetable response:', { 
+          hasError: !!jht?.error, 
+          hasTimetable: !!jht?.timetable,
+          source: jht?.source 
+        })
       }
     } catch (e) {
-      // ignore and continue to next strategies
+      // ignore home-timetable errors and continue to /api/timetable
+      console.log('[timetable.provider] home-timetable fetch failed, continuing to /api/timetable')
     }
 
     // Reuse the parsing logic from above by creating a DOMParser here as well
