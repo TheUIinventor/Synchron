@@ -42,6 +42,32 @@ export interface FullTimetableResponse {
   weekType: "A" | "B" | null
 }
 
+/**
+ * Day information from calendar/days.json API
+ * Keyed by date string (YYYY-MM-DD)
+ */
+export interface DayInfo {
+  date: string           // YYYY-MM-DD
+  term: number | null    // Term number (1-4)
+  week: number | null    // Week of term
+  weekType: string | null // "A" or "B" week in cycle
+  dayNumber: number | null // Day in timetable cycle (1-10 for A/B, 1-15 for A/B/C)
+  dayName: string | null  // e.g. "MonA", "TueB", "WedA"
+}
+
+export type DaysResponse = Record<string, DayInfo>
+
+/**
+ * Term information from calendar/terms.json API
+ */
+export interface TermInfo {
+  term: number
+  start: string  // YYYY-MM-DD
+  end: string    // YYYY-MM-DD
+}
+
+export type TermsResponse = TermInfo[]
+
 // Fetch functions - these call our Next.js API routes which proxy SBHS
 async function fetchDayTimetable(date?: string): Promise<DayTimetableResponse> {
   const url = date 
@@ -77,9 +103,53 @@ async function fetchFullTimetable(): Promise<FullTimetableResponse> {
   return response.json()
 }
 
+/**
+ * Fetch day info from calendar/days.json API
+ * Returns info about term, week, weekType, dayNumber for each date in range
+ */
+async function fetchCalendarDays(from: string, to: string): Promise<DaysResponse> {
+  const url = `/api/calendar?endpoint=days&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+  
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: {
+      "Accept": "application/json",
+    },
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch calendar days: ${response.status}`)
+  }
+  
+  return response.json()
+}
+
+/**
+ * Fetch term dates from calendar/terms.json API
+ * Returns start/end dates for each term
+ */
+async function fetchCalendarTerms(): Promise<TermsResponse> {
+  const url = `/api/calendar?endpoint=terms`
+  
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: {
+      "Accept": "application/json",
+    },
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch calendar terms: ${response.status}`)
+  }
+  
+  return response.json()
+}
+
 // Query key generators
 const dayTimetableKey = sbhsKey("timetable/daytimetable")
 const fullTimetableKey = sbhsKey("timetable/timetable")
+const calendarDaysKey = sbhsKey("calendar/days")
+const calendarTermsKey = sbhsKey("calendar/terms")
 
 /**
  * Hook for fetching day-specific timetable with subs applied
@@ -159,9 +229,89 @@ export function useCombinedTimetable(date?: string) {
   }
 }
 
+/**
+ * Hook for fetching calendar day information
+ * Returns term, week, weekType, dayNumber, dayName for each date in range.
+ * This is the authoritative source for determining which week (A/B) a date is.
+ * 
+ * @param from - Start date YYYY-MM-DD
+ * @param to - End date YYYY-MM-DD
+ * 
+ * Usage example:
+ * ```tsx
+ * const today = new Date().toISOString().split('T')[0]
+ * const { data } = useDay(today, today)
+ * // data[today] contains { term, week, weekType, dayNumber, dayName }
+ * // dayName like "MonA" tells you it's Monday of Week A
+ * ```
+ */
+export function useDay(from?: string, to?: string) {
+  return useQuery({
+    queryKey: calendarDaysKey(from && to ? { from, to } : undefined),
+    queryFn: () => fetchCalendarDays(from!, to!),
+    enabled: !!from && !!to, // Only fetch if both dates provided
+    staleTime: 60 * 60 * 1000, // Calendar data is fresh for 1 hour
+    gcTime: Infinity,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  })
+}
+
+// Attach query key getter to hook for external cache invalidation
+useDay.getQueryKey = calendarDaysKey
+
+/**
+ * Hook for fetching term dates
+ * Returns start/end dates for each school term.
+ * Useful for determining term boundaries, holidays, etc.
+ * 
+ * Usage example:
+ * ```tsx
+ * const { data: terms } = useTerms()
+ * // terms is array of { term, start, end }
+ * ```
+ */
+export function useTerms() {
+  return useQuery({
+    queryKey: calendarTermsKey(),
+    queryFn: fetchCalendarTerms,
+    staleTime: 24 * 60 * 60 * 1000, // Term dates are fresh for 24 hours
+    gcTime: Infinity,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  })
+}
+
+// Attach query key getter to hook for external cache invalidation
+useTerms.getQueryKey = calendarTermsKey
+
+/**
+ * Helper hook to get today's calendar info
+ * Convenient wrapper around useDay for the common case of needing today's info
+ */
+export function useToday() {
+  const today = new Date().toISOString().split('T')[0]
+  const query = useDay(today, today)
+  
+  return {
+    ...query,
+    // Extract today's info from the response for convenience
+    dayInfo: query.data?.[today] ?? null,
+    // Quick accessors for common properties
+    term: query.data?.[today]?.term ?? null,
+    week: query.data?.[today]?.week ?? null,
+    weekType: query.data?.[today]?.weekType as "A" | "B" | null ?? null,
+    dayNumber: query.data?.[today]?.dayNumber ?? null,
+    dayName: query.data?.[today]?.dayName ?? null,
+  }
+}
+
 export default {
   useDtt,
   useTimetable,
   useCombinedTimetable,
+  useDay,
+  useTerms,
+  useToday,
   sbhsKey,
 }
