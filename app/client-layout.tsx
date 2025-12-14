@@ -11,7 +11,7 @@ import { BottomNav } from "@/components/bottom-nav"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider"
 import { TimetableProvider } from "@/contexts/timetable-context"
-import { QueryClientProviderWrapper, hydrateFromProcessedSnapshot } from '@/lib/query-client'
+import { QueryClientProviderWrapper } from '@/lib/query-client'
 import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
@@ -24,13 +24,6 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       .catch(err => console.debug('auth refresh error', err))
   }, [])
 
-  // Hydrate the React Query cache from our processed snapshot on mount
-  useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return
-      hydrateFromProcessedSnapshot()
-    } catch (e) {}
-  }, [])
 
   // Emergency unregister is disabled by default to avoid reload loops that
   // block navigation and user interactions. To enable temporarily set
