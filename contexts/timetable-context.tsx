@@ -261,14 +261,6 @@ const payloadHasNoTimetable = (payload: any) => {
     if (payload.noTimetable === true) return true
     if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
     if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
-    // Check if timetable object exists but all days are empty arrays
-    if (payload.timetable && typeof payload.timetable === 'object' && !Array.isArray(payload.timetable)) {
-      const allDaysEmpty = Object.values(payload.timetable).every(
-        (dayPeriods: any) => !Array.isArray(dayPeriods) || dayPeriods.length === 0
-      )
-      // Only count as "no timetable" if explicitly marked or all days empty
-      if (allDaysEmpty && (payload.isHoliday || payload.noTimetable)) return true
-    }
   } catch (e) {}
   return false
 }
@@ -586,19 +578,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             cleaned[day] = (rawMap[day] || []).map((p) => {
               const item: any = { ...(p as any) }
 
-              // Check for room variation fields from API or cached data
-              const candidateDest = item.displayRoom || item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
-
               // Normalize explicit destination room fields into `displayRoom`.
-              // Only set if not already set by API (check for explicit true value)
-              if (item.isRoomChange !== true) {
-                if (candidateDest && String(candidateDest).trim()) {
-                  const candStr = String(candidateDest).trim()
-                  const roomStr = String(item.room || '').trim()
-                  if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                    item.displayRoom = candStr
-                    item.isRoomChange = true
-                  }
+              const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
+              if (candidateDest && String(candidateDest).trim()) {
+                const candStr = String(candidateDest).trim()
+                const roomStr = String(item.room || '').trim()
+                if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+                  item.displayRoom = candStr
+                  item.isRoomChange = true
                 }
               }
 
@@ -606,12 +593,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const casual = item.casualSurname || undefined
                 const candidate = item.fullTeacher || item.teacher || undefined
-                const displayTeacher = casual ? stripLeadingCasualCode(casual) : stripLeadingCasualCode(candidate as any)
-                item.displayTeacher = displayTeacher
+                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                item.displayTeacher = dt
               } catch (e) {}
 
-              // Defensive: remove stale `isRoomChange` ONLY if there's no destination room anywhere
-              if (!candidateDest && item.isRoomChange && !item.displayRoom) {
+              // Defensive: remove stale `isRoomChange` if no explicit dest
+              if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) {
                 delete item.isRoomChange
               }
 
@@ -626,7 +613,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const cached = __initialCachedSubs
             if (cached && Array.isArray(cached) && cached.length) {
               try {
-                const applied = applySubstitutionsToTimetable(cleaned, cached, { debug: true })
+                const applied = applySubstitutionsToTimetable(cleaned, cached, { debug: false })
                 return applied
               } catch (e) {
                 // fall back to cleaned map on error
@@ -790,11 +777,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       for (const day of Object.keys(m)) {
         try {
           m[day] = (m[day] || []).map((p) => {
-            // If API already set isRoomChange to true, preserve it
-            if ((p as any).isRoomChange === true) {
-              return p
-            }
-            
             // Check several common variant keys that might exist on the
             // incoming period object.
             const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to || undefined
@@ -829,8 +811,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   const casual = (clean as any).casualSurname || undefined
                   const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
-                  const displayTeacher = casual ? stripLeadingCasualCode(casual) : stripLeadingCasualCode(candidate as any)
-                  (clean as any).displayTeacher = displayTeacher
+                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                  (clean as any).displayTeacher = dt
                 } catch (e) {}
                 return clean
               }
@@ -839,8 +821,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try {
               const casual = (p as any).casualSurname || undefined
               const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
-              const displayTeacher = casual ? stripLeadingCasualCode(casual) : stripLeadingCasualCode(candidate as any)
-              (p as any).displayTeacher = displayTeacher
+              const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+              (p as any).displayTeacher = dt
             } catch (e) {}
             return p
           })
@@ -851,73 +833,75 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return m
     }
 
-    // Merge day-specific timetable (with subs/room changes applied) with
-    // the full cycle timetable (clean, no subs). Priority:
-    // 1. If externalTimetable[day] has class periods (not just breaks), use it
-    //    because it has substitutions and room changes already applied for that day.
-    // 2. Otherwise fall back to timetableByWeek[day][currentWeek] which is the
-    //    clean cycle data without day-specific variations.
+    // Merge fresh timetable with previously-seen timetable entries to preserve
+    // casually-provided teacher fields (e.g. `casualSurname`). This ensures
+    // that when a background refresh returns a timetable lacking `casualSurname`
+    // we keep the cached casual display instead of reverting to a short code.
+
+    // Simplified: directly set external timetable without complex preservation.
+    // Reverting the previous experimental merge logic to keep behavior stable.
+    // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
-    if (useExternalTimetableByWeek || useExternalTimetable) {
+    if (useExternalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
-      const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-      
-      // Helper to check if a list has actual class periods (not just breaks)
-      const hasClassPeriods = (list: Period[]) => {
-        if (!Array.isArray(list) || list.length === 0) return false
-        return list.some(p => {
-          const subj = String(p.subject || '').toLowerCase()
-          return subj && !/(break|recess|lunch)/i.test(subj)
-        })
-      }
-      
-      for (const day of allDays) {
+      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
         let list: Period[] = []
-        
-        // Priority 1: Check if externalTimetable has day-specific data with subs
-        const daySpecific = useExternalTimetable ? (useExternalTimetable as any)[day] : null
-        if (Array.isArray(daySpecific) && hasClassPeriods(daySpecific)) {
-          // Use day-specific data - it has subs and room changes applied
-          // Filter by weekType if known to avoid showing periods from wrong week
-          if (currentWeek === 'A' || currentWeek === 'B') {
-            list = daySpecific.filter((p: any) => !p.weekType || p.weekType === currentWeek)
-          } else {
-            // No known week - show entries without weekType (commonly breaks)
-            // plus all entries since we can't filter properly
-            list = daySpecific.slice()
-          }
-          console.log(`[timetable.provider] Using day-specific timetable for ${day} (has subs/room changes)`)
-        } else if (useExternalTimetableByWeek) {
-          // Priority 2: Fall back to cycle timetable for the current week
-          const groups = (useExternalTimetableByWeek as any)[day] as { A: Period[]; B: Period[]; unknown: Period[] } | undefined
-          if (groups) {
-            if (currentWeek === 'A' || currentWeek === 'B') {
-              list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]).slice() : []
-            } else {
-              // No known week - prefer A, then B, then unknown
+
+        // If an explicit current week is known, use it.
+        if (currentWeek === 'A' || currentWeek === 'B') {
+          list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
+        } else {
+          // Try to infer which week (A or B) the grouped timetable should use
+          // by comparing available per-day entries in any provided external
+          // timetable with the A/B grouped entries. This helps when the
+          // server returned `timetableByWeek` but did not provide an explicit
+          // `weekType` value for the current selection; prefer the group that
+          // best matches the live/day timetable data.
+          try {
+            const reference = useExternalTimetable || lastRecordedTimetable || {}
+            const refPeriods = Array.isArray((reference as any)[day]) ? (reference as any)[day] as Period[] : []
+            const score = { A: 0, B: 0 }
+
+            const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+            if (refPeriods && refPeriods.length) {
+              for (const rp of refPeriods) {
+                const rsub = norm(rp.subject)
+                const rper = norm(rp.period)
+                if (groups && Array.isArray(groups.A)) {
+                  for (const a of groups.A) {
+                    if (norm(a.subject) === rsub && norm(a.period) === rper) { score.A += 2 }
+                    else if (norm(a.period) === rper) { score.A += 1 }
+                  }
+                }
+                if (groups && Array.isArray(groups.B)) {
+                  for (const b of groups.B) {
+                    if (norm(b.subject) === rsub && norm(b.period) === rper) { score.B += 2 }
+                    else if (norm(b.period) === rper) { score.B += 1 }
+                  }
+                }
+              }
+            }
+
+            if (score.A > score.B) list = Array.isArray(groups.A) ? groups.A.slice() : []
+            else if (score.B > score.A) list = Array.isArray(groups.B) ? groups.B.slice() : []
+            else {
+              // No clear match: prefer the non-empty group (A then B), or
+              // fall back to unknown if both are empty.
               if (groups.A && groups.A.length) list = groups.A.slice()
               else if (groups.B && groups.B.length) list = groups.B.slice()
               else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
             }
-            console.log(`[timetable.provider] Using cycle timetable for ${day} (Week ${currentWeek || 'unknown'})`)
+          } catch (e) {
+            // On error, fall back to original behaviour: prefer A if present
+            if (groups.A && groups.A.length) list = groups.A.slice()
+            else if (groups.B && groups.B.length) list = groups.B.slice()
+            else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
           }
-        } else if (Array.isArray(daySpecific)) {
-          // Day-specific data exists but only has breaks - still use it
-          list = daySpecific.slice()
         }
-        
-        filtered[day] = list
+
+        filtered[day] = list.slice()
       }
-      
-      // If the server explicitly reported that there is no timetable for the
-      // requested date, return the empty-by-day map as-is (do not insert
-      // Break rows based on bell times). This keeps the UI blank like a
-      // weekend when upstream reports "no timetable".
-      if (timetableSource === 'external-empty') {
-        preferToRoomOnMap(filtered)
-        return cleanupMap(filtered)
-      }
-      
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         // Only use API-provided bell buckets; do not fall back to hardwired data.
@@ -970,6 +954,106 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         }
+        dayPeriods.sort((a, z) => {
+          const aIsBreak = /(?:recess|lunch|break)/i.test(String(a.subject || a.period || ''))
+          const zIsBreak = /(?:recess|lunch|break)/i.test(String(z.subject || z.period || ''))
+          if (!aIsBreak && !zIsBreak) {
+            const ai = canonicalIndex(a.period)
+            const zi = canonicalIndex(z.period)
+            if (ai < 998 && zi < 998 && ai !== zi) return ai - zi
+          }
+          return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, z.time)
+        })
+        filtered[day] = dayPeriods
+      }
+
+      preferToRoomOnMap(filtered)
+      return cleanupMap(filtered)
+    }
+
+    if (useExternalTimetable) {
+      const filtered: Record<string, Period[]> = {}
+      for (const [day, periods] of Object.entries(useExternalTimetable)) {
+        const list = Array.isArray(periods) ? periods : []
+        // When the server provides week-tagged entries (A/B), prefer entries
+        // that match the known `currentWeek`. However, many upstream payloads
+        // include UI-only items like Recess/Lunch without a `weekType` ΓÇö treat
+        // those as applicable to either week so they aren't dropped.
+        if (currentWeek === 'A' || currentWeek === 'B') {
+          filtered[day] = list.filter((p) => !(p as any).weekType || (p as any).weekType === currentWeek)
+        } else {
+          // If we don't yet know the current week, show untagged entries
+          // (commonly Break rows) rather than returning an empty list.
+          filtered[day] = list.filter((p) => !(p as any).weekType)
+        }
+      }
+      // If the server explicitly reported that there is no timetable for the
+      // requested date, return the empty-by-day map as-is (do not insert
+      // Break rows based on bell times). This keeps the UI blank like a
+      // weekend when upstream reports "no timetable".
+      if (timetableSource === 'external-empty') {
+        preferToRoomOnMap(filtered)
+        return cleanupMap(filtered)
+      }
+      // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
+      const getBellForDay = (dayName: string) => {
+        // Use only API-provided buckets when available; otherwise return empty.
+        const source = useExternalBellTimes
+        const bucket = dayName === 'Friday' ? source?.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? source?.['Wed/Thurs'] : source?.['Mon/Tues'])
+        return bucket || []
+      }
+
+      const parseStartMinutes = (timeStr: string) => {
+        try {
+          const part = (timeStr || '').split('-')[0].trim()
+          const [h, m] = part.split(':').map((s) => parseInt(s, 10))
+          if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m
+        } catch (e) {}
+        return 0
+      }
+
+      for (const day of Object.keys(filtered)) {
+        const bells = getBellForDay(day) || []
+        const dayPeriods = filtered[day]
+
+        // If the server provided an explicit bellTimes object, respect the
+        // original API ordering for that day's bucket. Otherwise, sort bells
+        // into canonical order as a fallback.
+        const externalBucket = useExternalBellTimes ? (day === 'Friday' ? useExternalBellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues'])) : null
+        const shouldRespectApiOrder = !!externalBucket && Array.isArray(externalBucket)
+
+        if (!shouldRespectApiOrder) {
+          bells.sort((a, b) => {
+            const ai = canonicalIndex(a?.period)
+            const bi = canonicalIndex(b?.period)
+            if (ai !== bi) return ai - bi
+            return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
+          })
+        }
+
+        for (const b of bells) {
+          try {
+            const bellStart = parseStartMinutesForDay(dayPeriods, b.time)
+            const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
+            const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
+            const hasMatchingClass = matching.length > 0
+            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
+            if (hasMatchingClass) continue
+            const label = b.period || 'Break'
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
+          } catch (e) {
+            const label = b.period
+            if (!/(recess|lunch|break)/i.test(label)) continue
+            const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === label.toLowerCase())
+            if (!exists) {
+              dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
+            }
+          }
+        }
+
         dayPeriods.sort((a, z) => {
           const aIsBreak = /(?:recess|lunch|break)/i.test(String(a.subject || a.period || ''))
           const zIsBreak = /(?:recess|lunch|break)/i.test(String(z.subject || z.period || ''))
@@ -1063,7 +1147,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     // If we're displaying the bundled sample because live data couldn't be obtained,
     // and the API hasn't explicitly specified A/B (currentWeek is null), do not
-    // assume a default week — return an empty timetable so the UI can show a
+    // assume a default week ΓÇö return an empty timetable so the UI can show a
     // clear message instead of presenting potentially incorrect week data.
     if (timetableSource === 'fallback-sample' && (currentWeek !== 'A' && currentWeek !== 'B')) {
       return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
@@ -1668,12 +1752,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalWeekType(null)
             return
           }
-          // NOTE: Do NOT return early here. The home-timetable scrapes HTML 
-          // and does NOT include room/sub variations. Continue to /api/timetable 
-          // which has the proper variations applied from roomVariations/classVariations.
-          // This home-timetable data is only used as a fallback if /api/timetable fails.
           if (jht.timetable && typeof jht.timetable === 'object' && !Array.isArray(jht.timetable)) {
-            // Store for fallback use only - don't set as primary or return
+            // NOTE: Do NOT return early here. The home-timetable scrapes HTML 
+            // and does NOT include room/sub variations. Continue to /api/timetable 
+            // which has the proper variations applied from roomVariations/classVariations.
+            // This data is ignored in favor of the proper API response below.
+            console.log('[timetable.provider] home-timetable returned data but skipping - need /api/timetable for variations')
           }
         }
       } else if (htctype.includes('text/html')) {
@@ -1683,6 +1767,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (hasHt) {
           // NOTE: Do NOT set or return here. HTML-parsed data lacks room/sub variations.
           // Continue to /api/timetable which has proper variations applied.
+          console.log('[timetable.provider] parsed HTML timetable but skipping - need /api/timetable for variations')
         }
       }
     } catch (e) {
@@ -1758,9 +1843,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
       // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
       // Include today's date so we get day-specific variations (room changes, substitutes) applied
-      const todayDate = new Date().toISOString().slice(0, 10)
+      const todayDateStr = new Date().toISOString().slice(0, 10)
       try {
-        const r = await fetch(`/api/timetable?date=${todayDate}`, { credentials: 'include' })
+        const r = await fetch(`/api/timetable?date=${todayDateStr}`, { credentials: 'include' })
         if (r.status === 401) {
           if (!attemptedRefresh) {
             try {
@@ -1951,14 +2036,46 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       try { console.debug('[timetable.provider] homepage substitutions applied, count=', appliedCount) } catch (e) {}
                     } catch (e) { try { console.debug('[timetable.provider] homepage substitution apply error', e) } catch (err) {} }
 
-                  // NOTE: Following competitor's pattern - timetableByWeek is the CLEAN 15-day cycle
-                  // NEVER apply substitutions to the cycle view. Substitutions are date-specific
-                  // and only belong in the day view (byDay/timetable). The cycle view shows the
-                  // master schedule without any date-bound changes.
-                  
-                  // Keep finalByWeek as-is from the API (already clean without subs)
-                  if (j.timetableByWeek) {
-                    finalByWeek = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                  // For the cycle/grouped view (timetableByWeek), only apply
+                  // substitutions that do NOT have a specific date attached.
+                  // Date-bound substitutions should only affect the single
+                  // calendar date (daily view), not both Week A and Week B.
+                  const genericSubs = subs.filter((s: any) => !s || !s.date)
+
+                  if (j.timetableByWeek && genericSubs.length) {
+                      try {
+                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                      const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                      // Copy to avoid mutating original
+                      for (const d of Object.keys(byWeekSrc)) {
+                        transformed[d] = {
+                          A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                          B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                          unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
+                        }
+                      }
+
+                      // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
+                      const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                        for (const d of Object.keys(transformed)) {
+                          weekMap[d] = transformed[d][weekKey] || []
+                        }
+                        const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
+                        for (const d of Object.keys(transformed)) {
+                          transformed[d][weekKey] = applied[d] || []
+                        }
+                      }
+
+                      // Apply generic substitutions to grouped week maps (debug enabled)
+                      applyToWeek('A')
+                      applyToWeek('B')
+                      applyToWeek('unknown')
+
+                      finalByWeek = transformed
+                    } catch (e) {
+                      // ignore by-week substitution failures
+                    }
                   }
                 }
               } catch (e) {
@@ -2056,140 +2173,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
               setTimetableSource(j.source ?? 'external')
               // (weekType already set above if present)
-              
-              // Background fetch: load substitutions for all weekdays
-              ;(async () => {
-                try {
-                  console.log('[timetable.provider] Starting background fetch for all weekdays')
-                  const today = new Date()
-                  const currentDay = today.getDay() // 0=Sun, 1=Mon, ..., 5=Fri
-                  
-                  // Get Monday of current week
-                  const daysToMonday = currentDay === 0 ? 6 : (currentDay - 1)
-                  const monday = new Date(today)
-                  monday.setDate(today.getDate() - daysToMonday)
-                  
-                  // Generate dates for Mon-Fri of current week
-                  const weekDates: { day: string, date: string }[] = []
-                  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-                  for (let i = 0; i < 5; i++) {
-                    const d = new Date(monday)
-                    d.setDate(monday.getDate() + i)
-                    const dateStr = d.toISOString().slice(0, 10) // YYYY-MM-DD
-                    weekDates.push({ day: dayNames[i], date: dateStr })
-                  }
-                  
-                  // Load cached substitutions first
-                  let cachedData: Record<string, any> = {}
-                  if (typeof window !== 'undefined') {
-                    try {
-                      const cached = localStorage.getItem('synchron-week-substitutions')
-                      if (cached) {
-                        cachedData = JSON.parse(cached)
-                        console.log('[timetable.provider] Loaded cached substitutions for dates:', Object.keys(cachedData))
-                        
-                        // Apply cached data immediately - ONLY timetable (day view), NOT timetableByWeek
-                        // timetableByWeek is the clean 15-day cycle and should not have date-specific subs
-                        const cachedUpdates: Record<string, Period[]> = {}
-                        
-                        for (const { day, date } of weekDates) {
-                          if (cachedData[date]) {
-                            const data = cachedData[date]
-                            if (data.timetable && data.timetable[day]) {
-                              cachedUpdates[day] = data.timetable[day]
-                            }
-                            // NOTE: Do NOT apply timetableByWeek from cache - that's the clean cycle view
-                          }
-                        }
-                        
-                        if (Object.keys(cachedUpdates).length > 0) {
-                          console.log('[timetable.provider] Applying cached substitutions for:', Object.keys(cachedUpdates))
-                          setExternalTimetable(prev => ({ ...prev, ...cachedUpdates }))
-                        }
-                        // NOTE: Do NOT apply cachedUpdatesByWeek - timetableByWeek should remain clean
-                      }
-                    } catch (e) {
-                      console.error('[timetable.provider] Failed to load cached substitutions:', e)
-                    }
-                  }
-                  
-                  // Only fetch days that aren't cached or are stale (>5 minutes old)
-                  const STALE_TIME = 5 * 60 * 1000 // 5 minutes
-                  const datesToFetch = weekDates.filter(({ date }) => {
-                    if (!cachedData[date]) return true
-                    const age = Date.now() - (cachedData[date].fetchedAt || 0)
-                    return age > STALE_TIME
-                  })
-                  
-                  if (datesToFetch.length === 0) {
-                    console.log('[timetable.provider] All substitutions are cached and fresh')
-                    return
-                  }
-                  
-                  console.log('[timetable.provider] Fetching fresh data for:', datesToFetch.map(d => d.date))
-                  
-                  // Fetch all days in parallel
-                  const fetches = datesToFetch.map(async ({ day, date }) => {
-                    try {
-                      const res = await fetch(`/api/timetable?date=${date}`, { credentials: 'include' })
-                      if (!res.ok) return null
-                      const data = await res.json()
-                      return { day, date, data }
-                    } catch (e) {
-                      console.error(`[timetable.provider] Failed to fetch ${day} (${date}):`, e)
-                      return null
-                    }
-                  })
-                  
-                  const results = await Promise.all(fetches)
-                  
-                  // Merge the results into the current timetable - ONLY day view, NOT cycle view
-                  const updates: Record<string, Period[]> = {}
-                  
-                  for (const result of results) {
-                    if (!result || !result.data) continue
-                    const { day, data } = result
-                    
-                    // Extract the day's periods with substitutions already applied by API
-                    if (data.timetable && data.timetable[day]) {
-                      updates[day] = data.timetable[day]
-                    }
-                    // NOTE: Do NOT merge timetableByWeek - that's the clean 15-day cycle
-                  }
-                  
-                  // Cache the substitutions by date - MERGE with existing cache
-                  // NOTE: Only cache timetable (day view with subs), NOT timetableByWeek (clean cycle)
-                  if (typeof window !== 'undefined') {
-                    try {
-                      // Start with existing cached data
-                      const mergedCache: Record<string, any> = { ...cachedData }
-                      for (const result of results) {
-                        if (!result || !result.data) continue
-                        mergedCache[result.date] = {
-                          timetable: result.data.timetable,
-                          // NOTE: Do NOT cache timetableByWeek - it's the clean cycle view
-                          fetchedAt: Date.now()
-                        }
-                      }
-                      localStorage.setItem('synchron-week-substitutions', JSON.stringify(mergedCache))
-                      console.log('[timetable.provider] Cached substitutions for dates:', Object.keys(mergedCache))
-                    } catch (e) {
-                      console.error('[timetable.provider] Failed to cache substitutions:', e)
-                    }
-                  }
-                  
-                  // Update state with merged data (only if we got updates)
-                  // NOTE: Only update timetable (day view), NOT timetableByWeek (clean cycle)
-                  if (Object.keys(updates).length > 0) {
-                    console.log('[timetable.provider] Applying background-fetched substitutions for days:', Object.keys(updates))
-                    setExternalTimetable(prev => ({ ...prev, ...updates }))
-                  }
-                  // NOTE: Do NOT merge into timetableByWeek - it's the clean 15-day cycle
-                } catch (e) {
-                  console.error('[timetable.provider] Background fetch failed:', e)
-                }
-              })()
-              
               return
             }
             if (Array.isArray(j.timetable)) {
@@ -2277,10 +2260,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // short handshake delay ΓÇö reduced for snappier background refreshes
       await new Promise((res) => setTimeout(res, 300))
 
-      // Include today's date so we get day-specific variations (room changes, substitutes) applied
-      const todayDate2 = new Date().toISOString().slice(0, 10)
+      // Include today's date so we get day-specific variations applied
+      const todayDateStr2 = new Date().toISOString().slice(0, 10)
       try {
-        const r2 = await fetch(`/api/timetable?date=${todayDate2}`, { credentials: 'include' })
+        const r2 = await fetch(`/api/timetable?date=${todayDateStr2}`, { credentials: 'include' })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
           if (!attemptedRefresh) {
@@ -2705,14 +2688,41 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
                 } catch (e) { /* ignore substitution apply errors */ }
 
-                // NOTE: Following competitor's pattern - timetableByWeek is the CLEAN 15-day cycle
-                // NEVER apply substitutions to the cycle view. Substitutions are date-specific
-                // and only belong in the day view (byDay/timetable). The cycle view shows the
-                // master schedule without any date-bound changes.
-                
-                // Keep finalByWeek as-is from the API (already clean without subs)
-                if (j.timetableByWeek) {
-                  finalByWeek = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                const genericSubs = subs.filter((s: any) => !s || !s.date)
+
+                if (j.timetableByWeek && genericSubs.length) {
+                  try {
+                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                    // Copy to avoid mutating original
+                    for (const d of Object.keys(byWeekSrc)) {
+                      transformed[d] = {
+                        A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                        B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                        unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
+                      }
+                    }
+
+                    // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
+                    const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
+                      const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+                      for (const d of Object.keys(transformed)) {
+                        weekMap[d] = transformed[d][weekKey] || []
+                      }
+                      const applied = applySubstitutionsToTimetable(weekMap, genericSubs, { debug: true })
+                      for (const d of Object.keys(transformed)) {
+                        transformed[d][weekKey] = applied[d] || []
+                      }
+                    }
+
+                    applyToWeek('A')
+                    applyToWeek('B')
+                    applyToWeek('unknown')
+
+                    finalByWeek = transformed
+                  } catch (e) {
+                    // ignore by-week substitution failures
+                  }
                 }
               }
             } catch (e) {

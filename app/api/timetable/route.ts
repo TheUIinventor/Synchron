@@ -207,10 +207,15 @@ export async function GET(req: NextRequest) {
     // JSON (`daytimetable.json`), prefer returning that payload directly so
     // clients that requested `/api/timetable?date=YYYY-MM-DD` receive the
     // authoritative per-day JSON rather than the aggregated full timetable.
+    console.log(`[API DEBUG] dateParam=${dateParam}, dayRes.json exists=${!!(dayRes as any)?.json}`)
     if (dateParam) {
       try {
         if (dayRes && (dayRes as any).json) {
           const dj = (dayRes as any).json
+          console.log(`[API DEBUG] Processing date-specific path for ${dateParam}`)
+          console.log(`[API DEBUG] dj.bells length=${Array.isArray(dj.bells) ? dj.bells.length : 'not array'}`)
+          console.log(`[API DEBUG] dj.classVariations keys=${dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'none'}`)
+          console.log(`[API DEBUG] dj.roomVariations keys=${dj.roomVariations ? Object.keys(dj.roomVariations).join(',') : 'none'}`)
           // Normalize the day response into the same shape we return for
           // the aggregated endpoint so clients receive `timetable`.
           const byDay: Record<string, any[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
@@ -363,6 +368,11 @@ export async function GET(req: NextRequest) {
           }
 
           const maybeBellTimes = dj.bellTimes || dj.bells || (bellsRes && (bellsRes as any).json) || undefined
+
+          // Log summary of what we're returning
+          const subsApplied = Object.values(byDay).flat().filter((p: any) => p.isSubstitute || p.casualSurname).length
+          const roomChangesApplied = Object.values(byDay).flat().filter((p: any) => p.isRoomChange || p.displayRoom).length
+          console.log(`[API DEBUG] Returning date-specific response: ${Object.values(byDay).flat().length} periods, ${subsApplied} subs, ${roomChangesApplied} room changes`)
 
           return NextResponse.json({
             timetable: byDay,
