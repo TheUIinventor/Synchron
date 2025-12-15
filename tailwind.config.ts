@@ -19,9 +19,12 @@ const config = {
     },
     extend: {
       fontFamily: {
-        // Use Roboto Flex (via CSS variable provided by Next's font loader)
-        sans: ["var(--font-roboto-flex)", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
-        serif: ["var(--font-roboto-flex)", "Georgia", "Times New Roman", "serif"],
+        // OS-specific font stack:
+        // - Windows: Segoe UI Variable (modern) or Segoe UI
+        // - macOS/iOS/iPadOS: SF Pro (via system-ui/-apple-system)
+        // - Android: Roboto
+        sans: ['"Segoe UI Variable"', '"Segoe UI"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"SF Pro"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        serif: ['Georgia', '"Times New Roman"', 'serif'],
       },
       colors: {
         border: "hsl(var(--border) / <alpha-value>)",
