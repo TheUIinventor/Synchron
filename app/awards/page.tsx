@@ -279,7 +279,7 @@ export default function AwardsPage() {
           </Link>
 
           {/* Heading: left-aligned on mobile, centered on md+; smaller on mobile */}
-          <h1 className="text-lg font-bold text-left md:text-center md:flex-1 font-serif">Student Awards</h1>
+          <h1 className="text-lg font-bold text-left md:text-center md:flex-1">Student Awards</h1>
 
           <div className="w-6"></div>
         </div>
@@ -343,7 +343,7 @@ export default function AwardsPage() {
 
         {/* Category Progress Cards - Enhanced Grid */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3 font-serif">Progress by Category</h3>
+          <h3 className="text-lg font-semibold mb-3">Progress by Category</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {Object.entries(categoryData).map(([category, data]) => {
               const pointsToNextNomination = 30 - (data.points % 30)
@@ -384,7 +384,7 @@ export default function AwardsPage() {
 
         {/* Award Levels - Dynamic View */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3 font-serif">Award Progress</h3>
+          <h3 className="text-lg font-semibold mb-3">Award Progress</h3>
           <div className="space-y-1.5">
             {awardLevels.map((level, index) => {
               const isAchieved = level.achieved
@@ -448,7 +448,7 @@ export default function AwardsPage() {
           </div>
         </div>
 
-        <h2 className="text-xl font-semibold mb-4 font-serif">Recent Points Earned</h2>
+        <h2 className="text-xl font-semibold mb-4">Recent Points Earned</h2>
 
         {/* Participation list from portal (if authenticated) */}
         {participation.loading && <p className="text-sm text-muted-foreground">Loading participation...</p>}

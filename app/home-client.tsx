@@ -108,7 +108,7 @@ export default function HomeClient() {
         <div className="w-24 h-24 rounded-3xl bg-destructive/10 flex items-center justify-center mb-4">
           <Loader2 className="h-10 w-10 text-destructive animate-spin" />
         </div>
-        <h2 className="text-2xl font-serif text-destructive">Connection Error</h2>
+        <h2 className="text-2xl font-sans font-semibold text-destructive">Connection Error</h2>
         <p className="text-muted-foreground max-w-xs">{error}</p>
         <button 
           onClick={() => refreshExternal && refreshExternal()} 
@@ -369,7 +369,7 @@ export default function HomeClient() {
                 </div>
                 
                 <div className="mt-3">
-                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-serif leading-tight mb-2">
+                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-sans font-semibold leading-tight mb-2">
                     {currentPeriod?.subject ? (
                       canvasLinks[currentPeriod.subject] ? (
                         <a href={canvasLinks[currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
@@ -540,7 +540,7 @@ export default function HomeClient() {
                   </div>
                   <div className="flex items-end justify-between">
                     <div>
-                      <h3 className="text-3xl font-serif">View</h3>
+                      <h3 className="text-3xl font-sans font-semibold">View</h3>
                       <p className="text-sm font-medium opacity-80">Daily Notices</p>
                     </div>
                     <div className="h-10 w-10 rounded-full bg-tertiary/20 flex items-center justify-center">
