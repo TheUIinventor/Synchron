@@ -653,6 +653,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
+  // Track when authoritative bell times have been set from /api/timetable
+  // to prevent fallback paths from overwriting them with generic/stale data
+  const authoritativeBellsDateRef = useRef<string | null>(null)
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
@@ -1768,14 +1771,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // here because the home-timetable endpoint lacks classVariations and
     // roomVariations. We always want to proceed to /api/timetable?date=xxx
     // which returns the full day timetable with substitute/room changes.
+    // ALSO: Do NOT set bell times from this endpoint if we already have them,
+    // since /api/timetable returns authoritative date-specific bell times
+    // that may include variations (e.g., modified schedules for special days).
     try {
       const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
       const htctype = ht.headers.get('content-type') || ''
       if (ht.ok && htctype.includes('application/json')) {
         const jht = await ht.json()
-        // Extract bell times from home-timetable if available, but do NOT
-        // set timetable state - we'll get the authoritative data from /api/timetable
-        if (jht) {
+        // Only extract bell times if we don't already have any - the authoritative
+        // data comes from /api/timetable which may have date-specific variations
+        if (jht && !externalBellTimes && !lastSeenBellTimesRef.current) {
           try {
             const computed = buildBellTimesFromPayload(jht)
             const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
@@ -1783,7 +1789,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
               if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
               else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-              else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
               else finalBellTimes[k] = []
             }
             const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
@@ -1940,7 +1945,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny) {
+                // Only update bells if we don't have authoritative date-specific ones for today
+                const todayIso = (new Date()).toISOString().slice(0,10)
+                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
@@ -1992,7 +1999,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     } catch (e) {}
                     setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
-                    if (parsedCache.bellTimes) {
+                    // Only restore cached bell times if we don't have authoritative
+                    // date-specific bells from /api/timetable for today
+                    const todayIso = (new Date()).toISOString().slice(0,10)
+                    if (parsedCache.bellTimes && authoritativeBellsDateRef.current !== todayIso) {
                       setExternalBellTimes(parsedCache.bellTimes)
                       lastSeenBellTimesRef.current = parsedCache.bellTimes
                       lastSeenBellTsRef.current = parsedCache.savedAt || Date.now()
@@ -2034,7 +2044,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny) {
+                // Only update bells if we don't have authoritative date-specific ones for today
+                const todayIso = (new Date()).toISOString().slice(0,10)
+                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
@@ -2372,7 +2384,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny) {
+                // Only update bells if we don't have authoritative date-specific ones for today
+                const todayIso = (new Date()).toISOString().slice(0,10)
+                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
@@ -2417,6 +2431,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
+                  // Mark as authoritative since this is from /api/timetable
+                  authoritativeBellsDateRef.current = (new Date()).toISOString().slice(0,10)
                 } else {
                   try { console.log('[timetable.provider] skipping empty external bellTimes merge (retry)') } catch (e) {}
                 }
@@ -2426,6 +2442,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   setExternalBellTimes(j.bellTimes)
                   lastSeenBellTimesRef.current = j.bellTimes
                   lastSeenBellTsRef.current = Date.now()
+                  // Mark as authoritative since this is from /api/timetable
+                  authoritativeBellsDateRef.current = (new Date()).toISOString().slice(0,10)
                 }
               }
             }
@@ -2745,7 +2763,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny) {
+                // Only update bells if we don't have authoritative date-specific ones for today
+                const todayIso = (new Date()).toISOString().slice(0,10)
+                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
@@ -2841,7 +2861,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setLastFetchedDate((new Date()).toISOString().slice(0,10))
               setLastFetchedPayloadSummary(summary)
             } catch (e) {}
-            if (j.bellTimes) setExternalBellTimes(j.bellTimes)
+            if (j.bellTimes) {
+              setExternalBellTimes(j.bellTimes)
+              // Mark these as authoritative date-specific bells
+              authoritativeBellsDateRef.current = (selectedDateObject || new Date()).toISOString().slice(0,10)
+              lastSeenBellTimesRef.current = j.bellTimes
+              lastSeenBellTsRef.current = Date.now()
+            }
             if (j.weekType === 'A' || j.weekType === 'B') {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
