@@ -430,13 +430,12 @@ export default function TimetablePage() {
 
             {/* Daily Schedule (wide format) */}
             <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4 mx-auto max-w-[680px]">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base sm:text-lg font-semibold text-on-surface truncate">{selectedDayName}{(externalWeekType ?? currentWeek) ? ` ${externalWeekType ?? currentWeek}` : ''} Schedule</h2>
-                  <p className="text-xs sm:text-sm text-on-surface-variant truncate">{formatSelectedDate()}</p>
+                  <h2 className="text-base sm:text-lg font-bold text-on-surface truncate">{formatSelectedDate()}</h2>
                 </div>
               </div>
 
@@ -490,68 +489,91 @@ export default function TimetablePage() {
                     </div>
                   )}
 
-                  <div className="space-y-3">
-                    {todaysTimetable.map((period, idx) => (
-                      period.subject === "Break" ? (
-                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-1">
-                          <div className="w-16 sm:w-20 text-sm font-medium text-on-surface-variant">
-                              {(() => {
-                                try {
-                                  const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
-                                  const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
-                                  const { start } = parseTimeRange(timeSrc || '')
-                                  return formatTo12Hour(start)
-                                } catch (e) { return ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '') }
-                              })()}
+                  <div className="space-y-3 flex-1 pr-2">
+                    {todaysTimetable.map((period, idx) => {
+                      // Compute start time for display
+                      let startTime = ''
+                      try {
+                        const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
+                        const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                        const { start } = parseTimeRange(timeSrc || '')
+                        startTime = formatTo12Hour(start)
+                      } catch (e) {
+                        startTime = ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '')
+                      }
+                      
+                      const isBreak = period.subject === 'Break'
+                      const teacherDisplay = (() => {
+                        if (!period) return null
+                        if ((period as any).displayTeacher) return stripLeadingCasualCode((period as any).displayTeacher)
+                        if (period.isSubstitute && (period as any).casualSurname) return (period as any).casualSurname
+                        const candidate = period.fullTeacher || period.teacher || null
+                        if (period.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
+                        return candidate
+                      })()
+                      const roomDisplay = (() => {
+                        const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                        return displayRoom
+                      })()
+                      
+                      const cardClass = 'flex-1 p-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
+
+                      return (
+                        <div key={period.id ?? idx} className="flex gap-3 items-center group cursor-pointer">
+                          <div className="flex flex-col items-center min-w-[3rem]">
+                            <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
                           </div>
-                          <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
-                        </div>
-                        ) : (
-                        <div key={period.id ?? period.period} className="flex items-start gap-3 py-1">
-                          <div className="w-16 sm:w-20 text-sm font-medium text-on-surface-variant">
-                              {(() => {
-                                  try {
-                                    const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
-                                    const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
-                                    const { start } = parseTimeRange(timeSrc || '')
-                                    return formatTo12Hour(start)
-                                  } catch (e) { return ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '') }
-                                })()}
-                          </div>
-                          <div className="flex-1">
-                              <div className={`relative overflow-hidden rounded-xl flex items-center bg-surface-container-high transition-all hover:shadow-md ${isPhone ? '' : 'active:scale-95'}`}>
-                                {/* Left accent bar */}
-                                <div className={`${getSubjectColor(period.subject).split(' ')[0] || 'bg-surface-variant'} w-1 h-full rounded-l-md mr-3`} />
-                                <div className="flex items-center justify-between w-full px-3 py-1.5 sm:py-2">
-                                  <div className="min-w-0 pr-2">
-                                    <div className={`text-base sm:text-lg font-semibold truncate ${isSubstitutePeriod(period) ? 'text-on-surface' : 'text-on-surface-variant'}`}>{getDisplaySubject(period)}</div>
-                                    {period?.note && <div className="text-xs text-on-surface-variant mt-0.5 truncate">{period.note}</div>}
+
+                          {isBreak ? (
+                            <div className="flex-1 text-sm text-muted-foreground flex items-center">{period.period}</div>
+                          ) : (
+                            <div className={cardClass}>
+                              <div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-sm truncate">{period.subject}</p>
                                   </div>
-                                  <div className="flex items-center gap-3 flex-shrink-0">
-                                    {(() => {
-                                      const raw = (period as any).displayTeacher || (period.fullTeacher || period.teacher) || ''
-                                      const shown = stripLeadingCasualCode(String(raw))
-                                      if (isSubstitutePeriod(period)) {
-                                        return (
-                                          <span className="inline-block bg-blue-600 text-white text-sm font-medium px-3 py-1 rounded-full truncate max-w-[160px]">
-                                            {shown}
-                                          </span>
-                                        )
-                                      }
-                                      return (
-                                        <span className="text-sm text-on-surface-variant truncate max-w-[140px]">{shown}</span>
-                                      )
-                                    })()}
-                                    <span className={`text-sm font-semibold truncate max-w-[72px] ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full' : 'text-on-surface-variant'}`}>
-                                      {getDisplayRoom(period)}
+                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                    {isSubstitutePeriod(period) ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                      >
+                                        {teacherDisplay}
+                                      </span>
+                                    ) : (
+                                      <span className="text-on-surface-variant truncate max-w-[100px]">{teacherDisplay}</span>
+                                    )}
+                                    <span>•</span>
+                                    <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                      style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
+                                    >
+                                      {roomDisplay}
                                     </span>
                                   </div>
                                 </div>
+                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
+                                  {isSubstitutePeriod(period) ? (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                    >
+                                      {teacherDisplay}
+                                    </span>
+                                  ) : (
+                                    <span className="text-on-surface-variant truncate max-w-[100px]">{teacherDisplay}</span>
+                                  )}
+                                  <span className="mx-2">•</span>
+                                  <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                    style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
+                                  >
+                                    {roomDisplay}
+                                  </span>
+                                </div>
                               </div>
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )
-                    ))}
+                    })}
                   </div>
                 </>
               )}
