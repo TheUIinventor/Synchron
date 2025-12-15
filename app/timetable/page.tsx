@@ -172,7 +172,9 @@ export default function TimetablePage() {
   const getDisplayRoom = (period: any) => {
     try {
       if (!period) return ''
-      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom || (period as any).to
+      // NOTE: Do NOT include `.to` here - that field is commonly used for
+      // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
+      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom
       if (display && String(display).trim()) return String(display)
     } catch (e) {}
     return period.room || ''

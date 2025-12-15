@@ -579,7 +579,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const item: any = { ...(p as any) }
 
               // Normalize explicit destination room fields into `displayRoom`.
-              const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom || item.to
+              // NOTE: Do NOT include `item.to` here - that field is commonly used for
+              // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
+              const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom
               if (candidateDest && String(candidateDest).trim()) {
                 const candStr = String(candidateDest).trim()
                 const roomStr = String(item.room || '').trim()
@@ -779,7 +781,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           m[day] = (m[day] || []).map((p) => {
             // Check several common variant keys that might exist on the
             // incoming period object.
-            const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || (p as any).to || undefined
+            // NOTE: Do NOT include `.to` here - that field is commonly used for
+            // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
+            const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || undefined
             // Only treat as a change when a non-empty candidate exists and the
             // normalized value differs from the scheduled room. This avoids
             // false positives caused by casing or surrounding whitespace.
@@ -800,7 +804,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // and there is no `displayRoom` already present. We must not
             // remove a `displayRoom` that was applied earlier by
             // `applySubstitutionsToTimetable` or other normalization logic.
-            if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom && !(p as any).to) {
+            if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom) {
               // If a `displayRoom` is present, assume it is intentional and
               // preserve it. Only remove the stale `isRoomChange` flag when
               // there is no display override to show.

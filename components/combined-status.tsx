@@ -67,7 +67,8 @@ export default function CombinedStatus() {
   const getDisplayRoom = useCallback((period: any) => {
     if (!period) return ''
     try {
-      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom || (period as any).to
+      // NOTE: Do NOT include `.to` - that field is commonly used for end times
+      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom
       if (display && String(display).trim()) return String(display)
     } catch (e) {}
     return period.room || ''

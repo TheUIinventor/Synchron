@@ -609,7 +609,8 @@ export default function HomeClient() {
                                   <span>•</span>
                                   {/* Room: prefer destination room fields when present; highlight if a room change */}
                                   {(() => {
-                                    const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
+                                    // NOTE: Do NOT include `.to` - that field is commonly used for end times
+                                    const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
                                     return (
                                       <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
                                     )
@@ -628,7 +629,8 @@ export default function HomeClient() {
                                   )}
                                   <span className="mx-2">•</span>
                                   {(() => {
-                                    const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
+                                    // NOTE: Do NOT include `.to` - that field is commonly used for end times
+                                    const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
                                     return (
                                       <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
                                         style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
@@ -666,7 +668,8 @@ export default function HomeClient() {
                                     </span>
                                     <span className="mx-2">•</span>
                                     {(() => {
-                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || (period as any).to || period.room
+                                      // NOTE: Do NOT include `.to` - that field is commonly used for end times
+                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
                                       return (
                                         <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : (isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}
                                           style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
