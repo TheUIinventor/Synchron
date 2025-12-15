@@ -907,7 +907,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        filtered[day] = list.slice()
+        // Deep copy periods to prevent mutation of original timetableByWeek objects
+        filtered[day] = list.map(p => ({ ...p }))
         
         // CRITICAL: Merge date-specific variation info from externalTimetable (byDay)
         // into the selected timetableByWeek periods. The date-specific API response
@@ -995,6 +996,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
+            // Only insert break rows for entries that look like actual breaks (Recess, Lunch, etc.)
+            // Do NOT treat numeric period labels (1, 2, 3, etc.) as breaks
+            const looksLikeBreak = /(recess|lunch|break|l1|l2|r\b)/i.test(String(label))
+            if (!looksLikeBreak) continue
             const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
             if (!exists) {
               dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
@@ -1095,6 +1100,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
+            // Only insert break rows for entries that look like actual breaks (Recess, Lunch, etc.)
+            // Do NOT treat numeric period labels (1, 2, 3, etc.) as breaks
+            const looksLikeBreak = /(recess|lunch|break|l1|l2|r\b)/i.test(String(label))
+            if (!looksLikeBreak) continue
             const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
             if (!exists) {
               dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
@@ -1169,6 +1178,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
+            // Only insert break rows for entries that look like actual breaks (Recess, Lunch, etc.)
+            // Do NOT treat numeric period labels (1, 2, 3, etc.) as breaks
+            const looksLikeBreak = /(recess|lunch|break|l1|l2|r\b)/i.test(String(label))
+            if (!looksLikeBreak) continue
             const exists = dayPeriods.some((p) => p.subject === 'Break' && (p.period || '').toLowerCase() === String(label).toLowerCase())
             if (!exists) {
               dayPeriods.push({ period: label, time: b.time, subject: 'Break', teacher: '', room: '' })
