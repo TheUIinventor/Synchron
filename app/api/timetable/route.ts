@@ -332,14 +332,23 @@ export async function GET(req: NextRequest) {
                 }
               }
               
-              // Check for room variation
+              // Check for room variation - only if it actually differs from scheduled room
               const roomVar = roomVars[bellKey] || roomVars[bell.period] || null
               let displayRoom: string | undefined = undefined
               let isRoomChange = false
+              let originalRoom: string | undefined = undefined
+              const scheduledRoom = String(periodData.room || '').trim()
               if (roomVar && roomVar.roomTo) {
-                displayRoom = roomVar.roomTo
-                isRoomChange = true
-                console.log(`[API] Applied room change for P${bellKey}: -> ${displayRoom}`)
+                const newRoom = String(roomVar.roomTo).trim()
+                // Only mark as room change if rooms actually differ
+                if (newRoom && newRoom.toLowerCase() !== scheduledRoom.toLowerCase()) {
+                  displayRoom = newRoom
+                  isRoomChange = true
+                  originalRoom = scheduledRoom
+                  console.log(`[API] Applied room change for P${bellKey}: ${scheduledRoom} -> ${displayRoom}`)
+                } else {
+                  console.log(`[API] Skipping room change for P${bellKey}: same as scheduled (${scheduledRoom})`)
+                }
               }
               
               const start = bell.startTime || bell.start || ''
@@ -362,6 +371,7 @@ export async function GET(req: NextRequest) {
                 // Room change info
                 displayRoom,
                 isRoomChange,
+                originalRoom,
               }
             })
           } else {
@@ -394,11 +404,17 @@ export async function GET(req: NextRequest) {
                 base.displayTeacher = classVar.casualSurname
               }
               
-              // Apply room variation
+              // Apply room variation - only if it actually differs from scheduled room
               const roomVar = roomVars[periodKey] || null
               if (roomVar && roomVar.roomTo) {
-                base.displayRoom = roomVar.roomTo
-                base.isRoomChange = true
+                const newRoom = String(roomVar.roomTo).trim()
+                const currentRoom = String(base.room || '').trim()
+                // Only mark as room change if the rooms actually differ
+                if (newRoom && newRoom.toLowerCase() !== currentRoom.toLowerCase()) {
+                  base.displayRoom = newRoom
+                  base.isRoomChange = true
+                  base.originalRoom = currentRoom // Preserve for UI
+                }
               }
               
               return base
@@ -1270,9 +1286,19 @@ export async function GET(req: NextRequest) {
                     applied = true
                     return
                   }
+                  
+                  // Only apply if the new room actually differs from scheduled room
+                  const currentRoom = String(p.room || '').trim()
+                  if (newRoom.toLowerCase() === currentRoom.toLowerCase()) {
+                    console.log(`[API] ⏭️ Skipping P${periodKey} room change - same as scheduled: ${currentRoom}`)
+                    applied = true
+                    return
+                  }
+                  
                   p.displayRoom = newRoom
                   p.isRoomChange = true
-                  console.log(`[API] ✅ Applied room change: ${dayResDay} P${periodKey} -> ${newRoom}`)
+                  p.originalRoom = currentRoom // Preserve for UI
+                  console.log(`[API] ✅ Applied room change: ${dayResDay} P${periodKey} ${currentRoom} -> ${newRoom}`)
                   variationsDiag.appliedRoomVars.push({ period: periodKey, room: newRoom })
                   applied = true
                 }

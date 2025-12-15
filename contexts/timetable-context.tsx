@@ -656,6 +656,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Track when authoritative bell times have been set from /api/timetable
   // to prevent fallback paths from overwriting them with generic/stale data
   const authoritativeBellsDateRef = useRef<string | null>(null)
+  // Track authoritative variation data (subs/room changes) for a date to prevent
+  // fallback paths from overwriting date-specific variations with stale data
+  const authoritativeVariationsRef = useRef<{
+    date: string | null
+    data: Record<string, { period: string; isSubstitute?: boolean; isRoomChange?: boolean; displayRoom?: string; displayTeacher?: string; casualSurname?: string; originalTeacher?: string; originalRoom?: string }[]> | null
+  }>({ date: null, data: null })
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
@@ -915,8 +921,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // sets isSubstitute/casualSurname/displayTeacher and isRoomChange/displayRoom
         // on byDay periods for variations that apply to this specific date.
         // Match by period number AND subject to ensure we're merging the correct data.
+        //
+        // Also check authoritativeVariationsRef as a fallback - this preserves variations
+        // even when a fetch returns data without them (e.g. a different codepath).
         try {
+          const todayIso = (new Date()).toISOString().slice(0, 10)
           const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+          
+          // Check if we have authoritative variations for today that should be preserved
+          const authVars = authoritativeVariationsRef.current
+          const hasAuthoritativeVars = authVars && authVars.date === todayIso && authVars.data && Array.isArray(authVars.data[day])
+          
+          // Count variations in current source
+          const sourceHasVariations = daySource.some((p: any) => p.isSubstitute || p.isRoomChange)
+          
+          // If the current source has variations, update the authoritative ref
+          if (sourceHasVariations) {
+            const varData: Record<string, any[]> = {}
+            for (const d of Object.keys(useExternalTimetable || {})) {
+              const arr = (useExternalTimetable as any)[d] || []
+              varData[d] = arr.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
+                period: p.period,
+                isSubstitute: p.isSubstitute,
+                isRoomChange: p.isRoomChange,
+                displayRoom: p.displayRoom,
+                displayTeacher: p.displayTeacher,
+                casualSurname: p.casualSurname,
+                originalTeacher: p.originalTeacher,
+                originalRoom: p.originalRoom,
+              }))
+            }
+            authoritativeVariationsRef.current = { date: todayIso, data: varData }
+          }
+          
           if (daySource.length) {
             for (const p of filtered[day]) {
               const normPeriod = String(p.period).trim().toLowerCase()
@@ -944,12 +981,67 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
                 if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
                 if ((match as any).isSubstitute && match.teacher) p.teacher = match.teacher
-                // Copy room change info - these are date-specific variations
-                if ((match as any).isRoomChange) {
-                  (p as any).isRoomChange = true
-                  if ((match as any).displayRoom) (p as any).displayRoom = (match as any).displayRoom
-                  // Update the actual room field so it displays correctly
-                  if ((match as any).displayRoom) p.room = (match as any).displayRoom
+                
+                // Copy room change info - ONLY if explicitly marked as a room change by the API
+                // The API sets isRoomChange=true and displayRoom when there's a variation.
+                // Do NOT infer room changes by comparing room fields - this causes false positives
+                // when timetableByWeek has a different "normal" room than byDay for non-variation cases.
+                if ((match as any).isRoomChange && (match as any).displayRoom) {
+                  const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                  const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
+                  // Only mark as room change if the variation room actually differs from scheduled
+                  if (variationRoom && variationRoom !== scheduledRoom) {
+                    (p as any).isRoomChange = true
+                    (p as any).displayRoom = (match as any).displayRoom
+                    (p as any).originalRoom = p.room // Preserve original for UI
+                  }
+                }
+              } else if (hasAuthoritativeVars) {
+                // No match in current source - check authoritative variations as fallback
+                const authMatch = (authVars.data![day] || []).find((v: any) => 
+                  String(v.period).trim().toLowerCase() === normPeriod
+                )
+                if (authMatch) {
+                  if (authMatch.isSubstitute) {
+                    (p as any).isSubstitute = true
+                    if (authMatch.casualSurname) (p as any).casualSurname = authMatch.casualSurname
+                    if (authMatch.displayTeacher) (p as any).displayTeacher = authMatch.displayTeacher
+                    if (authMatch.originalTeacher) (p as any).originalTeacher = authMatch.originalTeacher
+                  }
+                  if (authMatch.isRoomChange && authMatch.displayRoom) {
+                    const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                    const variationRoom = String(authMatch.displayRoom || '').trim().toLowerCase()
+                    if (variationRoom && variationRoom !== scheduledRoom) {
+                      (p as any).isRoomChange = true
+                      (p as any).displayRoom = authMatch.displayRoom
+                      (p as any).originalRoom = p.room
+                    }
+                  }
+                }
+              }
+            }
+          } else if (hasAuthoritativeVars) {
+            // No daySource at all but we have authoritative variations - apply them
+            for (const p of filtered[day]) {
+              const normPeriod = String(p.period).trim().toLowerCase()
+              const authMatch = (authVars.data![day] || []).find((v: any) => 
+                String(v.period).trim().toLowerCase() === normPeriod
+              )
+              if (authMatch) {
+                if (authMatch.isSubstitute) {
+                  (p as any).isSubstitute = true
+                  if (authMatch.casualSurname) (p as any).casualSurname = authMatch.casualSurname
+                  if (authMatch.displayTeacher) (p as any).displayTeacher = authMatch.displayTeacher
+                  if (authMatch.originalTeacher) (p as any).originalTeacher = authMatch.originalTeacher
+                }
+                if (authMatch.isRoomChange && authMatch.displayRoom) {
+                  const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                  const variationRoom = String(authMatch.displayRoom || '').trim().toLowerCase()
+                  if (variationRoom && variationRoom !== scheduledRoom) {
+                    (p as any).isRoomChange = true
+                    (p as any).displayRoom = authMatch.displayRoom
+                    (p as any).originalRoom = p.room
+                  }
                 }
               }
             }
