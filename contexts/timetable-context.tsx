@@ -906,28 +906,43 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
         filtered[day] = list.slice()
         
-        // CRITICAL: Merge substitution info from externalTimetable (byDay) into
-        // the selected timetableByWeek periods. The date-specific API response
-        // sets isSubstitute/casualSurname/displayTeacher/isRoomChange/displayRoom
-        // on byDay periods, but these may not be on the timetableByWeek periods.
-        // Match by period number and copy sub info to ensure display shows subs.
+        // CRITICAL: Merge teacher substitution info from externalTimetable (byDay)
+        // into the selected timetableByWeek periods. The date-specific API response
+        // sets isSubstitute/casualSurname/displayTeacher on byDay periods.
+        // Match by period number AND subject to ensure we're merging the correct data.
+        // NOTE: We do NOT merge room change info here because timetableByWeek already
+        // has the correct room for the selected week, and externalTimetable may have
+        // data from a different week or duplicate periods that could cause false positives.
         try {
           const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
           if (daySource.length) {
             for (const p of filtered[day]) {
               const normPeriod = String(p.period).trim().toLowerCase()
-              const match = daySource.find((src) => String(src.period).trim().toLowerCase() === normPeriod)
+              const normSubject = String(p.subject || '').trim().toLowerCase()
+              // Find a match that has the same period AND similar subject
+              const match = daySource.find((src) => {
+                const srcPeriod = String(src.period).trim().toLowerCase()
+                const srcSubject = String(src.subject || '').trim().toLowerCase()
+                // Must match period number
+                if (srcPeriod !== normPeriod) return false
+                // Subject should match (allow for short vs long name variations)
+                if (srcSubject === normSubject) return true
+                if (srcSubject.includes(normSubject) || normSubject.includes(srcSubject)) return true
+                // Also accept if both refer to same subject code
+                const srcCode = srcSubject.replace(/[^a-z0-9]/g, '')
+                const pCode = normSubject.replace(/[^a-z0-9]/g, '')
+                if (srcCode && pCode && (srcCode.includes(pCode) || pCode.includes(srcCode))) return true
+                return false
+              })
               if (match) {
-                // Copy substitution-related fields from the authoritative source
+                // Only copy teacher substitution info - these are authoritative for today
                 if ((match as any).isSubstitute) (p as any).isSubstitute = true
                 if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
                 if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
                 if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
                 if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
-                if ((match as any).isRoomChange) (p as any).isRoomChange = true
-                if ((match as any).displayRoom) (p as any).displayRoom = (match as any).displayRoom
-                // Also copy the teacher if it was updated to the substitute
                 if ((match as any).isSubstitute && match.teacher) p.teacher = match.teacher
+                // Do NOT merge room info - rely on timetableByWeek's room data for the correct week
               }
             }
           }

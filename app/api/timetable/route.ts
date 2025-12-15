@@ -978,7 +978,30 @@ export async function GET(req: NextRequest) {
         const roomKey = normalizeString(p.room).toUpperCase()
         const weekTypeKey = normalizeString(p.weekType).toUpperCase()
         const key = [period, startMin, subjectKey, teacherKey, roomKey, weekTypeKey].join('|')
-        if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), fullTeacher: normalizeString(p.fullTeacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
+        if (!seen.has(key)) {
+          // Create a clean copy WITHOUT date-specific flags like isRoomChange/displayRoom
+          // or isSubstitute/casualSurname. The timetableByWeek represents the cycle/template
+          // data, not date-specific variations. Date-specific info stays in byDay.
+          const clean = { 
+            ...p, 
+            period, 
+            time, 
+            subject: subjectDisplay, 
+            teacher: normalizeString(p.teacher), 
+            fullTeacher: normalizeString(p.fullTeacher), 
+            room: normalizeString(p.room), 
+            weekType: weekTypeKey || undefined 
+          }
+          // Remove date-specific variation flags from the cycle view
+          delete clean.isRoomChange
+          delete clean.displayRoom
+          delete clean.isSubstitute
+          delete clean.casualSurname
+          delete clean.casualToken
+          delete clean.displayTeacher
+          delete clean.originalTeacher
+          seen.set(key, clean)
+        }
       }
       return Array.from(seen.values())
     }
