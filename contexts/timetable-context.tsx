@@ -905,6 +905,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
 
         filtered[day] = list.slice()
+        
+        // CRITICAL: Merge substitution info from externalTimetable (byDay) into
+        // the selected timetableByWeek periods. The date-specific API response
+        // sets isSubstitute/casualSurname/displayTeacher/isRoomChange/displayRoom
+        // on byDay periods, but these may not be on the timetableByWeek periods.
+        // Match by period number and copy sub info to ensure display shows subs.
+        try {
+          const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+          if (daySource.length) {
+            for (const p of filtered[day]) {
+              const normPeriod = String(p.period).trim().toLowerCase()
+              const match = daySource.find((src) => String(src.period).trim().toLowerCase() === normPeriod)
+              if (match) {
+                // Copy substitution-related fields from the authoritative source
+                if ((match as any).isSubstitute) (p as any).isSubstitute = true
+                if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
+                if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
+                if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
+                if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
+                if ((match as any).isRoomChange) (p as any).isRoomChange = true
+                if ((match as any).displayRoom) (p as any).displayRoom = (match as any).displayRoom
+                // Also copy the teacher if it was updated to the substitute
+                if ((match as any).isSubstitute && match.teacher) p.teacher = match.teacher
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore merge errors - display will still work without subs
+        }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
