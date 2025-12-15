@@ -251,13 +251,13 @@ function getThemeColors(theme: ColorTheme) {
 
 // Helper function to get font family
 function getFontFamily(theme: FontTheme): string {
-  // OS-specific font stack for default theme:
-  // - Windows: Segoe UI Variable (or Segoe UI fallback)
-  // - macOS/iOS/iPadOS: SF Pro (system-ui resolves to this on Apple platforms)
-  // - Android: Roboto
-  // The browser will use the first available font in the stack
+  // OS-specific system font stack:
+  // - Windows: Segoe UI Variable (Win11+) or Segoe UI (Win10)
+  // - macOS/iOS/iPadOS: -apple-system / BlinkMacSystemFont resolves to SF Pro
+  // - Android/Chrome OS: Roboto
+  // - Linux: Falls through to Roboto, Helvetica Neue, or Arial
   const fontMap = {
-    default: '"Segoe UI Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro", "Roboto", "Helvetica Neue", Arial, sans-serif',
+    default: '-apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     minecraft: "var(--font-vt323)",
     comic: '"Comic Sans MS", "Comic Sans", cursive, sans-serif',
     impact: '"Impact", "Arial Black", sans-serif',

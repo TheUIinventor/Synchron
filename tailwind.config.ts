@@ -19,11 +19,11 @@ const config = {
     },
     extend: {
       fontFamily: {
-        // OS-specific font stack:
-        // - Windows: Segoe UI Variable (modern) or Segoe UI
-        // - macOS/iOS/iPadOS: SF Pro (via system-ui/-apple-system)
-        // - Android: Roboto
-        sans: ['"Segoe UI Variable"', '"Segoe UI"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"SF Pro"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        // OS-specific system font stack:
+        // - macOS/iOS/iPadOS: -apple-system / BlinkMacSystemFont -> SF Pro
+        // - Windows: Segoe UI Variable (Win11+) or Segoe UI (Win10)
+        // - Android/Chrome OS: Roboto
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI Variable"', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
         serif: ['Georgia', '"Times New Roman"', 'serif'],
       },
       colors: {
