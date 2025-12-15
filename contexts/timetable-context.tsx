@@ -909,13 +909,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
         filtered[day] = list.slice()
         
-        // CRITICAL: Merge teacher substitution info from externalTimetable (byDay)
+        // CRITICAL: Merge date-specific variation info from externalTimetable (byDay)
         // into the selected timetableByWeek periods. The date-specific API response
-        // sets isSubstitute/casualSurname/displayTeacher on byDay periods.
+        // sets isSubstitute/casualSurname/displayTeacher and isRoomChange/displayRoom
+        // on byDay periods for variations that apply to this specific date.
         // Match by period number AND subject to ensure we're merging the correct data.
-        // NOTE: We do NOT merge room change info here because timetableByWeek already
-        // has the correct room for the selected week, and externalTimetable may have
-        // data from a different week or duplicate periods that could cause false positives.
         try {
           const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
           if (daySource.length) {
@@ -938,19 +936,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 return false
               })
               if (match) {
-                // Only copy teacher substitution info - these are authoritative for today
+                // Copy teacher substitution info - these are authoritative for today
                 if ((match as any).isSubstitute) (p as any).isSubstitute = true
                 if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
                 if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
                 if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
                 if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
                 if ((match as any).isSubstitute && match.teacher) p.teacher = match.teacher
-                // Do NOT merge room info - rely on timetableByWeek's room data for the correct week
+                // Copy room change info - these are date-specific variations
+                if ((match as any).isRoomChange) {
+                  (p as any).isRoomChange = true
+                  if ((match as any).displayRoom) (p as any).displayRoom = (match as any).displayRoom
+                  // Update the actual room field so it displays correctly
+                  if ((match as any).displayRoom) p.room = (match as any).displayRoom
+                }
               }
             }
           }
         } catch (e) {
-          // Ignore merge errors - display will still work without subs
+          // Ignore merge errors - display will still work without variations
         }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
@@ -1945,9 +1949,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                // Only update bells if we don't have authoritative date-specific ones for today
-                const todayIso = (new Date()).toISOString().slice(0,10)
-                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
+                // Only update bells if we don't already have authoritative date-specific ones
+                if (hasAny && !authoritativeBellsDateRef.current) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
@@ -1999,10 +2002,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     } catch (e) {}
                     setExternalTimetable(parsedCache.timetable)
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
-                    // Only restore cached bell times if we don't have authoritative
-                    // date-specific bells from /api/timetable for today
-                    const todayIso = (new Date()).toISOString().slice(0,10)
-                    if (parsedCache.bellTimes && authoritativeBellsDateRef.current !== todayIso) {
+                    // Only restore cached bell times if we don't already have authoritative
+                    // date-specific bells from /api/timetable
+                    if (parsedCache.bellTimes && !authoritativeBellsDateRef.current) {
                       setExternalBellTimes(parsedCache.bellTimes)
                       lastSeenBellTimesRef.current = parsedCache.bellTimes
                       lastSeenBellTsRef.current = parsedCache.savedAt || Date.now()
@@ -2044,9 +2046,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                // Only update bells if we don't have authoritative date-specific ones for today
-                const todayIso = (new Date()).toISOString().slice(0,10)
-                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
+                // Only update bells if we don't already have authoritative date-specific ones
+                if (hasAny && !authoritativeBellsDateRef.current) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
@@ -2384,9 +2385,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                // Only update bells if we don't have authoritative date-specific ones for today
-                const todayIso = (new Date()).toISOString().slice(0,10)
-                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
+                // Only update bells if we don't already have authoritative date-specific ones
+                if (hasAny && !authoritativeBellsDateRef.current) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
@@ -2763,9 +2763,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                // Only update bells if we don't have authoritative date-specific ones for today
-                const todayIso = (new Date()).toISOString().slice(0,10)
-                if (hasAny && authoritativeBellsDateRef.current !== todayIso) {
+                // Only update bells if we don't already have authoritative date-specific ones
+                if (hasAny && !authoritativeBellsDateRef.current) {
                   setExternalBellTimes(finalBellTimes)
                   lastSeenBellTimesRef.current = finalBellTimes
                   lastSeenBellTsRef.current = Date.now()
