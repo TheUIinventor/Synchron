@@ -23,7 +23,8 @@ export default function HomeClient() {
     selectedDay,
     selectedDateObject,
     timetableSource,
-    bellTimes } = useTimetable() as any;
+    bellTimes,
+    reauthRequired } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -684,6 +685,11 @@ export default function HomeClient() {
                         </div>
                       )
                     })
+                  ) : reauthRequired ? (
+                    <div className="text-center py-8 space-y-3">
+                      <p className="text-muted-foreground">Sign in to see your timetable</p>
+                      <AuthButton />
+                    </div>
                   ) : (
                     <p className="text-muted-foreground text-center py-8">No classes today</p>
                   )}

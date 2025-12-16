@@ -1311,14 +1311,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     // If we're displaying the bundled sample because live data couldn't be obtained,
     // and the API hasn't explicitly specified A/B (currentWeek is null), do not
-    // assume a default week ΓÇö return an empty timetable so the UI can show a
+    // assume a default week — return an empty timetable so the UI can show a
     // clear message instead of presenting potentially incorrect week data.
     if (timetableSource === 'fallback-sample' && (currentWeek !== 'A' && currentWeek !== 'B')) {
       return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
     }
 
+    // If re-authentication is required and we have no cached/external data,
+    // return empty timetable so the UI can prompt the user to sign in
+    // instead of showing sample data.
+    if (reauthRequired && !useExternalTimetable) {
+      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    }
+
     return currentWeek === "B" ? timetableWeekB : timetableWeekA
-  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading])
+  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired])
 
   // Persist computed break-layouts (simple heuristic) so we can hydrate
   // break rows quickly on restart without recomputing from bells immediately.
@@ -2506,36 +2513,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           try { setIsAuthenticated(true); setReauthRequired(false) } catch (e) {}
           if (j == null) return
           if (payloadHasNoTimetable(j)) {
-            if (!cancelled) {
-              try {
-                const computed = buildBellTimesFromPayload(j)
-                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                const src = j.bellTimes || {}
-                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-                  else finalBellTimes[k] = []
-                }
-                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                // Only update bells if we don't already have authoritative date-specific ones
-                if (hasAny && !authoritativeBellsDateRef.current) {
-                  setExternalBellTimes(finalBellTimes)
-                  lastSeenBellTimesRef.current = finalBellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                }
-              } catch (e) {
-                // ignore
+            try {
+              const computed = buildBellTimesFromPayload(j)
+              const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+              const src = j.bellTimes || {}
+              for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                else finalBellTimes[k] = []
               }
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
-              setTimetableSource('external-empty')
-              setExternalWeekType(null)
-              try {
-                setLastFetchedDate((new Date()).toISOString().slice(0,10))
-                setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
-              } catch (e) {}
+              const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+              // Only update bells if we don't already have authoritative date-specific ones
+              if (hasAny && !authoritativeBellsDateRef.current) {
+                setExternalBellTimes(finalBellTimes)
+                lastSeenBellTimesRef.current = finalBellTimes
+                lastSeenBellTsRef.current = Date.now()
+              }
+            } catch (e) {
+              // ignore
             }
+            setExternalTimetable(emptyByDay)
+            setExternalTimetableByWeek(null)
+            setTimetableSource('external-empty')
+            setExternalWeekType(null)
+            try {
+              setLastFetchedDate((new Date()).toISOString().slice(0,10))
+              setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
+            } catch (e) {}
             return
           }
 
