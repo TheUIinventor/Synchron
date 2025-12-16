@@ -217,9 +217,6 @@ const computePayloadHash = (input: any) => {
 }
 
 // Try to parse a fetch Response for bell times and apply them to state.
-// NOTE: This function references lastSeenBellTimesRef and setExternalBellTimes
-// which are defined inside TimetableProvider. It must be called from within
-// the provider scope to access these via closure.
 const extractBellTimesFromResponse = async (res: Response | null) => {
   if (!res) return
   try {
@@ -236,19 +233,15 @@ const extractBellTimesFromResponse = async (res: Response | null) => {
       for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
         if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
         else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-        // @ts-ignore - lastSeenBellTimesRef accessed via closure from TimetableProvider
-        else if (typeof lastSeenBellTimesRef !== 'undefined' && lastSeenBellTimesRef?.current?.[k]?.length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+        else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
         else finalBellTimes[k] = []
       }
       const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
       if (hasAny) {
         try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
-        // @ts-ignore - setExternalBellTimes accessed via closure from TimetableProvider
-        if (typeof setExternalBellTimes === 'function') setExternalBellTimes(finalBellTimes)
-        // @ts-ignore
-        if (typeof lastSeenBellTimesRef !== 'undefined') lastSeenBellTimesRef.current = finalBellTimes
-        // @ts-ignore
-        if (typeof lastSeenBellTsRef !== 'undefined') lastSeenBellTsRef.current = Date.now()
+        setExternalBellTimes(finalBellTimes)
+        lastSeenBellTimesRef.current = finalBellTimes
+        lastSeenBellTsRef.current = Date.now()
       }
     } catch (e) {
       // ignore
@@ -256,28 +249,6 @@ const extractBellTimesFromResponse = async (res: Response | null) => {
   } catch (e) {
     // ignore
   }
-}
-
-// Helper to merge bell times, preserving existing sector data when new data is empty.
-// This ensures switching between bell time sectors (Mon/Tues ↔ Wed/Thurs ↔ Fri) shows
-// breaks immediately without waiting for a new fetch.
-const mergeBellTimes = (
-  newBells: Record<string, any[]> | null | undefined,
-  computed: Record<string, any[]> | null | undefined,
-  existing: Record<string, any[]> | null | undefined
-): Record<string, any[]> => {
-  const merged: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-  for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri'] as const) {
-    // Priority: newBells > computed > existing
-    if (newBells && newBells[k] && Array.isArray(newBells[k]) && newBells[k].length) {
-      merged[k] = newBells[k]
-    } else if (computed && computed[k] && Array.isArray(computed[k]) && computed[k].length) {
-      merged[k] = computed[k]
-    } else if (existing && existing[k] && Array.isArray(existing[k]) && existing[k].length) {
-      merged[k] = existing[k]
-    }
-  }
-  return merged
 }
 
 // Explicit empty timetable used when the upstream API reports "no timetable".
@@ -1942,8 +1913,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (jht && !externalBellTimes && !lastSeenBellTimesRef.current) {
           try {
             const computed = buildBellTimesFromPayload(jht)
+            const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
             const src = jht.bellTimes || {}
-            const finalBellTimes = mergeBellTimes(src, computed, lastSeenBellTimesRef.current)
+            for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+              if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+              else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+              else finalBellTimes[k] = []
+            }
             const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
             if (hasAny) {
               setExternalBellTimes(finalBellTimes)
@@ -2101,8 +2077,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (payloadHasNoTimetable(j)) {
               try {
                 const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
                 const src = j.bellTimes || {}
-                const finalBellTimes = mergeBellTimes(src, computed, lastSeenBellTimesRef.current)
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
                 // Only update bells if we don't already have authoritative date-specific ones
                 if (hasAny && !authoritativeBellsDateRef.current) {
@@ -2192,8 +2174,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // (either in `bellTimes` or embedded `upstream` structures).
               try {
                 const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
                 const src = j.bellTimes || {}
-                const finalBellTimes = mergeBellTimes(src, computed, lastSeenBellTimesRef.current)
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
                 // Only update bells if we don't already have authoritative date-specific ones
                 if (hasAny && !authoritativeBellsDateRef.current) {
@@ -2560,8 +2548,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (payloadHasNoTimetable(j)) {
             try {
               const computed = buildBellTimesFromPayload(j)
+              const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
               const src = j.bellTimes || {}
-              const finalBellTimes = mergeBellTimes(src, computed, lastSeenBellTimesRef.current)
+              for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                else finalBellTimes[k] = []
+              }
               const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
               // Only update bells if we don't already have authoritative date-specific ones
               if (hasAny && !authoritativeBellsDateRef.current) {
@@ -2595,8 +2589,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (j.bellTimes || j.upstream) {
               try {
                 const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
                 const src = j.bellTimes || {}
-                const finalBellTimes = mergeBellTimes(src, computed, lastSeenBellTimesRef.current)
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else finalBellTimes[k] = []
+                }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
                 if (hasAny || !lastSeenBellTimesRef.current) {
                   try { console.log('[timetable.provider] setExternalBellTimes (merged retry)', finalBellTimes) } catch (e) {}
@@ -2610,11 +2609,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {
                 if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
-                  // Fallback: merge raw bellTimes with existing data
-                  const rawMerged = mergeBellTimes(j.bellTimes, null, lastSeenBellTimesRef.current)
-                  try { console.log('[timetable.provider] setExternalBellTimes (merged raw retry)', rawMerged) } catch (e) {}
-                  setExternalBellTimes(rawMerged)
-                  lastSeenBellTimesRef.current = rawMerged
+                  try { console.log('[timetable.provider] setExternalBellTimes (raw retry)', j.bellTimes) } catch (e) {}
+                  setExternalBellTimes(j.bellTimes)
+                  lastSeenBellTimesRef.current = j.bellTimes
                   lastSeenBellTsRef.current = Date.now()
                   // Mark as authoritative since this is from /api/timetable
                   authoritativeBellsDateRef.current = (new Date()).toISOString().slice(0,10)
@@ -2978,8 +2975,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (!cancelled) {
               try {
                 const computed = buildBellTimesFromPayload(j)
+                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
                 const src = j.bellTimes || {}
-                const finalBellTimes = mergeBellTimes(src, computed, lastSeenBellTimesRef.current)
+                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+                  else finalBellTimes[k] = []
+                }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
                 // Only update bells if we don't already have authoritative date-specific ones
                 if (hasAny && !authoritativeBellsDateRef.current) {
@@ -3079,29 +3082,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setLastFetchedPayloadSummary(summary)
             } catch (e) {}
             if (j.bellTimes) {
-              // CRITICAL: Merge new bell times with existing ones instead of replacing.
-              // The API may only return bells for the requested date's sector, leaving
-              // other sectors empty. We preserve existing sector data and only update
-              // buckets that have new non-empty entries. This prevents breaks from
-              // disappearing when switching between bell time sectors (Mon/Tues ↔ Wed/Thurs ↔ Fri).
-              const merged: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-              const existing = externalBellTimes || lastSeenBellTimesRef.current || {}
-              // Start with existing data
-              for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri'] as const) {
-                if (existing[k] && Array.isArray(existing[k]) && existing[k].length) {
-                  merged[k] = existing[k]
-                }
-              }
-              // Override with new data only when the bucket has entries
-              for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri'] as const) {
-                if (j.bellTimes[k] && Array.isArray(j.bellTimes[k]) && j.bellTimes[k].length) {
-                  merged[k] = j.bellTimes[k]
-                }
-              }
-              setExternalBellTimes(merged)
+              setExternalBellTimes(j.bellTimes)
               // Mark these as authoritative date-specific bells
               authoritativeBellsDateRef.current = (selectedDateObject || new Date()).toISOString().slice(0,10)
-              lastSeenBellTimesRef.current = merged
+              lastSeenBellTimesRef.current = j.bellTimes
               lastSeenBellTsRef.current = Date.now()
             }
             if (j.weekType === 'A' || j.weekType === 'B') {
