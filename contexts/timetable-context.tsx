@@ -64,6 +64,9 @@ type TimetableContextType = {
   // Full A/B grouped timetable when available from the server
   timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
   externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
+  // Authentication state for showing re-auth prompts
+  isAuthenticated?: boolean | null
+  reauthRequired?: boolean
 }
 
 // Create the context
@@ -707,6 +710,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [reauthRequired, setReauthRequired] = useState<boolean>(false)
   const [lastUserSelectedAt, setLastUserSelectedAt] = useState<number | null>(null)
 
   // Start a simple mount->ready timer so we can measure app load time
@@ -2010,9 +2014,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!rr || !rr.ok) {
                 try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
                 try { setIsAuthenticated(false) } catch (e) {}
+                try { setReauthRequired(true) } catch (e) {}
               }
             } catch (e) {
               try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
+              try { setReauthRequired(true) } catch (err) {}
             }
             return refreshExternal(true)
           }
@@ -2020,6 +2026,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const rctype = r.headers.get('content-type') || ''
         if (rctype.includes('application/json')) {
           const j = await r.json()
+          try { setIsAuthenticated(true); setReauthRequired(false) } catch (e) {}
           console.log('[DEBUG refreshExternal] got JSON response:', { 
             hasError: !!j?.error, 
             hasTimetable: !!j?.timetable,
@@ -2466,9 +2473,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!rr || !rr.ok) {
                 try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
                 try { setIsAuthenticated(false) } catch (e) {}
+                try { setReauthRequired(true) } catch (e) {}
               }
             } catch (e) {
               try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
+              try { setReauthRequired(true) } catch (err) {}
             }
             return refreshExternal(true)
           }
@@ -2476,6 +2485,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const rctype2 = r2.headers.get('content-type') || ''
         if (rctype2.includes('application/json')) {
           const j = await r2.json()
+          try { setIsAuthenticated(true); setReauthRequired(false) } catch (e) {}
           if (j == null) return
           if (payloadHasNoTimetable(j)) {
             if (!cancelled) {
@@ -3084,6 +3094,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         externalWeekType,
         isLoading,
         isRefreshing,
+        isAuthenticated,
+        reauthRequired,
         isShowingCachedWhileLoading: Boolean((isLoading || isRefreshing) && lastRecordedTimetable),
         error,
         refreshExternal,
