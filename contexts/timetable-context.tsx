@@ -751,11 +751,61 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Persist the last successful external timetable to localStorage so the
   // app can immediately show the most-recent real data after a reload.
+  // CRITICAL: When updating lastRecordedTimetable, preserve any substitution
+  // data that exists in the current lastRecordedTimetable but is missing in
+  // the new externalTimetable. This prevents substitutions from "flashing"
+  // when a background refresh returns data without substitution markers.
   useEffect(() => {
     try {
       if (externalTimetable && timetableSource && timetableSource !== 'fallback-sample') {
+        // Merge substitution data from lastRecordedTimetable into externalTimetable
+        // before updating lastRecordedTimetable. This prevents losing substitution
+        // info when a background fetch returns data without it.
+        let timetableToRecord = externalTimetable
+        if (lastRecordedTimetable) {
+          let needsMerge = false
+          const mergedForRecord: Record<string, Period[]> = {}
+          for (const day of Object.keys(externalTimetable)) {
+            const newList = (externalTimetable[day] || []).map((p) => {
+              const prevList = lastRecordedTimetable[day] || []
+              const match = prevList.find((q) => {
+                try {
+                  if (String(q?.period || '') === String(p?.period || '') && 
+                      String(q?.subject || '') === String(p?.subject || '')) return true
+                } catch (e) {}
+                return false
+              })
+              if (match) {
+                const pAny = p as any
+                const matchAny = match as any
+                // Check if the previous had sub data that the new one lacks
+                if ((!pAny.isSubstitute && matchAny.isSubstitute) ||
+                    (!pAny.casualSurname && matchAny.casualSurname) ||
+                    (!pAny.isRoomChange && matchAny.isRoomChange)) {
+                  needsMerge = true
+                  const copy = { ...p } as any
+                  if (!pAny.isSubstitute && matchAny.isSubstitute) copy.isSubstitute = matchAny.isSubstitute
+                  if (!pAny.casualSurname && matchAny.casualSurname) copy.casualSurname = matchAny.casualSurname
+                  if (!pAny.displayTeacher && matchAny.displayTeacher) copy.displayTeacher = matchAny.displayTeacher
+                  if (!pAny.originalTeacher && matchAny.originalTeacher) copy.originalTeacher = matchAny.originalTeacher
+                  if (!pAny.isRoomChange && matchAny.isRoomChange) copy.isRoomChange = matchAny.isRoomChange
+                  if (!pAny.displayRoom && matchAny.displayRoom) copy.displayRoom = matchAny.displayRoom
+                  if (!pAny.originalRoom && matchAny.originalRoom) copy.originalRoom = matchAny.originalRoom
+                  return copy
+                }
+              }
+              return p
+            })
+            mergedForRecord[day] = newList
+          }
+          if (needsMerge) {
+            timetableToRecord = mergedForRecord
+            try { console.debug('[timetable.provider] preserved substitution data when updating lastRecordedTimetable') } catch (e) {}
+          }
+        }
+        
         const payload = {
-          timetable: externalTimetable,
+          timetable: timetableToRecord,
           timetableByWeek: externalTimetableByWeek || null,
           bellTimes: externalBellTimes || null,
           source: timetableSource,
@@ -768,7 +818,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         } catch (e) {
           // ignore storage errors
         }
-        setLastRecordedTimetable(externalTimetable)
+        setLastRecordedTimetable(timetableToRecord)
         if (externalTimetableByWeek) setLastRecordedTimetableByWeek(externalTimetableByWeek)
         if (externalBellTimes) { lastSeenBellTimesRef.current = externalBellTimes; lastSeenBellTsRef.current = Date.now() }
         try { console.log('[timetable.provider] persisted last external timetable', { source: timetableSource }) } catch (e) {}
@@ -3132,10 +3182,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [externalWeekType, currentWeek])
 
-  // Preserve casualSurname from the last recorded timetable when a fresh
-  // externalTimetable arrives that lacks casual markers. This handles the
-  // case where a background refresh returns a bare teacher code (e.g. "LIKZ")
-  // and we want to keep the human-friendly casual name previously applied.
+  // Preserve substitution data (casualSurname, isSubstitute, displayTeacher, isRoomChange, 
+  // displayRoom, originalTeacher, originalRoom) from the last recorded timetable when a fresh
+  // externalTimetable arrives that lacks these markers. This handles the case where a 
+  // background refresh returns a bare timetable without substitution info, and we want to
+  // keep the substitution data that was previously applied.
   useEffect(() => {
     try {
       if (!externalTimetable) return
@@ -3156,11 +3207,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
               return false
             })
-            if (match && !(p as any).casualSurname && (match as any).casualSurname) {
-              const copy = { ...p } as any
-              copy.casualSurname = (match as any).casualSurname
-              changed = true
-              return copy
+            if (match) {
+              // Check if any substitution data needs to be preserved
+              const pAny = p as any
+              const matchAny = match as any
+              const needsCasual = !pAny.casualSurname && matchAny.casualSurname
+              const needsSubstitute = !pAny.isSubstitute && matchAny.isSubstitute
+              const needsDisplayTeacher = !pAny.displayTeacher && matchAny.displayTeacher
+              const needsOriginalTeacher = !pAny.originalTeacher && matchAny.originalTeacher
+              const needsRoomChange = !pAny.isRoomChange && matchAny.isRoomChange
+              const needsDisplayRoom = !pAny.displayRoom && matchAny.displayRoom
+              const needsOriginalRoom = !pAny.originalRoom && matchAny.originalRoom
+              
+              if (needsCasual || needsSubstitute || needsDisplayTeacher || needsOriginalTeacher || 
+                  needsRoomChange || needsDisplayRoom || needsOriginalRoom) {
+                const copy = { ...p } as any
+                if (needsCasual) copy.casualSurname = matchAny.casualSurname
+                if (needsSubstitute) copy.isSubstitute = matchAny.isSubstitute
+                if (needsDisplayTeacher) copy.displayTeacher = matchAny.displayTeacher
+                if (needsOriginalTeacher) copy.originalTeacher = matchAny.originalTeacher
+                if (needsRoomChange) copy.isRoomChange = matchAny.isRoomChange
+                if (needsDisplayRoom) copy.displayRoom = matchAny.displayRoom
+                if (needsOriginalRoom) copy.originalRoom = matchAny.originalRoom
+                changed = true
+                return copy
+              }
             }
           } catch (e) {
             // ignore per-item errors
@@ -3170,7 +3241,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         merged[day] = newList
       }
       if (changed) {
-        try { console.debug('[timetable.provider] merged casualSurname from cache into refreshed timetable') } catch (e) {}
+        try { console.debug('[timetable.provider] merged substitution data from cache into refreshed timetable') } catch (e) {}
         setExternalTimetable(merged)
       }
     } catch (e) {
