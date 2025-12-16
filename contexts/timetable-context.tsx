@@ -763,7 +763,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // otherwise fall back to the last-seen cached bell times.
     const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
 
-    // Cleanup helper: remove roll-call entries and orphaned period '0' placeholders
+    // Cleanup helper: previously removed roll-call entries and orphaned period
+    // '0' placeholders, but user wants Period 0, Roll Call, and End of Day to
+    // show. Now we keep all entries and only normalize labels.
     const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
     const isRollCallEntry = (p: any) => {
       const subj = String(p?.subject || '').toLowerCase()
@@ -771,16 +773,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
     }
     const cleanupMap = (m: Record<string, Period[]>) => {
-      for (const [day, arr] of Object.entries(m)) {
-        try {
-          const hasReal0 = arr.some(p => normalizePeriodLabel(p.period) === '0' && String(p.subject || '').trim() !== '')
-          m[day] = arr.filter(p => {
-            if (isRollCallEntry(p)) return false
-            if (!hasReal0 && normalizePeriodLabel(p.period) === '0') return false
-            return true
-          })
-        } catch (e) { /* ignore cleanup errors */ }
-      }
+      // No longer filter out roll call or period 0 - user wants them visible
       return m
     }
     // Normalize any explicit to-room fields left on period objects so the UI
@@ -1129,18 +1122,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     if (useExternalTimetable) {
       const filtered: Record<string, Period[]> = {}
+      
+      // Helper to identify non-class periods that should always be shown
+      // (Period 0, Roll Call, End of Day, etc.)
+      const isNonClassPeriod = (p: Period) => {
+        const period = String(p.period || '').trim().toLowerCase()
+        const subject = String(p.subject || '').trim().toLowerCase()
+        // Period 0, Roll Call (RC), End of Day (EoD) should always show
+        if (period === '0' || period === 'rc' || period === 'eod') return true
+        if (subject.includes('period 0') || subject.includes('roll call') || subject.includes('end of day')) return true
+        // Also keep breaks
+        if (subject === 'break' || /(recess|lunch)/i.test(subject) || /(recess|lunch)/i.test(period)) return true
+        return false
+      }
+      
       for (const [day, periods] of Object.entries(useExternalTimetable)) {
         const list = Array.isArray(periods) ? periods : []
         // When the server provides week-tagged entries (A/B), prefer entries
         // that match the known `currentWeek`. However, many upstream payloads
-        // include UI-only items like Recess/Lunch without a `weekType` ΓÇö treat
+        // include UI-only items like Recess/Lunch without a `weekType` — treat
         // those as applicable to either week so they aren't dropped.
+        // Also always preserve Period 0, Roll Call, and End of Day.
         if (currentWeek === 'A' || currentWeek === 'B') {
-          filtered[day] = list.filter((p) => !(p as any).weekType || (p as any).weekType === currentWeek)
+          filtered[day] = list.filter((p) => isNonClassPeriod(p) || !(p as any).weekType || (p as any).weekType === currentWeek)
         } else {
           // If we don't yet know the current week, show untagged entries
           // (commonly Break rows) rather than returning an empty list.
-          filtered[day] = list.filter((p) => !(p as any).weekType)
+          // Always include non-class periods (Period 0, Roll Call, End of Day).
+          filtered[day] = list.filter((p) => isNonClassPeriod(p) || !(p as any).weekType)
         }
       }
       // If the server explicitly reported that there is no timetable for the
@@ -2376,12 +2385,36 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               return
             }
             if (Array.isArray(j.timetable)) {
-              const byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+              let byDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
               for (const p of j.timetable) {
                 const day = p.day || p.weekday || 'Monday'
                 if (!byDay[day]) byDay[day] = []
                 byDay[day].push(p)
               }
+              
+              // Extract and apply substitutions to array-shaped payload
+              try {
+                const subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+                try {
+                  const payloadDate = extractDateFromPayload(j.upstream || j)
+                  if (payloadDate && Array.isArray(subs)) {
+                    subs.forEach((s: any) => {
+                      try { if (s && !s.date) s.date = payloadDate } catch (e) {}
+                    })
+                  }
+                } catch (e) {}
+                if (Array.isArray(subs) && subs.length) {
+                  try {
+                    console.debug('[timetable.provider] applying substitutions to array payload', subs.length)
+                    byDay = applySubstitutionsToTimetable(byDay, subs, { debug: true })
+                  } catch (e) {
+                    console.debug('[timetable.provider] array substitution apply error', e)
+                  }
+                }
+              } catch (e) {
+                // ignore substitution extraction errors
+              }
+              
               // Attach long titles from subjects mapping if available
               try {
                 const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || null
@@ -2398,7 +2431,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   for (const d of Object.keys(byDay)) {
                     try {
                       for (const p of byDay[d]) {
-                        try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                        try { if (!(p as any).title && p.subject && shortToTitle[p.subject]) (p as any).title = shortToTitle[p.subject] } catch (e) {}
                       }
                     } catch (e) {}
                   }
@@ -2585,6 +2618,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               }
             }
+            
+            // Extract and apply substitutions (same logic as first fetch path)
+            let finalTimetable = j.timetable
+            try {
+              const subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+              try {
+                const payloadDate = extractDateFromPayload(j.upstream || j)
+                if (payloadDate && Array.isArray(subs)) {
+                  subs.forEach((s: any) => {
+                    try { if (s && !s.date) s.date = payloadDate } catch (e) {}
+                  })
+                }
+              } catch (e) {}
+              if (Array.isArray(subs) && subs.length) {
+                try {
+                  console.debug('[timetable.provider] applying substitutions from retry path', subs.length)
+                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                } catch (e) {
+                  console.debug('[timetable.provider] retry substitution apply error', e)
+                }
+              }
+            } catch (e) {
+              // ignore substitution extraction errors
+            }
+            
             // Compute summary before transitioning
             let retrySummary: { weekType: string | null; hasByWeek: boolean } | null = null
             let retryDate = ''
@@ -2594,7 +2652,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             } catch (e) {}
             // Use startTransition to batch ALL updates and prevent flash
             startTransition(() => {
-              setExternalTimetable(j.timetable)
+              setExternalTimetable(finalTimetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)
@@ -2613,9 +2671,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!byDay[day]) byDay[day] = []
               byDay[day].push(p)
             }
+            
+            // Extract and apply substitutions
+            let finalTimetable = byDay
+            try {
+              const subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+              try {
+                const payloadDate = extractDateFromPayload(j.upstream || j)
+                if (payloadDate && Array.isArray(subs)) {
+                  subs.forEach((s: any) => {
+                    try { if (s && !s.date) s.date = payloadDate } catch (e) {}
+                  })
+                }
+              } catch (e) {}
+              if (Array.isArray(subs) && subs.length) {
+                try {
+                  console.debug('[timetable.provider] applying substitutions from array retry path', subs.length)
+                  finalTimetable = applySubstitutionsToTimetable(byDay, subs, { debug: true })
+                } catch (e) {
+                  console.debug('[timetable.provider] array retry substitution apply error', e)
+                }
+              }
+            } catch (e) {
+              // ignore substitution extraction errors
+            }
+            
             // Use startTransition to batch updates and prevent flash
             startTransition(() => {
-              setExternalTimetable(byDay)
+              setExternalTimetable(finalTimetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)

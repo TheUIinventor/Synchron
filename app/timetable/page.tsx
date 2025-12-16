@@ -502,7 +502,20 @@ export default function TimetablePage() {
                         startTime = ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '')
                       }
                       
-                      const isBreak = period.subject === 'Break'
+                      // Treat Period 0, Roll Call, End of Day, and Break as non-class periods
+                      const periodLabel = String(period.period || '').trim().toLowerCase()
+                      const subjectLabel = String(period.subject || '').trim().toLowerCase()
+                      const isBreak = period.subject === 'Break' || 
+                        periodLabel === '0' || periodLabel === 'rc' || periodLabel === 'eod' ||
+                        subjectLabel.includes('period 0') || subjectLabel.includes('roll call') || subjectLabel.includes('end of day')
+                      // Get display label for non-class periods
+                      const nonClassLabel = (() => {
+                        if (period.subject === 'Break') return period.period
+                        if (periodLabel === '0' || subjectLabel.includes('period 0')) return 'Period 0'
+                        if (periodLabel === 'rc' || subjectLabel.includes('roll call')) return 'Roll Call'
+                        if (periodLabel === 'eod' || subjectLabel.includes('end of day')) return 'End of Day'
+                        return period.period || period.subject
+                      })()
                       const teacherDisplay = (() => {
                         if (!period) return null
                         if ((period as any).displayTeacher) return stripLeadingCasualCode((period as any).displayTeacher)
@@ -525,7 +538,7 @@ export default function TimetablePage() {
                           </div>
 
                           {isBreak ? (
-                            <div className="flex-1 text-sm text-muted-foreground flex items-center">{period.period}</div>
+                            <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
                           ) : (
                             <div className={cardClass}>
                               <div>

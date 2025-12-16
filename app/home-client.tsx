@@ -573,7 +573,22 @@ export default function HomeClient() {
                         const { start } = parseTimeRange(startTime || '')
                         startTime = formatTo12Hour(start)
                       } catch (e) {}
-                      const isBreak = period.subject === 'Break'
+                      
+                      // Treat Period 0, Roll Call, End of Day, and Break as non-class periods
+                      const periodLabel = String(period.period || '').trim().toLowerCase()
+                      const subjectLabel = String(period.subject || '').trim().toLowerCase()
+                      const isNonClass = period.subject === 'Break' || 
+                        periodLabel === '0' || periodLabel === 'rc' || periodLabel === 'eod' ||
+                        subjectLabel.includes('period 0') || subjectLabel.includes('roll call') || subjectLabel.includes('end of day')
+                      // Get display label for non-class periods
+                      const nonClassLabel = (() => {
+                        if (period.subject === 'Break') return period.period
+                        if (periodLabel === '0' || subjectLabel.includes('period 0')) return 'Period 0'
+                        if (periodLabel === 'rc' || subjectLabel.includes('roll call')) return 'Roll Call'
+                        if (periodLabel === 'eod' || subjectLabel.includes('end of day')) return 'End of Day'
+                        return period.period || period.subject
+                      })()
+                      
                       const link = canvasLinks[(period.subject ?? '').trim()]
                       const cardClass = cn(
                         'flex-1 p-2 rounded-xl border transition-all shadow-sm',
@@ -588,8 +603,8 @@ export default function HomeClient() {
                             <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
                           </div>
 
-                            {isBreak ? (
-                            <div className="flex-1 text-sm text-muted-foreground flex items-center">{period.period}</div>
+                            {isNonClass ? (
+                            <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
                           ) : link ? (
                             <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} block`}>
                               <div className="flex items-center justify-between gap-3">
