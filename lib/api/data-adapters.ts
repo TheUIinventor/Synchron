@@ -115,7 +115,25 @@ export function applySubstitutionsToTimetable(
     // causing displayRoom to be applied to unrelated periods. Require at
     // least one identifying field so we don't accidentally overwrite rooms.
     if (!sub.period && !sub.subject) return
+    
+    // For room-only changes (toRoom provided but no substitute teacher),
+    // REQUIRE a date. Room changes without a date are extremely likely to be
+    // mis-applied to the wrong day (e.g., same room in same period on different
+    // day gets flagged as a "change"). Skip room-only variations that lack dates.
+    const hasSubstituteTeacher = !!(sub.substituteTeacher || (sub as any).casualSurname)
+    const hasRoomChange = !!(sub.toRoom && String(sub.toRoom).trim())
+    const hasDate = !!sub.date
+    
+    // If this is a room-only change (no teacher sub) and no date, skip it entirely
+    if (hasRoomChange && !hasSubstituteTeacher && !hasDate) {
+      if (options?.debug) {
+        console.debug('[adapters] skipping room-only variation without date', { period: sub.period, toRoom: sub.toRoom })
+      }
+      return
+    }
+    
     // If date is present, try to map to day name; otherwise apply across all days
+    // (but only for teacher substitutions, not room changes - handled above)
     const candidateDays = (() => {
       if (sub.date) {
         try {
@@ -133,8 +151,18 @@ export function applySubstitutionsToTimetable(
         const found = dayNames.filter((dn) => sub.date && dn.toLowerCase().includes(sub.date.toLowerCase()))
         if (found.length > 0) return found
       }
-      return Object.keys(result)
+      // No date - for teacher-only subs, apply to today's day only (safer than all days)
+      // Get today's day name
+      const today = new Date()
+      const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+      const todayName = names[today.getDay()]
+      // Only return today if it exists in the result, otherwise skip entirely
+      if (result[todayName]) return [todayName]
+      return []
     })()
+
+    // If no candidate days, skip this substitution
+    if (candidateDays.length === 0) return
 
     // normalizers for comparison
     const normalize = (s?: string) => (s || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim()
