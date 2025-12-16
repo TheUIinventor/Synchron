@@ -11,7 +11,9 @@ export function AuthButton() {
   const { isAuthenticated, logout, initiateLogin } = useAuth()
   const { reauthRequired } = useTimetable() as any
 
-  const showReauth = Boolean(reauthRequired && !isAuthenticated)
+  // Show reauth button when reauthRequired is true, regardless of isAuthenticated
+  // (we may still have expired tokens in storage, making isAuthenticated true)
+  const showReauth = Boolean(reauthRequired)
 
   // This is the client-side logic to handle both login and logout
   const handleAuth = () => {

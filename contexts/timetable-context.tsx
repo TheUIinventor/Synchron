@@ -2015,12 +2015,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
                 try { setIsAuthenticated(false) } catch (e) {}
                 try { setReauthRequired(true) } catch (e) {}
+                // Refresh failed, don't retry - just bail out
+                return
               }
             } catch (e) {
               try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
               try { setReauthRequired(true) } catch (err) {}
+              // Refresh failed, don't retry - just bail out
+              return
             }
+            // Refresh succeeded, retry the timetable fetch
             return refreshExternal(true)
+          } else {
+            // Already attempted refresh and still got 401 - give up
+            try { setReauthRequired(true) } catch (e) {}
+            return
           }
         }
         const rctype = r.headers.get('content-type') || ''
@@ -2474,12 +2483,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
                 try { setIsAuthenticated(false) } catch (e) {}
                 try { setReauthRequired(true) } catch (e) {}
+                // Refresh failed, don't retry - just bail out
+                return
               }
             } catch (e) {
               try { toast({ title: 'Session expired', description: 'Please sign in again.' }) } catch (e) {}
               try { setReauthRequired(true) } catch (err) {}
+              // Refresh failed, don't retry - just bail out
+              return
             }
+            // Refresh succeeded, retry the timetable fetch
             return refreshExternal(true)
+          } else {
+            // Already attempted refresh and still got 401 - give up
+            try { setReauthRequired(true) } catch (e) {}
+            return
           }
         }
         const rctype2 = r2.headers.get('content-type') || ''
