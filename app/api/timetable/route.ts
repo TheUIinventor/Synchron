@@ -968,8 +968,21 @@ export async function GET(req: NextRequest) {
 
     // If some weekdays remain empty but the full timetable has entries, backfill from the detailed days object
     // Remove obvious placeholder entries with no useful information
+    // But preserve Period 0, Roll Call, End of Day, and break periods
+    const isSpecialPeriod = (p: any) => {
+      const period = String(p.period || '').trim().toLowerCase()
+      const subject = String(p.subject || '').trim().toLowerCase()
+      // Period 0, Roll Call (RC), End of Day (EoD) should always be kept
+      if (period === '0' || period === 'rc' || period === 'eod') return true
+      if (subject.includes('period 0') || subject.includes('roll call') || subject.includes('end of day')) return true
+      // Also keep breaks (Recess, Lunch)
+      if (/(recess|lunch|break)/i.test(subject) || /(recess|lunch|break|^r$|^l\d?$|mtl|wfl)/i.test(period)) return true
+      return false
+    }
     for (const dayName of Object.keys(byDay)) {
       byDay[dayName] = byDay[dayName].filter(p => {
+        // Always keep special periods (Period 0, RC, EoD, breaks)
+        if (isSpecialPeriod(p)) return true
         const hasSubject = p.subject && p.subject.toLowerCase() !== 'class'
         const hasTeacher = p.teacher && p.teacher.trim().length > 0
         const hasRoom = p.room && p.room.trim().length > 0
