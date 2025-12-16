@@ -1048,10 +1048,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
+      // Also fall back to cached break layouts for instant display during sector switches
       const getBellForDay = (dayName: string) => {
-        // Only use API-provided bell buckets; do not fall back to hardwired data.
+        // Prefer API-provided bell buckets
         if (useExternalBellTimes) {
-          return dayName === 'Friday' ? useExternalBellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues']) || []
+          const bucket = dayName === 'Friday' ? useExternalBellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues'])
+          if (bucket && bucket.length) return bucket
+        }
+        return []
+      }
+      
+      // Helper to get cached breaks for a day (for instant display during sector switches)
+      const getCachedBreaksForDay = (dayName: string): Period[] => {
+        if (cachedBreakLayoutsRef.current && cachedBreakLayoutsRef.current[dayName]) {
+          // Filter to only break periods
+          return cachedBreakLayoutsRef.current[dayName].filter((p: any) => 
+            /(?:recess|lunch|break)/i.test(String(p.subject || p.period || ''))
+          ).map((p: any) => ({
+            period: p.period,
+            time: p.time,
+            subject: 'Break',
+            teacher: '',
+            room: ''
+          }))
         }
         return []
       }
@@ -1060,6 +1079,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       for (const day of Object.keys(filtered)) {
         let bells = (getBellForDay(day) || []).slice()
         const dayPeriods = filtered[day]
+        
+        // If no bells available from API, use cached break layouts as fallback
+        // This ensures breaks show instantly during sector switches
+        if (bells.length === 0) {
+          const cachedBreaks = getCachedBreaksForDay(day)
+          for (const breakPeriod of cachedBreaks) {
+            const exists = dayPeriods.some((p) => 
+              p.subject === 'Break' && (p.period || '').toLowerCase() === (breakPeriod.period || '').toLowerCase()
+            )
+            if (!exists) {
+              dayPeriods.push({ ...breakPeriod })
+            }
+          }
+        }
+        
         // If the server provided `externalBellTimes`, always respect the
         // API ordering; otherwise, sort bells by canonical order.
         if (!useExternalBellTimes) {
@@ -2591,9 +2625,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const computed = buildBellTimesFromPayload(j)
                 const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
                 const src = j.bellTimes || {}
+                const existingBells = lastSeenBellTimesRef.current || externalBellTimes || {}
                 for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
                   if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
                   else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                  // Preserve existing bell times for sectors not in the new response
+                  else if (existingBells[k] && Array.isArray(existingBells[k]) && existingBells[k].length) finalBellTimes[k] = existingBells[k]
                   else finalBellTimes[k] = []
                 }
                 const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
@@ -2610,8 +2647,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 if (j.bellTimes && Object.values(j.bellTimes).some((arr: any) => Array.isArray(arr) && arr.length > 0)) {
                   try { console.log('[timetable.provider] setExternalBellTimes (raw retry)', j.bellTimes) } catch (e) {}
-                  setExternalBellTimes(j.bellTimes)
-                  lastSeenBellTimesRef.current = j.bellTimes
+                  // Merge with existing bell times to preserve all sectors
+                  const mergedBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                  const existingBells = lastSeenBellTimesRef.current || externalBellTimes || {}
+                  for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                    if (j.bellTimes[k] && Array.isArray(j.bellTimes[k]) && j.bellTimes[k].length) mergedBellTimes[k] = j.bellTimes[k]
+                    else if (existingBells[k] && Array.isArray(existingBells[k]) && existingBells[k].length) mergedBellTimes[k] = existingBells[k]
+                  }
+                  setExternalBellTimes(mergedBellTimes)
+                  lastSeenBellTimesRef.current = mergedBellTimes
                   lastSeenBellTsRef.current = Date.now()
                   // Mark as authoritative since this is from /api/timetable
                   authoritativeBellsDateRef.current = (new Date()).toISOString().slice(0,10)
@@ -3082,10 +3126,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setLastFetchedPayloadSummary(summary)
             } catch (e) {}
             if (j.bellTimes) {
-              setExternalBellTimes(j.bellTimes)
+              // Merge new bell times with existing ones to preserve all sectors
+              // This prevents breaks from disappearing when switching between sectors
+              const mergedBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+              const existingBells = lastSeenBellTimesRef.current || externalBellTimes || {}
+              for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                // Prefer new API data, fall back to existing data
+                if (j.bellTimes[k] && Array.isArray(j.bellTimes[k]) && j.bellTimes[k].length) {
+                  mergedBellTimes[k] = j.bellTimes[k]
+                } else if (existingBells[k] && Array.isArray(existingBells[k]) && existingBells[k].length) {
+                  mergedBellTimes[k] = existingBells[k]
+                }
+              }
+              setExternalBellTimes(mergedBellTimes)
               // Mark these as authoritative date-specific bells
               authoritativeBellsDateRef.current = (selectedDateObject || new Date()).toISOString().slice(0,10)
-              lastSeenBellTimesRef.current = j.bellTimes
+              lastSeenBellTimesRef.current = mergedBellTimes
               lastSeenBellTsRef.current = Date.now()
             }
             if (j.weekType === 'A' || j.weekType === 'B') {
