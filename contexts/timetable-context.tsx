@@ -940,37 +940,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           
           try { console.debug('[timetable.provider] variation lookup for', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
           
-          // Count variations in current source
-          const sourceHasVariations = daySource.some((p: any) => p.isSubstitute || p.isRoomChange)
-          
-          // If the current source has variations, update the authoritative map for this date
-          if (sourceHasVariations) {
-            const varData: Record<string, any[]> = {}
-            for (const d of Object.keys(useExternalTimetable || {})) {
-              const arr = (useExternalTimetable as any)[d] || []
-              varData[d] = arr.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
-                period: p.period,
-                isSubstitute: p.isSubstitute,
-                isRoomChange: p.isRoomChange,
-                displayRoom: p.displayRoom,
-                displayTeacher: p.displayTeacher,
-                casualSurname: p.casualSurname,
-                originalTeacher: p.originalTeacher,
-                originalRoom: p.originalRoom,
-              }))
-            }
-            authVarsMap.set(selectedIso, varData)
-            // Limit map size to prevent memory growth (keep last 14 days)
-            if (authVarsMap.size > 14) {
-              const oldest = Array.from(authVarsMap.keys()).sort()[0]
-              authVarsMap.delete(oldest)
-            }
-            try { console.debug('[timetable.provider] saved authoritative variations for', selectedIso, 'day', day, 'count', (varData[day] || []).length) } catch (e) {}
-          }
-          
           // Apply variations to all periods in this day
           // STRATEGY: Always apply authoritative variations if they exist for this date.
-          // Only use fresh match data if it ALSO has variations (to update the display).
+          // Also overlay fresh match data if it has variations (to update the display with newest data).
+          // NOTE: Variation SAVING is handled by a separate useEffect that watches externalTimetable
           for (const p of filtered[day]) {
             const normPeriod = String(p.period).trim().toLowerCase()
             
@@ -1409,6 +1382,59 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try { console.debug('[timetable.provider] persisted authoritative variations for', map.size, 'dates') } catch (e) {}
     } catch (e) {}
   }, [timetableData]) // Re-persist whenever timetable data changes (which triggers variation updates)
+
+  // CRITICAL: Capture variations from externalTimetable IMMEDIATELY when they appear
+  // This ensures we never lose substitutions/room changes even if timetable is later overwritten
+  useEffect(() => {
+    try {
+      if (!externalTimetable) return
+      if (!selectedDateObject) return
+      
+      const selectedIso = selectedDateObject.toISOString().slice(0, 10)
+      
+      // Check if externalTimetable has any variations
+      let hasVariations = false
+      const varData: Record<string, any[]> = {}
+      
+      for (const day of Object.keys(externalTimetable)) {
+        const periods = (externalTimetable as any)[day] || []
+        const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
+          period: p.period,
+          isSubstitute: p.isSubstitute,
+          isRoomChange: p.isRoomChange,
+          displayRoom: p.displayRoom,
+          displayTeacher: p.displayTeacher,
+          casualSurname: p.casualSurname,
+          originalTeacher: p.originalTeacher,
+          originalRoom: p.originalRoom,
+        }))
+        if (variations.length > 0) {
+          hasVariations = true
+          varData[day] = variations
+        } else {
+          varData[day] = []
+        }
+      }
+      
+      if (hasVariations) {
+        const map = authoritativeVariationsRef.current
+        map.set(selectedIso, varData)
+        // Limit map size to prevent memory growth (keep last 14 days)
+        if (map.size > 14) {
+          const oldest = Array.from(map.keys()).sort()[0]
+          map.delete(oldest)
+        }
+        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', selectedIso, varData) } catch (e) {}
+        
+        // Immediately persist to localStorage
+        try {
+          const obj: Record<string, any> = {}
+          map.forEach((value, key) => { obj[key] = value })
+          localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }, [externalTimetable, selectedDateObject])
 
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
