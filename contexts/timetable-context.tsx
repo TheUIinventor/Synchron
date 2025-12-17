@@ -993,6 +993,32 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     (p as any).originalRoom = p.room // Preserve original for UI
                   }
                 }
+                
+                // FALLBACK: If the match doesn't have variation info but we have authoritative
+                // variations, use them. This handles the case where a background fetch returns
+                // data without substitution markers but we previously had valid variation data.
+                if (!(match as any).isSubstitute && !(match as any).isRoomChange && hasAuthoritativeVars) {
+                  const authMatch = (authVars.data![day] || []).find((v: any) => 
+                    String(v.period).trim().toLowerCase() === normPeriod
+                  )
+                  if (authMatch) {
+                    if (authMatch.isSubstitute) {
+                      (p as any).isSubstitute = true
+                      if (authMatch.casualSurname) (p as any).casualSurname = authMatch.casualSurname
+                      if (authMatch.displayTeacher) (p as any).displayTeacher = authMatch.displayTeacher
+                      if (authMatch.originalTeacher) (p as any).originalTeacher = authMatch.originalTeacher
+                    }
+                    if (authMatch.isRoomChange && authMatch.displayRoom) {
+                      const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                      const variationRoom = String(authMatch.displayRoom || '').trim().toLowerCase()
+                      if (variationRoom && variationRoom !== scheduledRoom) {
+                        (p as any).isRoomChange = true
+                        (p as any).displayRoom = authMatch.displayRoom
+                        (p as any).originalRoom = p.room
+                      }
+                    }
+                  }
+                }
               } else if (hasAuthoritativeVars) {
                 // No match in current source - check authoritative variations as fallback
                 const authMatch = (authVars.data![day] || []).find((v: any) => 
