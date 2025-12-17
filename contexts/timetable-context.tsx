@@ -2155,6 +2155,60 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         const todayDateStr = fetchDate.toISOString().slice(0, 10)
         console.log('[DEBUG refreshExternal] fetching for date:', todayDateStr, 'selectedDateObjectRef:', currentSelectedDate?.toISOString().slice(0,10))
+        // Check the official calendar for holidays for this exact date.
+        try {
+          try {
+            const calRes = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(todayDateStr)}&to=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
+            const cctype = calRes.headers.get('content-type') || ''
+            if (calRes.ok && cctype.includes('application/json')) {
+              const calJson = await calRes.json()
+              // calendar/days.json usually returns an object keyed by date or an array
+              let dayInfo: any = null
+              if (Array.isArray(calJson) && calJson.length) dayInfo = calJson[0]
+              else if (calJson && typeof calJson === 'object' && calJson[todayDateStr]) dayInfo = calJson[todayDateStr]
+              else if (calJson && typeof calJson === 'object') {
+                // try to find a single entry matching the date
+                for (const k of Object.keys(calJson)) {
+                  const v = calJson[k]
+                  if (v && (v.date === todayDateStr || String(k) === todayDateStr)) { dayInfo = v; break }
+                }
+              }
+              const isHolidayCal = Boolean(
+                dayInfo && (
+                  dayInfo.isHoliday === true ||
+                  dayInfo.holiday === true ||
+                  String(dayInfo.is_school_day).toLowerCase() === 'false' ||
+                  String(dayInfo.status).toLowerCase().includes('holiday') ||
+                  String(dayInfo.type || '').toLowerCase().includes('holiday') ||
+                  String(dayInfo.dayType || '').toLowerCase().includes('holiday')
+                )
+              )
+              if (isHolidayCal) {
+                try {
+                  if (typeof window !== 'undefined' && window.localStorage) {
+                    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                    try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                  }
+                } catch (e) {}
+
+                setExternalTimetable(emptyByDay)
+                setExternalTimetableByWeek(null)
+                setTimetableSource('calendar-holiday')
+                setExternalWeekType(null)
+                try { setLastFetchedDate(todayDateStr); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+                setIsRefreshing(false)
+                if (!hadCache) setIsLoading(false)
+                return
+              }
+            }
+          } catch (e) {
+            // ignore calendar errors and continue to timetable fetch
+          }
+        } catch (e) {}
         const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
         console.log('[DEBUG refreshExternal] response status:', r.status)
         if (r.status === 401) {
@@ -2661,6 +2715,57 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         const todayDateStr2 = fetchDate2.toISOString().slice(0, 10)
+        // Check calendar on retry fetch as well
+        try {
+          try {
+            const calRes2 = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(todayDateStr2)}&to=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include' })
+            const cctype2 = calRes2.headers.get('content-type') || ''
+            if (calRes2.ok && cctype2.includes('application/json')) {
+              const calJson2 = await calRes2.json()
+              let dayInfo2: any = null
+              if (Array.isArray(calJson2) && calJson2.length) dayInfo2 = calJson2[0]
+              else if (calJson2 && typeof calJson2 === 'object' && calJson2[todayDateStr2]) dayInfo2 = calJson2[todayDateStr2]
+              else if (calJson2 && typeof calJson2 === 'object') {
+                for (const k of Object.keys(calJson2)) {
+                  const v = calJson2[k]
+                  if (v && (v.date === todayDateStr2 || String(k) === todayDateStr2)) { dayInfo2 = v; break }
+                }
+              }
+              const isHolidayCal2 = Boolean(
+                dayInfo2 && (
+                  dayInfo2.isHoliday === true ||
+                  dayInfo2.holiday === true ||
+                  String(dayInfo2.is_school_day).toLowerCase() === 'false' ||
+                  String(dayInfo2.status).toLowerCase().includes('holiday') ||
+                  String(dayInfo2.type || '').toLowerCase().includes('holiday') ||
+                  String(dayInfo2.dayType || '').toLowerCase().includes('holiday')
+                )
+              )
+              if (isHolidayCal2) {
+                try {
+                  if (typeof window !== 'undefined' && window.localStorage) {
+                    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                    try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                  }
+                } catch (e) {}
+                setExternalTimetable(emptyByDay)
+                setExternalTimetableByWeek(null)
+                setTimetableSource('calendar-holiday')
+                setExternalWeekType(null)
+                try { setLastFetchedDate(todayDateStr2); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+                setIsRefreshing(false)
+                if (!hadCache) setIsLoading(false)
+                return
+              }
+            }
+          } catch (e) {
+            // ignore calendar errors and continue to timetable fetch
+          }
+        } catch (e) {}
         const r2 = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include' })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
@@ -3151,6 +3256,55 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // If we've just requested this same date, skip duplicate fetch
         if (lastRequestedDateRef.current === ds) return
         lastRequestedDateRef.current = ds
+        // Check calendar for selected date — if it's a holiday, clear caches and show empty timetable
+        try {
+          try {
+            const calResSel = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
+            const cctypeSel = calResSel.headers.get('content-type') || ''
+            if (calResSel.ok && cctypeSel.includes('application/json')) {
+              const calJsonSel = await calResSel.json()
+              let dayInfoSel: any = null
+              if (Array.isArray(calJsonSel) && calJsonSel.length) dayInfoSel = calJsonSel[0]
+              else if (calJsonSel && typeof calJsonSel === 'object' && calJsonSel[ds]) dayInfoSel = calJsonSel[ds]
+              else if (calJsonSel && typeof calJsonSel === 'object') {
+                for (const k of Object.keys(calJsonSel)) {
+                  const v = calJsonSel[k]
+                  if (v && (v.date === ds || String(k) === ds)) { dayInfoSel = v; break }
+                }
+              }
+              const isHolidaySel = Boolean(
+                dayInfoSel && (
+                  dayInfoSel.isHoliday === true ||
+                  dayInfoSel.holiday === true ||
+                  String(dayInfoSel.is_school_day).toLowerCase() === 'false' ||
+                  String(dayInfoSel.status).toLowerCase().includes('holiday') ||
+                  String(dayInfoSel.type || '').toLowerCase().includes('holiday') ||
+                  String(dayInfoSel.dayType || '').toLowerCase().includes('holiday')
+                )
+              )
+              if (isHolidaySel) {
+                try {
+                  if (typeof window !== 'undefined' && window.localStorage) {
+                    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                    try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                  }
+                } catch (e) {}
+                setExternalTimetable(emptyByDay)
+                setExternalTimetableByWeek(null)
+                setTimetableSource('calendar-holiday')
+                setExternalWeekType(null)
+                try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+                return
+              }
+            }
+          } catch (e) {
+            // ignore calendar errors and continue to fetch
+          }
+        } catch (e) {}
         const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
         const ctype = res.headers.get('content-type') || ''
         if (!res.ok) {
