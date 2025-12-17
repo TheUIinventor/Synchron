@@ -586,78 +586,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
   }, [])
 
-  // Memoize the current timetable based on selected week
-  // Try to synchronously hydrate last-known timetable from localStorage so the UI
-  // can display cached data instantly while we fetch fresh data in the background.
-  const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(() => {
-    try {
-      if (__initialExternalTimetable) {
-        try { console.debug('[timetable.provider] found synchron-last-timetable in storage (init)') } catch (e) {}
-        const rawMap = __initialExternalTimetable
-        try {
-          // Clone and normalise cached entries so the UI can use
-          // `displayRoom`/`displayTeacher`/`isRoomChange`/`isSubstitute`
-          // immediately on first render without waiting for effects.
-          const cleaned: Record<string, Period[]> = {}
-          for (const day of Object.keys(rawMap)) {
-            cleaned[day] = (rawMap[day] || []).map((p) => {
-              const item: any = { ...(p as any) }
-
-              // Normalize explicit destination room fields into `displayRoom`.
-              // NOTE: Do NOT include `item.to` here - that field is commonly used for
-              // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
-              const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom
-              if (candidateDest && String(candidateDest).trim()) {
-                const candStr = String(candidateDest).trim()
-                const roomStr = String(item.room || '').trim()
-                if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                  item.displayRoom = candStr
-                  item.isRoomChange = true
-                }
-              }
-
-              // Compute a normalized `displayTeacher` for immediate UI use.
-              try {
-                const casual = item.casualSurname || undefined
-                const candidate = item.fullTeacher || item.teacher || undefined
-                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                item.displayTeacher = dt
-              } catch (e) {}
-
-              // Defensive: remove stale `isRoomChange` if no explicit dest
-              if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) {
-                delete item.isRoomChange
-              }
-
-              return item
-            })
-          }
-
-          // If we have cached substitutions from a previous run, apply them
-          // synchronously so the UI shows substitutes immediately instead
-          // of waiting for the hydration effect.
-          try {
-            const cached = __initialCachedSubs
-            if (cached && Array.isArray(cached) && cached.length) {
-              try {
-                const applied = applySubstitutionsToTimetable(cleaned, cached, { debug: false })
-                return applied
-              } catch (e) {
-                // fall back to cleaned map on error
-              }
-            }
-          } catch (e) {}
-
-          return cleaned
-        } catch (e) {
-          return rawMap
-        }
-      }
-    } catch (e) {
-      // ignore parse errors
-    }
-    return null
-  })
+  // Defer applying the cached timetable until after a quick calendar check so
+  // we don't show stale cached periods on a date that the official calendar
+  // marks as a holiday. The cached payload is still available in
+  // `__initialParsedCache`/`__initialProcessedCache` for hydration after the
+  // calendar check completes.
+  const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
   const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
   const [timetableSource, setTimetableSource] = useState<string | null>(() => {
     try {
@@ -744,6 +678,112 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return
     try { console.time('[timetable] mount->ready') } catch (e) {}
     loadTimingStartedRef.current = true
+  }, [])
+
+  // On mount: run a quick calendar check for the currently-selected date
+  // and then apply any cached timetable only if the calendar does not mark
+  // the date as a holiday. This prevents stale cached timetables from
+  // appearing on holiday dates before background refreshes run.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let cancelled = false
+    void (async () => {
+      try {
+        const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
+        try {
+          const calRes = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
+          const cctype = calRes.headers.get('content-type') || ''
+          if (calRes.ok && cctype.includes('application/json')) {
+            const calJson = await calRes.json()
+            let dayInfo: any = null
+            if (Array.isArray(calJson) && calJson.length) dayInfo = calJson[0]
+            else if (calJson && typeof calJson === 'object' && calJson[ds]) dayInfo = calJson[ds]
+            else if (calJson && typeof calJson === 'object') {
+              for (const k of Object.keys(calJson)) {
+                const v = calJson[k]
+                if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
+              }
+            }
+            const isHoliday = Boolean(
+              dayInfo && (
+                dayInfo.isHoliday === true ||
+                dayInfo.holiday === true ||
+                String(dayInfo.is_school_day).toLowerCase() === 'false' ||
+                String(dayInfo.status || '').toLowerCase().includes('holiday') ||
+                String(dayInfo.type || '').toLowerCase().includes('holiday') ||
+                String(dayInfo.dayType || '').toLowerCase().includes('holiday')
+              )
+            )
+            if (isHoliday) {
+              // Clear client caches synchronously to avoid rehydration later
+              try {
+                if (typeof window !== 'undefined' && window.localStorage) {
+                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                  try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                }
+              } catch (e) {}
+              if (!cancelled) {
+                setExternalTimetable(emptyByDay)
+                setExternalTimetableByWeek(null)
+                setTimetableSource('calendar-holiday')
+                setExternalWeekType(null)
+                try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+              }
+              return
+            }
+          }
+        } catch (e) {
+          // ignore calendar check failures and fall back to cached data
+        }
+
+        // If not a holiday, apply cached processed payload (if any) quickly
+        try {
+          const src = __initialProcessedCache || __initialParsedCache
+          let map: Record<string, Period[]> | null = null
+          if (src && src.timetable) map = __extractMapFromCache(src.timetable) || __extractMapFromCache(src)
+          if (!map && __initialExternalTimetable) map = __initialExternalTimetable
+          if (map && !cancelled) {
+            // apply cached subs if present
+            try {
+              const cleaned: Record<string, Period[]> = {}
+              for (const day of Object.keys(map)) {
+                cleaned[day] = (map[day] || []).map((p) => {
+                  const item: any = { ...(p as any) }
+                  const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom
+                  if (candidateDest && String(candidateDest).trim()) {
+                    const candStr = String(candidateDest).trim()
+                    const roomStr = String(item.room || '').trim()
+                    if (candStr.toLowerCase() !== roomStr.toLowerCase()) { item.displayRoom = candStr; item.isRoomChange = true }
+                  }
+                  try { const casual = item.casualSurname || undefined; const candidate = item.fullTeacher || item.teacher || undefined; const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any); item.displayTeacher = dt } catch (e) {}
+                  if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) delete (item as any).isRoomChange
+                  return item
+                })
+              }
+              const cachedSubs = __initialCachedSubs
+              const final = (cachedSubs && Array.isArray(cachedSubs) && cachedSubs.length) ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
+              setExternalTimetable(final)
+              setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
+              setExternalBellTimes(__initialExternalBellTimes || null)
+              setTimetableSource(__initialTimetableSource || 'cache')
+              setLastRecordedTimetable(final)
+            } catch (e) {
+              // apply raw map if processing fails
+              if (!cancelled && map) {
+                setExternalTimetable(map)
+                setTimetableSource(__initialTimetableSource || 'cache')
+                setLastRecordedTimetable(map)
+              }
+            }
+          }
+        } catch (e) {}
+      } catch (e) {}
+    })()
+    return () => { cancelled = true }
   }, [])
 
   // Persist the last successful external timetable to localStorage so the
