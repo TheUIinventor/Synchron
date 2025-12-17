@@ -1,15 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { ChevronLeft, ExternalLink, RefreshCw, X } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { ExternalLink, RefreshCw, X, LogIn } from "lucide-react"
 import { trackSectionUsage } from "@/utils/usage-tracker"
-import PageTransition from "@/components/page-transition"
 import { Button } from "@/components/ui/button"
 
 export default function ClipboardPage() {
   const [showAuthHelper, setShowAuthHelper] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const popupRef = useRef<Window | null>(null)
+  const popupCheckInterval = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Track clipboard usage
@@ -18,10 +20,9 @@ export default function ClipboardPage() {
 
   // Check if user might need to authenticate (show helper after a delay)
   useEffect(() => {
-    // Show auth helper after 3 seconds - gives iframe time to load or fail
     const timer = setTimeout(() => {
       setShowAuthHelper(true)
-    }, 3000)
+    }, 5000)
     return () => clearTimeout(timer)
   }, [iframeKey])
 
@@ -43,14 +44,58 @@ export default function ClipboardPage() {
     iframe.setAttribute("allowfullscreen", "")
     iframe.style.background = "transparent"
     iframe.setAttribute("data-key", String(iframeKey))
+    iframeRef.current = iframe
 
     document.body.appendChild(iframe)
 
     return () => {
       try { iframe.remove() } catch (e) {}
       try { style.remove() } catch (e) {}
+      iframeRef.current = null
     }
   }, [iframeKey])
+
+  // Cleanup popup check interval on unmount
+  useEffect(() => {
+    return () => {
+      if (popupCheckInterval.current) {
+        clearInterval(popupCheckInterval.current)
+      }
+    }
+  }, [])
+
+  // Open login in a popup window (popups don't have X-Frame-Options restrictions)
+  const handlePopupLogin = () => {
+    setIsAuthenticating(true)
+    
+    // Calculate popup position (center of screen)
+    const width = 500
+    const height = 700
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+    
+    // Open popup for authentication
+    popupRef.current = window.open(
+      "https://portal.clipboard.app/sbhs/calendar",
+      "clipboard_auth",
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=no`
+    )
+
+    // Check when popup is closed
+    if (popupRef.current) {
+      popupCheckInterval.current = setInterval(() => {
+        if (popupRef.current?.closed) {
+          clearInterval(popupCheckInterval.current!)
+          popupCheckInterval.current = null
+          setIsAuthenticating(false)
+          // Refresh iframe after popup closes (user hopefully authenticated)
+          handleRefresh()
+        }
+      }, 500)
+    } else {
+      setIsAuthenticating(false)
+    }
+  }
 
   const handleOpenInNewTab = () => {
     window.open("https://portal.clipboard.app/sbhs/calendar", "_blank")
@@ -73,9 +118,22 @@ export default function ClipboardPage() {
             <X className="h-4 w-4" />
           </button>
           <p className="text-sm text-muted-foreground mb-3 pr-4">
-            Having trouble signing in? Microsoft login doesn&apos;t work inside embedded frames.
+            {isAuthenticating 
+              ? "Sign in to Clipboard in the popup window, then close it when done."
+              : "Having trouble signing in? Try the popup login."
+            }
           </p>
-          <div className="flex gap-2 justify-center">
+          <div className="flex gap-2 justify-center flex-wrap">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handlePopupLogin}
+              className="gap-1.5"
+              disabled={isAuthenticating}
+            >
+              <LogIn className="h-4 w-4" />
+              {isAuthenticating ? "Authenticating..." : "Popup Login"}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -83,7 +141,7 @@ export default function ClipboardPage() {
               className="gap-1.5"
             >
               <ExternalLink className="h-4 w-4" />
-              Open in New Tab
+              New Tab
             </Button>
             <Button
               variant="ghost"
@@ -95,9 +153,6 @@ export default function ClipboardPage() {
               Refresh
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Sign in there, then come back and refresh.
-          </p>
         </div>
       )}
     </>
