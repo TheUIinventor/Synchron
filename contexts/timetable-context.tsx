@@ -371,12 +371,15 @@ const timetableWeekA = {
     { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
   ],
   Friday: [
-              if (isHolidaySel) {
-                holidayDateRef.current = true
+    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
     { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-                  if (typeof window !== 'undefined' && window.localStorage) {
-                    try { clearClientCaches() } catch (e) {}
-                  }
+    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
 
 const timetableWeekB = {
   Monday: [
@@ -736,14 +739,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.dayType || '').toLowerCase().includes('holiday')
               )
             )
-            if (isHolidayCal) {
+            if (isHoliday) {
               holidayDateRef.current = true
-              // Clear client caches synchronously to avoid rehydration later
-              try {
-                    try { clearClientCaches() } catch (e) {}
-                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                }
-              } catch (e) {}
+              try { clearClientCaches() } catch (e) {}
               if (!cancelled) {
                 setExternalTimetable(emptyByDay)
                 setExternalTimetableByWeek(null)
@@ -3340,7 +3338,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   String(dayInfoSel.dayType || '').toLowerCase().includes('holiday')
                 )
               )
-              if (isHolidayCal2) {
+              if (isHolidaySel) {
                 holidayDateRef.current = true
                 try {
                   if (typeof window !== 'undefined' && window.localStorage) {
