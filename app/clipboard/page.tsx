@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronLeft, ExternalLink, RefreshCw } from "lucide-react"
+import { ChevronLeft, ExternalLink, RefreshCw, X } from "lucide-react"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { Button } from "@/components/ui/button"
@@ -64,8 +64,15 @@ export default function ClipboardPage() {
   return (
     <>
       {showAuthHelper && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 md:left-[calc(5rem+50%)] md:-translate-x-1/2 lg:left-[calc(6rem+50%)] z-50 bg-card border border-border rounded-lg shadow-lg p-4 max-w-sm text-center">
-          <p className="text-sm text-muted-foreground mb-3">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 md:left-[calc(5rem+50%)] md:-translate-x-1/2 lg:left-[calc(6rem+50%)] z-50 bg-card border border-border rounded-lg shadow-lg p-4 max-w-sm text-center relative">
+          <button
+            onClick={() => setShowAuthHelper(false)}
+            className="absolute top-2 right-2 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <p className="text-sm text-muted-foreground mb-3 pr-4">
             Having trouble signing in? Microsoft login doesn&apos;t work inside embedded frames.
           </p>
           <div className="flex gap-2 justify-center">
