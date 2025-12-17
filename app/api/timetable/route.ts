@@ -62,6 +62,8 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
   const fullTeacher = item.fullTeacher || item.full_teacher || item.fullTeacherName || item.full_teacher_name || item.fullname || item.full_name || ''
   const room = item.room || item.roomName || item.room_name || item.venue || item.location || ''
   const period = String(item.period || item.p || item.block || item.lesson || item.lessonNumber || item.lesson_number || item.name || item.title || '')
+  // Subject colour (hex without # prefix, e.g., "448ae6")
+  const colour = item.colour || item.color || undefined
   // Avoid using subject/title/name fields when inferring week type because class
   // names sometimes include trailing group letters (e.g. "MAT A") which falsely
   // indicate a week letter. Only consider explicit week-like fields.
@@ -75,7 +77,7 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
     subject = String(subject || '').trim()
   } catch (e) {}
 
-  return { period, time, subject, teacher, fullTeacher: fullTeacher || undefined, room, weekType: weekType ?? undefined }
+  return { period, time, subject, teacher, fullTeacher: fullTeacher || undefined, room, weekType: weekType ?? undefined, colour }
 }
 
 // This route proxies SBHS Timetable API endpoints shown in the portal docs:
@@ -355,6 +357,9 @@ export async function GET(req: NextRequest) {
               const end = bell.endTime || bell.end || ''
               const time = [start, end].filter(Boolean).join(' - ')
               
+              // Extract colour from subject data (hex without # prefix)
+              const subjectColour = subjectData.colour || undefined
+              
               return {
                 period: bellKey,
                 time,
@@ -363,6 +368,8 @@ export async function GET(req: NextRequest) {
                 fullTeacher: periodData.fullTeacher || undefined,
                 room: periodData.room || '',
                 weekType: inferred || undefined,
+                // Subject colour (hex without # prefix, e.g., "448ae6")
+                colour: subjectColour,
                 // Substitution info
                 casualSurname: casualSurname,
                 isSubstitute,

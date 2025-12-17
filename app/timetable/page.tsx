@@ -540,8 +540,15 @@ export default function TimetablePage() {
                           {isBreak ? (
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
                           ) : (
-                            <div className={cardClass}>
-                              <div>
+                            <div className={`${cardClass} flex items-stretch gap-2`}>
+                              {/* Subject colour bar */}
+                              {(period as any).colour && (
+                                <div 
+                                  className="w-1 min-w-[4px] rounded-lg self-stretch" 
+                                  style={{ backgroundColor: `#${(period as any).colour}` }} 
+                                />
+                              )}
+                              <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">
                                     <p className="font-medium text-sm truncate">{period.subject}</p>

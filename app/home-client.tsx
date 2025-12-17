@@ -606,59 +606,75 @@ export default function HomeClient() {
                             {isNonClass ? (
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
                           ) : link ? (
-                            <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} block`}>
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-sm truncate">{period.subject}</span>
-                                  {/* no separate Sub/Room pills here; teacher will be highlighted when substituted */}
-                                </div>
-                                <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                  {(isSubstitutePeriod(period)) ? (
-                                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
-                                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                    >
-                                      {displayTeacher(period)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
-                                  )}
-                                  <span>•</span>
-                                  {/* Room: prefer destination room fields when present; highlight if a room change */}
-                                  {(() => {
-                                    // NOTE: Do NOT include `.to` - that field is commonly used for end times
-                                    const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
-                                    return (
-                                      <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
-                                    )
-                                  })()}
-                                </div>
-                              </div>
-                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  {(isSubstitutePeriod(period)) ? (
-                                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
-                                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                    >
-                                      {displayTeacher(period)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
-                                  )}
-                                  <span className="mx-2">•</span>
-                                  {(() => {
-                                    // NOTE: Do NOT include `.to` - that field is commonly used for end times
-                                    const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
-                                    return (
-                                      <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
-                                        style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
-                                        {displayRoom}
+                            <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} flex items-stretch gap-2`}>
+                              {/* Subject colour bar */}
+                              {(period as any).colour && (
+                                <div 
+                                  className="w-1 min-w-[4px] rounded-lg self-stretch" 
+                                  style={{ backgroundColor: `#${(period as any).colour}` }} 
+                                />
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm truncate">{period.subject}</span>
+                                    {/* no separate Sub/Room pills here; teacher will be highlighted when substituted */}
+                                  </div>
+                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                    {(isSubstitutePeriod(period)) ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                      >
+                                        {displayTeacher(period)}
                                       </span>
-                                    )
-                                  })()}
+                                    ) : (
+                                      <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
+                                    )}
+                                    <span>•</span>
+                                    {/* Room: prefer destination room fields when present; highlight if a room change */}
+                                    {(() => {
+                                      // NOTE: Do NOT include `.to` - that field is commonly used for end times
+                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                                      return (
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
+                                      )
+                                    })()}
+                                  </div>
                                 </div>
+                                  <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
+                                    {(isSubstitutePeriod(period)) ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                      >
+                                        {displayTeacher(period)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
+                                    )}
+                                    <span className="mx-2">•</span>
+                                    {(() => {
+                                      // NOTE: Do NOT include `.to` - that field is commonly used for end times
+                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                                      return (
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                          style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
+                                          {displayRoom}
+                                        </span>
+                                      )
+                                    })()}
+                                  </div>
+                              </div>
                             </a>
                           ) : (
-                            <div className={cardClass}>
-                              <div>
+                            <div className={`${cardClass} flex items-stretch gap-2`}>
+                              {/* Subject colour bar */}
+                              {(period as any).colour && (
+                                <div 
+                                  className="w-1 min-w-[4px] rounded-lg self-stretch" 
+                                  style={{ backgroundColor: `#${(period as any).colour}` }} 
+                                />
+                              )}
+                              <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">
                                     <p className="font-medium text-sm truncate">{period.subject}</p>
