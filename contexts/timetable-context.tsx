@@ -1992,38 +1992,73 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // ALSO: Do NOT set bell times from this endpoint if we already have them,
     // since /api/timetable returns authoritative date-specific bell times
     // that may include variations (e.g., modified schedules for special days).
-    try {
-      const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
-      const htctype = ht.headers.get('content-type') || ''
-      if (ht.ok && htctype.includes('application/json')) {
-        const jht = await ht.json()
-        // Only extract bell times if we don't already have any - the authoritative
-        // data comes from /api/timetable which may have date-specific variations
-        if (jht && !externalBellTimes && !lastSeenBellTimesRef.current) {
-          try {
-            const computed = buildBellTimesFromPayload(jht)
-            const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-            const src = jht.bellTimes || {}
-            for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-              if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-              else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-              else finalBellTimes[k] = []
+      try {
+        const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
+        const htctype = ht.headers.get('content-type') || ''
+        if (ht.ok && htctype.includes('application/json')) {
+          const jht = await ht.json()
+          // Only extract bell times if we don't already have any - the authoritative
+          // data comes from /api/timetable which may have date-specific variations
+          if (jht && !externalBellTimes && !lastSeenBellTimesRef.current) {
+            try {
+              const computed = buildBellTimesFromPayload(jht)
+              const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+              const src = jht.bellTimes || {}
+              for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                else finalBellTimes[k] = []
+              }
+              const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+              if (hasAny) {
+                setExternalBellTimes(finalBellTimes)
+                lastSeenBellTimesRef.current = finalBellTimes
+                lastSeenBellTsRef.current = Date.now()
+              }
+            } catch (e) {
+              // ignore extraction errors
             }
-            const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-            if (hasAny) {
-              setExternalBellTimes(finalBellTimes)
-              lastSeenBellTimesRef.current = finalBellTimes
-              lastSeenBellTsRef.current = Date.now()
+          }
+
+          // If the homepage scraper or API augmentation marked today as a holiday,
+          // respect that and immediately show an empty timetable (do not proceed
+          // to fetch /api/timetable which may be blocked by auth or return HTML).
+          try {
+            const isHolidaySignal = Boolean(
+              jht?.holiday === true || jht?.isHoliday === true || jht?.noTimetable === true || (jht && jht.timetable && Object.keys(jht.timetable).length === 0)
+            )
+            if (isHolidaySignal) {
+              // Clear caches to avoid stale cached timetables rehydrating
+              try {
+                if (typeof window !== 'undefined' && window.localStorage) {
+                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                  try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                }
+              } catch (e) {}
+
+              // Set empty timetable and mark source so UI shows 'No periods'
+              setExternalTimetable(emptyByDay)
+              setExternalTimetableByWeek(null)
+              setTimetableSource('portal-home-empty')
+              setExternalWeekType(null)
+              try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ holiday: true }) } catch (e) {}
+              setIsRefreshing(false)
+              if (!hadCache) setIsLoading(false)
+              return
             }
           } catch (e) {
-            // ignore extraction errors
+            // ignore holiday-check errors and continue
           }
+
+          // Do NOT set externalTimetable here for normal cases - continue to /api/timetable
         }
-        // Do NOT set externalTimetable or return early - continue to /api/timetable
+      } catch (e) {
+        // ignore and continue to next strategies
       }
-    } catch (e) {
-      // ignore and continue to next strategies
-    }
 
     // Reuse the parsing logic from above by creating a DOMParser here as well
     function parseTimetableHtmlLocal(html: string): Record<string, Period[]> {
@@ -2679,6 +2714,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             } catch (e) {
               // ignore
             }
+            // Clear any persisted client-side caches to avoid showing stale classes
+            try {
+              if (typeof window !== 'undefined' && window.localStorage) {
+                try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                try {
+                  // Remove any processed payload caches
+                  for (const k of Object.keys(localStorage)) {
+                    try {
+                      if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k)
+                    } catch (e) {}
+                  }
+                } catch (e) {}
+                try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+              }
+            } catch (e) {}
+
             setExternalTimetable(emptyByDay)
             setExternalTimetableByWeek(null)
             setTimetableSource('external-empty')
