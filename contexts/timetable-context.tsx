@@ -541,6 +541,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
+  // Keep selectedDateObjectRef in sync with state so interval callbacks can access the latest value
+  useEffect(() => {
+    selectedDateObjectRef.current = selectedDateObject
+  }, [selectedDateObject])
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
@@ -682,6 +686,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Track the date that the current externalTimetable data is actually FOR (not the selected date)
   // This is critical for correctly associating variations with the right date when capturing them
   const externalTimetableDateRef = useRef<string | null>(null)
+  // Track the currently selected date as a ref so interval callbacks can access the latest value
+  // without stale closure issues
+  const selectedDateObjectRef = useRef<Date | null>(null)
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
@@ -2088,11 +2095,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // CRITICAL: Use the currently selected date, NOT a calculated "next school day".
         // This prevents refreshExternal from overwriting timetable data for a date the user
         // is currently viewing with data for a different date.
+        // Use the REF to get the latest value, avoiding stale closure issues in interval callbacks.
         // Fall back to smart date calculation only if no date is explicitly selected.
+        const currentSelectedDate = selectedDateObjectRef.current
         let fetchDate: Date
-        if (selectedDateObject) {
+        if (currentSelectedDate) {
           // User has a date selected - respect it
-          fetchDate = selectedDateObject
+          fetchDate = currentSelectedDate
         } else {
           // No date selected - use next school day logic
           const now = new Date()
@@ -2108,7 +2117,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         const todayDateStr = fetchDate.toISOString().slice(0, 10)
-        console.log('[DEBUG refreshExternal] fetching for date:', todayDateStr, 'selectedDateObject:', selectedDateObject?.toISOString().slice(0,10))
+        console.log('[DEBUG refreshExternal] fetching for date:', todayDateStr, 'selectedDateObjectRef:', currentSelectedDate?.toISOString().slice(0,10))
         const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
         console.log('[DEBUG refreshExternal] response status:', r.status)
         if (r.status === 401) {
@@ -2594,7 +2603,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         // Use the same date as the first fetch - which now respects selectedDateObject
         // This ensures retry doesn't fetch for a different date than what the user is viewing
-        const todayDateStr2 = todayDateStr
+        // Recalculate using the ref since we're in a different try block
+        const currentSelectedDate2 = selectedDateObjectRef.current
+        let fetchDate2: Date
+        if (currentSelectedDate2) {
+          fetchDate2 = currentSelectedDate2
+        } else {
+          const now2 = new Date()
+          const dow2 = now2.getDay()
+          if (dow2 === 0 || dow2 === 6) {
+            fetchDate2 = getNextSchoolDay(now2)
+          } else if (isSchoolDayOver()) {
+            fetchDate2 = getNextSchoolDay(now2)
+          } else {
+            fetchDate2 = now2
+          }
+        }
+        const todayDateStr2 = fetchDate2.toISOString().slice(0, 10)
         const r2 = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include' })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
@@ -3102,6 +3127,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try {
               // First try to extract variations embedded in the timetable payload
               let subs = PortalScraper.extractVariationsFromJson(j.upstream || j)
+              try { console.debug('[timetable.provider] fetchForDate extracted subs from upstream:', Array.isArray(subs) ? subs.length : 0, 'for date', ds) } catch (e) {}
 
     
               // If none found in upstream, request from the AI timetable endpoint
@@ -3110,6 +3136,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // Try to extract substitutions from the already-fetched timetable payload
                   const fetched = await getPortalSubstitutions(j)
                   if (Array.isArray(fetched) && fetched.length) subs = fetched
+                  try { console.debug('[timetable.provider] fetchForDate fetched subs via getPortalSubstitutions:', Array.isArray(subs) ? subs.length : 0) } catch (e) {}
                 } catch (e) {
                   // ignore
                 }
@@ -3119,6 +3146,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   // Apply all substitutions (date-specific + generic) to the per-day timetable
                   finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                  // Count variations in the result
+                  let varCount = 0
+                  for (const day of Object.keys(finalTimetable)) {
+                    varCount += ((finalTimetable as any)[day] || []).filter((p: any) => p.isSubstitute || p.isRoomChange).length
+                  }
+                  try { console.debug('[timetable.provider] fetchForDate applied subs, variations in result:', varCount, 'for date', ds) } catch (e) {}
                 } catch (e) { /* ignore substitution apply errors */ }
 
                 const genericSubs = subs.filter((s: any) => !s || !s.date)
