@@ -246,14 +246,22 @@ export async function GET(req: NextRequest) {
           // Extract periods - prefer building from bells + periods like competitor does
           const bells = dj.bells || []
           const periodsObj = dj?.timetable?.timetable?.periods || dj?.timetable?.periods || {}
-          const subjectsObj = dj?.timetable?.subjects || {}
+          // subjects can be an object keyed by "9ENG A" or an empty array [] - handle both cases
+          const rawSubjects = dj?.timetable?.subjects
+          const subjectsObj = (!Array.isArray(rawSubjects) && rawSubjects) ? rawSubjects : {}
           const classVars = !Array.isArray(dj.classVariations) ? (dj.classVariations || {}) : {}
           const roomVars = !Array.isArray(dj.roomVariations) ? (dj.roomVariations || {}) : {}
           
           // Debug: Log the extracted data structures
           console.log(`[API] periodsObj source: ${dj?.timetable?.timetable?.periods ? 'timetable.timetable.periods' : dj?.timetable?.periods ? 'timetable.periods' : 'empty fallback'}`)
           console.log(`[API] periodsObj keys: [${Object.keys(periodsObj).join(', ')}]`)
+          console.log(`[API] rawSubjects type: ${Array.isArray(rawSubjects) ? 'array' : typeof rawSubjects}, isArray: ${Array.isArray(rawSubjects)}`)
           console.log(`[API] subjectsObj keys: [${Object.keys(subjectsObj).join(', ')}]`)
+          // Debug: Log a sample subject to see its structure
+          const firstSubjectKey = Object.keys(subjectsObj)[0]
+          if (firstSubjectKey) {
+            console.log(`[API] Sample subject "${firstSubjectKey}":`, JSON.stringify(subjectsObj[firstSubjectKey]))
+          }
           if (bells.length > 0) {
             console.log(`[API] bells sample (first 2):`, JSON.stringify(bells.slice(0, 2)))
           }
@@ -316,11 +324,25 @@ export async function GET(req: NextRequest) {
               const periodData = periodsObj[bellKey] || {}
               
               // Build subject lookup key (year + title)
+              // SBHS subjects are keyed like "9ENG A" (no space between year and shortTitle)
               let subjectKey = periodData.title || ''
               if (periodData.year) {
                 subjectKey = periodData.year + subjectKey
               }
-              const subjectData = subjectsObj[subjectKey] || {}
+              // Try alternate key format with space if first lookup fails
+              let subjectData = subjectsObj[subjectKey] || {}
+              if (!subjectData.colour && periodData.year && periodData.title) {
+                // Try with space: "9 ENG A" instead of "9ENG A"
+                const altKey = periodData.year + ' ' + periodData.title
+                if (subjectsObj[altKey]) {
+                  subjectData = subjectsObj[altKey]
+                }
+              }
+              
+              // Debug: Log subject lookup for first few periods
+              if (bellKey === '1' || bellKey === '2') {
+                console.log(`[API] Subject lookup for P${bellKey}: key="${subjectKey}", found=${!!subjectsObj[subjectKey]}, colour="${subjectData.colour || 'none'}", availableKeys=${Object.keys(subjectsObj).slice(0, 3).join(',')}`)
+              }
               
               // Check for class variation (substitute)
               const classVar = classVars[bellKey] || classVars[bell.period] || null

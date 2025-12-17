@@ -22,6 +22,8 @@ export type Period = {
   fullTeacher?: string
   casualSurname?: string
   displayTeacher?: string
+  // Subject colour (hex without # prefix, e.g., "448ae6")
+  colour?: string
 }
 
 // Define the bell time type

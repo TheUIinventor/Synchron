@@ -542,10 +542,10 @@ export default function TimetablePage() {
                           ) : (
                             <div className={`${cardClass} flex items-stretch gap-2`}>
                               {/* Subject colour bar */}
-                              {(period as any).colour && (
+                              {period.colour && (
                                 <div 
                                   className="w-1 min-w-[4px] rounded-lg self-stretch" 
-                                  style={{ backgroundColor: `#${(period as any).colour}` }} 
+                                  style={{ backgroundColor: `#${period.colour}` }} 
                                 />
                               )}
                               <div className="flex-1">
