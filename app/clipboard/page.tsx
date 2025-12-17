@@ -9,6 +9,9 @@ export default function ClipboardPage() {
   const [showAuthHelper, setShowAuthHelper] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [cookieText, setCookieText] = useState("")
+  const [isLoadingProxy, setIsLoadingProxy] = useState(false)
+  const [proxyError, setProxyError] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const popupRef = useRef<Window | null>(null)
   const popupCheckInterval = useRef<NodeJS.Timeout | null>(null)
@@ -18,12 +21,9 @@ export default function ClipboardPage() {
     trackSectionUsage("clipboard")
   }, [])
 
-  // Check if user might need to authenticate (show helper after a delay)
+  // Show helper immediately (user requested instant visibility)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowAuthHelper(true)
-    }, 5000)
-    return () => clearTimeout(timer)
+    setShowAuthHelper(true)
   }, [iframeKey])
 
   useEffect(() => {
@@ -106,10 +106,46 @@ export default function ClipboardPage() {
     setIframeKey((k) => k + 1)
   }
 
+  // Aggressive experiment: POST the user-supplied cookie to the proxy and load HTML via srcdoc
+  const handleLoadWithCookie = async () => {
+    setProxyError(null)
+    if (!cookieText || cookieText.trim().length < 10) {
+      setProxyError('Please paste a valid session cookie string from portal.clipboard.app')
+      return
+    }
+    if (!confirm('This will send the provided cookie string to the local Synchron server to fetch Clipboard HTML. Do not paste secrets you do not trust. Proceed?')) return
+    setIsLoadingProxy(true)
+    try {
+      const res = await fetch('/api/clipboard/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookie: cookieText.trim() })
+      })
+      const j = await res.json()
+      if (!j || !j.ok) {
+        setProxyError(j?.error || 'Proxy fetch failed')
+        setIsLoadingProxy(false)
+        return
+      }
+
+      // Load returned HTML into iframe via srcdoc
+      if (iframeRef.current) {
+        // Some browsers restrict srcdoc + allow-same-origin; this is experimental
+        iframeRef.current.srcdoc = j.html
+        // Clear any previous data-key so next reload path isn't stale
+        iframeRef.current.removeAttribute('data-key')
+      }
+    } catch (e: any) {
+      setProxyError(String(e))
+    } finally {
+      setIsLoadingProxy(false)
+    }
+  }
+
   return (
     <>
       {showAuthHelper && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 md:left-[calc(5rem+50%)] md:-translate-x-1/2 lg:left-[calc(6rem+50%)] z-50 bg-card border border-border rounded-lg shadow-lg p-4 max-w-sm text-center relative">
+        <div className="fixed bottom-4 left-4 md:left-20 lg:left-24 z-50 bg-card border border-border rounded-lg shadow-lg p-4 max-w-sm text-center relative">
           <button
             onClick={() => setShowAuthHelper(false)}
             className="absolute top-2 right-2 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -118,11 +154,19 @@ export default function ClipboardPage() {
             <X className="h-4 w-4" />
           </button>
           <p className="text-sm text-muted-foreground mb-3 pr-4">
-            {isAuthenticating 
-              ? "Sign in to Clipboard in the popup window, then close it when done."
-              : "Having trouble signing in? Try the popup login."
+            {isAuthenticating
+              ? "Complete SSO in the popup, then close it."
+              : "Quick verification flow: use the popup, then finish sign-in inside the embedded page."
             }
           </p>
+          <div className="text-left text-xs text-muted-foreground mb-3 pr-2">
+            <ol className="list-decimal list-inside">
+              <li>Click <strong>Popup Login</strong> and complete the Microsoft SSO in the popup.</li>
+              <li>Close the popup when SSO finishes.</li>
+              <li>In the embedded Clipboard frame, click the page's <em>Sign in with SSO</em> button (it may ask for your student ID). This final confirmation binds the session to the embed.</li>
+            </ol>
+            <p className="mt-2">This typically completes a one-time verification for the browser/profile — after that the embed should load without repeating the full SSO flow.</p>
+          </div>
           <div className="flex gap-2 justify-center flex-wrap">
             <Button
               variant="default"
@@ -152,6 +196,26 @@ export default function ClipboardPage() {
               <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>
+          </div>
+
+          <div className="mt-4 text-left">
+            <p className="text-xs text-rose-600 mb-2">Experimental: manual cookie proxy (insecure)</p>
+            <p className="text-xs text-muted-foreground mb-2">If you know how you signed in previously, paste the clipboard.app session cookie here and click "Load via proxy". This sends the cookie to your local Synchron server to fetch the page on your behalf. Do not paste passwords or tokens you do not trust.</p>
+            <textarea
+              value={cookieText}
+              onChange={(e) => setCookieText(e.target.value)}
+              placeholder="Paste Cookie header value (e.g. 'session=...; path=/;')"
+              className="w-full rounded-md border p-2 text-xs"
+              rows={3}
+            />
+            <div className="flex gap-2 justify-end mt-2">
+              <Button variant="secondary" size="sm" onClick={() => { setCookieText('') }}>Clear</Button>
+              <Button variant="destructive" size="sm" onClick={() => { setCookieText('') }}>Cancel</Button>
+              <Button variant="default" size="sm" onClick={handleLoadWithCookie} disabled={isLoadingProxy}>
+                {isLoadingProxy ? 'Loading...' : 'Load via proxy'}
+              </Button>
+            </div>
+            {proxyError && <p className="text-xs text-rose-600 mt-2">{proxyError}</p>}
           </div>
         </div>
       )}
