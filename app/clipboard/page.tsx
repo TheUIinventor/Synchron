@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { RefreshCw, X, LogIn } from "lucide-react"
+import { ExternalLink, RefreshCw, X, LogIn } from "lucide-react"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import { Button } from "@/components/ui/button"
 
@@ -81,16 +81,13 @@ export default function ClipboardPage() {
       `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=no`
     )
 
-    // Check when popup is closed and mark step complete
+    // Check when popup is closed
     if (popupRef.current) {
       popupCheckInterval.current = setInterval(() => {
         if (popupRef.current?.closed) {
           clearInterval(popupCheckInterval.current!)
           popupCheckInterval.current = null
           setIsAuthenticating(false)
-          // Mark step 1 complete
-          setSteps((s) => s.map((st) => (st.id === 1 ? { ...st, completed: true } : st)))
-          setActiveStep((n) => Math.min(n + 1, steps.length - 1))
           // Refresh iframe after popup closes (user hopefully authenticated)
           handleRefresh()
         }
@@ -101,7 +98,7 @@ export default function ClipboardPage() {
   }
 
   const handleOpenInNewTab = () => {
-    // (Removed New Tab button — encourage popup flow)
+    window.open("https://portal.clipboard.app/sbhs/calendar", "_blank")
   }
 
   const handleRefresh = () => {
@@ -182,6 +179,15 @@ export default function ClipboardPage() {
               {isAuthenticating ? "Authenticating..." : "Popup Login"}
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenInNewTab}
+              className="gap-1.5"
+            >
+              <ExternalLink className="h-4 w-4" />
+              New Tab
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               onClick={handleRefresh}
@@ -210,41 +216,6 @@ export default function ClipboardPage() {
               </Button>
             </div>
             {proxyError && <p className="text-xs text-rose-600 mt-2">{proxyError}</p>}
-          </div>
-          {/* Render current step card */}
-          <div className="text-left">
-            {steps.map((st, idx) => (
-              <div key={st.id} className={`${idx === activeStep ? 'block' : 'hidden'}`}>
-                <h3 className="font-semibold">{st.title}</h3>
-                <p className="text-xs text-muted-foreground mt-2 mb-3">{st.description}</p>
-                <div className="flex gap-2 justify-center">
-                  {st.id === 1 && (
-                    <Button variant="default" size="sm" onClick={handlePopupLogin} className="gap-1.5" disabled={isAuthenticating}>
-                      <LogIn className="h-4 w-4" />
-                      {isAuthenticating ? 'Authenticating...' : 'Popup Login'}
-                    </Button>
-                  )}
-                  {st.id === 2 && (
-                    <>
-                      <Button variant="default" size="sm" onClick={handleConfirmEmbedSignIn} className="gap-1.5">
-                        I've signed in (confirm)
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={handleRefresh} className="gap-1.5">
-                        <RefreshCw className="h-4 w-4" />
-                        Refresh Embed
-                      </Button>
-                    </>
-                  )}
-                </div>
-                {st.completed && (
-                  <div className="absolute inset-0 bg-emerald-600 bg-opacity-10 rounded-lg flex items-center justify-center pointer-events-none">
-                    <div className="bg-emerald-600 text-white rounded-full p-2">
-                      ✓
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         </div>
       )}
