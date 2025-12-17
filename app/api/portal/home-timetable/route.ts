@@ -106,29 +106,65 @@ export async function GET(req: NextRequest) {
       }
 
       const has = Object.values(byDay).some(a => a.length)
-      // Try to augment the scraped timetable with an API-derived weekType
-      let weekType: string | null = null
-      try {
-        const headersForApi: Record<string, string> = { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-        if (incomingCookie) headersForApi['Cookie'] = incomingCookie
-        const hosts = ['https://student.sbhs.net.au', 'https://api.sbhs.net.au']
-        for (const host of hosts) {
-          try {
-            const dr = await fetch(`${host}/api/timetable/daytimetable.json`, { headers: headersForApi })
-            const fr = await fetch(`${host}/api/timetable/timetable.json`, { headers: headersForApi })
-            const candidate = (await (dr.ok ? dr.json().catch(() => null) : Promise.resolve(null))) || (await (fr.ok ? fr.json().catch(() => null) : Promise.resolve(null)))
-            if (candidate && typeof candidate === 'object') {
-              const maybe = (candidate.weekType || candidate.week || candidate.week_label || candidate.cycle || candidate.rotation || candidate.weekLabel || candidate.week_type)
-              if (maybe) {
-                const s = String(maybe).trim().toUpperCase()
-                if (s === 'A' || s === 'B') { weekType = s; break }
-                const m = s.match(/\b([AB])\b/)
-                if (m && m[1]) { weekType = m[1]; break }
+        // Try to augment the scraped timetable with an API-derived weekType
+        let weekType: string | null = null
+        try {
+          const headersForApi: Record<string, string> = { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
+          if (incomingCookie) headersForApi['Cookie'] = incomingCookie
+          const hosts = ['https://student.sbhs.net.au', 'https://api.sbhs.net.au']
+          for (const host of hosts) {
+            try {
+              const dr = await fetch(`${host}/api/timetable/daytimetable.json`, { headers: headersForApi })
+              const fr = await fetch(`${host}/api/timetable/timetable.json`, { headers: headersForApi })
+              const candidate = (await (dr.ok ? dr.json().catch(() => null) : Promise.resolve(null))) || (await (fr.ok ? fr.json().catch(() => null) : Promise.resolve(null)))
+              if (candidate && typeof candidate === 'object') {
+                const maybe = (candidate.weekType || candidate.week || candidate.week_label || candidate.cycle || candidate.rotation || candidate.weekLabel || candidate.week_type)
+                if (maybe) {
+                  const s = String(maybe).trim().toUpperCase()
+                  if (s === 'A' || s === 'B') { weekType = s; break }
+                  const m = s.match(/\b([AB])\b/)
+                  if (m && m[1]) { weekType = m[1]; break }
+                }
               }
-            }
-          } catch (e) { /* ignore host errors */ }
-        }
-      } catch (e) { /* ignore api augmentation errors */ }
+            } catch (e) { /* ignore host errors */ }
+          }
+        } catch (e) { /* ignore api augmentation errors */ }
+      
+        // If API calendar marks today as a holiday, suppress portal timetable output
+        try {
+          const headersForApi: Record<string, string> = { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
+          if (incomingCookie) headersForApi['Cookie'] = incomingCookie
+          const hosts = ['https://student.sbhs.net.au', 'https://api.sbhs.net.au']
+          const today = new Date().toISOString().slice(0, 10)
+          for (const host of hosts) {
+            try {
+              const url = `${host}/api/calendar/days.json?from=${today}&to=${today}`
+              const dr = await fetch(url, { headers: headersForApi })
+              if (!dr.ok) continue
+              const days = await dr.json().catch(() => null)
+              if (!days) continue
+              const day = days[today] ?? (Array.isArray(days) && days[0]) ?? null
+              const checkHoliday = (d: any) => {
+                if (!d || typeof d !== 'object') return false
+                if ('isHoliday' in d) return !!d.isHoliday
+                if ('holiday' in d) {
+                  const v = d.holiday
+                  if (typeof v === 'boolean') return v
+                  if (typeof v === 'string') return /holiday/i.test(v)
+                }
+                if ('is_school_day' in d) return !d.is_school_day
+                if ('isSchoolDay' in d) return !d.isSchoolDay
+                if ('status' in d && typeof d.status === 'string') if (/holiday|public/i.test(d.status)) return true
+                if ('type' in d && typeof d.type === 'string') if (/holiday|public/i.test(d.type)) return true
+                if ('dayType' in d && typeof d.dayType === 'string') if (/holiday/i.test(d.dayType)) return true
+                return false
+              }
+              if (checkHoliday(day)) {
+                return NextResponse.json({ timetable: {}, source: 'portal-home', weekType: weekType ?? undefined, holiday: true })
+              }
+            } catch (e) { /* ignore individual host errors */ }
+          }
+        } catch (e) { /* ignore calendar check errors */ }
 
       if (has) return NextResponse.json({ timetable: byDay, source: 'portal-home', weekType: weekType ?? undefined })
 
