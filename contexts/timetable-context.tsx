@@ -218,6 +218,31 @@ const computePayloadHash = (input: any) => {
   }
 }
 
+// Clear client-side persistent caches (localStorage) and ask the Service
+// Worker to clear runtime caches to avoid serving stale API responses.
+const clearClientCaches = () => {
+  try {
+    if (typeof window === 'undefined') return
+    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+    try {
+      const keys = Object.keys(localStorage || {})
+      for (const k of keys) {
+        try { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } catch (e) {}
+      }
+    } catch (e) {}
+    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+  } catch (e) {}
+
+  try {
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
+      try { navigator.serviceWorker.controller.postMessage('clear-cache') } catch (e) {}
+    }
+  } catch (e) {}
+}
+
 // Try to parse a fetch Response for bell times and apply them to state.
 const extractBellTimesFromResponse = async (res: Response | null) => {
   if (!res) return
@@ -346,16 +371,12 @@ const timetableWeekA = {
     { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
   ],
   Friday: [
-    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+              if (isHolidaySel) {
+                holidayDateRef.current = true
     { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
-    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-  ],
-}
+                  if (typeof window !== 'undefined' && window.localStorage) {
+                    try { clearClientCaches() } catch (e) {}
+                  }
 
 const timetableWeekB = {
   Monday: [
@@ -628,6 +649,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
+  const holidayDateRef = useRef<boolean>(false)
 
   // Aggressive background refresh tuning
   // NOTE: reduced intervals to make visible-refresh more responsive.
@@ -714,15 +736,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.dayType || '').toLowerCase().includes('holiday')
               )
             )
-            if (isHoliday) {
+            if (isHolidayCal) {
+              holidayDateRef.current = true
               // Clear client caches synchronously to avoid rehydration later
               try {
-                if (typeof window !== 'undefined' && window.localStorage) {
-                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                  try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                    try { clearClientCaches() } catch (e) {}
                   try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
                 }
               } catch (e) {}
@@ -2072,7 +2090,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 if (typeof window !== 'undefined' && window.localStorage) {
                   try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                  try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                  try { clearClientCaches() } catch (e) {}
                   try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
                   try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
                   try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
@@ -2227,7 +2245,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   if (typeof window !== 'undefined' && window.localStorage) {
                     try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                    try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                    try { clearClientCaches() } catch (e) {}
                     try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
                     try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
                     try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
@@ -2249,7 +2267,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // ignore calendar errors and continue to timetable fetch
           }
         } catch (e) {}
-        const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
+        const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include', cache: 'no-store', headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' } })
         console.log('[DEBUG refreshExternal] response status:', r.status)
         if (r.status === 401) {
           if (!attemptedRefresh) {
@@ -2785,7 +2803,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   if (typeof window !== 'undefined' && window.localStorage) {
                     try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                    try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
+                    try { clearClientCaches() } catch (e) {}
                     try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
                     try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
                     try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
@@ -2806,7 +2824,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // ignore calendar errors and continue to timetable fetch
           }
         } catch (e) {}
-        const r2 = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include' })
+        const r2 = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include', cache: 'no-store', headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' } })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
           if (!attemptedRefresh) {
@@ -3322,15 +3340,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   String(dayInfoSel.dayType || '').toLowerCase().includes('holiday')
                 )
               )
-              if (isHolidaySel) {
+              if (isHolidayCal2) {
+                holidayDateRef.current = true
                 try {
                   if (typeof window !== 'undefined' && window.localStorage) {
-                    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                    try { for (const k of Object.keys(localStorage)) { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                    try { clearClientCaches() } catch (e) {}
                   }
                 } catch (e) {}
                 setExternalTimetable(emptyByDay)
@@ -3345,7 +3359,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // ignore calendar errors and continue to fetch
           }
         } catch (e) {}
-        const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
+        const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include', cache: 'no-store', headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' } })
         const ctype = res.headers.get('content-type') || ''
         if (!res.ok) {
           try { await extractBellTimesFromResponse(res) } catch (e) {}

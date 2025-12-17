@@ -43,6 +43,20 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET
   if (request.method !== 'GET') return
 
+  // Avoid caching API responses for timetable/calendar/portal endpoints
+  // to ensure clients always see the authoritative live data.
+  try {
+    const url = new URL(request.url)
+    if (url.pathname.startsWith('/api/timetable') || url.pathname.startsWith('/api/calendar') || url.pathname.startsWith('/api/portal')) {
+      event.respondWith(
+        fetch(request).then((res) => {
+          return res
+        }).catch(() => caches.match(request))
+      )
+      return
+    }
+  } catch (e) {}
+
   // Navigation requests: try network, fallback to cache
   if (request.mode === 'navigate') {
     event.respondWith(
