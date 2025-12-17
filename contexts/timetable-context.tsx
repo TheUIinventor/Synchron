@@ -679,6 +679,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // fallback paths from overwriting date-specific variations with stale data.
   // Key is ISO date string (YYYY-MM-DD), value is variations for that date.
   const authoritativeVariationsRef = useRef<Map<string, Record<string, { period: string; isSubstitute?: boolean; isRoomChange?: boolean; displayRoom?: string; displayTeacher?: string; casualSurname?: string; originalTeacher?: string; originalRoom?: string }[]>>>(__initialAuthoritativeVariations)
+  // Track the date that the current externalTimetable data is actually FOR (not the selected date)
+  // This is critical for correctly associating variations with the right date when capturing them
+  const externalTimetableDateRef = useRef<string | null>(null)
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
@@ -1385,12 +1388,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // CRITICAL: Capture variations from externalTimetable IMMEDIATELY when they appear
   // This ensures we never lose substitutions/room changes even if timetable is later overwritten
+  // NOTE: We use externalTimetableDateRef (the date the timetable data is FOR) rather than
+  // selectedDateObject (the date the user is viewing) because they can differ during date switches.
   useEffect(() => {
     try {
       if (!externalTimetable) return
-      if (!selectedDateObject) return
       
-      const selectedIso = selectedDateObject.toISOString().slice(0, 10)
+      // Use the date the timetable is actually FOR, falling back to selected date
+      const timetableDateIso = externalTimetableDateRef.current || 
+        (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
+      
+      if (!timetableDateIso) return
       
       // Check if externalTimetable has any variations
       let hasVariations = false
@@ -1418,13 +1426,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       
       if (hasVariations) {
         const map = authoritativeVariationsRef.current
-        map.set(selectedIso, varData)
+        map.set(timetableDateIso, varData)
         // Limit map size to prevent memory growth (keep last 14 days)
         if (map.size > 14) {
           const oldest = Array.from(map.keys()).sort()[0]
           map.delete(oldest)
         }
-        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', selectedIso, varData) } catch (e) {}
+        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
         
         // Immediately persist to localStorage
         try {
@@ -2441,6 +2449,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   setCurrentWeek(j.weekType)
                 }
                 if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                // Track which date this timetable is FOR
+                externalTimetableDateRef.current = computedDate
                 setExternalTimetable(finalTimetable)
                 setTimetableSource(computedSource)
                 setLastFetchedDate(computedDate)
@@ -2734,6 +2744,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             } catch (e) {}
             // Use startTransition to batch ALL updates and prevent flash
             startTransition(() => {
+              // Track which date this timetable is FOR
+              if (retryDate) externalTimetableDateRef.current = retryDate
               setExternalTimetable(finalTimetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
@@ -2780,6 +2792,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // Use startTransition to batch updates and prevent flash
             startTransition(() => {
+              // Track which date this timetable is FOR
+              externalTimetableDateRef.current = (new Date()).toISOString().slice(0, 10)
               setExternalTimetable(finalTimetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
@@ -3149,6 +3163,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+              // CRITICAL: Track which date this timetable data is FOR before setting it
+              externalTimetableDateRef.current = ds
               setExternalTimetable(finalTimetable)
             setTimetableSource(j.source ?? 'external')
             // record debug summary
