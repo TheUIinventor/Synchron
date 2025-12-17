@@ -2085,22 +2085,30 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
       // Always try timetable first regardless of userinfo; the API route will forward HTML if login is required
       try {
-        // Calculate the date we should fetch - always use the next school day logic
-        // to ensure we're fetching for a day that has classes, not weekends
-        const now = new Date()
-        const dow = now.getDay()
+        // CRITICAL: Use the currently selected date, NOT a calculated "next school day".
+        // This prevents refreshExternal from overwriting timetable data for a date the user
+        // is currently viewing with data for a different date.
+        // Fall back to smart date calculation only if no date is explicitly selected.
         let fetchDate: Date
-        if (dow === 0 || dow === 6) {
-          // Weekend - use next Monday
-          fetchDate = getNextSchoolDay(now)
-        } else if (isSchoolDayOver()) {
-          // Weekday but school is over - use next school day
-          fetchDate = getNextSchoolDay(now)
+        if (selectedDateObject) {
+          // User has a date selected - respect it
+          fetchDate = selectedDateObject
         } else {
-          fetchDate = now
+          // No date selected - use next school day logic
+          const now = new Date()
+          const dow = now.getDay()
+          if (dow === 0 || dow === 6) {
+            // Weekend - use next Monday
+            fetchDate = getNextSchoolDay(now)
+          } else if (isSchoolDayOver()) {
+            // Weekday but school is over - use next school day
+            fetchDate = getNextSchoolDay(now)
+          } else {
+            fetchDate = now
+          }
         }
         const todayDateStr = fetchDate.toISOString().slice(0, 10)
-        console.log('[DEBUG refreshExternal] fetching for date:', todayDateStr, 'dow=', dow)
+        console.log('[DEBUG refreshExternal] fetching for date:', todayDateStr, 'selectedDateObject:', selectedDateObject?.toISOString().slice(0,10))
         const r = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr)}`, { credentials: 'include' })
         console.log('[DEBUG refreshExternal] response status:', r.status)
         if (r.status === 401) {
@@ -2442,7 +2450,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
               const computedSource = j.source ?? 'external'
-              const computedDate = (new Date()).toISOString().slice(0,10)
+              // Use the actual date we fetched for, not the current date
+              const computedDate = todayDateStr
               startTransition(() => {
                 if (j.weekType === 'A' || j.weekType === 'B') {
                   setExternalWeekType(j.weekType)
@@ -2583,18 +2592,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       await new Promise((res) => setTimeout(res, 300))
 
       try {
-        // Use same date calculation as the first fetch - always target the next school day
-        const now2 = new Date()
-        const dow2 = now2.getDay()
-        let fetchDate2: Date
-        if (dow2 === 0 || dow2 === 6) {
-          fetchDate2 = getNextSchoolDay(now2)
-        } else if (isSchoolDayOver()) {
-          fetchDate2 = getNextSchoolDay(now2)
-        } else {
-          fetchDate2 = now2
-        }
-        const todayDateStr2 = fetchDate2.toISOString().slice(0, 10)
+        // Use the same date as the first fetch - which now respects selectedDateObject
+        // This ensures retry doesn't fetch for a different date than what the user is viewing
+        const todayDateStr2 = todayDateStr
         const r2 = await fetch(`/api/timetable?date=${encodeURIComponent(todayDateStr2)}`, { credentials: 'include' })
         if (r2.status === 401) {
           try { await extractBellTimesFromResponse(r2) } catch (e) {}
@@ -2737,9 +2737,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // Compute summary before transitioning
             let retrySummary: { weekType: string | null; hasByWeek: boolean } | null = null
-            let retryDate = ''
+            // Use the date we actually fetched for, not the current date
+            const retryDate = todayDateStr2
             try {
-              retryDate = (new Date()).toISOString().slice(0,10)
               retrySummary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
             } catch (e) {}
             // Use startTransition to batch ALL updates and prevent flash
@@ -2792,8 +2792,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // Use startTransition to batch updates and prevent flash
             startTransition(() => {
-              // Track which date this timetable is FOR
-              externalTimetableDateRef.current = (new Date()).toISOString().slice(0, 10)
+              // Track which date this timetable is FOR - use the date we fetched for
+              externalTimetableDateRef.current = todayDateStr2
               setExternalTimetable(finalTimetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
