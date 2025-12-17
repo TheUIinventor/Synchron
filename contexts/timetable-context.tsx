@@ -2475,6 +2475,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setTimetableSource(computedSource)
                 setLastFetchedDate(computedDate)
                 if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
+                // Clear loading indicator as soon as we have valid data
+                setIsRefreshing(false)
               })
               // Note: do not override provider-selected date here. The
               // `selectedDateObject` is driven by user choice and time-based
@@ -2584,6 +2586,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             startTransition(() => {
               setExternalTimetable(parsed)
               setTimetableSource('external-scraped')
+              // Clear loading indicator as soon as we have valid data
+              setIsRefreshing(false)
             })
             return
           }
@@ -2781,6 +2785,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               if (retryDate) setLastFetchedDate(retryDate)
               if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
+              // Clear loading indicator as soon as we have valid data
+              setIsRefreshing(false)
             })
             return
           }
@@ -2827,6 +2833,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setExternalWeekType(j.weekType)
                 setCurrentWeek(j.weekType)
               }
+              // Clear loading indicator as soon as we have valid data
+              setIsRefreshing(false)
             })
             return
           }
@@ -2840,6 +2848,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             startTransition(() => {
               setExternalTimetable(parsed)
               setTimetableSource('external-scraped')
+              // Clear loading indicator as soon as we have valid data
+              setIsRefreshing(false)
             })
             return
           }
@@ -2859,12 +2869,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           setExternalTimetable(lastRecordedTimetable)
           setTimetableSource('cache')
           setError(null)
+          // Clear loading indicator as soon as we have valid data
+          setIsRefreshing(false)
         })
       } else if (isAuthenticated) {
         startTransition(() => {
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("Could not refresh timetable. Showing sample data.")
+          setIsRefreshing(false)
         })
       } else {
         // No cached data and auth unknown/false: keep whatever we have and surface an error
@@ -2872,6 +2885,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("Could not refresh timetable. Showing sample data.")
+          setIsRefreshing(false)
         })
       }
     } catch (e) {
@@ -2881,18 +2895,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           setExternalTimetable(lastRecordedTimetable)
           setTimetableSource('cache')
           setError(null)
+          setIsRefreshing(false)
         })
       } else if (isAuthenticated) {
         startTransition(() => {
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("An error occurred while refreshing timetable.")
+          setIsRefreshing(false)
         })
       } else {
         startTransition(() => {
           setExternalTimetable(null)
           setTimetableSource('fallback-sample')
           setError("An error occurred while refreshing timetable.")
+          setIsRefreshing(false)
         })
       }
     } finally {
