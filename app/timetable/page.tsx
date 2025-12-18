@@ -551,7 +551,7 @@ export default function TimetablePage() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">
-                                    <p className="font-medium text-xs sm:text-sm truncate">{period.subject}</p>
+                                    <p className="hidden md:block font-medium text-sm truncate">{period.subject}</p>
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {isSubstitutePeriod(period) ? (
@@ -571,8 +571,13 @@ export default function TimetablePage() {
                                     </span>
                                   </div>
                                 </div>
-                                <div className="md:hidden flex items-center justify-between text-xs text-muted-foreground w-full">
-                                  <div className="truncate pr-3 font-medium text-xs">{period.subject}</div>
+                                <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`rounded-lg px-3 py-1 text-sm font-bold flex-shrink-0 text-center ${getSubjectColor(period.subject)}`}>
+                                      {getSubjectAbbr(period.subject)}
+                                    </div>
+                                    <div className="truncate text-sm font-medium min-w-0">{period.subject}</div>
+                                  </div>
                                   <div className="flex items-center gap-2 shrink-0 text-right">
                                     {isSubstitutePeriod(period) ? (
                                       <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[120px]"
