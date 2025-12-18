@@ -650,7 +650,7 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <div className={`rounded-md px-2 py-0.5 text-xs font-semibold flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject)}`}>
+                                    <div className={`rounded-md px-2.5 py-1 text-sm font-semibold flex-shrink-0 min-w-[36px] text-center ${getSubjectColor(period.subject)}`}>
                                       {getSubjectAbbr(period.subject)}
                                     </div>
                                     <div className="truncate font-medium text-sm">{period.subject}</div>
@@ -712,7 +712,7 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <div className={`rounded-md px-2 py-0.5 text-xs font-semibold flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject)}`}>
+                                    <div className={`rounded-md px-2.5 py-1 text-sm font-semibold flex-shrink-0 min-w-[36px] text-center ${getSubjectColor(period.subject)}`}>
                                       {getSubjectAbbr(period.subject)}
                                     </div>
                                     <div className="truncate font-medium text-sm">{period.subject}</div>
