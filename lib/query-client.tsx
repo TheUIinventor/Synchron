@@ -90,10 +90,84 @@ export function QueryClientProviderWrapper({ children }: { children: React.React
             const raw = window.localStorage.getItem(k)
             if (!raw) continue
             const parsed = JSON.parse(raw)
-            if (parsed && parsed.savedAt) {
-              const dateIso = (new Date(parsed.savedAt)).toISOString().slice(0,10)
-              // Store under ['timetable', dateIso] so provider can read it
-              try { queryClient.setQueryData(['timetable', dateIso], parsed) } catch (e) {}
+            if (parsed) {
+              // Try to infer an authoritative date for this processed payload.
+              // Prefer explicit upstream day/date fields, then an explicit `date` field,
+              // then any ISO-like keys on the timetable object, and finally fall back
+              // to the persisted `savedAt` timestamp.
+              let dateIso: string | null = null
+              try {
+                const candidateDates: Array<string | null> = []
+                // upstream.day.date or upstream.dayInfo.date
+                try { candidateDates.push(parsed.upstream?.day?.date || parsed.upstream?.dayInfo?.date || null) } catch (e) { candidateDates.push(null) }
+                // top-level date
+                try { candidateDates.push(parsed.date || parsed.day || null) } catch (e) { candidateDates.push(null) }
+                // If timetable is keyed by ISO dates, prefer those keys
+                try {
+                  if (parsed.timetable && typeof parsed.timetable === 'object') {
+                    const keys = Object.keys(parsed.timetable)
+                    const isoKey = keys.find((kk: string) => /^\d{4}-\d{2}-\d{2}$/.test(kk))
+                    if (isoKey) candidateDates.push(isoKey)
+                  }
+                } catch (e) { }
+
+                // Finally, fallback to savedAt timestamp
+                try { candidateDates.push(parsed.savedAt ? (new Date(parsed.savedAt)).toISOString().slice(0,10) : null) } catch (e) { candidateDates.push(null) }
+
+                for (const c of candidateDates) {
+                  if (!c) continue
+                  // Normalize strings like '/Date(...)' and partials
+                  try {
+                    const s = String(c).trim()
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { dateIso = s; break }
+                    // try parsing flexible formats
+                    const dt = new Date(s)
+                    if (!Number.isNaN(dt.getTime())) { dateIso = dt.toISOString().slice(0,10); break }
+                  } catch (e) { continue }
+                }
+              } catch (e) {}
+
+              if (!dateIso && parsed.savedAt) {
+                try { dateIso = (new Date(parsed.savedAt)).toISOString().slice(0,10) } catch (e) { dateIso = null }
+              }
+
+              if (dateIso) {
+                try { queryClient.setQueryData(['timetable', dateIso], parsed) } catch (e) {}
+
+                // Also attempt to populate authoritative variations map in localStorage
+                try {
+                  const mapRaw = window.localStorage.getItem('synchron-authoritative-variations')
+                  const mapObj = mapRaw ? JSON.parse(mapRaw) : {}
+                  // Extract any variations present in the processed payload's timetable
+                  try {
+                    const tt = parsed.timetable || {}
+                    const varData: Record<string, any[]> = {}
+                    let foundAny = false
+                    for (const day of Object.keys(tt || {})) {
+                      const arr = (tt as any)[day] || []
+                      const vars = (arr || []).filter((p: any) => p && (p.isSubstitute || p.isRoomChange)).map((p: any) => ({ period: p.period, isSubstitute: !!p.isSubstitute, isRoomChange: !!p.isRoomChange, displayRoom: p.displayRoom, displayTeacher: p.displayTeacher, casualSurname: p.casualSurname, originalTeacher: p.originalTeacher, originalRoom: p.originalRoom }))
+                      if (vars && vars.length) { varData[day] = vars; foundAny = true }
+                    }
+                    if (foundAny) {
+                      // Only set when we have actual variations
+                      mapObj[dateIso] = mapObj[dateIso] || {}
+                      // merge days without overwriting existing per-period entries
+                      for (const d of Object.keys(varData)) {
+                        mapObj[dateIso][d] = mapObj[dateIso][d] || []
+                        // Append any new entries that aren't duplicates by period+room+teacher
+                        const existing = mapObj[dateIso][d] || []
+                        const combined = existing.slice()
+                        for (const v of varData[d]) {
+                          const dup = combined.find((e: any) => String(e.period) === String(v.period) && String(e.displayRoom || '') === String(v.displayRoom || '') && String(e.displayTeacher || '') === String(v.displayTeacher || ''))
+                          if (!dup) combined.push(v)
+                        }
+                        mapObj[dateIso][d] = combined
+                      }
+                      try { window.localStorage.setItem('synchron-authoritative-variations', JSON.stringify(mapObj)) } catch (e) {}
+                    }
+                  } catch (e) {}
+                } catch (e) {}
+              }
             }
           }
         } catch (e) { /* ignore per-key errors */ }
