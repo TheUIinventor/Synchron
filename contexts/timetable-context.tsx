@@ -67,6 +67,9 @@ type TimetableContextType = {
   // Full A/B grouped timetable when available from the server
   timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
   externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
+  // Authentication state for showing re-auth prompts
+  isAuthenticated?: boolean | null
+  reauthRequired?: boolean
 }
 
 // Create the context
@@ -122,159 +125,187 @@ const canonicalIndex = (label?: string) => {
   return 998
 }
 
-  const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
-    try {
-      const part = (timeStr || '').split('-')[0].trim()
-      const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
-      if (!Number.isFinite(hRaw)) return 0
-      const m = Number.isFinite(mRaw) ? mRaw : 0
-      let h = hRaw
-      const hasMorning = dayPeriods.some((p) => {
-        try {
-          const ppart = (p.time || '').split('-')[0].trim()
-          const hh = parseInt(ppart.split(':')[0], 10)
-          return Number.isFinite(hh) && hh >= 8
-        } catch (e) { return false }
-      })
-      if (h < 8 && hasMorning) h += 12
-      return h * 60 + m
-    } catch (e) { return 0 }
+const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
+  try {
+    const part = (timeStr || '').split('-')[0].trim()
+    const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
+    if (!Number.isFinite(hRaw)) return 0
+    const m = Number.isFinite(mRaw) ? mRaw : 0
+    let h = hRaw
+    const hasMorning = dayPeriods.some((p) => {
+      try {
+        const ppart = (p.time || '').split('-')[0].trim()
+        const hh = parseInt(ppart.split(':')[0], 10)
+        return Number.isFinite(hh) && hh >= 8
+      } catch (e) { return false }
+    })
+    if (h < 8 && hasMorning) h += 12
+    return h * 60 + m
+  } catch (e) { return 0 }
+}
+
+// Build a normalized external bellTimes mapping from the server payload.
+// If the server provided explicit `bellTimes`, prefer those. When a
+// bucket is missing or empty, fall back to using `upstream` bell data if
+// available in the payload (same-origin data from the server).
+const buildBellTimesFromPayload = (payload: any) => {
+  const result: Record<string, { period: string; time: string }[]> = {
+    'Mon/Tues': [],
+    'Wed/Thurs': [],
+    'Fri': [],
   }
 
-  // Build a normalized external bellTimes mapping from the server payload.
-  // If the server provided explicit `bellTimes`, prefer those. When a
-  // bucket is missing or empty, fall back to using `upstream` bell data if
-  // available in the payload (same-origin data from the server).
-  const buildBellTimesFromPayload = (payload: any) => {
-    const result: Record<string, { period: string; time: string }[]> = {
-      'Mon/Tues': [],
-      'Wed/Thurs': [],
-      'Fri': [],
+  try {
+    const src = payload?.bellTimes || {}
+    if (src['Mon/Tues'] && Array.isArray(src['Mon/Tues']) && src['Mon/Tues'].length) result['Mon/Tues'] = src['Mon/Tues']
+    if (src['Wed/Thurs'] && Array.isArray(src['Wed/Thurs']) && src['Wed/Thurs'].length) result['Wed/Thurs'] = src['Wed/Thurs']
+    if (src['Fri'] && Array.isArray(src['Fri']) && src['Fri'].length) result['Fri'] = src['Fri']
+
+    if ((result['Mon/Tues'] && result['Mon/Tues'].length) && (result['Wed/Thurs'] && result['Wed/Thurs'].length) && (result['Fri'] && result['Fri'].length)) {
+      return result
     }
 
+    // Try upstream/day bells and map them into the correct bucket. Some
+    // servers include the upstream payload inside `diagnostics.upstream`, so
+    // check that location too. IMPORTANT: only populate the bucket that the
+    // upstream bells actually apply to (e.g. a Wednesday-only bells array
+    // should populate `Wed/Thurs`), instead of duplicating the same array
+    // across all buckets.
+    const candidateUpstream = payload?.upstream || payload?.diagnostics?.upstream || {}
     try {
-      const src = payload?.bellTimes || {}
-      if (src['Mon/Tues'] && Array.isArray(src['Mon/Tues']) && src['Mon/Tues'].length) result['Mon/Tues'] = src['Mon/Tues']
-      if (src['Wed/Thurs'] && Array.isArray(src['Wed/Thurs']) && src['Wed/Thurs'].length) result['Wed/Thurs'] = src['Wed/Thurs']
-      if (src['Fri'] && Array.isArray(src['Fri']) && src['Fri'].length) result['Fri'] = src['Fri']
-
-      if ((result['Mon/Tues'] && result['Mon/Tues'].length) && (result['Wed/Thurs'] && result['Wed/Thurs'].length) && (result['Fri'] && result['Fri'].length)) {
-        return result
-      }
-
-      // Try upstream/day bells and map them into the correct bucket. Some
-      // servers include the upstream payload inside `diagnostics.upstream`, so
-      // check that location too. IMPORTANT: only populate the bucket that the
-      // upstream bells actually apply to (e.g. a Wednesday-only bells array
-      // should populate `Wed/Thurs`), instead of duplicating the same array
-      // across all buckets.
-      const candidateUpstream = payload?.upstream || payload?.diagnostics?.upstream || {}
-      try {
-        if (candidateUpstream?.day && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) {
-          const rawDay = String(candidateUpstream.day.dayName || candidateUpstream.day.day || candidateUpstream.day.date || candidateUpstream.day.dayname || '').toLowerCase()
+      if (candidateUpstream?.day && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) {
+        const rawDay = String(candidateUpstream.day.dayName || candidateUpstream.day.day || candidateUpstream.day.date || candidateUpstream.day.dayname || '').toLowerCase()
+        const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+        const mapped = (candidateUpstream.day.bells || []).map((b: any) => {
+          const label = b.bellDisplay || b.period || b.bell || String(b.period)
+          const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
+          return { period: String(label), time }
+        })
+        if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
+      } else if (candidateUpstream?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length) {
+        const rawDay = String(candidateUpstream.bells.day || candidateUpstream.bells.date || candidateUpstream.bells.dayName || '').toLowerCase()
+        if (rawDay) {
           const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
-          const mapped = (candidateUpstream.day.bells || []).map((b: any) => {
+          const mapped = (candidateUpstream.bells.bells || []).map((b: any) => {
             const label = b.bellDisplay || b.period || b.bell || String(b.period)
             const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
             return { period: String(label), time }
           })
           if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
-        } else if (candidateUpstream?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length) {
-          const rawDay = String(candidateUpstream.bells.day || candidateUpstream.bells.date || candidateUpstream.bells.dayName || '').toLowerCase()
-          if (rawDay) {
-            const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
-            const mapped = (candidateUpstream.bells.bells || []).map((b: any) => {
-              const label = b.bellDisplay || b.period || b.bell || String(b.period)
-              const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
-              return { period: String(label), time }
-            })
-            if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
-          }
         }
-      } catch (e) {
-        // ignore and return what we could assemble
       }
     } catch (e) {
       // ignore and return what we could assemble
     }
-
-    return result
+  } catch (e) {
+    // ignore and return what we could assemble
   }
 
-  // Lightweight deterministic hash for JSON payloads (djb2 on stringified input)
-  const computePayloadHash = (input: any) => {
-    try {
-      const s = typeof input === 'string' ? input : JSON.stringify(input)
-      let h = 5381
-      for (let i = 0; i < s.length; i++) {
-        h = ((h << 5) + h) + s.charCodeAt(i)
-        h = h & 0xffffffff
-      }
-      return String(h >>> 0)
-    } catch (e) {
-      return null
+  return result
+}
+
+// Lightweight deterministic hash for JSON payloads (djb2 on stringified input)
+const computePayloadHash = (input: any) => {
+  try {
+    const s = typeof input === 'string' ? input : JSON.stringify(input)
+    let h = 5381
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) + h) + s.charCodeAt(i)
+      h = h & 0xffffffff
     }
+    return String(h >>> 0)
+  } catch (e) {
+    return null
   }
+}
 
-  // Try to parse a fetch Response for bell times and apply them to state.
-  const extractBellTimesFromResponse = async (res: Response | null) => {
-    if (!res) return
+// Clear client-side persistent caches (localStorage) and ask the Service
+// Worker to clear runtime caches to avoid serving stale API responses.
+const clearClientCaches = () => {
+  try {
+    if (typeof window === 'undefined') return
+    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
     try {
-      const ctype = res.headers.get('content-type') || ''
-      if (!ctype.includes('application/json')) return
-      // clone/parse safely
-      let j: any = null
-      try { j = await res.clone().json() } catch (e) { return }
-      if (!j) return
-      try {
-        const computed = buildBellTimesFromPayload(j)
-        const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-        const src = j.bellTimes || {}
-        for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-          if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-          else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-          else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-          else finalBellTimes[k] = []
-        }
-        const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-        if (hasAny) {
-          try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
-          setExternalBellTimes(finalBellTimes)
-          lastSeenBellTimesRef.current = finalBellTimes
-          lastSeenBellTsRef.current = Date.now()
-        }
-      } catch (e) {
-        // ignore
+      const keys = Object.keys(localStorage || {})
+      for (const k of keys) {
+        try { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } catch (e) {}
+      }
+    } catch (e) {}
+    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+  } catch (e) {}
+
+  try {
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
+      try { navigator.serviceWorker.controller.postMessage('clear-cache') } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+// Try to parse a fetch Response for bell times and apply them to state.
+const extractBellTimesFromResponse = async (res: Response | null) => {
+  if (!res) return
+  try {
+    const ctype = res.headers.get('content-type') || ''
+    if (!ctype.includes('application/json')) return
+    // clone/parse safely
+    let j: any = null
+    try { j = await res.clone().json() } catch (e) { return }
+    if (!j) return
+    try {
+      const computed = buildBellTimesFromPayload(j)
+      const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+      const src = j.bellTimes || {}
+      for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+        if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+        else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+        else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+        else finalBellTimes[k] = []
+      }
+      const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+      if (hasAny) {
+        try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
+        setExternalBellTimes(finalBellTimes)
+        lastSeenBellTimesRef.current = finalBellTimes
+        lastSeenBellTsRef.current = Date.now()
       }
     } catch (e) {
       // ignore
     }
+  } catch (e) {
+    // ignore
   }
+}
 
-  // Explicit empty timetable used when the upstream API reports "no timetable".
-  const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+// Explicit empty timetable used when the upstream API reports "no timetable".
+const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
-  const payloadHasNoTimetable = (payload: any) => {
-    try {
-      if (!payload) return false
-      if (payload.error) return true
-      if (payload.timetable === false) return true
-      if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
-      if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
-    } catch (e) {}
-    return false
-  }
+const payloadHasNoTimetable = (payload: any) => {
+  try {
+    if (!payload) { console.log('[DEBUG payloadHasNoTimetable] no payload'); return false }
+    if (payload.error) { console.log('[DEBUG payloadHasNoTimetable] payload.error=', payload.error); return true }
+    if (payload.timetable === false) { console.log('[DEBUG payloadHasNoTimetable] timetable===false'); return true }
+    if (payload.noTimetable === true) { console.log('[DEBUG payloadHasNoTimetable] noTimetable===true'); return true }
+    if (payload.isHoliday === true) { console.log('[DEBUG payloadHasNoTimetable] isHoliday===true'); return true }
+    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG payloadHasNoTimetable] upstream.day issue'); return true }
+    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG payloadHasNoTimetable] diagnostics issue'); return true }
+    console.log('[DEBUG payloadHasNoTimetable] returning FALSE - has timetable', { hasTimetable: !!payload.timetable, keys: Object.keys(payload || {}) })
+  } catch (e) { console.log('[DEBUG payloadHasNoTimetable] exception', e) }
+  return false
+}
 
-  // Try to extract an authoritative ISO date string from various payload locations
-  const extractDateFromPayload = (payload: any): string | null => {
-    try {
-      if (!payload) return null
-      const maybe = (p: any) => {
-        if (!p) return null
-        if (typeof p === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p)) return p
-        if (p.date && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date)) return p.date
-        return null
-      }
+// Try to extract an authoritative ISO date string from various payload locations
+const extractDateFromPayload = (payload: any): string | null => {
+  try {
+    if (!payload) return null
+    const maybe = (p: any) => {
+      if (!p) return null
+      if (typeof p === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p)) return p
+      if (p.date && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date)) return p.date
+      return null
+    }
 
     // Common locations seen in API payloads
     const paths = [
@@ -300,110 +331,111 @@ const canonicalIndex = (label?: string) => {
 
 // Mock data for the timetable - memoized
 const timetableWeekA = {
-        Monday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-        ],
-        Tuesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-        ],
-        Wednesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-        ],
-        Thursday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
-        ],
-        Friday: [
-          { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-        ],
-      }
+  Monday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
+  Tuesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+  ],
+  Wednesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+  ],
+  Thursday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
+  ],
+  Friday: [
+    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
 
-      const timetableWeekB = {
-        Monday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Art", teacher: "Ms. Wilson", room: "Art Studio" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Computing", teacher: "Ms. Lee", room: "Computer Lab" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "PE", teacher: "Mr. Davis", room: "101" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-        ],
-        Tuesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "PE", teacher: "Mr. Davis", room: "101" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Art", teacher: "Ms. Wilson", room: "505" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-        ],
-        Wednesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "PE", teacher: "Mr. Davis", room: "101" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Art", teacher: "Ms. Wilson", room: "505" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "English", teacher: "Ms. Smith", room: "301" },
-        ],
-        Thursday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
-        ],
-        Friday: [
-          { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-        ],
-      }
+}
+
+const timetableWeekB = {
+  Monday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Art", teacher: "Ms. Wilson", room: "Art Studio" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:30", subject: "Computing", teacher: "Ms. Lee", room: "Computer Lab" },
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "PE", teacher: "Mr. Davis", room: "101" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+  ],
+  Tuesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "PE", teacher: "Mr. Davis", room: "101" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:30", subject: "Art", teacher: "Ms. Wilson", room: "505" },
+    { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+  ],
+  Wednesday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "PE", teacher: "Mr. Davis", room: "101" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Art", teacher: "Ms. Wilson", room: "505" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "English", teacher: "Ms. Smith", room: "301" },
+  ],
+  Thursday: [
+    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
+  ],
+  Friday: [
+    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+    { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
+    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
+    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
+    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+  ],
+}
 
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
