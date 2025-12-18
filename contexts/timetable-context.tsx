@@ -1502,8 +1502,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (hasVariations) {
         const map = authoritativeVariationsRef.current
         map.set(timetableDateIso, varData)
-        // Limit map size to prevent memory growth (keep last 14 days)
-        if (map.size > 14) {
+        // Limit map size to prevent unbounded growth. Keep a longer history
+        // so substitutions from weeks ago remain available (previously 14 days).
+        // Increase retention to 90 days to match user expectations for "past weeks".
+        const MAX_VAR_DAYS = 90
+        if (map.size > MAX_VAR_DAYS) {
           const oldest = Array.from(map.keys()).sort()[0]
           map.delete(oldest)
         }
