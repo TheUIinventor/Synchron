@@ -250,22 +250,9 @@ export default function TimetablePage() {
 
       // Build normalized lookup map from bucket entries (preserve original ordering)
       const entries = bucket.map((b: any, i: number) => {
-        // Create multiple normalized label variants to improve matching
-        const rawLabels = [b?.originalPeriod, b?.period, b?.bellDisplay, b?.bell, b?.title].filter(Boolean).map((x: any) => String(x))
-        const labels = rawLabels
-          .map((x: any) => normalizeLabel(String(x)))
-          .concat(
-            // also include compact numeric variants (e.g. 'p1', 'period1', '1')
-            rawLabels.map((x: any) => {
-              try {
-                const s = String(x || '').toLowerCase()
-                const digits = (s.match(/(\d+)/) || [])[0]
-                if (digits) return digits
-                return ''
-              } catch (e) { return '' }
-            }).filter(Boolean)
-          )
+        const labels = [b?.originalPeriod, b?.period, b?.bellDisplay, b?.bell, b?.title]
           .filter(Boolean)
+          .map((x: any) => normalizeLabel(String(x)))
         const time = b?.time || (b?.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : '')
         // parse start for sorting
         let start: string | null = null

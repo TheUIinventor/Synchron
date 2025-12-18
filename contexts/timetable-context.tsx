@@ -243,9 +243,40 @@ const clearClientCaches = () => {
   } catch (e) {}
 }
 
-// NOTE: `extractBellTimesFromResponse` is defined inside the provider
-// so it has access to refs and state setters (`setExternalBellTimes`,
-// `lastSeenBellTimesRef`, `lastSeenBellTsRef`). See insertion below.
+// Try to parse a fetch Response for bell times and apply them to state.
+const extractBellTimesFromResponse = async (res: Response | null) => {
+  if (!res) return
+  try {
+    const ctype = res.headers.get('content-type') || ''
+    if (!ctype.includes('application/json')) return
+    // clone/parse safely
+    let j: any = null
+    try { j = await res.clone().json() } catch (e) { return }
+    if (!j) return
+    try {
+      const computed = buildBellTimesFromPayload(j)
+      const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+      const src = j.bellTimes || {}
+      for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+        if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+        else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+        else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+        else finalBellTimes[k] = []
+      }
+      const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+      if (hasAny) {
+        try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
+        setExternalBellTimes(finalBellTimes)
+        lastSeenBellTimesRef.current = finalBellTimes
+        lastSeenBellTsRef.current = Date.now()
+      }
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    // ignore
+  }
+}
 
 // Explicit empty timetable used when the upstream API reports "no timetable".
 const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
@@ -608,42 +639,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
-  // Track whether substitutions have been applied to the current external timetable
-  const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
-  // Try to parse a fetch Response for bell times and apply them to state.
-  const extractBellTimesFromResponse = async (res: Response | null) => {
-    if (!res) return
-    try {
-      const ctype = res.headers.get('content-type') || ''
-      if (!ctype.includes('application/json')) return
-      // clone/parse safely
-      let j: any = null
-      try { j = await res.clone().json() } catch (e) { return }
-      if (!j) return
-      try {
-        const computed = buildBellTimesFromPayload(j)
-        const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-        const src = j.bellTimes || {}
-        for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-          if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-          else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-          else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-          else finalBellTimes[k] = []
-        }
-        const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-        if (hasAny) {
-          try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
-          setExternalBellTimes(finalBellTimes)
-          lastSeenBellTimesRef.current = finalBellTimes
-          lastSeenBellTsRef.current = Date.now()
-        }
-      } catch (e) {
-        // ignore
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
   // Track when authoritative bell times have been set from /api/timetable
   // to prevent fallback paths from overwriting them with generic/stale data
   const authoritativeBellsDateRef = useRef<string | null>(null)
@@ -1542,6 +1537,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
   }, [externalTimetable, selectedDateObject])
 
+  // Track whether substitutions have been applied to the current external timetable
+  const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
   // Track the last time we attempted to fetch substitutions so we can retry
   // periodically instead of permanently skipping when no subs were present.
   const lastSubsAttemptRef = useRef<number | null>(null)
