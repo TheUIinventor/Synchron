@@ -241,3 +241,15 @@
   transform: scale(var(--ui-scale));
   transition: transform 180ms ease;
 }
+
+/* Prevent elements from causing horizontal overflow after load */
+html, body, #__next {
+  overflow-x: hidden;
+}
+
+/* Constrain wide media and pre/code blocks so they don't expand page width */
+img, svg, video, pre, code {
+  max-width: 100%;
+  height: auto;
+  word-break: break-word;
+}
