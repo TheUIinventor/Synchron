@@ -1513,6 +1513,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
   // Track whether substitutions have been applied to the current external timetable
   const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
+  // Track the last time we attempted to fetch substitutions so we can retry
+  // periodically instead of permanently skipping when no subs were present.
+  const lastSubsAttemptRef = useRef<number | null>(null)
   // Track the last date string we requested from /api/timetable to avoid
   // redundant concurrent or repeated fetches for the same date.
   const lastRequestedDateRef = useRef<string | null>(null)
@@ -1859,13 +1862,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (!externalTimetable) return
     if (!timetableSource) return
     if (timetableSource === 'fallback-sample') return
+    // If we already applied substitutions, skip. Otherwise, limit retry
+    // frequency so we don't hammer the AI/portal endpoint when no subs exist.
+    const SUBS_RETRY_MS = 2 * 60 * 1000 // 2 minutes
     if (subsAppliedRef.current) return
+    if (lastSubsAttemptRef.current && (Date.now() - lastSubsAttemptRef.current) < SUBS_RETRY_MS) return
 
     let cancelled = false
 
     ;(async () => {
       try {
         try { console.debug('[timetable.provider] fetching substitutions for externalTimetable') } catch (e) {}
+        lastSubsAttemptRef.current = Date.now()
         const subs = await getPortalSubstitutions()
         try { console.debug('[timetable.provider] substitutions fetched', Array.isArray(subs) ? subs.length : 0) } catch (e) {}
         if (!cancelled && subs.length > 0) {
@@ -1895,7 +1903,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // ignore apply errors
           }
         } else {
-          subsAppliedRef.current = Date.now()
+          // No substitutions found this attempt; record attempt timestamp
+          lastSubsAttemptRef.current = Date.now()
         }
       } catch (e) {
         try { console.debug('[timetable.provider] error fetching substitutions', e) } catch (err) {}
