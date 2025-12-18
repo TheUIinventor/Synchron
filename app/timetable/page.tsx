@@ -305,7 +305,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-[90%] mx-auto px-4 sm:px-6 py-6 pb-24">
+      <div className="w-full max-w-full mx-auto px-3 sm:px-6 py-4 pb-20">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -429,7 +429,7 @@ export default function TimetablePage() {
             )}
 
             {/* Daily Schedule (wide format) */}
-            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4 mx-auto max-w-[680px]">
+            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-2 sm:p-4 mx-auto max-w-full">
               <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
@@ -489,7 +489,7 @@ export default function TimetablePage() {
                     </div>
                   )}
 
-                  <div className="space-y-3 flex-1 pr-2">
+                  <div className="space-y-3 flex-1 pr-0 sm:pr-2">
                     {todaysTimetable.map((period, idx) => {
                       // Compute start time for display
                       let startTime = ''
@@ -533,7 +533,7 @@ export default function TimetablePage() {
 
                       return (
                         <div key={period.id ?? idx} className="flex gap-3 items-center group cursor-pointer">
-                          <div className="flex flex-col items-center min-w-[3rem]">
+                          <div className="flex flex-col items-center min-w-[2.5rem] sm:min-w-[3rem]">
                             <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
                           </div>
 
@@ -551,7 +551,7 @@ export default function TimetablePage() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">
-                                    <p className="font-medium text-sm truncate">{period.subject}</p>
+                                    <p className="font-medium text-xs sm:text-sm truncate">{period.subject}</p>
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {isSubstitutePeriod(period) ? (
