@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => {
+  try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
+}
+
 // Fetch the SBHS portal homepage with forwarded cookies and scrape the on-page timetable into JSON
 export async function GET(req: NextRequest) {
   const incomingCookie = req.headers.get('cookie') || ''
@@ -26,7 +33,7 @@ export async function GET(req: NextRequest) {
       }
       break
     }
-    if (!res) return NextResponse.json({ error: 'No response from portal' }, { status: 502 })
+    if (!res) return NextResponse.json({ error: 'No response from portal' }, { status: 502, headers: cacheHeaders(req) })
 
     const html = await res.text()
     const ctype = res.headers.get('content-type') || ''
@@ -160,21 +167,21 @@ export async function GET(req: NextRequest) {
                 return false
               }
               if (checkHoliday(day)) {
-                return NextResponse.json({ timetable: {}, source: 'portal-home', weekType: weekType ?? undefined, holiday: true })
+                return NextResponse.json({ timetable: {}, source: 'portal-home', weekType: weekType ?? undefined, holiday: true }, { headers: cacheHeaders(req) })
               }
             } catch (e) { /* ignore individual host errors */ }
           }
         } catch (e) { /* ignore calendar check errors */ }
 
-      if (has) return NextResponse.json({ timetable: byDay, source: 'portal-home', weekType: weekType ?? undefined })
+      if (has) return NextResponse.json({ timetable: byDay, source: 'portal-home', weekType: weekType ?? undefined }, { headers: cacheHeaders(req) })
 
       // If no timetable found, forward the HTML for client-side handling
-      return new NextResponse(html, { headers: { 'content-type': ctype || 'text/html; charset=utf-8' }, status: res.status })
+      return new NextResponse(html, { headers: Object.assign({}, { 'content-type': ctype || 'text/html; charset=utf-8' }, cacheHeaders(req)), status: res.status })
     }
 
     // Non-HTML: just forward status
-    return NextResponse.json({ error: 'Unexpected portal response type', contentType: ctype }, { status: 502 })
+    return NextResponse.json({ error: 'Unexpected portal response type', contentType: ctype }, { status: 502, headers: cacheHeaders(req) })
   } catch (err) {
-    return NextResponse.json({ error: 'Portal fetch error', details: String(err) }, { status: 500 })
+    return NextResponse.json({ error: 'Portal fetch error', details: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

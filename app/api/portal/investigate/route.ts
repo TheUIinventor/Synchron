@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => { try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } } }
+
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -38,8 +43,8 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, url: loginUrl, status: r1.status, headers: headers1, tokens, location, follow: r2info })
+    return NextResponse.json({ ok: true, url: loginUrl, status: r1.status, headers: headers1, tokens, location, follow: r2info }, { headers: cacheHeaders(req) })
   } catch (err) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

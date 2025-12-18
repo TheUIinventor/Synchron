@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => {
+  try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
+}
+
 // Whitelist a small set of safe portal paths we allow probing via this diagnostic proxy.
 const ALLOWED = new Set([
   '/details/userinfo.json',
@@ -53,14 +60,15 @@ export async function GET(req: Request) {
     }
 
     const options: any = { status: 200 }
+    options.headers = Object.assign({}, cacheHeaders(req))
     if (sc) {
       // forward Set-Cookie to the client but strip Domain
       const forwarded = sc.replace(/;\s*Domain=[^;]+/gi, '')
-      options.headers = { 'set-cookie': forwarded }
+      options.headers['set-cookie'] = forwarded
     }
 
     return NextResponse.json(resp, options)
   } catch (err) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

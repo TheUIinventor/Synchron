@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => { try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } } }
+
 // Lightweight server-side processor to apply normalized substitutions
 // to the normalized timetable returned by our `/api/timetable` route.
 // This duplicates only the small subset of logic we need for debugging
@@ -32,8 +37,8 @@ export async function GET(req: Request) {
     const ttRes = await fetch(`${origin}/api/timetable`, { headers: { accept: 'application/json' } })
     const subsRes = await fetch(`${origin}/api/portal/substitutions?debug=1`, { headers: { accept: 'application/json' } })
 
-    if (!ttRes.ok) return NextResponse.json({ error: 'Failed to fetch /api/timetable', status: ttRes.status }, { status: 502 })
-    if (!subsRes.ok) return NextResponse.json({ error: 'Failed to fetch /api/portal/substitutions', status: subsRes.status }, { status: 502 })
+    if (!ttRes.ok) return NextResponse.json({ error: 'Failed to fetch /api/timetable', status: ttRes.status }, { status: 502, headers: cacheHeaders(req) })
+    if (!subsRes.ok) return NextResponse.json({ error: 'Failed to fetch /api/portal/substitutions', status: subsRes.status }, { status: 502, headers: cacheHeaders(req) })
 
     const ttJson = await ttRes.json()
     const subsJson = await subsRes.json()
@@ -98,8 +103,8 @@ export async function GET(req: Request) {
       })
     })
 
-    return NextResponse.json({ timetable: baseTimetable, processed, substitutions, upstreamRaw: subsJson.raw || null })
+    return NextResponse.json({ timetable: baseTimetable, processed, substitutions, upstreamRaw: subsJson.raw || null }, { headers: cacheHeaders(req) })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return NextResponse.json({ error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

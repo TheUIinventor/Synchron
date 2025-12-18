@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server'
 import { normalizeVariation, collectFromJson } from '@/lib/api/normalizers'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => {
+  try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
+}
+
 const PORTAL_BASE = 'https://student.sbhs.net.au'
 const API_BASE = 'https://api.sbhs.net.au'
 export async function GET(req: Request) {
@@ -39,7 +46,7 @@ export async function GET(req: Request) {
             const subs = collectFromJson(j)
             const payload: any = { substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() }
             if (wantDebugRaw) payload.raw = j
-            return NextResponse.json(payload)
+            return NextResponse.json(payload, { headers: cacheHeaders(req) })
           }
         } catch (e) {
           // ignore and fall back to portal
@@ -52,12 +59,12 @@ export async function GET(req: Request) {
     for (const ep of endpoints) {
       const res = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
       const ct = res.headers.get('content-type') || ''
-      if (res.ok && ct.includes('application/json')) {
+        if (res.ok && ct.includes('application/json')) {
         const j = await res.json()
         const subs = collectFromJson(j)
         const payload: any = { substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() }
         if (wantDebugRaw) payload.raw = j
-        return NextResponse.json(payload)
+        return NextResponse.json(payload, { headers: cacheHeaders(req) })
       }
     }
 
@@ -68,8 +75,8 @@ export async function GET(req: Request) {
       source: `${PORTAL_BASE} (no JSON endpoint available)`,
       lastUpdated: new Date().toISOString(),
       fallbackNeeded: true
-    })
+    }, { headers: cacheHeaders(req) })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return NextResponse.json({ error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

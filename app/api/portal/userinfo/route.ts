@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => {
+  try { const hasCookie = req && req.cookies ? Boolean(req.cookies.get && (req.cookies.get('sbhs_access_token') || req.cookies.get('sbhs_refresh_token'))) : (req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie'))); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
+}
+
 // Proxy the SBHS portal userinfo endpoint server-side to avoid CORS issues
 export async function GET(req: NextRequest) {
   const apiUrl = 'https://student.sbhs.net.au/details/userinfo.json'
@@ -58,7 +65,7 @@ export async function GET(req: NextRequest) {
 
   // If no access token, return 401 to signal signed-out; client will attempt refresh
   if (!accessToken && !refreshToken) {
-    return NextResponse.json({ success: false, error: 'Missing SBHS access token' }, { status: 401 })
+    return NextResponse.json({ success: false, error: 'Missing SBHS access token' }, { status: 401, headers: cacheHeaders(req) })
   }
   // NOTE: Do not introspect access tokens (JWTs). Access tokens may change
   // format or content and should not be relied upon for user identity.
@@ -140,7 +147,7 @@ export async function GET(req: NextRequest) {
               const found = extractNameFromJson(j)
               if (found) {
                 const given = found.split(/\s+/)[0]
-                const res = NextResponse.json({ success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${host}${path}` })
+                const res = NextResponse.json({ success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${host}${path}` }, { headers: cacheHeaders(req) })
                 // propagate any set-cookie header we received
                 const sc = r.headers.get('set-cookie')
                 if (sc) res.headers.set('set-cookie', sc.replace(/;\s*Domain=[^;]+/gi, ''))
@@ -194,7 +201,7 @@ export async function GET(req: NextRequest) {
         forwardedSetCookie = rawSetCookie.replace(/;\s*Domain=[^;]+/gi, '')
       }
     if (!response.ok) {
-      return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status })
+      return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status, headers: cacheHeaders(req) })
     }
 
     let data: any
@@ -353,12 +360,12 @@ export async function GET(req: NextRequest) {
             sentAuthorization: !!authHeader,
             maskedAuthorization: maskedAuth,
           },
-          forwardedSetCookie ? { status: 401, headers: { 'set-cookie': forwardedSetCookie } } : { status: 401 },
+          forwardedSetCookie ? { status: 401, headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) } : { status: 401, headers: cacheHeaders(req) },
         )
       }
 
       // Otherwise return a 500 with the raw body for debugging
-      return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500, headers: cacheHeaders(req) })
     }
 
     // Also include a small headers object for debugging (mask set-cookie)
@@ -368,11 +375,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (forwardedSetCookie) {
-      return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: { 'set-cookie': forwardedSetCookie } })
+      return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) })
     }
 
-    return NextResponse.json({ success: true, data, responseHeaders: okHeaders })
+    return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: cacheHeaders(req) })
   } catch (error) {
-    return NextResponse.json({ success: false, error: 'Proxy error', details: String(error) }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Proxy error', details: String(error) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

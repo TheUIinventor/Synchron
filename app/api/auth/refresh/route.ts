@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+export const runtime = 'edge'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
 const TOKEN_ENDPOINT = process.env.SBHS_TOKEN_ENDPOINT || 'https://auth.sbhs.net.au/token'
 
 export async function GET(req: NextRequest) {
   try {
     const refreshToken = req.cookies.get('sbhs_refresh_token')?.value || null
     if (!refreshToken) {
-      return NextResponse.json({ success: false, error: 'No refresh token present' }, { status: 401 })
+      return NextResponse.json({ success: false, error: 'No refresh token present' }, { status: 401, headers: { 'Cache-Control': NON_SHARED_CACHE } })
     }
 
     const params = new URLSearchParams()
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     if (!tokenRes.ok) {
       const text = await tokenRes.text()
-      return NextResponse.json({ success: false, error: 'Token endpoint error', details: text }, { status: tokenRes.status })
+      return NextResponse.json({ success: false, error: 'Token endpoint error', details: text }, { status: tokenRes.status, headers: { 'Cache-Control': NON_SHARED_CACHE } })
     }
 
     const tok = await tokenRes.json()
@@ -49,8 +51,10 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // Refresh responses must not be public-cached
+    res.headers.set('Cache-Control', NON_SHARED_CACHE)
     return res
   } catch (err) {
-    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : 'refresh error' }, { status: 500 })
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : 'refresh error' }, { status: 500, headers: { 'Cache-Control': NON_SHARED_CACHE } })
   }
 }

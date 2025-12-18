@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => { try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } } }
+
 function norm(s?: any) { try { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim() } catch { return '' } }
 
 function collect(v: any) {
@@ -42,10 +47,10 @@ export async function GET(req: Request) {
           // can operate. Put the portal proxy result under `upstream`.
           j = { timetable: subsJson.timetable || {}, upstream: subsJson.raw || subsJson }
         } else {
-          return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
+          return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502, headers: cacheHeaders(req) })
         }
       } catch (e) {
-        return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
+        return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502, headers: cacheHeaders(req) })
       }
     } else {
       if (!res.ok) return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
@@ -97,8 +102,8 @@ export async function GET(req: Request) {
       } catch (e) {}
     }
 
-    return NextResponse.json({ upstream: upstream || null, classVars, roomVars, mapping: results, timetableHead: Object.keys(base).reduce((acc: any, k) => { acc[k] = (base[k]||[]).slice(0,6); return acc }, {}) })
+    return NextResponse.json({ upstream: upstream || null, classVars, roomVars, mapping: results, timetableHead: Object.keys(base).reduce((acc: any, k) => { acc[k] = (base[k]||[]).slice(0,6); return acc }, {}) }, { headers: cacheHeaders(req) })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return NextResponse.json({ error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

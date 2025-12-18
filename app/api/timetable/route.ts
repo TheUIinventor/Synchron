@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => {
+  try {
+    const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie'))
+    return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE }
+  } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
+}
+
 type WeekType = 'A' | 'B'
 
 function normalizeWeekType(value: any): WeekType | null {
@@ -311,7 +322,7 @@ export async function GET(req: NextRequest) {
               isHoliday: true,
               noTimetable: true,
               upstream: { day: dj, full: null, bells: null },
-            })
+            }, { status: 200, headers: cacheHeaders(req) })
           }
           
           // Build periods from bells (like competitor's dttSchema.transform)
@@ -546,7 +557,7 @@ export async function GET(req: NextRequest) {
             hostTried: responses.map((r: any) => r?.status ?? null),
           },
         },
-        { status: authError.status },
+        { status: authError.status, headers: cacheHeaders(req) },
       )
     }
 
@@ -573,7 +584,7 @@ export async function GET(req: NextRequest) {
             hostTried: responses.map((r: any) => r?.status ?? null),
           },
         },
-        { status: 401 },
+        { status: 401, headers: cacheHeaders(req) },
       )
     }
 
@@ -1380,7 +1391,7 @@ export async function GET(req: NextRequest) {
             bells: bellsRes?.json ?? null,
           }
         }
-      })
+      }, { status: 200, headers: cacheHeaders(req) })
     }
 
     return NextResponse.json(
@@ -1401,9 +1412,9 @@ export async function GET(req: NextRequest) {
           forwardedCookies: incomingCookie ? true : false,
         },
       },
-      { status: 502 },
+      { status: 502, headers: cacheHeaders(req) },
     )
   } catch (error) {
-    return NextResponse.json({ error: 'Proxy error', details: String(error) }, { status: 500 })
+    return NextResponse.json({ error: 'Proxy error', details: String(error) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

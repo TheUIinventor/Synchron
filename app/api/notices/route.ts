@@ -1,12 +1,20 @@
 import { NextRequest } from "next/server";
 
+export const runtime = 'edge'
+
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => {
+  try { const hasCookie = req && req.cookies && Boolean(req.cookies.get && (req.cookies.get('sbhs_access_token') || req.cookies.get('sbhs_refresh_token'))); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
+}
+
 export async function GET(req: NextRequest) {
   const apiUrl = "https://student.sbhs.net.au/api/dailynews/list.json";
   const accessToken = req.cookies.get('sbhs_access_token')?.value
   const refreshToken = req.cookies.get('sbhs_refresh_token')?.value
   // If neither token present, signal signed-out
   if (!accessToken && !refreshToken) {
-    return new Response(JSON.stringify({ error: "Missing SBHS access token" }), { status: 401 })
+    return new Response(JSON.stringify({ error: "Missing SBHS access token" }), { status: 401, headers: cacheHeaders(req) })
   }
 
   try {
@@ -24,7 +32,7 @@ export async function GET(req: NextRequest) {
     const response = await fetch(apiUrl, { headers })
     const text = await response.text()
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: "Failed to fetch notices", status: response.status, responseBody: text }), { status: response.status })
+      return new Response(JSON.stringify({ error: "Failed to fetch notices", status: response.status, responseBody: text }), { status: response.status, headers: cacheHeaders(req) })
     }
     // forward Set-Cookie if present (strip Domain)
     const sc = response.headers.get('set-cookie')
@@ -35,11 +43,10 @@ export async function GET(req: NextRequest) {
     }
 
     const data = JSON.parse(text)
+    // Attach cache header based on authentication presence (do not public-cache private user content)
+    options.headers = Object.assign({}, options.headers || {}, cacheHeaders(req))
     return new Response(JSON.stringify(data), options)
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Error fetching notices", details: String(err) }),
-      { status: 500 }
-    );
+    return new Response(JSON.stringify({ error: "Error fetching notices", details: String(err) }), { status: 500, headers: cacheHeaders(req) })
   }
 }

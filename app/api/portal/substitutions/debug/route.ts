@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => { try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } } }
+
 const PORTAL_BASE = 'https://student.sbhs.net.au'
 const API_BASE = 'https://api.sbhs.net.au'
 
@@ -73,8 +78,8 @@ export async function GET(req: Request) {
     const forwardedHeaders = { ...baseHeaders }
     if (forwardedHeaders['Authorization']) forwardedHeaders['Authorization'] = forwardedHeaders['Authorization'].slice(0, 32) + '...'
 
-    return NextResponse.json({ ok: true, accessTokenPresent, accessTokenPayload, forwardedHeaders, results, apiResults })
+    return NextResponse.json({ ok: true, accessTokenPresent, accessTokenPayload, forwardedHeaders, results, apiResults }, { headers: cacheHeaders(req) })
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }
