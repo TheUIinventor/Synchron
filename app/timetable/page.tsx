@@ -305,7 +305,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-full mx-auto px-3 sm:px-6 py-4 pb-20">
+      <div className="w-full max-w-full mx-auto px-3 sm:px-6 py-4 pb-20 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -382,7 +382,7 @@ export default function TimetablePage() {
         {viewMode === "daily" && (
           <>
             {/* Date Navigation */}
-            <div className="flex items-center justify-between mb-4 max-w-lg mx-auto">
+            <div className="flex items-center justify-between mb-4 w-full max-w-full mx-auto">
               <button
                 className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
                 onClick={goToPreviousDay}
