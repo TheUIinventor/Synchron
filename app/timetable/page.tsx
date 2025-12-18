@@ -46,6 +46,7 @@ export default function TimetablePage() {
   const [showDiag, setShowDiag] = useState(false)
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
 
   const fetchDiagnostics = async () => {
     setShowDiag(true)
@@ -391,18 +392,48 @@ export default function TimetablePage() {
               </button>
 
                 <div className="text-center">
-                  <h2 className="font-semibold text-on-surface">
-                    {(() => {
-                      try {
-                        const weekday = displayDateObject.toLocaleDateString('en-US', { weekday: 'short' })
-                        const dateShort = displayDateObject.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-                        const weekNum = getWeek(displayDateObject)
-                        const wt = (externalWeekType || currentWeek) || ''
-                        const weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
-                        return `${weekday}, ${dateShort}${weekPart}`
-                      } catch (e) { return selectedDayName }
-                    })()}
-                  </h2>
+                  {/* Clickable small boxed date that opens a calendar popover */}
+                  {(() => {
+                    try {
+                      const weekday = displayDateObject.toLocaleDateString('en-US', { weekday: 'short' })
+                      const dateShort = displayDateObject.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+                      const weekNum = getWeek(displayDateObject)
+                      const wt = (externalWeekType || currentWeek) || ''
+                      const weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
+                      const headerShort = `${weekday}, ${dateShort}${weekPart}`
+                      return (
+                        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                          <PopoverTrigger asChild>
+                            <button
+                              aria-label="Select date"
+                              className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest cursor-pointer"
+                              type="button"
+                            >
+                              {headerShort}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto">
+                            <DatePicker
+                              mode="single"
+                              selected={displayDateObject}
+                              onSelect={(d: any) => {
+                                try {
+                                  if (d) {
+                                    // DayPicker may pass a Date or an array; coerce to Date
+                                    const picked = Array.isArray(d) ? d[0] : d
+                                    if (picked instanceof Date && !Number.isNaN(picked.getTime())) {
+                                      setSelectedDateObject(new Date(picked))
+                                    }
+                                  }
+                                } catch (e) {}
+                                setDatePickerOpen(false)
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      )
+                    } catch (e) { return <h2 className="font-semibold text-on-surface">{selectedDayName}</h2> }
+                  })()}
                 </div>
 
               <button
