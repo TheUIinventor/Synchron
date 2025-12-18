@@ -650,9 +650,9 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <div className={`hidden md:inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 max-w-[100px] text-center truncate ${getSubjectColor(period.subject)}`}>
-                                      <span className="truncate block max-w-full text-xs font-medium leading-none">{period.subject}</span>
-                                    </div>
+                                    <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}>
+                                      {period.subject}
+                                    </span>
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {(isSubstitutePeriod(period)) ? (
