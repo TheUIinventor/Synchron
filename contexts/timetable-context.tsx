@@ -766,30 +766,38 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (!map && __initialExternalTimetable) map = __initialExternalTimetable
           if (map && !cancelled) {
             // apply cached subs if present
-            try {
-              const cleaned: Record<string, Period[]> = {}
-              for (const day of Object.keys(map)) {
-                cleaned[day] = (map[day] || []).map((p) => {
-                  const item: any = { ...(p as any) }
-                  const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom
-                  if (candidateDest && String(candidateDest).trim()) {
-                    const candStr = String(candidateDest).trim()
-                    const roomStr = String(item.room || '').trim()
-                    if (candStr.toLowerCase() !== roomStr.toLowerCase()) { item.displayRoom = candStr; item.isRoomChange = true }
-                  }
-                  try { const casual = item.casualSurname || undefined; const candidate = item.fullTeacher || item.teacher || undefined; const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any); item.displayTeacher = dt } catch (e) {}
-                  if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) delete (item as any).isRoomChange
-                  return item
-                })
-              }
-              const cachedSubs = __initialCachedSubs
-              const final = (cachedSubs && Array.isArray(cachedSubs) && cachedSubs.length) ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
-              setExternalTimetable(final)
-              setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
-              setExternalBellTimes(__initialExternalBellTimes || null)
-              setTimetableSource(__initialTimetableSource || 'cache')
-              setLastRecordedTimetable(final)
-            } catch (e) {
+              try {
+                const cleaned: Record<string, Period[]> = {}
+                for (const day of Object.keys(map)) {
+                  cleaned[day] = (map[day] || []).map((p) => {
+                    const item: any = { ...(p as any) }
+                    const candidateDest = item.toRoom || item.roomTo || item.room_to || item.newRoom
+                    if (candidateDest && String(candidateDest).trim()) {
+                      const candStr = String(candidateDest).trim()
+                      const roomStr = String(item.room || '').trim()
+                      if (candStr.toLowerCase() !== roomStr.toLowerCase()) { item.displayRoom = candStr; item.isRoomChange = true }
+                    }
+                    try { const casual = item.casualSurname || undefined; const candidate = item.fullTeacher || item.teacher || undefined; const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any); item.displayTeacher = dt } catch (e) {}
+                    if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) delete (item as any).isRoomChange
+                    return item
+                  })
+                }
+                const cachedSubs = __initialCachedSubs
+                // To avoid a visual "flash" where cached substitutions briefly
+                // appear and are then removed by the authoritative refresh, do
+                // not apply cached substitutions during initial synchronous
+                // hydration when the client is online. If the client is offline
+                // (no network), apply cached subs so the user still sees latest
+                // known variations.
+                const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+                const shouldApplyCachedSubs = isOffline && (cachedSubs && Array.isArray(cachedSubs) && cachedSubs.length)
+                const final = shouldApplyCachedSubs ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
+                setExternalTimetable(final)
+                setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
+                setExternalBellTimes(__initialExternalBellTimes || null)
+                setTimetableSource(__initialTimetableSource || 'cache')
+                setLastRecordedTimetable(final)
+              } catch (e) {
               // apply raw map if processing fails
               if (!cancelled && map) {
                 setExternalTimetable(map)
