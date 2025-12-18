@@ -238,6 +238,7 @@ const canonicalIndex = (label?: string) => {
         const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
         if (hasAny) {
           try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
+          try { console.debug('[timetable.provider] setExternalBellTimes (from response)', { status: res.status, finalBellTimes }) } catch (e) {}
           setExternalBellTimes(finalBellTimes)
           lastSeenBellTimesRef.current = finalBellTimes
           lastSeenBellTsRef.current = Date.now()
@@ -775,6 +776,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const final = shouldApplyCachedSubs ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
                 setExternalTimetable(final)
                 setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
+                try { console.debug('[timetable.provider] hydrate: setExternalBellTimes (initial cache)', __initialExternalBellTimes) } catch (e) {}
                 setExternalBellTimes(__initialExternalBellTimes || null)
                 setTimetableSource(__initialTimetableSource || 'cache')
                 setLastRecordedTimetable(final)
@@ -1785,6 +1787,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (persistedBellTimes) {
         // Only set if we don't already have live external bell times
         if (!externalBellTimes) {
+          try { console.debug('[timetable.provider] hydrate from localStorage -> setExternalBellTimes (persisted)', persistedBellTimes) } catch (e) {}
           setExternalBellTimes(persistedBellTimes)
         }
         lastSeenBellTimesRef.current = persistedBellTimes
@@ -2060,7 +2063,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const jht = await ht.json()
           // Only extract bell times if we don't already have any - the authoritative
           // data comes from /api/timetable which may have date-specific variations
-          if (jht && !externalBellTimes && !lastSeenBellTimesRef.current) {
+              if (jht && !externalBellTimes && !lastSeenBellTimesRef.current) {
             try {
               const computed = buildBellTimesFromPayload(jht)
               const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
@@ -2072,6 +2075,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
               const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
               if (hasAny) {
+                try { console.debug('[timetable.provider] homepage-scraper -> setExternalBellTimes', finalBellTimes) } catch (e) {}
                 setExternalBellTimes(finalBellTimes)
                 lastSeenBellTimesRef.current = finalBellTimes
                 lastSeenBellTsRef.current = Date.now()
