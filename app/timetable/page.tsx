@@ -529,10 +529,10 @@ export default function TimetablePage() {
                         return displayRoom
                       })()
                       
-                      const cardClass = 'flex-1 px-3 py-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
+                      const cardClass = 'flex-1 w-full min-w-0 px-3 py-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
 
                       return (
-                        <div key={period.id ?? idx} className="flex gap-3 items-center group cursor-pointer">
+                        <div key={period.id ?? idx} className="flex gap-3 items-start group cursor-pointer w-full">
                           <div className="flex flex-col items-center min-w-[2.5rem] sm:min-w-[3rem]">
                             <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
                           </div>
@@ -540,7 +540,7 @@ export default function TimetablePage() {
                           {isBreak ? (
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
                           ) : (
-                            <div className={`${cardClass} flex items-stretch gap-2`}>
+                            <div className={`${cardClass} flex items-center gap-2`}>
                               {/* Subject colour bar */}
                               {period.colour && (
                                 <div 
@@ -573,23 +573,23 @@ export default function TimetablePage() {
                                 </div>
                                 <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
                                   <div className="flex items-center gap-3 min-w-0">
-                                    <div className={`rounded-lg px-3 py-1 text-sm font-bold flex-shrink-0 text-center ${getSubjectColor(period.subject)}`}>
+                                    <div className={`rounded-lg px-2 py-0.5 text-xs font-bold flex-shrink-0 text-center ${getSubjectColor(period.subject)}`}>
                                       {getSubjectAbbr(period.subject)}
                                     </div>
-                                    <div className="truncate text-sm font-medium min-w-0">{period.subject}</div>
+                                    <div className="truncate text-xs font-medium min-w-0">{period.subject}</div>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0 text-right">
                                     {isSubstitutePeriod(period) ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[120px]"
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[92px]"
                                         style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                       >
                                         {teacherDisplay}
                                       </span>
                                     ) : (
-                                      <span className="text-on-surface-variant truncate max-w-[120px]">{teacherDisplay}</span>
+                                      <span className="text-on-surface-variant truncate max-w-[92px]">{teacherDisplay}</span>
                                     )}
                                     <span className="text-on-surface-variant">•</span>
-                                    <span className={`truncate max-w-[86px] text-xs ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                    <span className={`truncate max-w-[56px] text-xs ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
                                       style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
                                     >
                                       {roomDisplay}
