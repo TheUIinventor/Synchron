@@ -114,7 +114,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans overflow-x-hidden;
     background-image: 
       radial-gradient(at 0% 0%, hsla(var(--primary) / 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 0%, hsla(var(--tertiary) / 0.12) 0px, transparent 50%),
