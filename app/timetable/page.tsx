@@ -305,7 +305,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-full mx-auto px-3 sm:px-6 py-4 pb-20 overflow-x-hidden min-w-0">
+      <div className="w-full max-w-full mx-auto px-3 sm:px-6 py-4 pb-28 sm:pb-20 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
