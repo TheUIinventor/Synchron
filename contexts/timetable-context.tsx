@@ -37,126 +37,90 @@ export type BellTime = {
 type TimetableContextType = {
   currentWeek: "A" | "B" | null
   selectedDay: string // Day for the main timetable display (e.g., "Monday")
-  "use client"
-
-  import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react"
-  import { useToast } from "@/hooks/use-toast"
-  import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
-  import { PortalScraper } from "@/lib/api/portal-scraper"
-  import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
-  import { stripLeadingCasualCode } from "@/lib/utils"
-
-  // Define the period type
-  export type Period = {
-    id?: number
-    period: string
-    time: string
-    subject: string
-    teacher: string
-    room: string
-    weekType?: "A" | "B"
-    isSubstitute?: boolean // New: Indicates a substitute teacher
-    isRoomChange?: boolean // New: Indicates a room change
-    // Optional fields populated during normalization
-    fullTeacher?: string
-    casualSurname?: string
-    displayTeacher?: string
+  selectedDateObject: Date // The actual Date object for the selectedDay
+  setSelectedDay: (day: string) => void
+  setSelectedDateObject: (d: Date) => void
+  timetableData: Record<string, Period[]>
+  currentMomentPeriodInfo: {
+    // Renamed from nextPeriodInfo to be clearer
+    nextPeriod: Period | null
+    timeUntil: string
+    isCurrentlyInClass: boolean
+    currentPeriod: Period | null
   }
-
-  // Define the bell time type
-  export type BellTime = {
-    period: string
-    time: string
+  // Backwards-compatible alias name used across older components
+  nextPeriodInfo?: {
+    nextPeriod: Period | null
+    timeUntil: string
+    isCurrentlyInClass: boolean
+    currentPeriod: Period | null
   }
+  isShowingCachedWhileLoading?: boolean
+  bellTimes: Record<string, BellTime[]>
+  isShowingNextDay: boolean // Indicates if the main timetable is showing next day
+  timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
+  isLoading: boolean
+  isRefreshing?: boolean
+  error: string | null
+  // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
+  refreshExternal?: () => Promise<void>
+  // Full A/B grouped timetable when available from the server
+  timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+  externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
+}
 
-  // Define the timetable context type
-  type TimetableContextType = {
-    currentWeek: "A" | "B" | null
-    selectedDay: string // Day for the main timetable display (e.g., "Monday")
-    selectedDateObject: Date // The actual Date object for the selectedDay
-    setSelectedDay: (day: string) => void
-    setSelectedDateObject: (d: Date) => void
-    timetableData: Record<string, Period[]>
-    currentMomentPeriodInfo: {
-      // Renamed from nextPeriodInfo to be clearer
-      nextPeriod: Period | null
-      timeUntil: string
-      isCurrentlyInClass: boolean
-      currentPeriod: Period | null
-    }
-    // Backwards-compatible alias name used across older components
-    nextPeriodInfo?: {
-      nextPeriod: Period | null
-      timeUntil: string
-      isCurrentlyInClass: boolean
-      currentPeriod: Period | null
-    }
-    isShowingCachedWhileLoading?: boolean
-    bellTimes: Record<string, BellTime[]>
-    isShowingNextDay: boolean // Indicates if the main timetable is showing next day
-    timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
-    isLoading: boolean
-    isRefreshing?: boolean
-    error: string | null
-    // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
-    refreshExternal?: () => Promise<void>
-    // Full A/B grouped timetable when available from the server
-    timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-    externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
-  }
+// Create the context
+const TimetableContext = createContext<TimetableContextType | undefined>(undefined)
 
-  // Create the context
-  const TimetableContext = createContext<TimetableContextType | undefined>(undefined)
-
-  // Updated bell times for different day groups
-  const bellTimesData = {
-    "Mon/Tues": [
-      { period: "Period 1", time: "9:00 - 10:05" },
-      { period: "Period 2", time: "10:05 - 11:05" },
-      { period: "Recess", time: "11:05 - 11:25" },
-      { period: "Period 3", time: "11:25 - 12:30" },
-      { period: "Period 4", time: "12:30 - 1:30" },
-      { period: "Lunch 1", time: "1:30 - 1:50" },
-      { period: "Lunch 2", time: "1:50 - 2:10" },
-      { period: "Period 5", time: "2:10 - 3:10" },
-      { period: "End of Day", time: "15:10" },
-    ],
-    "Wed/Thurs": [
-      { period: "Period 1", time: "9:00 - 10:05" },
-      { period: "Period 2", time: "10:05 - 11:05" },
-      { period: "Recess", time: "11:05 - 11:25" },
-      { period: "Period 3", time: "11:25 - 12:25" },
-      { period: "Lunch 1", time: "12:25 - 12:45" },
-      { period: "Lunch 2", time: "12:45 - 1:05" },
-      { period: "Period 4", time: "1:05 - 2:10" },
-      { period: "Period 5", time: "2:10 - 3:10" },
-      { period: "End of Day", time: "15:10" },
-    ],
-    Fri: [
-      { period: "Period 1", time: "9:25 - 10:20" },
-      { period: "Period 2", time: "10:20 - 11:10" },
-      { period: "Recess", time: "11:10 - 11:40" },
-      { period: "Period 3", time: "11:40 - 12:35" },
-      { period: "Lunch 1", time: "12:35 - 12:55" },
-      { period: "Lunch 2", time: "12:55 - 1:15" },
-      { period: "Period 4", time: "1:15 - 2:15" },
-      { period: "Period 5", time: "2:15 - 3:10" },
-      { period: "End of Day", time: "15:10" },
-    ],
-  }
-  const canonicalIndex = (label?: string) => {
-    if (!label) return 999
-    const s = String(label).toLowerCase()
-    if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
-    if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
-    if (/recess|break|interval|morning break/.test(s)) return 2
-    if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
-    if (/lunch\s*1|lunch1/.test(s)) return 4
-    if (/lunch\s*2|lunch2/.test(s)) return 5
-    if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
-    if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
-    return 998
-  }
+// Updated bell times for different day groups
+const bellTimesData = {
+  "Mon/Tues": [
+    { period: "Period 1", time: "9:00 - 10:05" },
+    { period: "Period 2", time: "10:05 - 11:05" },
+    { period: "Recess", time: "11:05 - 11:25" },
+    { period: "Period 3", time: "11:25 - 12:30" },
+    { period: "Period 4", time: "12:30 - 1:30" },
+    { period: "Lunch 1", time: "1:30 - 1:50" },
+    { period: "Lunch 2", time: "1:50 - 2:10" },
+    { period: "Period 5", time: "2:10 - 3:10" },
+    { period: "End of Day", time: "15:10" },
+  ],
+  "Wed/Thurs": [
+    { period: "Period 1", time: "9:00 - 10:05" },
+    { period: "Period 2", time: "10:05 - 11:05" },
+    { period: "Recess", time: "11:05 - 11:25" },
+    { period: "Period 3", time: "11:25 - 12:25" },
+    { period: "Lunch 1", time: "12:25 - 12:45" },
+    { period: "Lunch 2", time: "12:45 - 1:05" },
+    { period: "Period 4", time: "1:05 - 2:10" },
+    { period: "Period 5", time: "2:10 - 3:10" },
+    { period: "End of Day", time: "15:10" },
+  ],
+  Fri: [
+    { period: "Period 1", time: "9:25 - 10:20" },
+    { period: "Period 2", time: "10:20 - 11:10" },
+    { period: "Recess", time: "11:10 - 11:40" },
+    { period: "Period 3", time: "11:40 - 12:35" },
+    { period: "Lunch 1", time: "12:35 - 12:55" },
+    { period: "Lunch 2", time: "12:55 - 1:15" },
+    { period: "Period 4", time: "1:15 - 2:15" },
+    { period: "Period 5", time: "2:15 - 3:10" },
+    { period: "End of Day", time: "15:10" },
+  ],
+}
+const canonicalIndex = (label?: string) => {
+  if (!label) return 999
+  const s = String(label).toLowerCase()
+  if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
+  if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
+  if (/recess|break|interval|morning break/.test(s)) return 2
+  if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
+  if (/lunch\s*1|lunch1/.test(s)) return 4
+  if (/lunch\s*2|lunch2/.test(s)) return 5
+  if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
+  if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
+  return 998
+}
 
   const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
     try {
@@ -322,120 +286,112 @@ type TimetableContextType = {
         payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && payload.diagnostics.upstream.day.date,
         payload.upstream && payload.upstream.full && payload.upstream.full.dayInfo && payload.upstream.full.dayInfo.date,
       ]
-
-      for (const p of paths) {
-        const found = maybe(p)
-        if (found) return found
+      // Mock data for the timetable - memoized
+      const timetableWeekA = {
+        Monday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+          { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+        ],
+        Tuesday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:30", subject: "History", teacher: "Mr. Brown", room: "205" },
+          { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+        ],
+        Wednesday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:25", subject: "English", teacher: "Ms. Smith", room: "301" },
+          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+        ],
+        Thursday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
+          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
+        ],
+        Friday: [
+          { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+          { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+          { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+          { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
+          { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+          { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+        ],
       }
 
-      return null
-    } catch (e) {
-      return null
-    }
-  }
-
-  // Mock data for the timetable - memoized
-  const timetableWeekA = {
-    { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-  ],
-  Tuesday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:30", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
-    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-  ],
-  Wednesday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:25", subject: "English", teacher: "Ms. Smith", room: "301" },
-    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-  ],
-  Thursday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
-  ],
-  Friday: [
-    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-    { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
-    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-  ],
-
-}
-
-const timetableWeekB = {
-  Monday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Art", teacher: "Ms. Wilson", room: "Art Studio" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:30", subject: "Computing", teacher: "Ms. Lee", room: "Computer Lab" },
-    { id: 5, period: "4", time: "12:30 - 1:30", subject: "PE", teacher: "Mr. Davis", room: "101" },
-    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-  ],
-  Tuesday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "PE", teacher: "Mr. Davis", room: "101" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:30", subject: "Art", teacher: "Ms. Wilson", room: "505" },
-    { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-    { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-  ],
-  Wednesday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:25", subject: "PE", teacher: "Mr. Davis", room: "101" },
-    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Art", teacher: "Ms. Wilson", room: "505" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "English", teacher: "Ms. Smith", room: "301" },
-  ],
-  Thursday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-    { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-    { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
-  ],
-  Friday: [
-    { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-    { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-    { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-    { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
-    { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
-    { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-    { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-  ],
-}
+      const timetableWeekB = {
+        Monday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Art", teacher: "Ms. Wilson", room: "Art Studio" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Computing", teacher: "Ms. Lee", room: "Computer Lab" },
+          { id: 5, period: "4", time: "12:30 - 1:30", subject: "PE", teacher: "Mr. Davis", room: "101" },
+          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+        ],
+        Tuesday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "PE", teacher: "Mr. Davis", room: "101" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Art", teacher: "Ms. Wilson", room: "505" },
+          { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+        ],
+        Wednesday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:25", subject: "PE", teacher: "Mr. Davis", room: "101" },
+          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Art", teacher: "Ms. Wilson", room: "505" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "English", teacher: "Ms. Smith", room: "301" },
+        ],
+        Thursday: [
+          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
+          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
+          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
+          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
+          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
+        ],
+        Friday: [
+          { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
+          { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
+          { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
+          { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
+          { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
+          { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
+          { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
+          { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
+        ],
+      }
 
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
