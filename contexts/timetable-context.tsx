@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, startTransition, type ReactNode } from "react"
+import { usePathname } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
@@ -573,6 +574,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     selectedDateObjectRef.current = selectedDateObject
   }, [selectedDateObject])
+  // Reset selected date to current (or next school day) when the user navigates away
+  try {
+    const pathname = usePathname()
+    const prevPathRef = useRef<string | null>(null)
+    useEffect(() => {
+      try {
+        const prev = prevPathRef.current
+        const nowPath = pathname || null
+        const leftTimetable = prev && prev.startsWith('/timetable') && (!nowPath || !nowPath.startsWith('/timetable'))
+        if (leftTimetable) {
+          try {
+            const now = new Date()
+            const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
+            const target = (isWeekendNow || isSchoolDayOver()) ? getNextSchoolDay(now) : now
+            setSelectedDateObject(target)
+            try { setLastUserSelectedAt(null) } catch (e) {}
+          } catch (e) {}
+        }
+        prevPathRef.current = nowPath
+      } catch (e) {}
+    }, [pathname])
+  } catch (e) { }
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
