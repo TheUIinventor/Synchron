@@ -143,10 +143,22 @@ export function QueryClientProviderWrapper({ children }: { children: React.React
                     const tt = parsed.timetable || {}
                     const varData: Record<string, any[]> = {}
                     let foundAny = false
-                    for (const day of Object.keys(tt || {})) {
-                      const arr = (tt as any)[day] || []
-                      const vars = (arr || []).filter((p: any) => p && (p.isSubstitute || p.isRoomChange)).map((p: any) => ({ period: p.period, isSubstitute: !!p.isSubstitute, isRoomChange: !!p.isRoomChange, displayRoom: p.displayRoom, displayTeacher: p.displayTeacher, casualSurname: p.casualSurname, originalTeacher: p.originalTeacher, originalRoom: p.originalRoom }))
-                      if (vars && vars.length) { varData[day] = vars; foundAny = true }
+                    for (const rawDayKey of Object.keys(tt || {})) {
+                      try {
+                        const arr = (tt as any)[rawDayKey] || []
+                        // Normalize keys: if the timetable uses ISO-date keys (YYYY-MM-DD),
+                        // convert them to the weekday name (e.g., 'Monday') which the
+                        // provider expects when applying authoritative variations.
+                        let dayKey = String(rawDayKey)
+                        try {
+                          if (/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
+                            const dt = new Date(dayKey)
+                            if (!Number.isNaN(dt.getTime())) dayKey = dt.toLocaleDateString('en-US', { weekday: 'long' })
+                          }
+                        } catch (e) {}
+                        const vars = (arr || []).filter((p: any) => p && (p.isSubstitute || p.isRoomChange)).map((p: any) => ({ period: p.period, isSubstitute: !!p.isSubstitute, isRoomChange: !!p.isRoomChange, displayRoom: p.displayRoom, displayTeacher: p.displayTeacher, casualSurname: p.casualSurname, originalTeacher: p.originalTeacher, originalRoom: p.originalRoom }))
+                        if (vars && vars.length) { varData[dayKey] = vars; foundAny = true }
+                      } catch (e) { /* ignore per-day errors */ }
                     }
                     if (foundAny) {
                       // Only set when we have actual variations
