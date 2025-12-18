@@ -551,7 +551,7 @@ export default function TimetablePage() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <div className={`hidden md:inline-flex rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
+                                    <div className={`hidden md:inline-flex rounded-md px-2 py-0.5 text-xs font-semibold flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject)}`}>
                                       {getSubjectAbbr(period.subject)}
                                     </div>
                                     <p className="hidden md:block font-medium text-sm truncate">{period.subject}</p>
