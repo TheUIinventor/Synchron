@@ -668,6 +668,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // fallback paths from overwriting date-specific variations with stale data.
   // Key is ISO date string (YYYY-MM-DD), value is variations for that date.
   const authoritativeVariationsRef = useRef<Map<string, Record<string, { period: string; isSubstitute?: boolean; isRoomChange?: boolean; displayRoom?: string; displayTeacher?: string; casualSurname?: string; originalTeacher?: string; originalRoom?: string }[]>>>(__initialAuthoritativeVariations)
+  // Debug: log authoritative variations presence on mount and when selected date changes
+  useEffect(() => {
+    try {
+      const map = authoritativeVariationsRef.current
+      const keys = Array.from(map.keys())
+      try { console.debug('[timetable.provider] authoritativeVariations keys count=', keys.length, 'keys=', keys.slice(0,10)) } catch (e) {}
+      const selIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
+      if (selIso) {
+        try { console.debug('[timetable.provider] selectedIso=', selIso, 'hasAuthVars=', map.has(selIso), 'authVarsForSelected=', map.get(selIso)) } catch (e) {}
+      }
+    } catch (e) {}
+  }, [selectedDateObject])
   // Track the date that the current externalTimetable data is actually FOR (not the selected date)
   // This is critical for correctly associating variations with the right date when capturing them
   const externalTimetableDateRef = useRef<string | null>(null)

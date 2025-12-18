@@ -132,7 +132,7 @@ export function QueryClientProviderWrapper({ children }: { children: React.React
               }
 
               if (dateIso) {
-                try { queryClient.setQueryData(['timetable', dateIso], parsed) } catch (e) {}
+                try { queryClient.setQueryData(['timetable', dateIso], parsed); try { console.debug('[query-client] migrated processed key', k, '->', dateIso) } catch (e) {} } catch (e) {}
 
                 // Also attempt to populate authoritative variations map in localStorage
                 try {
@@ -162,6 +162,7 @@ export function QueryClientProviderWrapper({ children }: { children: React.React
                     }
                     if (foundAny) {
                       // Only set when we have actual variations
+                      try { console.debug('[query-client] extracted authoritative variations for', dateIso, 'days:', Object.keys(varData)) } catch (e) {}
                       mapObj[dateIso] = mapObj[dateIso] || {}
                       // merge days without overwriting existing per-period entries
                       for (const d of Object.keys(varData)) {
