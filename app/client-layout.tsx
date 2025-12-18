@@ -1,6 +1,4 @@
-
-"use client";
-"use client";
+﻿"use client"
 import TopRightActionIcons from "@/components/top-right-action-icons";
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -139,7 +137,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       // Compute needed scale but clamp between 0.85 and 1
       const needed = clientH / contentH
       // Apply a small page-specific multiplier on the home page to trim
-      // vertical space (5% reduction) — this only affects the home route.
+      // vertical space (5% reduction)  this only affects the home route.
       const isHome = typeof window !== 'undefined' && (pathname === '/' || pathname === '')
       const pageMultiplier = isHome ? 0.90 : 1
       const scale = Math.max(0.85, Math.min(1, needed * pageMultiplier))

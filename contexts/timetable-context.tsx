@@ -276,18 +276,30 @@ const canonicalIndex = (label?: string) => {
         return null
       }
 
-      // Common locations seen in API payloads
-      const paths = [
-        payload.date,
-        payload.day,
-        payload.dayInfo && payload.dayInfo.date,
-        payload.upstream && payload.upstream.day && payload.upstream.day.date,
-        payload.upstream && payload.upstream.dayInfo && payload.upstream.dayInfo.date,
-        payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && payload.diagnostics.upstream.day.date,
-        payload.upstream && payload.upstream.full && payload.upstream.full.dayInfo && payload.upstream.full.dayInfo.date,
-      ]
-      // Mock data for the timetable - memoized
-      const timetableWeekA = {
+    // Common locations seen in API payloads
+    const paths = [
+      payload.date,
+      payload.day,
+      payload.dayInfo && payload.dayInfo.date,
+      payload.upstream && payload.upstream.day && payload.upstream.day.date,
+      payload.upstream && payload.upstream.dayInfo && payload.upstream.dayInfo.date,
+      payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && payload.diagnostics.upstream.day.date,
+      payload.upstream && payload.upstream.full && payload.upstream.full.dayInfo && payload.upstream.full.dayInfo.date,
+    ]
+
+    for (const p of paths) {
+      const found = maybe(p)
+      if (found) return found
+    }
+
+    return null
+  } catch (e) {
+    return null
+  }
+}
+
+// Mock data for the timetable - memoized
+const timetableWeekA = {
         Monday: [
           { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
           { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
