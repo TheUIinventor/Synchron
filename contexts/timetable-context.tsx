@@ -1503,9 +1503,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const map = authoritativeVariationsRef.current
         map.set(timetableDateIso, varData)
         // Limit map size to prevent unbounded growth. Keep a longer history
-        // so substitutions from weeks ago remain available (previously 14 days).
-        // Increase retention to 90 days to match user expectations for "past weeks".
-        const MAX_VAR_DAYS = 90
+        // so substitutions from far-past dates remain available. Timetabl-app
+        // preserves query cache in localStorage (react-query persister) and
+        // thus can show substitutions from months ago. To match that behavior
+        // for authoritative variations we retain up to 365 days by default.
+        const MAX_VAR_DAYS = 365
         if (map.size > MAX_VAR_DAYS) {
           const oldest = Array.from(map.keys()).sort()[0]
           map.delete(oldest)

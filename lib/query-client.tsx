@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query'
+import { persistQueryClient } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 
 /**
  * QueryClient configured following Timetabl app patterns:
@@ -57,6 +59,28 @@ function getQueryClient() {
 export function QueryClientProviderWrapper({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => getQueryClient())
   
+  // Initialize persistence on mount (browser only)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const persister = createSyncStoragePersister({
+        storage: window.localStorage,
+        key: 'synchron-react-query',
+      })
+      // Persist the query client with an effectively infinite maxAge (gcTime handled by QueryClient)
+      persistQueryClient({
+        queryClient,
+        persister,
+        maxAge: Infinity,
+        // throttle to avoid excessive writes
+        throttleTime: 1000,
+      })
+    } catch (e) {
+      // ignore persistence failures
+      try { console.debug('[QueryClient] persistence init failed', e) } catch (err) {}
+    }
+  }, [queryClient])
+
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 }
 
