@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server'
 
-export const runtime = 'edge'
-const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
-const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
-const cacheHeaders = (req: any) => {
-  try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
-}
-
 // Fetches the SBHS portal homepage, forwarding cookies from the browser, and returns the HTML.
 // This relies on the user's active portal session in the same browser to succeed.
 export async function GET(req: Request) {
@@ -26,7 +19,7 @@ export async function GET(req: Request) {
     const ct = res.headers.get('content-type') || 'text/html; charset=utf-8'
     const sc = res.headers.get('set-cookie')
 
-    const options: any = { status: res.ok ? 200 : res.status, headers: Object.assign({}, { 'content-type': ct }, cacheHeaders(req)) }
+    const options: any = { status: res.ok ? 200 : res.status, headers: { 'content-type': ct } }
     if (sc) {
       // Strip Domain attribute so cookies can be set for our app's domain (best-effort)
       options.headers['set-cookie'] = sc.replace(/;\s*Domain=[^;]+/gi, '')
