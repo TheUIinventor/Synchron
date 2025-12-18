@@ -3335,6 +3335,30 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
         // If we've just requested this same date, skip duplicate fetch
         if (lastRequestedDateRef.current === ds) return
+          // Try to read a persisted processed payload from the react-query cache
+          try {
+            if (typeof window !== 'undefined') {
+              const qc = (await import('@/lib/query-client')).getQueryClient()
+              try {
+                const cached = qc.getQueryData(['timetable', ds]) as any | undefined
+                if (cached && cached.timetable) {
+                  // Use the cached processed timetable immediately and skip fetch
+                  externalTimetableDateRef.current = ds
+                  setExternalTimetable(cached.timetable)
+                  setExternalTimetableByWeek(cached.timetableByWeek || null)
+                  if (cached.bellTimes && !authoritativeBellsDateRef.current) {
+                    setExternalBellTimes(cached.bellTimes)
+                    lastSeenBellTimesRef.current = cached.bellTimes
+                  }
+                  setTimetableSource(cached.source || 'external-cache')
+                  setIsRefreshing(false)
+                  try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ cached: true }) } catch (e) {}
+                  lastRequestedDateRef.current = ds
+                  return
+                }
+              } catch (e) {}
+            }
+          } catch (e) {}
         lastRequestedDateRef.current = ds
         // Check calendar for selected date — if it's a holiday, clear caches and show empty timetable
         try {

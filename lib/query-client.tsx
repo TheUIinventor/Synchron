@@ -79,6 +79,26 @@ export function QueryClientProviderWrapper({ children }: { children: React.React
       // ignore persistence failures
       try { console.debug('[QueryClient] persistence init failed', e) } catch (err) {}
     }
+    // Migrate any existing `synchron-processed-<hash>` entries into the
+    // react-query cache so previously-processed timetables (with
+    // substitutions applied) become available when viewing past dates.
+    try {
+      const keys = Object.keys(window.localStorage || {})
+      for (const k of keys) {
+        try {
+          if (k && k.startsWith('synchron-processed-')) {
+            const raw = window.localStorage.getItem(k)
+            if (!raw) continue
+            const parsed = JSON.parse(raw)
+            if (parsed && parsed.savedAt) {
+              const dateIso = (new Date(parsed.savedAt)).toISOString().slice(0,10)
+              // Store under ['timetable', dateIso] so provider can read it
+              try { queryClient.setQueryData(['timetable', dateIso], parsed) } catch (e) {}
+            }
+          }
+        } catch (e) { /* ignore per-key errors */ }
+      }
+    } catch (e) {}
   }, [queryClient])
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
