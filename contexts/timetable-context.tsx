@@ -37,305 +37,305 @@ export type BellTime = {
 type TimetableContextType = {
   currentWeek: "A" | "B" | null
   selectedDay: string // Day for the main timetable display (e.g., "Monday")
-  selectedDateObject: Date // The actual Date object for the selectedDay
-  setSelectedDay: (day: string) => void
-  setSelectedDateObject: (d: Date) => void
-  timetableData: Record<string, Period[]>
-  currentMomentPeriodInfo: {
-    // Renamed from nextPeriodInfo to be clearer
-    nextPeriod: Period | null
-    timeUntil: string
-    isCurrentlyInClass: boolean
-    currentPeriod: Period | null
-  }
-  // Backwards-compatible alias name used across older components
-  nextPeriodInfo?: {
-    nextPeriod: Period | null
-    timeUntil: string
-    isCurrentlyInClass: boolean
-    currentPeriod: Period | null
-  }
-  isShowingCachedWhileLoading?: boolean
-  bellTimes: Record<string, BellTime[]>
-  isShowingNextDay: boolean // Indicates if the main timetable is showing next day
-  timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
-  isLoading: boolean
-  isRefreshing?: boolean
-  error: string | null
-  // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
-  refreshExternal?: () => Promise<void>
-  // Full A/B grouped timetable when available from the server
-  timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-  externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
-  // Authentication state for showing re-auth prompts
-  isAuthenticated?: boolean | null
-  reauthRequired?: boolean
-}
+  "use client"
 
-// Create the context
-const TimetableContext = createContext<TimetableContextType | undefined>(undefined)
+  import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react"
+  import { useToast } from "@/hooks/use-toast"
+  import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
+  import { PortalScraper } from "@/lib/api/portal-scraper"
+  import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
+  import { stripLeadingCasualCode } from "@/lib/utils"
 
-// Updated bell times for different day groups
-const bellTimesData = {
-  "Mon/Tues": [
-    { period: "Period 1", time: "9:00 - 10:05" },
-    { period: "Period 2", time: "10:05 - 11:05" },
-    { period: "Recess", time: "11:05 - 11:25" },
-    { period: "Period 3", time: "11:25 - 12:30" },
-    { period: "Period 4", time: "12:30 - 1:30" },
-    { period: "Lunch 1", time: "1:30 - 1:50" },
-    { period: "Lunch 2", time: "1:50 - 2:10" },
-    { period: "Period 5", time: "2:10 - 3:10" },
-    { period: "End of Day", time: "15:10" },
-  ],
-  "Wed/Thurs": [
-    { period: "Period 1", time: "9:00 - 10:05" },
-    { period: "Period 2", time: "10:05 - 11:05" },
-    { period: "Recess", time: "11:05 - 11:25" },
-    { period: "Period 3", time: "11:25 - 12:25" },
-    { period: "Lunch 1", time: "12:25 - 12:45" },
-    { period: "Lunch 2", time: "12:45 - 1:05" },
-    { period: "Period 4", time: "1:05 - 2:10" },
-    { period: "Period 5", time: "2:10 - 3:10" },
-    { period: "End of Day", time: "15:10" },
-  ],
-  Fri: [
-    { period: "Period 1", time: "9:25 - 10:20" },
-    { period: "Period 2", time: "10:20 - 11:10" },
-    { period: "Recess", time: "11:10 - 11:40" },
-    { period: "Period 3", time: "11:40 - 12:35" },
-    { period: "Lunch 1", time: "12:35 - 12:55" },
-    { period: "Lunch 2", time: "12:55 - 1:15" },
-    { period: "Period 4", time: "1:15 - 2:15" },
-    { period: "Period 5", time: "2:15 - 3:10" },
-    { period: "End of Day", time: "15:10" },
-  ],
-}
-const canonicalIndex = (label?: string) => {
-  if (!label) return 999
-  const s = String(label).toLowerCase()
-  if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
-  if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
-  if (/recess|break|interval|morning break/.test(s)) return 2
-  if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
-  if (/lunch\s*1|lunch1/.test(s)) return 4
-  if (/lunch\s*2|lunch2/.test(s)) return 5
-  if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
-  if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
-  return 998
-}
-
-const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
-  try {
-    const part = (timeStr || '').split('-')[0].trim()
-    const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
-    if (!Number.isFinite(hRaw)) return 0
-    const m = Number.isFinite(mRaw) ? mRaw : 0
-    let h = hRaw
-    const hasMorning = dayPeriods.some((p) => {
-      try {
-        const ppart = (p.time || '').split('-')[0].trim()
-        const hh = parseInt(ppart.split(':')[0], 10)
-        return Number.isFinite(hh) && hh >= 8
-      } catch (e) { return false }
-    })
-    if (h < 8 && hasMorning) h += 12
-    return h * 60 + m
-  } catch (e) { return 0 }
-}
-
-// Build a normalized external bellTimes mapping from the server payload.
-// If the server provided explicit `bellTimes`, prefer those. When a
-// bucket is missing or empty, fall back to using `upstream` bell data if
-// available in the payload (same-origin data from the server).
-const buildBellTimesFromPayload = (payload: any) => {
-  const result: Record<string, { period: string; time: string }[]> = {
-    'Mon/Tues': [],
-    'Wed/Thurs': [],
-    'Fri': [],
+  // Define the period type
+  export type Period = {
+    id?: number
+    period: string
+    time: string
+    subject: string
+    teacher: string
+    room: string
+    weekType?: "A" | "B"
+    isSubstitute?: boolean // New: Indicates a substitute teacher
+    isRoomChange?: boolean // New: Indicates a room change
+    // Optional fields populated during normalization
+    fullTeacher?: string
+    casualSurname?: string
+    displayTeacher?: string
   }
 
-  try {
-    const src = payload?.bellTimes || {}
-    if (src['Mon/Tues'] && Array.isArray(src['Mon/Tues']) && src['Mon/Tues'].length) result['Mon/Tues'] = src['Mon/Tues']
-    if (src['Wed/Thurs'] && Array.isArray(src['Wed/Thurs']) && src['Wed/Thurs'].length) result['Wed/Thurs'] = src['Wed/Thurs']
-    if (src['Fri'] && Array.isArray(src['Fri']) && src['Fri'].length) result['Fri'] = src['Fri']
+  // Define the bell time type
+  export type BellTime = {
+    period: string
+    time: string
+  }
 
-    if ((result['Mon/Tues'] && result['Mon/Tues'].length) && (result['Wed/Thurs'] && result['Wed/Thurs'].length) && (result['Fri'] && result['Fri'].length)) {
-      return result
+  // Define the timetable context type
+  type TimetableContextType = {
+    currentWeek: "A" | "B" | null
+    selectedDay: string // Day for the main timetable display (e.g., "Monday")
+    selectedDateObject: Date // The actual Date object for the selectedDay
+    setSelectedDay: (day: string) => void
+    setSelectedDateObject: (d: Date) => void
+    timetableData: Record<string, Period[]>
+    currentMomentPeriodInfo: {
+      // Renamed from nextPeriodInfo to be clearer
+      nextPeriod: Period | null
+      timeUntil: string
+      isCurrentlyInClass: boolean
+      currentPeriod: Period | null
+    }
+    // Backwards-compatible alias name used across older components
+    nextPeriodInfo?: {
+      nextPeriod: Period | null
+      timeUntil: string
+      isCurrentlyInClass: boolean
+      currentPeriod: Period | null
+    }
+    isShowingCachedWhileLoading?: boolean
+    bellTimes: Record<string, BellTime[]>
+    isShowingNextDay: boolean // Indicates if the main timetable is showing next day
+    timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
+    isLoading: boolean
+    isRefreshing?: boolean
+    error: string | null
+    // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
+    refreshExternal?: () => Promise<void>
+    // Full A/B grouped timetable when available from the server
+    timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+    externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
+  }
+
+  // Create the context
+  const TimetableContext = createContext<TimetableContextType | undefined>(undefined)
+
+  // Updated bell times for different day groups
+  const bellTimesData = {
+    "Mon/Tues": [
+      { period: "Period 1", time: "9:00 - 10:05" },
+      { period: "Period 2", time: "10:05 - 11:05" },
+      { period: "Recess", time: "11:05 - 11:25" },
+      { period: "Period 3", time: "11:25 - 12:30" },
+      { period: "Period 4", time: "12:30 - 1:30" },
+      { period: "Lunch 1", time: "1:30 - 1:50" },
+      { period: "Lunch 2", time: "1:50 - 2:10" },
+      { period: "Period 5", time: "2:10 - 3:10" },
+      { period: "End of Day", time: "15:10" },
+    ],
+    "Wed/Thurs": [
+      { period: "Period 1", time: "9:00 - 10:05" },
+      { period: "Period 2", time: "10:05 - 11:05" },
+      { period: "Recess", time: "11:05 - 11:25" },
+      { period: "Period 3", time: "11:25 - 12:25" },
+      { period: "Lunch 1", time: "12:25 - 12:45" },
+      { period: "Lunch 2", time: "12:45 - 1:05" },
+      { period: "Period 4", time: "1:05 - 2:10" },
+      { period: "Period 5", time: "2:10 - 3:10" },
+      { period: "End of Day", time: "15:10" },
+    ],
+    Fri: [
+      { period: "Period 1", time: "9:25 - 10:20" },
+      { period: "Period 2", time: "10:20 - 11:10" },
+      { period: "Recess", time: "11:10 - 11:40" },
+      { period: "Period 3", time: "11:40 - 12:35" },
+      { period: "Lunch 1", time: "12:35 - 12:55" },
+      { period: "Lunch 2", time: "12:55 - 1:15" },
+      { period: "Period 4", time: "1:15 - 2:15" },
+      { period: "Period 5", time: "2:15 - 3:10" },
+      { period: "End of Day", time: "15:10" },
+    ],
+  }
+  const canonicalIndex = (label?: string) => {
+    if (!label) return 999
+    const s = String(label).toLowerCase()
+    if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
+    if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
+    if (/recess|break|interval|morning break/.test(s)) return 2
+    if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
+    if (/lunch\s*1|lunch1/.test(s)) return 4
+    if (/lunch\s*2|lunch2/.test(s)) return 5
+    if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
+    if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
+    return 998
+  }
+
+  const parseStartMinutesForDay = (dayPeriods: Period[], timeStr: string) => {
+    try {
+      const part = (timeStr || '').split('-')[0].trim()
+      const [hRaw, mRaw] = part.split(':').map((s) => parseInt(s, 10))
+      if (!Number.isFinite(hRaw)) return 0
+      const m = Number.isFinite(mRaw) ? mRaw : 0
+      let h = hRaw
+      const hasMorning = dayPeriods.some((p) => {
+        try {
+          const ppart = (p.time || '').split('-')[0].trim()
+          const hh = parseInt(ppart.split(':')[0], 10)
+          return Number.isFinite(hh) && hh >= 8
+        } catch (e) { return false }
+      })
+      if (h < 8 && hasMorning) h += 12
+      return h * 60 + m
+    } catch (e) { return 0 }
+  }
+
+  // Build a normalized external bellTimes mapping from the server payload.
+  // If the server provided explicit `bellTimes`, prefer those. When a
+  // bucket is missing or empty, fall back to using `upstream` bell data if
+  // available in the payload (same-origin data from the server).
+  const buildBellTimesFromPayload = (payload: any) => {
+    const result: Record<string, { period: string; time: string }[]> = {
+      'Mon/Tues': [],
+      'Wed/Thurs': [],
+      'Fri': [],
     }
 
-    // Try upstream/day bells and map them into the correct bucket. Some
-    // servers include the upstream payload inside `diagnostics.upstream`, so
-    // check that location too. IMPORTANT: only populate the bucket that the
-    // upstream bells actually apply to (e.g. a Wednesday-only bells array
-    // should populate `Wed/Thurs`), instead of duplicating the same array
-    // across all buckets.
-    const candidateUpstream = payload?.upstream || payload?.diagnostics?.upstream || {}
     try {
-      if (candidateUpstream?.day && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) {
-        const rawDay = String(candidateUpstream.day.dayName || candidateUpstream.day.day || candidateUpstream.day.date || candidateUpstream.day.dayname || '').toLowerCase()
-        const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
-        const mapped = (candidateUpstream.day.bells || []).map((b: any) => {
-          const label = b.bellDisplay || b.period || b.bell || String(b.period)
-          const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
-          return { period: String(label), time }
-        })
-        if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
-      } else if (candidateUpstream?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length) {
-        const rawDay = String(candidateUpstream.bells.day || candidateUpstream.bells.date || candidateUpstream.bells.dayName || '').toLowerCase()
-        if (rawDay) {
+      const src = payload?.bellTimes || {}
+      if (src['Mon/Tues'] && Array.isArray(src['Mon/Tues']) && src['Mon/Tues'].length) result['Mon/Tues'] = src['Mon/Tues']
+      if (src['Wed/Thurs'] && Array.isArray(src['Wed/Thurs']) && src['Wed/Thurs'].length) result['Wed/Thurs'] = src['Wed/Thurs']
+      if (src['Fri'] && Array.isArray(src['Fri']) && src['Fri'].length) result['Fri'] = src['Fri']
+
+      if ((result['Mon/Tues'] && result['Mon/Tues'].length) && (result['Wed/Thurs'] && result['Wed/Thurs'].length) && (result['Fri'] && result['Fri'].length)) {
+        return result
+      }
+
+      // Try upstream/day bells and map them into the correct bucket. Some
+      // servers include the upstream payload inside `diagnostics.upstream`, so
+      // check that location too. IMPORTANT: only populate the bucket that the
+      // upstream bells actually apply to (e.g. a Wednesday-only bells array
+      // should populate `Wed/Thurs`), instead of duplicating the same array
+      // across all buckets.
+      const candidateUpstream = payload?.upstream || payload?.diagnostics?.upstream || {}
+      try {
+        if (candidateUpstream?.day && Array.isArray(candidateUpstream.day.bells) && candidateUpstream.day.bells.length) {
+          const rawDay = String(candidateUpstream.day.dayName || candidateUpstream.day.day || candidateUpstream.day.date || candidateUpstream.day.dayname || '').toLowerCase()
           const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
-          const mapped = (candidateUpstream.bells.bells || []).map((b: any) => {
+          const mapped = (candidateUpstream.day.bells || []).map((b: any) => {
             const label = b.bellDisplay || b.period || b.bell || String(b.period)
             const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
             return { period: String(label), time }
           })
           if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
+        } else if (candidateUpstream?.bells && Array.isArray(candidateUpstream.bells.bells) && candidateUpstream.bells.bells.length) {
+          const rawDay = String(candidateUpstream.bells.day || candidateUpstream.bells.date || candidateUpstream.bells.dayName || '').toLowerCase()
+          if (rawDay) {
+            const target = rawDay.includes('fri') ? 'Fri' : (rawDay.includes('wed') || rawDay.includes('thu') || rawDay.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+            const mapped = (candidateUpstream.bells.bells || []).map((b: any) => {
+              const label = b.bellDisplay || b.period || b.bell || String(b.period)
+              const time = b.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : (b.time || '')
+              return { period: String(label), time }
+            })
+            if ((!result[target] || result[target].length === 0) && mapped.length) result[target] = mapped.slice()
+          }
         }
+      } catch (e) {
+        // ignore and return what we could assemble
       }
     } catch (e) {
       // ignore and return what we could assemble
     }
-  } catch (e) {
-    // ignore and return what we could assemble
+
+    return result
   }
 
-  return result
-}
-
-// Lightweight deterministic hash for JSON payloads (djb2 on stringified input)
-const computePayloadHash = (input: any) => {
-  try {
-    const s = typeof input === 'string' ? input : JSON.stringify(input)
-    let h = 5381
-    for (let i = 0; i < s.length; i++) {
-      h = ((h << 5) + h) + s.charCodeAt(i)
-      h = h & 0xffffffff
+  // Lightweight deterministic hash for JSON payloads (djb2 on stringified input)
+  const computePayloadHash = (input: any) => {
+    try {
+      const s = typeof input === 'string' ? input : JSON.stringify(input)
+      let h = 5381
+      for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) + h) + s.charCodeAt(i)
+        h = h & 0xffffffff
+      }
+      return String(h >>> 0)
+    } catch (e) {
+      return null
     }
-    return String(h >>> 0)
-  } catch (e) {
-    return null
   }
-}
 
-// Clear client-side persistent caches (localStorage) and ask the Service
-// Worker to clear runtime caches to avoid serving stale API responses.
-const clearClientCaches = () => {
-  try {
-    if (typeof window === 'undefined') return
-    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+  // Try to parse a fetch Response for bell times and apply them to state.
+  const extractBellTimesFromResponse = async (res: Response | null) => {
+    if (!res) return
     try {
-      const keys = Object.keys(localStorage || {})
-      for (const k of keys) {
-        try { if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k) } catch (e) {}
-      }
-    } catch (e) {}
-    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-  } catch (e) {}
-
-  try {
-    if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
-      try { navigator.serviceWorker.controller.postMessage('clear-cache') } catch (e) {}
-    }
-  } catch (e) {}
-}
-
-// Try to parse a fetch Response for bell times and apply them to state.
-const extractBellTimesFromResponse = async (res: Response | null) => {
-  if (!res) return
-  try {
-    const ctype = res.headers.get('content-type') || ''
-    if (!ctype.includes('application/json')) return
-    // clone/parse safely
-    let j: any = null
-    try { j = await res.clone().json() } catch (e) { return }
-    if (!j) return
-    try {
-      const computed = buildBellTimesFromPayload(j)
-      const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-      const src = j.bellTimes || {}
-      for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-        if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-        else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-        else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-        else finalBellTimes[k] = []
-      }
-      const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-      if (hasAny) {
-        try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
-        setExternalBellTimes(finalBellTimes)
-        lastSeenBellTimesRef.current = finalBellTimes
-        lastSeenBellTsRef.current = Date.now()
+      const ctype = res.headers.get('content-type') || ''
+      if (!ctype.includes('application/json')) return
+      // clone/parse safely
+      let j: any = null
+      try { j = await res.clone().json() } catch (e) { return }
+      if (!j) return
+      try {
+        const computed = buildBellTimesFromPayload(j)
+        const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+        const src = j.bellTimes || {}
+        for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+          if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+          else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+          else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+          else finalBellTimes[k] = []
+        }
+        const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+        if (hasAny) {
+          try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
+          setExternalBellTimes(finalBellTimes)
+          lastSeenBellTimesRef.current = finalBellTimes
+          lastSeenBellTsRef.current = Date.now()
+        }
+      } catch (e) {
+        // ignore
       }
     } catch (e) {
       // ignore
     }
-  } catch (e) {
-    // ignore
   }
-}
 
-// Explicit empty timetable used when the upstream API reports "no timetable".
-const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+  // Explicit empty timetable used when the upstream API reports "no timetable".
+  const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
-const payloadHasNoTimetable = (payload: any) => {
-  try {
-    if (!payload) { console.log('[DEBUG payloadHasNoTimetable] no payload'); return false }
-    if (payload.error) { console.log('[DEBUG payloadHasNoTimetable] payload.error=', payload.error); return true }
-    if (payload.timetable === false) { console.log('[DEBUG payloadHasNoTimetable] timetable===false'); return true }
-    if (payload.noTimetable === true) { console.log('[DEBUG payloadHasNoTimetable] noTimetable===true'); return true }
-    if (payload.isHoliday === true) { console.log('[DEBUG payloadHasNoTimetable] isHoliday===true'); return true }
-    if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG payloadHasNoTimetable] upstream.day issue'); return true }
-    if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) { console.log('[DEBUG payloadHasNoTimetable] diagnostics issue'); return true }
-    console.log('[DEBUG payloadHasNoTimetable] returning FALSE - has timetable', { hasTimetable: !!payload.timetable, keys: Object.keys(payload || {}) })
-  } catch (e) { console.log('[DEBUG payloadHasNoTimetable] exception', e) }
-  return false
-}
+  const payloadHasNoTimetable = (payload: any) => {
+    try {
+      if (!payload) return false
+      if (payload.error) return true
+      if (payload.timetable === false) return true
+      if (payload.upstream && payload.upstream.day && (payload.upstream.day.timetable === false || String(payload.upstream.day.status).toLowerCase() === 'error')) return true
+      if (payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && (payload.diagnostics.upstream.day.timetable === false || String(payload.diagnostics.upstream.day.status).toLowerCase() === 'error')) return true
+    } catch (e) {}
+    return false
+  }
 
-// Try to extract an authoritative ISO date string from various payload locations
-const extractDateFromPayload = (payload: any): string | null => {
-  try {
-    if (!payload) return null
-    const maybe = (p: any) => {
-      if (!p) return null
-      if (typeof p === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p)) return p
-      if (p.date && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date)) return p.date
+  // Try to extract an authoritative ISO date string from various payload locations
+  const extractDateFromPayload = (payload: any): string | null => {
+    try {
+      if (!payload) return null
+      const maybe = (p: any) => {
+        if (!p) return null
+        if (typeof p === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p)) return p
+        if (p.date && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date)) return p.date
+        return null
+      }
+
+      // Common locations seen in API payloads
+      const paths = [
+        payload.date,
+        payload.day,
+        payload.dayInfo && payload.dayInfo.date,
+        payload.upstream && payload.upstream.day && payload.upstream.day.date,
+        payload.upstream && payload.upstream.dayInfo && payload.upstream.dayInfo.date,
+        payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && payload.diagnostics.upstream.day.date,
+        payload.upstream && payload.upstream.full && payload.upstream.full.dayInfo && payload.upstream.full.dayInfo.date,
+      ]
+
+      for (const p of paths) {
+        const found = maybe(p)
+        if (found) return found
+      }
+
+      return null
+    } catch (e) {
       return null
     }
-
-    // Common locations seen in API payloads
-    const paths = [
-      payload.date,
-      payload.day,
-      payload.dayInfo && payload.dayInfo.date,
-      payload.upstream && payload.upstream.day && payload.upstream.day.date,
-      payload.upstream && payload.upstream.dayInfo && payload.upstream.dayInfo.date,
-      payload.diagnostics && payload.diagnostics.upstream && payload.diagnostics.upstream.day && payload.diagnostics.upstream.day.date,
-      payload.upstream && payload.upstream.full && payload.upstream.full.dayInfo && payload.upstream.full.dayInfo.date,
-    ]
-
-    for (const p of paths) {
-      const found = maybe(p)
-      if (found) return found
-    }
-
-    return null
-  } catch (e) {
-    return null
   }
-}
 
-// Mock data for the timetable - memoized
-const timetableWeekA = {
-  Monday: [
-    { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-    { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-    { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-    { id: 4, period: "3", time: "11:25 - 12:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
+  // Mock data for the timetable - memoized
+  const timetableWeekA = {
     { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
     { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
     { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
