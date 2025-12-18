@@ -575,10 +575,9 @@ export default function TimetablePage() {
                                 </div>
                                 <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
                                   <div className="flex items-center gap-3 min-w-0">
-                                    <div className={`rounded-lg px-2 py-0.5 text-xs font-bold flex-shrink-0 text-center ${getSubjectColor(period.subject)}`}>
-                                      {getSubjectAbbr(period.subject)}
+                                    <div className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject)}`}>
+                                      <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
                                     </div>
-                                    <div className="truncate text-xs font-medium min-w-0">{period.subject}</div>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0 text-right">
                                     {isSubstitutePeriod(period) ? (
