@@ -492,6 +492,40 @@ export async function GET(req: NextRequest) {
         const bellLabelMap: Record<string, string> = { 'RC': 'Roll Call', 'R': 'Recess', 'MTL1': 'Lunch 1', 'MTL2': 'Lunch 2', 'MTL': 'Lunch', 'L': 'Lunch' }
         // if top-level day exists, map entire array to that bucket
         const topLevelDayRaw = (bj && (bj.day || bj.date || bj.dayName || bj.dayname)) ? String(bj.day || bj.date || bj.dayName || bj.dayname).toLowerCase() : null
+        // Detect whether individual bell entries include any pattern/day markers.
+        const hadPattern = Array.isArray(bellsArr) && bellsArr.length ? bellsArr.some((b: any) => {
+          const p = (b.dayPattern || b.pattern || b.day || '')
+          try { return String(p).trim().length > 0 } catch (e) { return false }
+        }) : false
+
+        // Defensive fallback: when the bells payload lacks a top-level day and
+        // none of the entries include a pattern/day marker, but the request
+        // included a `dateParam`, map the entire bells array to the weekday of
+        // that date. This covers portals that return a date-specific bells
+        // array without annotating each bell.
+        if (!topLevelDayRaw && !hadPattern && dateParam && Array.isArray(bellsArr) && bellsArr.length) {
+          try {
+            const dt = new Date(dateParam)
+            if (!Number.isNaN(dt.getTime())) {
+              const weekday = dt.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+              const target = weekday.includes('fri') ? 'Fri' : (weekday.includes('wed') || weekday.includes('thu') || weekday.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
+              const mappedAll = (bellsArr || []).map((b: any) => {
+                const rawLabel = String(b.period || b.name || b.title || b.bellDisplay || '').trim()
+                const key = rawLabel.toUpperCase()
+                const friendly = bellLabelMap[key] || (b.bellDisplay || rawLabel)
+                const bs = b.start || b.startTime || b.timeStart || b.from || b.start_time || b.starttime
+                const be = b.end || b.endTime || b.timeEnd || b.to || b.end_time || b.endtime
+                const timeStr = [bs, be].filter(Boolean).join(' - ')
+                return { period: String(friendly || rawLabel), originalPeriod: rawLabel, time: timeStr }
+              })
+              schedules[target] = schedules[target].concat(mappedAll)
+              bellSources[target] = 'api-date'
+            }
+          } catch (e) {
+            // ignore fallback failures and continue to normal per-bell parsing
+          }
+        }
+
         if (topLevelDayRaw) {
           const target = topLevelDayRaw.includes('fri') ? 'Fri' : (topLevelDayRaw.includes('wed') || topLevelDayRaw.includes('thu') || topLevelDayRaw.includes('thur')) ? 'Wed/Thurs' : 'Mon/Tues'
           const mappedAll = (bellsArr || []).map((b: any) => {
