@@ -12,6 +12,39 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn, stripLeadingCasualCode } from "@/lib/utils";
 
+  // Subject color mapping (copied from timetable page for consistency)
+  const getSubjectColor = (subject: string) => {
+    const s = (subject || '').toUpperCase();
+    if (s.includes("ENG")) return "bg-yellow-200 text-yellow-900 dark:bg-yellow-900/50 dark:text-yellow-100";
+    if (s.includes("MAT")) return "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-100";
+    if (s.includes("SCI") || s.includes("PHY") || s.includes("CHE") || s.includes("BIO")) return "bg-teal-200 text-teal-900 dark:bg-teal-900/50 dark:text-teal-100";
+    if (s.includes("HIS") || s.includes("GEO") || s.includes("ECO") || s.includes("BUS") || s.includes("LEG")) return "bg-blue-200 text-blue-900 dark:bg-blue-900/50 dark:text-blue-100";
+    if (s.includes("COM") || s.includes("IST") || s.includes("SDD") || s.includes("IPT")) return "bg-cyan-200 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-100";
+    if (s.includes("MUS") || s.includes("ART") || s.includes("VA") || s.includes("DRA")) return "bg-purple-200 text-purple-900 dark:bg-purple-900/50 dark:text-purple-100";
+    if (s.includes("PDH") || s.includes("PE") || s.includes("SP") || s.includes("SPO")) return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-100";
+    if (s.includes("TEC") || s.includes("D&T") || s.includes("TAS") || s.includes("FOO")) return "bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-100";
+    if (s.includes("LAN") || s.includes("FRE") || s.includes("GER") || s.includes("JAP") || s.includes("CHI")) return "bg-pink-200 text-pink-900 dark:bg-pink-900/50 dark:text-pink-100";
+    if (s.includes("REL") || s.includes("SCR") || s.includes("CAT")) return "bg-indigo-200 text-indigo-900 dark:bg-indigo-900/50 dark:text-indigo-100";
+    if (s.includes("BRE") || s.includes("REC") || s.includes("LUN")) return "bg-surface-variant text-on-surface-variant";
+    return "bg-surface-container-high text-on-surface";
+  }
+
+  const getSubjectAbbr = (subject: string) => {
+    const abbrMap: Record<string, string> = {
+      English: "ENG",
+      Mathematics: "MAT",
+      Science: "SCI",
+      History: "HIS",
+      Geography: "GEO",
+      Computing: "COM",
+      Music: "MUS",
+      Art: "ART",
+      PE: "PE",
+      Break: "BRK",
+    }
+    return abbrMap[subject] || String(subject || '').substring(0,3).toUpperCase()
+  }
+
 export default function HomeClient() {
   const { 
     timetableData, 
@@ -616,9 +649,11 @@ export default function HomeClient() {
                               )}
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-sm truncate">{period.subject}</span>
-                                    {/* no separate Sub/Room pills here; teacher will be highlighted when substituted */}
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
+                                      {getSubjectAbbr(period.subject)}
+                                    </div>
+                                    <div className="truncate font-medium text-sm">{period.subject}</div>
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {(isSubstitutePeriod(period)) ? (
@@ -676,9 +711,11 @@ export default function HomeClient() {
                               )}
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium text-sm truncate">{period.subject}</p>
-                                    {/* Remove textual 'Sub' and 'Room' pills; use teacher/room highlight styling instead */}
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
+                                      {getSubjectAbbr(period.subject)}
+                                    </div>
+                                    <div className="truncate font-medium text-sm">{period.subject}</div>
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {(isSubstitutePeriod(period)) ? (
