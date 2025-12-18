@@ -305,7 +305,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-[90%] mx-auto px-4 sm:px-6 py-6 pb-24">
+      <div className="w-full mx-auto px-3 sm:px-6 py-6 pb-24">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -429,7 +429,7 @@ export default function TimetablePage() {
             )}
 
             {/* Daily Schedule (wide format) */}
-            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4 mx-auto max-w-[680px]">
+            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4">
               <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
@@ -662,8 +662,8 @@ export default function TimetablePage() {
                                     <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                                   </div>
                                 ) : (
-                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3 w-full">
+                                    <div className="w-16 text-xs font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
                                           if (period.time) {
@@ -684,14 +684,14 @@ export default function TimetablePage() {
                                         return ''
                                       })()}
                                     </div>
-                                    <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
+                                    <div className={`rounded-md px-2 py-1 text-sm font-semibold flex-shrink-0 min-w-[36px] text-center ${getSubjectColor(period.subject)}`}>
                                       {getSubjectAbbr(period.subject)}
                                     </div>
-                                    <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
+                                    <div className="text-xs font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>
@@ -718,8 +718,8 @@ export default function TimetablePage() {
                               const bucketB = bellTimes ? (day === 'Friday' ? bellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
                               return itemsB.map((period: any, idx: number) => (
                                 period.subject === 'Break' ? (
-                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
-                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3 w-full">
+                                    <div className="w-16 text-xs font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
                                           const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
@@ -753,14 +753,14 @@ export default function TimetablePage() {
                                         return ''
                                       })()}
                                     </div>
-                                    <div className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[40px] text-center ${getSubjectColor(period.subject)}`}>
+                                    <div className={`rounded-md px-2 py-1 text-sm font-semibold flex-shrink-0 min-w-[36px] text-center ${getSubjectColor(period.subject)}`}>
                                       {getSubjectAbbr(period.subject)}
                                     </div>
-                                    <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
+                                    <div className="text-xs font-medium text-on-surface flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>
