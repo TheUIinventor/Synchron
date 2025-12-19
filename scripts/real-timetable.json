@@ -1,0 +1,684 @@
+{
+  "timetable": {
+    "Monday": [
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "ENG B",
+        "teacher": "CURJ",
+        "fullTeacher": "J Curry",
+        "room": "401",
+        "weekType": "A"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "D&T 1",
+        "teacher": "RYAA",
+        "fullTeacher": "A Ryan",
+        "room": "503",
+        "weekType": "A"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "HIS B",
+        "teacher": "PAUV",
+        "fullTeacher": "V Paul",
+        "room": "402",
+        "weekType": "A"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "CHI A",
+        "teacher": "FONR",
+        "fullTeacher": "R Fong",
+        "room": "103",
+        "weekType": "A"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "MAT A",
+        "teacher": "WARA",
+        "fullTeacher": "A Ward",
+        "room": "107",
+        "weekType": "A"
+      },
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "MAT A",
+        "teacher": "WARA",
+        "fullTeacher": "A Ward",
+        "room": "107",
+        "weekType": "B"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "D&T 1",
+        "teacher": "RYAA",
+        "fullTeacher": "A Ryan",
+        "room": "503",
+        "weekType": "B"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "HIS B",
+        "teacher": "PAUV",
+        "fullTeacher": "V Paul",
+        "room": "904",
+        "weekType": "B"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "MUS 1",
+        "teacher": "AOUP",
+        "fullTeacher": "P Aoun",
+        "room": "201",
+        "weekType": "B"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "CHI A",
+        "teacher": "FONR",
+        "fullTeacher": "R Fong",
+        "room": "213",
+        "weekType": "B"
+      }
+    ],
+    "Tuesday": [
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "ENG B",
+        "teacher": "CURJ",
+        "fullTeacher": "J Curry",
+        "room": "401",
+        "weekType": "A"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "CHI A",
+        "teacher": "FONR",
+        "fullTeacher": "R Fong",
+        "room": "213",
+        "weekType": "A"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "PDH B",
+        "teacher": "HAYB",
+        "fullTeacher": "B Hayman",
+        "room": "903",
+        "weekType": "A"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "SCI B",
+        "teacher": "MACN",
+        "fullTeacher": "N Mackenzie",
+        "room": "602",
+        "weekType": "A"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "MUS 1",
+        "teacher": "AOUP",
+        "fullTeacher": "P Aoun",
+        "room": "101",
+        "weekType": "A"
+      },
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "MUS 1",
+        "teacher": "AOUP",
+        "fullTeacher": "P Aoun",
+        "room": "101",
+        "weekType": "B"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "SCI B",
+        "teacher": "MACN",
+        "fullTeacher": "N Mackenzie",
+        "room": "602",
+        "weekType": "B"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "MAT A",
+        "teacher": "WARA",
+        "fullTeacher": "A Ward",
+        "room": "107",
+        "weekType": "B"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "ENG B",
+        "teacher": "CURJ",
+        "fullTeacher": "J Curry",
+        "room": "401",
+        "weekType": "B"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "PDH B",
+        "teacher": "HAYB",
+        "fullTeacher": "B Hayman",
+        "room": "903",
+        "weekType": "B"
+      }
+    ],
+    "Wednesday": [
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "MAT A",
+        "teacher": "WARA",
+        "fullTeacher": "A Ward",
+        "room": "107",
+        "weekType": "A"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "ENG B",
+        "teacher": "CURJ",
+        "fullTeacher": "J Curry",
+        "room": "401",
+        "weekType": "A"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "PDH B",
+        "teacher": "HAYB",
+        "fullTeacher": "B Hayman",
+        "room": "901",
+        "weekType": "A"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "VA 1",
+        "teacher": "REEC",
+        "fullTeacher": "C Reemst",
+        "room": "706",
+        "weekType": "A"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "VED 1",
+        "teacher": "CHRJ",
+        "fullTeacher": "J Christodoulou",
+        "room": "506",
+        "weekType": "A"
+      },
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "HIS B",
+        "teacher": "PAUV",
+        "fullTeacher": "V Paul",
+        "room": "402",
+        "weekType": "B"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "VED 1",
+        "teacher": "OLSS",
+        "fullTeacher": "S Olsen",
+        "room": "608",
+        "weekType": "B"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "ENG B",
+        "teacher": "CURJ",
+        "fullTeacher": "J Curry",
+        "room": "401",
+        "weekType": "B"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "D&T 1",
+        "teacher": "RYAA",
+        "fullTeacher": "A Ryan",
+        "room": "503",
+        "weekType": "B"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "SCI B",
+        "teacher": "MACN",
+        "fullTeacher": "N Mackenzie",
+        "room": "602",
+        "weekType": "B"
+      }
+    ],
+    "Thursday": [
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "CHI A",
+        "teacher": "FONR",
+        "fullTeacher": "R Fong",
+        "room": "213",
+        "weekType": "A"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "D&T 1",
+        "teacher": "RYAA",
+        "fullTeacher": "A Ryan",
+        "room": "503",
+        "weekType": "A"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "SCI B",
+        "teacher": "MACN",
+        "fullTeacher": "N Mackenzie",
+        "room": "602",
+        "weekType": "A"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "SP 8",
+        "teacher": "",
+        "fullTeacher": "",
+        "room": "",
+        "weekType": "A"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "SP 8",
+        "teacher": "",
+        "fullTeacher": "",
+        "room": "",
+        "weekType": "A"
+      },
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "HIS B",
+        "teacher": "PAUV",
+        "fullTeacher": "V Paul",
+        "room": "402",
+        "weekType": "B"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "ENG B",
+        "teacher": "CURJ",
+        "fullTeacher": "J Curry",
+        "room": "401",
+        "weekType": "B"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "SCI B",
+        "teacher": "MACN",
+        "fullTeacher": "N Mackenzie",
+        "room": "602",
+        "weekType": "B"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "SP 8",
+        "teacher": "",
+        "fullTeacher": "",
+        "room": "",
+        "weekType": "B"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "SP 8",
+        "teacher": "",
+        "fullTeacher": "",
+        "room": "",
+        "weekType": "B"
+      }
+    ],
+    "Friday": [
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "PDH B",
+        "teacher": "HAYB",
+        "fullTeacher": "B Hayman",
+        "room": "903",
+        "weekType": "A"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "SCI B",
+        "teacher": "MACN",
+        "fullTeacher": "N Mackenzie",
+        "room": "602",
+        "weekType": "A"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "HIS B",
+        "teacher": "PAUV",
+        "fullTeacher": "V Paul",
+        "room": "402",
+        "weekType": "A"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "D&T 1",
+        "teacher": "RYAA",
+        "fullTeacher": "A Ryan",
+        "room": "504",
+        "weekType": "A"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "MAT A",
+        "teacher": "WARA",
+        "fullTeacher": "A Ward",
+        "room": "107",
+        "weekType": "A"
+      },
+      {
+        "period": "1",
+        "time": "09:00 - 10:00",
+        "subject": "HIS B",
+        "teacher": "PAUV",
+        "fullTeacher": "V Paul",
+        "room": "402",
+        "weekType": "B"
+      },
+      {
+        "period": "2",
+        "time": "10:05 - 11:05",
+        "subject": "D&T 1",
+        "teacher": "RYAA",
+        "fullTeacher": "A Ryan",
+        "room": "503",
+        "weekType": "B"
+      },
+      {
+        "period": "3",
+        "time": "11:25 - 12:25",
+        "subject": "MAT A",
+        "teacher": "WARA",
+        "fullTeacher": "A Ward",
+        "room": "107",
+        "weekType": "B"
+      },
+      {
+        "period": "4",
+        "time": "12:30 - 13:30",
+        "subject": "VA 1",
+        "teacher": "REEC",
+        "fullTeacher": "C Reemst",
+        "room": "706",
+        "weekType": "B"
+      },
+      {
+        "period": "5",
+        "time": "14:10 - 15:10",
+        "subject": "CHI A",
+        "teacher": "FONR",
+        "fullTeacher": "R Fong",
+        "room": "213",
+        "weekType": "B"
+      }
+    ]
+  },
+  "timetableByWeek": {
+    "Monday": {
+      "A": [
+        {
+          "period": "1",
+          "time": "09:00 - 10:00",
+          "subject": "ENG B",
+          "teacher": "CURJ",
+          "fullTeacher": "J Curry",
+          "room": "401",
+          "weekType": "A"
+        },
+        {
+          "period": "2",
+          "time": "10:05 - 11:05",
+          "subject": "D&T 1",
+          "teacher": "RYAA",
+          "fullTeacher": "A Ryan",
+          "room": "503",
+          "weekType": "A"
+        },
+        {
+          "period": "3",
+          "time": "11:25 - 12:25",
+          "subject": "HIS B",
+          "teacher": "PAUV",
+          "fullTeacher": "V Paul",
+          "room": "402",
+          "weekType": "A"
+        },
+        {
+          "period": "4",
+          "time": "12:30 - 13:30",
+          "subject": "CHI A",
+          "teacher": "FONR",
+          "fullTeacher": "R Fong",
+          "room": "103",
+          "weekType": "A"
+        },
+        {
+          "period": "5",
+          "time": "14:10 - 15:10",
+          "subject": "MAT A",
+          "teacher": "WARA",
+          "fullTeacher": "A Ward",
+          "room": "107",
+          "weekType": "A"
+        }
+      ],
+      "B": [
+        {
+          "period": "1",
+          "time": "09:00 - 10:00",
+          "subject": "MAT A",
+          "teacher": "WARA",
+          "fullTeacher": "A Ward",
+          "room": "107",
+          "weekType": "B"
+        },
+        {
+          "period": "2",
+          "time": "10:05 - 11:05",
+          "subject": "D&T 1",
+          "teacher": "RYAA",
+          "fullTeacher": "A Ryan",
+          "room": "503",
+          "weekType": "B"
+        },
+        {
+          "period": "3",
+          "time": "11:25 - 12:25",
+          "subject": "HIS B",
+          "teacher": "PAUV",
+          "fullTeacher": "V Paul",
+          "room": "904",
+          "weekType": "B"
+        },
+        {
+          "period": "4",
+          "time": "12:30 - 13:30",
+          "subject": "MUS 1",
+          "teacher": "AOUP",
+          "fullTeacher": "P Aoun",
+          "room": "201",
+          "weekType": "B"
+        },
+        {
+          "period": "5",
+          "time": "14:10 - 15:10",
+          "subject": "CHI A",
+          "teacher": "FONR",
+          "fullTeacher": "R Fong",
+          "room": "213",
+          "weekType": "B"
+        }
+      ],
+      "unknown": []
+    },
+    "Tuesday": {
+      "A": [
+        {
+          "period": "1",
+          "time": "09:00 - 10:00",
+          "subject": "ENG B",
+          "teacher": "CURJ",
+          "fullTeacher": "J Curry",
+          "room": "401",
+          "weekType": "A"
+        },
+        {
+          "period": "2",
+          "time": "10:05 - 11:05",
+          "subject": "CHI A",
+          "teacher": "FONR",
+          "fullTeacher": "R Fong",
+          "room": "213",
+          "weekType": "A"
+        },
+        {
+          "period": "3",
+          "time": "11:25 - 12:25",
+          "subject": "PDH B",
+          "teacher": "HAYB",
+          "fullTeacher": "B Hayman",
+          "room": "903",
+          "weekType": "A"
+        },
+        {
+          "period": "4",
+          "time": "12:30 - 13:30",
+          "subject": "SCI B",
+          "teacher": "MACN",
+          "fullTeacher": "N Mackenzie",
+          "room": "602",
+          "weekType": "A"
+        },
+        {
+          "period": "5",
+          "time": "14:10 - 15:10",
+          "subject": "MUS 1",
+          "teacher": "AOUP",
+          "fullTeacher": "P Aoun",
+          "room": "101",
+          "weekType": "A"
+        }
+      ],
+      "B": [
+        {
+          "period": "1",
+          "time": "09:00 - 10:00",
+          "subject": "MUS 1",
+          "teacher": "AOUP",
+          "fullTeacher": "P Aoun",
+          "room": "101",
+          "weekType": "B"
+        },
+        {
+          "period": "2",
+          "time": "10:05 - 11:05",
+          "subject": "SCI B",
+          "teacher": "MACN",
+          "fullTeacher": "N Mackenzie",
+          "room": "602",
+          "weekType": "B"
+        },
+        {
+          "period": "3",
+          "time": "11:25 - 12:25",
+          "subject": "MAT A",
+          "teacher": "WARA",
+          "fullTeacher": "A Ward",
+          "room": "107",
+          "weekType": "B"
+        },
+        {
+          "period": "4",
+          "time": "12:30 - 13:30",
+          "subject": "ENG B",
+          "teacher": "CURJ",
+          "fullTeacher": "J Curry",
+          "room": "401",
+          "weekType": "B"
+        },
+        {
+          "period": "5",
+          "time": "14:10 - 15:10",
+          "subject": "PDH B",
+          "teacher": "HAYB",
+          "fullTeacher": "B Hayman",
+          "room": "903",
+          "weekType": "B"
+        }
+      ],
+      "unknown": []
+    },
+    "Wednesday": {
+      "A": [
+        {
+          "period": "1",
+          "time": "09:00 - 10:00",
+          "subject": "MAT A",
+          "teacher": "WARA",
+          "fullTeacher": "A Ward",
+          "room": "107",
+          "weekType": "A"
+        },
+        {
+          "period": "2",
+          "time": "10:05 - 11:05",
+          "subject": "ENG B",
+          "teacher": "CURJ",
+          "fullTeacher": "J Curry",
+          "room": "401",
+          "weekType": "A"
+        },
+        {
+        "period": "3", "time": "11:25 - 12:25", "subject": "PDH B", "teacher": "HAYB", "fullTeacher": "B Hayman", "room": "901", "weekType": "A"},
+        {
+          "period": "4",
+          "time": "12:30 - 13:30",
+... (file continues)

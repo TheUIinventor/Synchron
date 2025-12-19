@@ -2,22 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Bell, Menu, Settings } from "lucide-react";
+import { Home, Calendar, Bell, Menu, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/", icon: Home, label: "Home" },
+    { href: "/", icon: Home, label: "My Synchron" },
     { href: "/timetable", icon: Calendar, label: "Timetable" },
     { href: "/notices", icon: Bell, label: "Notices" },
-    { href: "/settings", icon: Settings, label: "Settings" },
+    { href: "/clipboard", icon: Clipboard, label: "Clipboard" },
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:hidden pointer-events-none">
-      <div className="pointer-events-auto mx-auto max-w-md bg-surface-container-high/90 backdrop-blur-lg border border-white/10 shadow-elevation-3 rounded-full px-6 py-3 flex items-center justify-between">
+    <div className="fixed bottom-0 left-0 right-0 z-[9999] p-4 md:hidden" style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}>
+      <div className="mx-auto max-w-md bg-surface-container-high/90 backdrop-blur-lg border border-white/10 shadow-elevation-3 rounded-full px-6 py-3 flex items-center justify-between" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;

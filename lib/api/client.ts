@@ -81,13 +81,34 @@ class SBHSPortalClient {
         /* ignore logging errors */
       }
 
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         ...options,
         headers,
         credentials: "include",
       })
 
-      // Handle session expiration
+      // Handle session expiration: attempt a silent refresh and retry once
+      if (response.status === 401) {
+        try {
+          const refreshRes = await fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
+          const refreshJson = await (refreshRes.ok ? refreshRes.json().catch(() => ({ success: false })) : Promise.resolve({ success: false }))
+          if (refreshRes.ok && refreshJson && (refreshJson.success || refreshJson.success === undefined)) {
+            // Reload any new access token from cookie and retry the original request once
+            this.loadAccessTokenFromCookie()
+            response = await fetch(url, {
+              ...options,
+              headers,
+              credentials: 'include',
+            })
+          } else {
+            // Refresh failed — clear session below
+          }
+        } catch (e) {
+          // Ignore refresh errors and fall through to clearing session
+        }
+      }
+
+      // If still unauthorized, clear session and return helpful message
       if (response.status === 401) {
         this.clearSession()
         return {

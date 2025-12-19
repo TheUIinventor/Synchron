@@ -19,9 +19,12 @@ const config = {
     },
     extend: {
       fontFamily: {
-        // M3 Expressive Typography - Switched to Calibri as requested
-        sans: ["Calibri", "sans-serif"],
-        serif: ["Calibri", "serif"],
+        // OS-specific system font stack:
+        // - macOS/iOS/iPadOS: -apple-system / BlinkMacSystemFont -> SF Pro
+        // - Windows: Segoe UI Variable (Win11+) or Segoe UI (Win10)
+        // - Android/Chrome OS: Roboto
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI Variable"', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        serif: ['Georgia', '"Times New Roman"', 'serif'],
       },
       colors: {
         border: "hsl(var(--border) / <alpha-value>)",

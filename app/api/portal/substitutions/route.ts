@@ -1,59 +1,13 @@
 import { NextResponse } from 'next/server'
+import { normalizeVariation, collectFromJson } from '@/lib/api/normalizers'
 
 const PORTAL_BASE = 'https://student.sbhs.net.au'
 const API_BASE = 'https://api.sbhs.net.au'
-
-function normalizeVariation(obj: any) {
-  return {
-    id: obj.id || obj.variationId || obj.vid || undefined,
-    date: obj.date || obj.day || obj.when || undefined,
-    period: obj.period || obj.periodName || obj.t || undefined,
-    subject: obj.subject || obj.class || obj.title || undefined,
-    originalTeacher: obj.teacher || obj.originalTeacher || obj.teacherName || undefined,
-    substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || undefined,
-    fromRoom: obj.fromRoom || obj.from || obj.oldRoom || undefined,
-    toRoom: obj.toRoom || obj.to || obj.room || obj.newRoom || undefined,
-    reason: obj.reason || obj.note || obj.comment || undefined,
-    raw: obj,
-  }
-}
-
-function collectFromJson(data: any) {
-  const collected: any[] = []
-  const push = (v: any) => {
-    if (!v) return
-    if (Array.isArray(v)) v.forEach((x) => collected.push(normalizeVariation(x)))
-    else if (typeof v === 'object') collected.push(normalizeVariation(v))
-  }
-
-  if (Array.isArray(data.variations)) push(data.variations)
-  if (Array.isArray(data.classVariations)) push(data.classVariations)
-  if (Array.isArray(data.days)) {
-    data.days.forEach((d: any) => {
-      if (Array.isArray(d.variations)) push(d.variations)
-      if (Array.isArray(d.classVariations)) push(d.classVariations)
-    })
-  }
-  if (data.timetable && Array.isArray(data.timetable.variations)) push(data.timetable.variations)
-
-  // shallow recursive search for arrays of objects that look like variations
-  const search = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return
-    for (const k of Object.keys(obj)) {
-      const v = obj[k]
-      if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') {
-        const keys = Object.keys(v[0]).join('|').toLowerCase()
-        if (keys.includes('substitute') || keys.includes('variation') || keys.includes('room') || keys.includes('teacher')) push(v)
-      } else if (typeof v === 'object') search(v)
-    }
-  }
-
-  search(data)
-  return collected
-}
-
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url)
+    const forceApi = (url.searchParams.get('source') || url.searchParams.get('force') || '').toLowerCase() === 'api'
+    const wantDebugRaw = String(url.searchParams.get('debug') || '').toLowerCase() === '1' || String(url.searchParams.get('debug') || '').toLowerCase() === 'true'
     const rawCookie = req.headers.get('cookie') || ''
     // If the app has a stored sbhs_access_token (set by our auth callback), forward it as a Bearer token.
     // This is necessary because browser cookies for student.sbhs.net.au are not available to the server proxy.
@@ -72,17 +26,20 @@ export async function GET(req: Request) {
     if (rawCookie) headers['Cookie'] = rawCookie
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
-    // Try API host first when we have a bearer token (API may accept token where portal web pages require session cookies)
+    // Try API host first when we have a bearer token or the caller requested the API explicitly.
+    // (Some environments may accept unauthenticated API reads; requesters can force API via ?source=api.)
     const jsonPaths = ['/api/timetable/timetable.json', '/api/timetable/daytimetable.json']
-    if (accessToken) {
+    if (accessToken || forceApi) {
       for (const p of jsonPaths) {
         try {
           const res = await fetch(`${API_BASE}${p}`, { headers, redirect: 'follow' })
           const ct = res.headers.get('content-type') || ''
-          if (res.ok && ct.includes('application/json')) {
+            if (res.ok && ct.includes('application/json')) {
             const j = await res.json()
             const subs = collectFromJson(j)
-            return NextResponse.json({ substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() })
+            const payload: any = { substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() }
+            if (wantDebugRaw) payload.raw = j
+            return NextResponse.json(payload)
           }
         } catch (e) {
           // ignore and fall back to portal
@@ -98,15 +55,20 @@ export async function GET(req: Request) {
       if (res.ok && ct.includes('application/json')) {
         const j = await res.json()
         const subs = collectFromJson(j)
-        return NextResponse.json({ substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() })
+        const payload: any = { substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() }
+        if (wantDebugRaw) payload.raw = j
+        return NextResponse.json(payload)
       }
     }
 
-    // If JSON endpoints not available, fetch HTML timetable page and return as text for client scraping fallback
-    const htmlRes = await fetch(`${PORTAL_BASE}/timetable`, { headers, redirect: 'follow' })
-    const html = await htmlRes.text()
-    // return HTML so client can scrape; also attempt to find variations in JSON within page
-    return new NextResponse(html, { status: htmlRes.ok ? 200 : htmlRes.status, headers: { 'content-type': htmlRes.headers.get('content-type') || 'text/html; charset=utf-8' } })
+    // If JSON endpoints not available, return empty array
+    // The client-side code should fetch and parse HTML if needed
+    return NextResponse.json({ 
+      substitutions: [], 
+      source: `${PORTAL_BASE} (no JSON endpoint available)`,
+      lastUpdated: new Date().toISOString(),
+      fallbackNeeded: true
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

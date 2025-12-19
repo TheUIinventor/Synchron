@@ -30,9 +30,9 @@ export function adaptTimetableData(entries: TimetableEntry[]): Record<string, Pe
   // Sort periods by start time for each day
   Object.keys(timetable).forEach((day) => {
     timetable[day].sort((a, b) => {
-      const timeA = a.time.split(" - ")[0]
-      const timeB = b.time.split(" - ")[0]
-      return timeA.localeCompare(timeB)
+      const timeA = (a.time || '').split(" - ")[0]
+      const timeB = (b.time || '').split(" - ")[0]
+      return String(timeA).localeCompare(String(timeB))
     })
   })
 
@@ -104,9 +104,36 @@ export function applySubstitutionsToTimetable(
   })
 
   // Simple heuristic: match substitution by period string and subject (if provided)
+  if (options?.debug) {
+    try { console.debug('[adapters] applySubstitutionsToTimetable subs=', substitutions ? substitutions.length : 0, substitutions && substitutions[0] ? substitutions[0] : null) } catch (e) {}
+  }
+
   substitutions.forEach((sub) => {
     if (!sub) return
+    // Skip ambiguous substitutions that provide neither a period nor a subject.
+    // These tended to match everything (periodMatch defaulted to `true`),
+    // causing displayRoom to be applied to unrelated periods. Require at
+    // least one identifying field so we don't accidentally overwrite rooms.
+    if (!sub.period && !sub.subject) return
+    
+    // For room-only changes (toRoom provided but no substitute teacher),
+    // REQUIRE a date. Room changes without a date are extremely likely to be
+    // mis-applied to the wrong day (e.g., same room in same period on different
+    // day gets flagged as a "change"). Skip room-only variations that lack dates.
+    const hasSubstituteTeacher = !!(sub.substituteTeacher || (sub as any).casualSurname)
+    const hasRoomChange = !!(sub.toRoom && String(sub.toRoom).trim())
+    const hasDate = !!sub.date
+    
+    // If this is a room-only change (no teacher sub) and no date, skip it entirely
+    if (hasRoomChange && !hasSubstituteTeacher && !hasDate) {
+      if (options?.debug) {
+        console.debug('[adapters] skipping room-only variation without date', { period: sub.period, toRoom: sub.toRoom })
+      }
+      return
+    }
+    
     // If date is present, try to map to day name; otherwise apply across all days
+    // (but only for teacher substitutions, not room changes - handled above)
     const candidateDays = (() => {
       if (sub.date) {
         try {
@@ -124,8 +151,18 @@ export function applySubstitutionsToTimetable(
         const found = dayNames.filter((dn) => sub.date && dn.toLowerCase().includes(sub.date.toLowerCase()))
         if (found.length > 0) return found
       }
-      return Object.keys(result)
+      // No date - for teacher-only subs, apply to today's day only (safer than all days)
+      // Get today's day name
+      const today = new Date()
+      const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+      const todayName = names[today.getDay()]
+      // Only return today if it exists in the result, otherwise skip entirely
+      if (result[todayName]) return [todayName]
+      return []
     })()
+
+    // If no candidate days, skip this substitution
+    if (candidateDays.length === 0) return
 
     // normalizers for comparison
     const normalize = (s?: string) => (s || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim()
@@ -135,33 +172,139 @@ export function applySubstitutionsToTimetable(
         // Normalize period identifiers: allow matching "1", "Period 1", "p1"
         const subPeriodNorm = normalize(sub.period)
         const periodNorm = normalize(period.period)
+        const digitsKey = (String(sub.period || '').match(/\d+/) || [])[0]
+        const digitsPer = (String(period.period || '').match(/\d+/) || [])[0]
 
-        const periodMatch = sub.period ? (subPeriodNorm === periodNorm || periodNorm.endsWith(subPeriodNorm) || subPeriodNorm.endsWith(periodNorm)) : true
+        // Tolerant matching: accept exact normalized equality, numeric match
+        // (e.g. '1' vs 'Period 1'), or substring containment to handle
+        // upstream variations that use shortened labels.
+        const periodMatch = sub.period
+          ? ( (subPeriodNorm && subPeriodNorm === periodNorm)
+              || (digitsKey && digitsPer && digitsKey === digitsPer)
+              || (periodNorm.includes(subPeriodNorm) && subPeriodNorm.length > 0)
+              || (subPeriodNorm.includes(periodNorm) && periodNorm.length > 0)
+            )
+          : true
 
-        // Subject match: fuzzy contains or exact after normalization
-        const subjectMatch = sub.subject ? normalize(period.subject).includes(normalize(sub.subject)) || normalize(sub.subject).includes(normalize(period.subject)) : true
+        // Subject match: prefer exact normalized equality when provided but
+        // accept substring matches as a fallback to improve mapping robustness.
+        const subjectMatch = sub.subject
+          ? ( (normalize(period.subject) === normalize(sub.subject)) || normalize(period.subject).includes(normalize(sub.subject)) || normalize(sub.subject).includes(normalize(period.subject)) )
+          : true
 
         if (periodMatch && subjectMatch) {
           // Track whether we changed anything for debug output
           let changed = false
 
-          // Replace teacher when substitution provides one
-          if (sub.substituteTeacher && sub.substituteTeacher !== period.teacher) {
+          // Replace teacher when substitution provides one. Prefer any
+          // normalized full-name for display (substituteTeacherFull) but
+          // keep the short code in `teacher` as a fallback.
+          // Accept either a short substitute code/name or a provided full name.
+          const hasShortSub = !!sub.substituteTeacher && String(sub.substituteTeacher).trim().length > 0
+          const hasFullSub = !!(sub as any).substituteTeacherFull && String((sub as any).substituteTeacherFull).trim().length > 0
+
+          // Preserve existing casual/substitute metadata unless the incoming
+          // substitution explicitly provides new substitute details. This
+          // prevents later room-only substitutions from wiping out casual
+          // display data (a common cause of casuals disappearing after swaps).
+          const existingCasual = (period as any).casualSurname
+          const existingIsSub = !!(period as any).isSubstitute
+
+          if (hasShortSub || hasFullSub || (sub as any).casualSurname) {
             period.isSubstitute = true
             const prev = period.teacher
-            period.teacher = sub.substituteTeacher
+            if (!(period as any).originalTeacher) (period as any).originalTeacher = prev
+
+            if (hasShortSub) {
+              period.teacher = sub.substituteTeacher as string
+            }
+
+            if (hasFullSub) {
+              (period as any).fullTeacher = String((sub as any).substituteTeacherFull)
+              if (options?.debug) console.debug(`Applied substitute teacher (full name provided): ${prev} -> ${period.teacher || (period as any).fullTeacher} / ${ (period as any).fullTeacher } (day=${day} period=${period.period} subject=${period.subject})`)
+            } else if (hasShortSub) {
+              (period as any).fullTeacher = String(sub.substituteTeacher)
+              if (options?.debug) console.debug(`Applied substitute teacher (short name only): ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`, sub)
+            }
+
+            if ((sub as any).casualSurname) {
+              const casualToken = (sub as any).casual ? String((sub as any).casual).trim() : ''
+              const surname = String((sub as any).casualSurname).trim()
+              ;(period as any).casualToken = casualToken || undefined
+              ;(period as any).casualSurname = surname
+              period.teacher = surname
+              period.isSubstitute = true
+              console.log(`✅ CASUAL APPLIED: ${day} Period ${period.period} ${period.subject} - casualSurname="${surname}" teacher="${period.teacher}" isSubstitute=${period.isSubstitute}`)
+            } else if ((period as any).fullTeacher) {
+              period.teacher = String((period as any).fullTeacher)
+            }
+
             changed = true
-            if (options?.debug) console.debug(`Applied substitute teacher: ${prev} -> ${period.teacher} (day=${day} period=${period.period} subject=${period.subject})`)
+          } else if (existingIsSub && existingCasual) {
+            if (options?.debug) console.debug('[adapters] preserving existing casual for period', { day, period: period.period, subject: period.subject, casual: existingCasual })
+            // do not overwrite existing substitute fields
           }
 
-          // Prefer explicit toRoom, then room, then fromRoom as replacement
-          const newRoom = sub.toRoom || sub.room || sub.fromRoom
-          if (newRoom && newRoom !== period.room) {
-            period.isRoomChange = true
-            const prevRoom = period.room
-            period.room = newRoom
-            changed = true
-            if (options?.debug) console.debug(`Applied room change: ${prevRoom} -> ${period.room} (day=${day} period=${period.period} subject=${period.subject})`)
+          // Prefer explicit toRoom as the authoritative destination. Only
+          // treat this as a room change when `toRoom` is explicitly provided
+          // and differs from the scheduled room (compare trimmed, case-insensitive).
+          const toRoomProvided = typeof sub.toRoom !== 'undefined' && sub.toRoom !== null && String(sub.toRoom).trim().length > 0
+          const fromRoomProvided = typeof (sub as any).fromRoom !== 'undefined' && (sub as any).fromRoom !== null && String((sub as any).fromRoom).trim().length > 0
+          const normalizeRoom = (r?: string) => (r || '').toString().trim().toLowerCase()
+          if (toRoomProvided) {
+            const candidateRoom = String(sub.toRoom).trim()
+            // If the substitution provides a `fromRoom`, ensure we only
+            // apply this room change when the scheduled room matches the
+            // provided `fromRoom`. This prevents accidental global room
+            // replacements when `toRoom` is present but not intended for
+            // all matching subjects/periods.
+            if (fromRoomProvided) {
+              const providedFrom = String((sub as any).fromRoom).trim()
+              if (normalizeRoom(providedFrom) !== normalizeRoom(period.room)) {
+                // scheduled room differs from fromRoom -> skip
+              } else {
+                if (normalizeRoom(candidateRoom) !== normalizeRoom(period.room)) {
+                  period.isRoomChange = true
+                  const prevRoom = period.room
+                  ;(period as any).displayRoom = candidateRoom
+                  changed = true
+                  try { console.debug('[adapters] applied toRoom -> displayRoom', { day, period: period.period, subject: period.subject, prevRoom, toRoom: candidateRoom }) } catch (e) {}
+                }
+              }
+            } else {
+              if (normalizeRoom(candidateRoom) !== normalizeRoom(period.room)) {
+                // Do not overwrite the original `room` value from the API.
+                // Instead, set a non-destructive `displayRoom` field which the
+                // UI will prefer when rendering destination rooms.
+                period.isRoomChange = true
+                const prevRoom = period.room
+                ;(period as any).displayRoom = candidateRoom
+                changed = true
+                try {
+                  console.debug('[adapters] applied toRoom -> displayRoom', { day, period: period.period, subject: period.subject, prevRoom, toRoom: candidateRoom })
+                } catch (e) {}
+              }
+            }
+          } else {
+            // For debugging: if a substitution provides an explicit `room`
+            // but not an explicit `toRoom`, prefer `room` as a fallback.
+            // Do NOT use `fromRoom` as a fallback because that usually
+            // indicates the original/scheduled room (not the destination)
+            // and using it here can cause the UI to display the wrong room.
+            const fallbackRoom = typeof sub.room !== 'undefined' && sub.room !== null && String(sub.room).trim().length > 0 ? String(sub.room).trim() : undefined
+            if (fallbackRoom) {
+              if (normalizeRoom(fallbackRoom) !== normalizeRoom(period.room)) {
+                // Do not overwrite the original `room`. Store the fallback
+                // in `displayRoom` for UI-only rendering. Do NOT mark
+                // `isRoomChange` because there's no explicit `toRoom`.
+                const prevRoom = period.room
+                ;(period as any).displayRoom = fallbackRoom
+                changed = true
+                try { console.debug('[adapters] applied fallback->displayRoom', { day, period: period.period, subject: period.subject, prevRoom, fallbackRoom }) } catch (e) {}
+              } else if (options?.debug) {
+                console.debug(`Fallback room provided but equal to scheduled room: ${fallbackRoom} (day=${day} period=${period.period})`)
+              }
+            }
           }
 
           if (options?.debug && !changed) {

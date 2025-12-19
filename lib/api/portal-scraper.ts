@@ -129,12 +129,22 @@ export class PortalScraper {
         return {
           id: obj.id || obj.variationId || obj.vid || undefined,
           date: obj.date || obj.day || obj.when || undefined,
-          period: obj.period || obj.periodName || obj.t || undefined,
+          period: obj.period || obj.periodName || obj.t || obj.key || undefined,
           subject: obj.subject || obj.class || obj.title || undefined,
           originalTeacher: obj.teacher || obj.originalTeacher || obj.teacherName || undefined,
-          substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || undefined,
-          fromRoom: obj.fromRoom || obj.from || obj.oldRoom || undefined,
-          toRoom: obj.toRoom || obj.to || obj.room || obj.newRoom || undefined,
+          // Accept casual/replacement fields as substitute identifiers
+          substituteTeacher: obj.substitute || obj.replacement || obj.replacementTeacher || obj.substituteTeacher || obj.casual || undefined,
+          // Preserve casual parts separately when available so downstream logic
+          // can prefer `casualSurname` alone for display.
+          casual: obj.casual || undefined,
+          casualSurname: obj.casualSurname || undefined,
+          // Provide a generous guess at the substitute's full name when available
+          substituteTeacherFull: obj.casualSurname ? (obj.casual ? `${obj.casual} ${obj.casualSurname}` : obj.casualSurname) : (obj.substituteFullName || obj.substituteFull || undefined),
+          // Accept multiple naming variants used by different payloads
+            // Upstream APIs sometimes name room fields `roomFrom`/`roomTo`
+            // or use snake_case. Accept those variants as well.
+            fromRoom: obj.fromRoom || obj.roomFrom || obj.room_from || obj.from || obj.oldRoom || undefined,
+            toRoom: obj.toRoom || obj.roomTo || obj.room_to || obj.to || obj.room || obj.newRoom || undefined,
           reason: obj.reason || obj.note || obj.comment || undefined,
           raw: obj,
         }
@@ -179,7 +189,59 @@ export class PortalScraper {
       }
     }
 
+    // Also handle object-maps like `classVariations: { "1": {...}, "2": {...} }`
+    // where variations may be keyed by period number rather than provided as an array.
+    const collectFromObjectMap = (obj: any) => {
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return
+      const entries = Object.entries(obj)
+      if (entries.length > 0 && entries.every(([, v]) => v && typeof v === 'object')) {
+        // Heuristic: check if child objects include substitution-like keys
+        const sample = entries[0][1]
+        const sampleKeys = Object.keys(sample).join('|').toLowerCase()
+        if (sampleKeys.includes('substitute') || sampleKeys.includes('casual') || sampleKeys.includes('replacement') || sampleKeys.includes('variation') || sampleKeys.includes('room')) {
+          // Normalize each child object, preserving the map key as `period` when missing
+          entries.forEach(([k, v]) => {
+            try {
+              if (v && typeof v === 'object') {
+                const withKey = { ...(v as any), key: k }
+                pushVariation(withKey)
+              }
+            } catch (e) {}
+          })
+        }
+      }
+    }
+
+    try {
+      collectFromObjectMap(data.classVariations)
+      collectFromObjectMap(data.roomVariations)
+
+      // If roomVariations exist as nested keys under upstream/day, ensure we pick them up
+      if (data.upstream && data.upstream.day && data.upstream.day.roomVariations) {
+        collectFromObjectMap(data.upstream.day.roomVariations)
+      }
+
+      // Recursively scan all nested objects for object-mapped variation maps
+      const recursiveScan = (obj: any) => {
+        if (!obj || typeof obj !== 'object') return
+        try { collectFromObjectMap(obj) } catch (e) {}
+        for (const k of Object.keys(obj)) {
+          try { recursiveScan((obj as any)[k]) } catch (e) {}
+        }
+      }
+
+      recursiveScan(data)
+    } catch (e) {
+      // ignore
+    }
+
     searchForArrays(data)
+
+    // Log briefly when room changes were explicitly found for easier debugging
+    try {
+      const roomFound = collected.some((c) => !!(c.toRoom || c.roomTo || c.room))
+      if (roomFound) console.debug('[portal-scraper] extracted room variations count=', collected.filter((c) => !!(c.toRoom || c.roomTo || c.room)).length)
+    } catch (e) {}
 
     return collected
   }

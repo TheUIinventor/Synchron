@@ -1,16 +1,19 @@
-
-"use client";
+﻿"use client"
 import TopRightActionIcons from "@/components/top-right-action-icons";
 import { useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 import type { ReactNode } from "react"
 import { BottomNav } from "@/components/bottom-nav"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider"
 import { TimetableProvider } from "@/contexts/timetable-context"
+import { QueryClientProviderWrapper } from '@/lib/query-client'
+import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   useEffect(() => {
     // Attempt a silent server-side refresh on initial load to restore session if possible
     fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
@@ -18,23 +21,182 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       .then(data => { if (!data.success) console.debug('auth refresh failed', data) })
       .catch(err => console.debug('auth refresh error', err))
   }, [])
+
+
+  // Emergency unregister is disabled by default to avoid reload loops that
+  // block navigation and user interactions. To enable temporarily set
+  // `sessionStorage['synchron:do-emergency']= 'true'` from the console.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const doEmergency = sessionStorage.getItem('synchron:do-emergency') === 'true'
+      if (!doEmergency) return
+      const already = sessionStorage.getItem('synchron:force-update') === 'true'
+      if (already) return
+      if ('serviceWorker' in navigator || 'caches' in window) {
+        ;(async () => {
+          try {
+            if ('serviceWorker' in navigator) {
+              const regs = await navigator.serviceWorker.getRegistrations()
+              for (const r of regs) {
+                try { await r.unregister() } catch (e) {}
+              }
+            }
+            if ('caches' in window) {
+              try {
+                const keys = await caches.keys()
+                for (const k of keys) {
+                  try { await caches.delete(k) } catch (e) {}
+                }
+              } catch (e) {}
+            }
+          } catch (e) {
+            console.debug('emergency sw clear failed', e)
+          } finally {
+            try { sessionStorage.setItem('synchron:force-update', 'true') } catch (e) {}
+            try { location.reload() } catch (e) {}
+          }
+        })()
+      }
+    } catch (e) {}
+  }, [])
+
+  // Prefetch core routes to speed up navigation (home, timetable, notices, clipboard, settings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const router = useRouter()
+      const routes = ['/', '/timetable', '/notices', '/clipboard', '/settings']
+      const doPrefetch = () => {
+        try {
+          for (const r of routes) {
+            try { router.prefetch(r) } catch (e) {}
+          }
+        } catch (e) {}
+      }
+      // Use requestIdleCallback if available to avoid blocking critical work
+      if ('requestIdleCallback' in window) {
+        ;(window as any).requestIdleCallback(() => doPrefetch(), { timeout: 2000 })
+      } else {
+        setTimeout(() => doPrefetch(), 1000)
+      }
+    } catch (e) {}
+  }, [])
+
+  // Register service worker and capture install prompt for PWA
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Service worker registration removed to avoid persistent cached bundles
+    // that can lock clients into old, broken builds. This app relies on
+    // normal HTTP caching; PWAs can be reintroduced with care in future.
+
+    // Capture the beforeinstallprompt event so the UI can trigger prompt later
+    function onBeforeInstall(e: any) {
+      // Prevent the default mini-infobar from showing
+      e.preventDefault()
+      // Store the event for later use (components can read window.__synchron_deferredInstall)
+      try { (window as any).__synchron_deferredInstall = e } catch (err) {}
+      // Optionally, dispatch a custom event so any UI can show an install button
+      window.dispatchEvent(new CustomEvent('synchron:beforeinstallprompt', { detail: {} }))
+    }
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstall as EventListener)
+    window.addEventListener('appinstalled', () => {
+      try { delete (window as any).__synchron_deferredInstall } catch (e) {}
+      window.dispatchEvent(new CustomEvent('synchron:appinstalled'))
+    })
+
+    return () => {
+      try { window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener) } catch (e) {}
+    }
+  }, [])
+
+  // Dynamic scaler: adjust root UI scale slightly when vertical space is constrained
+  useEffect(() => {
+    let raf = 0
+    function adjustScale() {
+      if (typeof window === 'undefined') return
+      const doc = document.documentElement
+      const body = document.body
+      const vw = window.innerWidth
+      // Only apply on large/wide viewports to avoid affecting mobile
+      if (vw < 1200) {
+        doc.style.setProperty('--ui-scale', '1')
+        return
+      }
+
+      const clientH = window.innerHeight
+      const contentH = Math.max(doc.scrollHeight, body.scrollHeight)
+
+      if (contentH <= clientH) {
+        doc.style.setProperty('--ui-scale', '1')
+        return
+      }
+
+      // Compute needed scale but clamp between 0.85 and 1
+      const needed = clientH / contentH
+      // Apply a small page-specific multiplier on the home page to trim
+      // vertical space (5% reduction)  this only affects the home route.
+      const isHome = typeof window !== 'undefined' && (pathname === '/' || pathname === '')
+      const pageMultiplier = isHome ? 0.90 : 1
+      const scale = Math.max(0.85, Math.min(1, needed * pageMultiplier))
+      // Only update the property when it actually changes to avoid layout thrash
+      const prev = doc.style.getPropertyValue('--ui-scale') || ''
+      if (prev !== String(scale)) doc.style.setProperty('--ui-scale', String(scale))
+    }
+
+    function onResize() {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(adjustScale)
+    }
+
+    // Run initial adjustment immediately, then re-run after short delays to
+    // accommodate late-loading fonts/images and small DOM mutations that can
+    // change layout height. This reduces flicker where a single early measurement
+    // flips the scale then resets on subsequent layout passes.
+    adjustScale()
+    const t1 = setTimeout(adjustScale, 200)
+    const t2 = setTimeout(adjustScale, 800)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+
+    // Also observe DOM mutations that might change height (e.g., fonts load)
+    const mo = new MutationObserver(() => onResize())
+    mo.observe(document.body, { childList: true, subtree: true })
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+      mo.disconnect()
+      if (raf) cancelAnimationFrame(raf)
+      clearTimeout(t1)
+      clearTimeout(t2)
+      // Reset the scale when unmounting to avoid leaking into other pages
+      document.documentElement.style.setProperty('--ui-scale', '1')
+    }
+  }, [pathname])
   return (
     <ThemeProvider
       attribute="class"
       defaultTheme="light"
       enableSystem
       disableTransitionOnChange={false}
-      storageKey="chronicl-theme-preference"
+      storageKey="synchron-theme-preference"
     >
       <UserSettingsProvider>
-        <TimetableProvider>
-          {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
-          {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
-          <ConditionalTopRightIcons />
-          <AppSidebar />
-          <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
-          <BottomNav />
-        </TimetableProvider>
+        <ErrorBoundary>
+          <QueryClientProviderWrapper>
+            <TimetableProvider>
+            {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
+            {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
+            <ConditionalTopRightIcons />
+            <AppSidebar />
+            <div className="pl-20 sm:pl-24 lg:pl-28 pb-8 md:pb-10">{children}</div>
+            <BottomNav />
+            </TimetableProvider>
+          </QueryClientProviderWrapper>
+        </ErrorBoundary>
       </UserSettingsProvider>
     </ThemeProvider>
   )

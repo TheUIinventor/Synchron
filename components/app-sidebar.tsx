@@ -2,21 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Bell, Settings } from "lucide-react";
+import { Home, Calendar, Bell, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/", icon: Home, label: "Home" },
+    { href: "/", icon: Home, label: "My Synchron" },
     { href: "/timetable", icon: Calendar, label: "Timetable" },
     { href: "/notices", icon: Bell, label: "Notices" },
-    { href: "/settings", icon: Settings, label: "Settings" },
+    { href: "/clipboard", icon: Clipboard, label: "Clipboard" },
   ];
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 z-40 hidden md:flex flex-col items-center w-20 lg:w-24 py-8 bg-surface-container/80 backdrop-blur-md border-r border-border/50">
+    <aside className="fixed left-0 top-0 bottom-0 z-[9999] hidden md:flex flex-col items-center w-20 lg:w-24 py-8 bg-surface-container/80 backdrop-blur-md border-r border-border/50">
       <div className="flex-1 flex flex-col items-center gap-4 w-full">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
@@ -56,6 +56,8 @@ export function AppSidebar() {
           );
         })}
       </div>
+      {/* bell times removed */}
     </aside>
   );
 }
+

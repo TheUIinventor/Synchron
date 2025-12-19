@@ -2,61 +2,190 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Send, Type, Home, ChevronLeft, Calendar, Bell, Clipboard, Award } from "lucide-react"
+import { Type, Home, ChevronLeft, Calendar, Bell, Clipboard, Award } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import ThemeToggle from "@/components/theme-toggle"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useUserSettings, type ColorTheme, type FontTheme } from "@/components/theme-provider"
-import { Textarea } from "@/components/ui/textarea"
-import type { NavItem } from "@/components/bottom-nav"
+import { useTimetableSafe } from "@/contexts/timetable-context"
+import { useToast } from "@/hooks/use-toast"
+// Feedback is now an embedded Google Form iframe; no local textarea needed
+// NavItem removed - navigation tabs control is no longer user-configurable
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
+import InstallAppButton from "@/components/install-app-button"
+
+const CANVAS_LINKS_KEY = "synchron-canvas-links"
+
+function CanvasLinksEditor() {
+  const timetableCtx = useTimetableSafe()
+  const timetableData = timetableCtx?.timetableData || {}
+  const { toast } = useToast()
+  const [links, setLinks] = useState<Record<string, string>>({})
+  const [saved, setSaved] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CANVAS_LINKS_KEY)
+      if (raw) setLinks(JSON.parse(raw))
+    } catch (e) {}
+  }, [])
+
+  const subjects = Array.from(
+    new Set(
+      Object.values(timetableData || {})
+        .flat()
+        .map((p: any) => (p.subject ?? "").trim())
+        .filter((s: string) => !!s && s.toLowerCase() !== "break")
+    )
+  ).sort()
+
+  function handleChange(subject: string, value: string) {
+    const key = subject.trim()
+    setLinks((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function handleSave(subject?: string) {
+    try {
+      // Normalize URLs: ensure protocol present
+      const normalize = (u: string) => {
+        if (!u) return u
+        if (/^https?:\/\//i.test(u)) return u
+        return `https://${u}`
+      }
+      const currentStored = JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")
+      const toSave = subject
+        ? { ...currentStored, [subject.trim()]: normalize(links[subject.trim()] ?? "") }
+        : Object.fromEntries(
+            Object.entries(links).map(([k, v]) => [k.trim(), normalize(v as string)])
+          )
+      localStorage.setItem(CANVAS_LINKS_KEY, JSON.stringify(toSave))
+      // Notify other components in this window that links updated
+      try { window.dispatchEvent(new CustomEvent('synchron:canvas-links-updated', { detail: { subject: subject ?? 'all' } })) } catch (e) {}
+      setSaved(subject ?? "all")
+      try {
+        if (subject) {
+          toast({ title: `Saved link for ${subject}`, description: toSave[subject] })
+        } else {
+          toast({ title: `Saved all Canvas links` })
+        }
+      } catch (e) {}
+      setTimeout(() => setSaved(null), 2000)
+    } catch (e) {}
+  }
+
+  function handleClear(subject: string) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CANVAS_LINKS_KEY) || "{}")
+      delete raw[subject.trim()]
+      localStorage.setItem(CANVAS_LINKS_KEY, JSON.stringify(raw))
+      setLinks((prev) => {
+        const copy = { ...prev }
+        delete copy[subject.trim()]
+        return copy
+      })
+      setSaved(subject)
+      try { window.dispatchEvent(new CustomEvent('synchron:canvas-links-updated', { detail: { subject } })) } catch (e) {}
+      try { toast({ title: `Cleared link for ${subject}` }) } catch (e) {}
+      setTimeout(() => setSaved(null), 1500)
+    } catch (e) {}
+  }
+
+  return (
+    <div className="space-y-3">
+      {subjects.length === 0 && (
+        <p className="text-sm text-on-surface-variant">No subjects found in timetable yet.</p>
+      )}
+
+      {subjects.map((s) => (
+        <div key={s} className="flex gap-3 items-start">
+          <div className="flex-1">
+            <label className="text-sm font-medium">{s}</label>
+            <input
+              className="w-full mt-1 p-2 rounded-md bg-surface-container-high border border-transparent focus:border-outline-variant"
+              placeholder={`https://canvas.school.edu/courses/...`}
+              value={links[s] ?? ""}
+              onChange={(e) => handleChange(s, e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <button className="px-3 py-2 rounded-md bg-primary text-on-primary" onClick={() => handleSave(s)}>Save</button>
+            <button className="px-3 py-2 rounded-md bg-surface text-on-surface" onClick={() => handleClear(s)}>Clear</button>
+          </div>
+        </div>
+      ))}
+
+      {subjects.length > 0 && (
+        <div className="pt-2 flex items-center justify-between">
+          <div className="text-sm text-on-surface-variant">Links saved locally to your browser.</div>
+          <div className="flex items-center gap-2">
+              <button
+                className="px-4 py-2 rounded-full bg-surface text-on-surface"
+                onClick={() => {
+                  setLinks({});
+                  localStorage.removeItem(CANVAS_LINKS_KEY);
+                  try { window.dispatchEvent(new CustomEvent('synchron:canvas-links-updated', { detail: { subject: 'all' } })) } catch (e) {}
+                  try { toast({ title: 'Cleared all Canvas links' }) } catch (e) {}
+                }}
+              >Clear All</button>
+            <button className="px-4 py-2 rounded-full bg-primary text-on-primary" onClick={() => handleSave()}>Save All</button>
+          </div>
+        </div>
+      )}
+
+      {saved && (
+        <div className="text-sm text-primary">Saved {saved === 'all' ? 'all links' : saved}</div>
+      )}
+    </div>
+  )
+}
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "feedback">("general")
-  const [feedbackText, setFeedbackText] = useState("")
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [activeTab, setActiveTab] = useState<"appearance" | "integrations" | "feedback">("appearance")
   const [appearanceTabClicks, setAppearanceTabClicks] = useState(0)
   const [showFontSelector, setShowFontSelector] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const router = useRouter()
-  const { navigationTabs, setNavigationTabs, colorTheme, setColorTheme, fontTheme, setFontTheme } = useUserSettings()
+  const { colorTheme, setColorTheme, fontTheme, setFontTheme } = useUserSettings()
+  // Instead of calling `useTimetable` directly (which may throw if provider missing),
+  // read/write localStorage and notify provider via custom event so the provider
+  // can pick up changes when possible.
+  const [aggressiveLocal, setAggressiveLocal] = useState<boolean>(() => {
+    try { const raw = localStorage.getItem('synchron-aggressive-refresh'); return raw === 'false' ? false : true } catch (e) { return true }
+  })
 
-  // Available navigation tabs
-  const availableTabs = [
-    { id: "home" as NavItem, label: "Home", icon: <Home className="h-5 w-5" />, required: true },
-    { id: "timetable" as NavItem, label: "My Synchron", icon: <Calendar className="h-5 w-5" /> },
-    { id: "notices" as NavItem, label: "Daily Notices", icon: <Bell className="h-5 w-5" /> },
-    { id: "clipboard" as NavItem, label: "Clipboard", icon: <Clipboard className="h-5 w-5" /> },
-    { id: "awards" as NavItem, label: "Award Points", icon: <Award className="h-5 w-5" /> },
-  ]
+  useEffect(() => {
+    try { localStorage.setItem('synchron-aggressive-refresh', aggressiveLocal ? 'true' : 'false') } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent('synchron:aggressive-refresh-changed', { detail: { value: aggressiveLocal } })) } catch (e) {}
+  }, [aggressiveLocal])
 
-  const handleTabToggle = (tabId: NavItem) => {
-    if (tabId === "home") return // Home is required
-
-    const isCurrentlyVisible = navigationTabs.includes(tabId)
-    if (isCurrentlyVisible) {
-      // Remove tab (but keep at least 2 tabs including home)
-      if (navigationTabs.length > 2) {
-        setNavigationTabs(navigationTabs.filter((tab) => tab !== tabId))
-      }
-    } else {
-      // Add tab (but keep max 5 tabs)
-      if (navigationTabs.length < 5) {
-        setNavigationTabs([...navigationTabs, tabId])
-      }
-    }
-  }
+  // Navigation tabs are not user-configurable in this build.
 
   // Load saved preference on mount and reset font easter egg
   useEffect(() => {
-    trackSectionUsage("settings" as NavItem)
+    trackSectionUsage("settings")
 
     // Reset font easter egg on page load - don't persist it
     setShowFontSelector(false)
     setAppearanceTabClicks(0)
+  }, [])
+
+  // Detect small/mobile screens (Tailwind `sm` breakpoint = 640px)
+  useEffect(() => {
+    function check() {
+      try {
+        setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 640 : false)
+      } catch (e) {
+        setIsMobile(false)
+      }
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
   }, [])
 
   const handleColorThemeChange = (theme: ColorTheme) => {
@@ -68,15 +197,7 @@ export default function SettingsPage() {
     setFontTheme(theme)
   }
 
-  const handleFeedbackSubmit = () => {
-    console.log("Feedback submitted:", feedbackText)
-    setFeedbackSubmitted(true)
-    setFeedbackText("")
-
-    setTimeout(() => {
-      setFeedbackSubmitted(false)
-    }, 3000)
-  }
+  // Feedback is submitted via the embedded Google Form; no client-side handler required.
 
   // Appearance tab easter egg handler
   const handleAppearanceTabClick = () => {
@@ -135,81 +256,69 @@ export default function SettingsPage() {
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
-            <TabsTrigger 
-              value="general" 
-              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
-            >
-              General
-            </TabsTrigger>
-            <TabsTrigger 
-              value="appearance" 
-              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2 relative"
-              onClick={handleAppearanceTabClick}
-            >
-              Appearance
-              {appearanceTabClicks > 0 && appearanceTabClicks < 7 && (
-                <span className="absolute -top-1 -right-1 text-xs animate-bounce">
-                  {"🎨".repeat(Math.min(appearanceTabClicks, 3))}
-                </span>
+              <TabsTrigger 
+                value="appearance" 
+                className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2 relative"
+                onClick={handleAppearanceTabClick}
+              >
+                Appearance
+                {appearanceTabClicks > 0 && appearanceTabClicks < 7 && (
+                  <span className="absolute -top-1 -right-1 text-xs animate-bounce">
+                    {"🎨".repeat(Math.min(appearanceTabClicks, 3))}
+                  </span>
+                )}
+              </TabsTrigger>
+              {/* Hide Integrations tab on small/mobile screens */}
+              {!isMobile && (
+                <TabsTrigger 
+                  value="integrations" 
+                  className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+                >
+                  Integrations
+                </TabsTrigger>
               )}
-            </TabsTrigger>
-            <TabsTrigger 
-              value="feedback" 
-              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
-            >
-              Feedback
-            </TabsTrigger>
-          </TabsList>
+              <TabsTrigger 
+                value="feedback" 
+                className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+              >
+                Feedback
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="general" className="space-y-6 mt-0">
+          {/* General tab removed - navigation settings moved into Appearance tab */}
+
+          <TabsContent value="appearance" className="space-y-6 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Navigation Tabs</CardTitle>
-                <CardDescription className="text-on-surface-variant">
-                  Customize which tabs appear in your bottom navigation (2-5 tabs)
-                </CardDescription>
+                <CardTitle className="text-lg font-semibold text-on-surface">Theme Mode</CardTitle>
+                <CardDescription className="text-on-surface-variant">Switch between Light and Dark</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {availableTabs.map((tab) => {
-                  const isVisible = navigationTabs.includes(tab.id)
-                  const isRequired = tab.required
-                  const canRemove = navigationTabs.length > 2 && !isRequired
-                  const canAdd = navigationTabs.length < 5
-
-                  return (
-                    <div
-                      key={tab.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-surface-container-high/50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${isVisible ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
-                          {tab.icon}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-on-surface">{tab.label}</span>
-                          {isRequired && (
-                            <span className="text-xs text-primary font-medium">Required</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <Switch
-                        checked={isVisible}
-                        onCheckedChange={() => handleTabToggle(tab.id)}
-                        disabled={isRequired || (isVisible && !canRemove) || (!isVisible && !canAdd)}
-                      />
-                    </div>
-                  )
-                })}
-
-                <div className="pt-2 text-xs text-center text-on-surface-variant">
-                  {navigationTabs.length}/5 tabs selected • Home is always required
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-on-surface-variant">Appearance</div>
+                  <ThemeToggle />
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="appearance" className="space-y-6 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
+                <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-on-surface-variant">Aggressive background refresh</div>
+                  <div className="flex items-center gap-3">
+                    <Switch checked={Boolean(aggressiveLocal)} onCheckedChange={(v) => { try { setAggressiveLocal(Boolean(v)) } catch (e) {} }} />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-on-surface-variant">When enabled, the app will poll more frequently while visible and immediately refresh when you return to the tab. This may increase network usage.</p>
+              </CardContent>
+            </Card>
+
+            {/* Navigation Tabs control removed - navigation is fixed in this build */}
+
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Color Theme</CardTitle>
@@ -313,49 +422,63 @@ export default function SettingsPage() {
             )}
           </TabsContent>
 
+          
+
           <TabsContent value="feedback" className="space-y-6 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Send Feedback</CardTitle>
                 <CardDescription className="text-on-surface-variant">
-                  Let us know how we can improve the app
+                  Please use the form below to submit feedback about the app.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Textarea
-                  placeholder="Type your feedback here..."
-                  className="min-h-[120px] bg-surface-container-high border-none focus-visible:ring-primary resize-none rounded-xl"
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                />
-
-                <Button
-                  className="w-full rounded-full"
-                  onClick={handleFeedbackSubmit}
-                  disabled={!feedbackText.trim() || feedbackSubmitted}
-                >
-                  {feedbackSubmitted ? (
-                    "Thank you!"
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Feedback
-                    </>
-                  )}
-                </Button>
+                <div className="w-full h-[600px] max-h-[75vh]">
+                  <iframe
+                    title="Synchron Feedback Form"
+                    src="https://docs.google.com/forms/d/e/1FAIpQLSfAS4FVqpjbWbzFDS5FShU6eKTrgXNARhZvz8r6PALqOQb6zQ/viewform?embedded=true"
+                    className="w-full h-full border-0 rounded-xl"
+                    frameBorder={0}
+                    marginHeight={0}
+                    marginWidth={0}
+                    allowFullScreen
+                  />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Integrations content hidden on mobile */}
+          {!isMobile && (
+            <TabsContent value="integrations" className="space-y-4 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Canvas Links</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Provide the Canvas (LMS) URL for each subject so the timetable links open the correct class page.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-on-surface-variant">Links are stored locally in your browser.</p>
+                <CanvasLinksEditor />
+              </CardContent>
+            </Card>
+            </TabsContent>
+          )}
+            {/* Install App action shown in Settings only */}
+            <div>
+              <InstallAppButton />
+            </div>
         </Tabs>
 
         {/* Easter Egg Area - Link to new page */}
         <div className="mt-8 pt-6 border-t border-outline-variant">
           <div className="text-center">
-            <Link
+              <Link
               href="/easter-egg"
               className="text-xs text-on-surface-variant/50 hover:text-primary transition-all duration-200 px-3 py-2 rounded-md hover:bg-surface-container-high focus:outline-none select-none"
             >
-              Synchron v2.1.1
+              Synchron v3.0.1
             </Link>
           </div>
         </div>

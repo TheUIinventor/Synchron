@@ -103,7 +103,7 @@ export default function NoticesClient() {
         
         {/* Header & Filters */}
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 px-2">
-          <h1 className="text-3xl font-serif font-medium hidden md:block">Notices</h1>
+          <h1 className="text-3xl font-semibold hidden md:block">Notices</h1>
           
           {/* Mobile Filter */}
           <div className="w-full md:hidden">

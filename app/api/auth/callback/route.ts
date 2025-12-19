@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+
 const clientId = process.env.SBHS_APP_ID || process.env.SBHS_CLIENT_ID || ''
 const clientSecret = process.env.SBHS_APP_SECRET || process.env.SBHS_CLIENT_SECRET || ''
 const redirectUri = process.env.SBHS_REDIRECT_URI || process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL || ''
@@ -66,8 +69,10 @@ export async function GET(req: NextRequest) {
     }
     // Clear state cookie
     res.cookies.set('sbhs_oauth_state', '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV !== 'development', path: '/', maxAge: 0 })
+    // Auth callbacks must not be public-cached
+    res.headers.set('Cache-Control', NON_SHARED_CACHE)
     return res
   } catch (error) {
-    return NextResponse.json({ error: 'Token exchange error', details: String(error) }, { status: 500 })
+    return NextResponse.json({ error: 'Token exchange error', details: String(error) }, { status: 500, headers: { 'Cache-Control': NON_SHARED_CACHE } })
   }
 }

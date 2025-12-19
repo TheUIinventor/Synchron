@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useTimetable } from "@/contexts/timetable-context"
 import { getCurrentDay, getCurrentTime } from "@/utils/time-utils"
+import { stripLeadingCasualCode } from "@/lib/utils"
 import { Clock, ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -25,6 +26,52 @@ export default function CombinedStatus() {
       return period.period
     }
     return period.subject
+  }, [])
+
+  // Helper to display teacher: if substitute and casualSurname provided,
+  // show only the casualSurname per UX request. Otherwise prefer fullTeacher
+  // then teacher.
+  const displayTeacher = useCallback((p: any) => {
+    if (!p) return ''
+    if (p.isSubstitute && (p as any).casualSurname) return stripLeadingCasualCode((p as any).casualSurname)
+    const candidate = p.fullTeacher || p.teacher || ''
+    if (p.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
+    return stripLeadingCasualCode(candidate)
+  }, [])
+
+  const isSubstitutePeriod = useCallback((p: any) => {
+    try {
+      if (!p) return false
+      const orig = String((p as any).originalTeacher || '').trim()
+      const teacher = String(p.teacher || '').trim()
+      const full = String((p as any).fullTeacher || '').trim()
+      const disp = String((p as any).displayTeacher || '').trim()
+      const changedTeacher = orig && orig !== teacher
+      try {
+        const cleanedFull = stripLeadingCasualCode(full || disp || '')
+        const cleanedRaw = stripLeadingCasualCode(teacher || '')
+        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
+      } catch (e) {}
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
+      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
+      if (rawIsCode && dispLooksName) return true
+      const hasCasual = Boolean((p as any).casualSurname || (p as any).casualToken || (p as any).casual)
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
+      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
+      const displayDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
+      const displayIndicatesSub = (rawIsCode && dispLooksName) || (displayDiff && hasCasual)
+      return Boolean(p.isSubstitute || hasCasual || changedTeacher || displayIndicatesSub)
+    } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
+  }, [])
+
+  const getDisplayRoom = useCallback((period: any) => {
+    if (!period) return ''
+    try {
+      // NOTE: Do NOT include `.to` - that field is commonly used for end times
+      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom
+      if (display && String(display).trim()) return String(display)
+    } catch (e) {}
+    return period.room || ''
   }, [])
 
   useEffect(() => {
@@ -59,11 +106,25 @@ export default function CombinedStatus() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="font-semibold text-green-700 dark:text-green-300 text-sm">Currently in class</span>
               </div>
-              <p className="font-medium mb-1">{getDisplaySubject(nextPeriodInfo.currentPeriod)}</p>
+                <p className="font-medium mb-1">
+                {nextPeriodInfo.currentPeriod?.subject === 'Break' ? (
+                  nextPeriodInfo.currentPeriod.period
+                ) : (
+                  nextPeriodInfo.currentPeriod?.subject
+                )}
+              </p>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400 mb-2">
-                <span>{nextPeriodInfo.currentPeriod.teacher}</span>
+                {(isSubstitutePeriod(nextPeriodInfo.currentPeriod)) ? (
+                  <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                    style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                  >
+                    {displayTeacher(nextPeriodInfo.currentPeriod)}
+                  </span>
+                ) : (
+                  <span className="text-on-surface-variant">{displayTeacher(nextPeriodInfo.currentPeriod)}</span>
+                )}
                 <span>•</span>
-                <span>{nextPeriodInfo.currentPeriod.room}</span>
+                <span>{getDisplayRoom(nextPeriodInfo.currentPeriod)}</span>
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400 font-mono bg-white/50 dark:bg-black/20 px-2 py-1 rounded-full inline-block">
                 {nextPeriodInfo.timeUntil}
@@ -76,11 +137,25 @@ export default function CombinedStatus() {
                   <ArrowRight className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                   <span className="font-medium text-blue-700 dark:text-blue-300 text-sm">Next class</span>
                 </div>
-                <p className="font-medium text-sm mb-1">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
+                <p className="font-medium text-sm mb-1">
+                  {nextPeriodInfo.nextPeriod?.subject === 'Break' ? (
+                    nextPeriodInfo.nextPeriod.period
+                  ) : (
+                    nextPeriodInfo.nextPeriod?.subject
+                  )}
+                </p>
                 <div className="flex items-center justify-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  <span>{nextPeriodInfo.nextPeriod.teacher}</span>
+                  {(isSubstitutePeriod(nextPeriodInfo.nextPeriod)) ? (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                      style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                    >
+                      {displayTeacher(nextPeriodInfo.nextPeriod)}
+                    </span>
+                  ) : (
+                    <span className="text-on-surface-variant">{displayTeacher(nextPeriodInfo.nextPeriod)}</span>
+                  )}
                   <span>•</span>
-                  <span>{nextPeriodInfo.nextPeriod.room}</span>
+                  <span>{getDisplayRoom(nextPeriodInfo.nextPeriod)}</span>
                 </div>
               </div>
             )}
@@ -91,9 +166,17 @@ export default function CombinedStatus() {
           <div className="card-optimized rounded-xl p-4 text-center mb-4 bg-blue-50 dark:bg-blue-900/20">
             <div className="flex items-center justify-center gap-2 mb-2">
               <ArrowRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="font-semibold text-blue-700 dark:text-blue-300">Next period</span>
+              <span className="font-semibold text-blue-700 dark:text-blue-300">
+                {((nextPeriodInfo.nextPeriod as any)?.isRollCallMarker) ? 'School in' : 'Next period'}
+              </span>
             </div>
-            <p className="font-medium mb-2">{getDisplaySubject(nextPeriodInfo.nextPeriod)}</p>
+            <p className="font-medium mb-2">
+              {nextPeriodInfo.nextPeriod?.subject === 'Break' ? (
+                nextPeriodInfo.nextPeriod.period
+              ) : (
+                nextPeriodInfo.nextPeriod?.subject
+              )}
+            </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 font-mono bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full inline-block">
               {nextPeriodInfo.timeUntil}
             </p>

@@ -27,34 +27,59 @@ export const formatTo12Hour = (date: Date): string => {
 
 // Parse time string (e.g., "8:45 - 9:45") to get start and end times
 export const parseTimeRange = (timeRange: string): { start: Date; end: Date } => {
-  const [startStr, endStr] = timeRange.split(" - ")
-
-  const startDate = new Date()
-  const endDate = new Date()
-
-  // Parse start time
-  const startParts = startStr.split(":")
-  let startHour = Number.parseInt(startParts[0], 10)
-  const startMinute = Number.parseInt(startParts[1], 10)
-
-  // Add the following conditional logic to adjust for PM hours (e.g., 1:00 PM is written as 1:00 in mock data)
-  // This assumes any hour between 1 and 7 (inclusive) is a PM hour if it's part of the school day.
-  if (startHour >= 1 && startHour <= 7) {
-    startHour += 12
+  // Defensive: handle missing or malformed input. Instead of returning a
+  // far-future sentinel for simple single-time values (e.g. "3:10 PM"),
+  // attempt to parse single timestamps as start times.
+  if (!timeRange || typeof timeRange !== 'string') {
+    const far = new Date(8640000000000000)
+    return { start: far, end: far }
   }
-  startDate.setHours(startHour, startMinute, 0, 0)
 
-  // Parse end time
-  const endParts = endStr.split(":")
-  let endHour = Number.parseInt(endParts[0], 10)
-  const endMinute = Number.parseInt(endParts[1], 10)
-
-  // Add the same conditional logic for the end hour
-  if (endHour >= 1 && endHour <= 7) {
-    endHour += 12
+  const parsePart = (part: string): { hour: number; minute: number } | null => {
+    try {
+      const raw = String(part || '').trim()
+      // match like "9:00", "9:00 AM", "09:00 pm"
+      const m = raw.match(/^(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?/) 
+      if (!m) return null
+      let h = Number.parseInt(m[1], 10)
+      const min = Number.parseInt(m[2], 10)
+      const ampm = m[3]
+      if (ampm) {
+        const a = String(ampm).toLowerCase()
+        if (a === 'pm' && h < 12) h += 12
+        if (a === 'am' && h === 12) h = 0
+      }
+      return { hour: h, minute: min }
+    } catch (e) { return null }
   }
-  endDate.setHours(endHour, endMinute, 0, 0)
 
+  const parts = timeRange.split(' - ')
+  const now = new Date()
+  if (parts.length === 1) {
+    // single time like "3:10 PM" or "09:00" - use it as both start and end
+    const p = parsePart(parts[0])
+    if (!p) {
+      const far = new Date(8640000000000000)
+      return { start: far, end: far }
+    }
+    const s = new Date(now)
+    s.setHours(p.hour, p.minute, 0, 0)
+    const e = new Date(s)
+    e.setMinutes(e.getMinutes())
+    return { start: s, end: e }
+  }
+
+  const startParsed = parsePart(parts[0])
+  const endParsed = parsePart(parts[1])
+  if (!startParsed || !endParsed) {
+    const far = new Date(8640000000000000)
+    return { start: far, end: far }
+  }
+
+  const startDate = new Date(now)
+  startDate.setHours(startParsed.hour, startParsed.minute, 0, 0)
+  const endDate = new Date(now)
+  endDate.setHours(endParsed.hour, endParsed.minute, 0, 0)
   return { start: startDate, end: endDate }
 }
 
@@ -141,6 +166,83 @@ export const getTimeUntilNextPeriod = (
   }
 
   return { nextPeriod, timeUntil, isCurrentlyInClass, currentPeriod }
+}
+
+// Parse a time range but anchored to a specific date. Returns start/end Date on that date.
+export const parseTimeRangeOnDate = (timeRange: string, baseDate: Date): { start: Date; end: Date } => {
+  if (!timeRange || typeof timeRange !== 'string') {
+    const far = new Date(8640000000000000)
+    return { start: far, end: far }
+  }
+
+  const parsePart = (part: string): { hour: number; minute: number } | null => {
+    try {
+      const raw = String(part || '').trim()
+      const m = raw.match(/^(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?/)
+      if (!m) return null
+      let h = Number.parseInt(m[1], 10)
+      const min = Number.parseInt(m[2], 10)
+      const ampm = m[3]
+      if (ampm) {
+        const a = String(ampm).toLowerCase()
+        if (a === 'pm' && h < 12) h += 12
+        if (a === 'am' && h === 12) h = 0
+      }
+      return { hour: h, minute: min }
+    } catch (e) { return null }
+  }
+
+  const parts = timeRange.split(' - ')
+  const startInfo = parsePart(parts[0] || '')
+  const endInfo = parts[1] ? parsePart(parts[1]) : null
+  if (!startInfo) {
+    const far = new Date(8640000000000000)
+    return { start: far, end: far }
+  }
+
+  const startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())
+  startDate.setHours(startInfo.hour, startInfo.minute, 0, 0)
+  let endDate: Date
+  if (endInfo) {
+    endDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())
+    endDate.setHours(endInfo.hour, endInfo.minute, 0, 0)
+  } else {
+    endDate = new Date(startDate)
+  }
+
+  return { start: startDate, end: endDate }
+}
+
+// Given a list of periods for a day and a base date, find the first non-break
+// period and return its start Date and the period object. Returns null if none.
+export const findFirstNonBreakPeriodOnDate = (
+  periods: Array<{ period: string; time: string; subject: string; teacher?: string; room?: string }> | undefined,
+  baseDate: Date,
+): { period: any; start: Date } | null => {
+  try {
+    if (!periods || !Array.isArray(periods)) return null
+    for (const p of periods) {
+      const subj = String(p.subject || p.period || '')
+      if (/(recess|lunch|break|end of day)/i.test(subj)) continue
+      const parsed = parseTimeRangeOnDate(String(p.time || ''), baseDate)
+      if (parsed && parsed.start && parsed.start.getTime() < 8640000000000000) {
+        return { period: p, start: parsed.start }
+      }
+    }
+  } catch (e) {}
+  return null
+}
+
+// Format a duration (ms) into "Xh Ym Zs" style (hours/mins/secs), used for countdowns
+export const formatDurationShort = (ms: number): string => {
+  if (!Number.isFinite(ms) || ms <= 0) return '0s'
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
 }
 
 // Get day of week

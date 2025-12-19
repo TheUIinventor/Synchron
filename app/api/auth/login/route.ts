@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+
 const clientId = process.env.SBHS_APP_ID || process.env.SBHS_CLIENT_ID || ''
 const redirectUri = process.env.SBHS_REDIRECT_URI || process.env.NEXT_PUBLIC_SBHS_REDIRECT_URI_VERCEL || ''
 const AUTH_ENDPOINT = process.env.SBHS_AUTHORIZATION_ENDPOINT || 'https://auth.sbhs.net.au/authorize'
@@ -19,5 +22,7 @@ export async function GET(req: NextRequest) {
 
   const res = NextResponse.redirect(url.toString())
   res.cookies.set('sbhs_oauth_state', state, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV !== 'development', path: '/' })
+  // Auth redirects should never be public-cached
+  res.headers.set('Cache-Control', NON_SHARED_CACHE)
   return res
 }

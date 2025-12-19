@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => { try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } } }
+
 function parseCookies(cookieHeader: string | null) {
   if (!cookieHeader) return {}
   return cookieHeader.split(';').map(s => s.trim()).filter(Boolean).reduce((acc: Record<string,string>, cur) => {
@@ -27,8 +32,8 @@ export async function GET(req: Request) {
       masked[k] = mask(cookies[k])
     }
 
-    return NextResponse.json({ ok: true, cookies: masked, count: Object.keys(masked).length })
+    return NextResponse.json({ ok: true, cookies: masked, count: Object.keys(masked).length }, { headers: cacheHeaders(req) })
   } catch (err) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }

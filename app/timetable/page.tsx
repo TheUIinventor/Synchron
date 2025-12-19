@@ -3,32 +3,59 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
-import { ChevronLeft, Calendar } from "lucide-react"
+import { ChevronLeft, Calendar as CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Calendar as DatePicker } from "@/components/ui/calendar"
+import { getWeek } from 'date-fns'
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
+import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
+import { stripLeadingCasualCode } from "@/lib/utils"
+
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [isPhone, setIsPhone] = useState(false)
+  // Use selected date from timetable context so the header date follows
+  // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, setCurrentWeek, timetableData, timetableSource, refreshExternal } = useTimetable()
+  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
     trackSectionUsage("timetable")
   }, [])
 
+  // Detect phone devices (exclude tablets which may be portrait but are tablets)
+  useEffect(() => {
+    function detect() {
+      try {
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
+        const isTabletUA = /iPad|Tablet|Android(?!.*Mobile)|Silk|Kindle/i.test(ua) || (typeof navigator !== 'undefined' && (navigator as any).maxTouchPoints && window.innerWidth >= 600 && window.innerWidth <= 1024)
+        const phone = typeof window !== 'undefined' ? (window.innerWidth < 640 && !isTabletUA) : false
+        setIsPhone(phone)
+      } catch (e) { setIsPhone(false) }
+    }
+    detect()
+    window.addEventListener('resize', detect)
+    return () => window.removeEventListener('resize', detect)
+  }, [])
+
   const [showDiag, setShowDiag] = useState(false)
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
+  const [showAuthVars, setShowAuthVars] = useState(false)
+  const [authVarsPreview, setAuthVarsPreview] = useState<any | null>(null)
 
   const fetchDiagnostics = async () => {
     setShowDiag(true)
     setDiagLoading(true)
     try {
-      const res = await fetch('/api/portal/substitutions/debug', { credentials: 'include' })
+      const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
+      const res = await fetch(`/api/timetable?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
       const ctype = res.headers.get('content-type') || ''
       let payload: any
       if (res.ok && ctype.includes('application/json')) {
@@ -46,37 +73,59 @@ export default function TimetablePage() {
     }
   }
 
-  // Get day name from selected date
-  const getSelectedDayName = () => {
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    return days[selectedDate.getDay()]
+  // Compute a single display date object used for the header and for
+  // selecting the timetable rows. If the provider's selected date is
+  // today and it's after school hours (or a weekend), show the next
+  // school day instead so the header and content remain consistent.
+  const getDisplayDateObject = () => {
+    try {
+      const now = new Date()
+      const sameDate = selectedDateObject.toDateString() === now.toDateString()
+      const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
+      // Auto-advance behavior applies only when the user has not manually
+      // selected a date during this page session. `lastUserSelectedAt` is
+      // null on initial load; once the user changes dates we avoid
+      // auto-advancing until a reload.
+      const userHasManuallySelected = Boolean(lastUserSelectedAt)
+      if (!userHasManuallySelected && sameDate && (isWeekendNow || isSchoolDayOver())) {
+        return getNextSchoolDay(now)
+      }
+    } catch (e) {}
+    return selectedDateObject
   }
 
-  // Format selected date
+  const displayDateObject = getDisplayDateObject()
+  // Compute the default date that would be shown on a fresh load
+  const nowForDefault = new Date()
+  const defaultDisplayDate = (nowForDefault.getDay() === 0 || nowForDefault.getDay() === 6 || isSchoolDayOver()) ? getNextSchoolDay(nowForDefault) : nowForDefault
   const formatSelectedDate = () => {
-    return selectedDate.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    })
+    const opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }
+    return displayDateObject.toLocaleDateString('en-US', opts)
   }
 
-  // Navigate dates
+  // Navigate dates by updating the provider's selected date object so
+  // the whole app stays in sync with navigation actions.
   const goToPreviousDay = () => {
-    const newDate = new Date(selectedDate)
+    const newDate = new Date(selectedDateObject)
     newDate.setDate(newDate.getDate() - 1)
-    setSelectedDate(newDate)
+    setSelectedDateObject(newDate)
   }
 
   const goToNextDay = () => {
-    const newDate = new Date(selectedDate)
+    const newDate = new Date(selectedDateObject)
     newDate.setDate(newDate.getDate() + 1)
-    setSelectedDate(newDate)
+    setSelectedDateObject(newDate)
   }
 
   const goToToday = () => {
-    setSelectedDate(new Date())
+    setSelectedDateObject(new Date())
+  }
+
+  const resetToCurrentOrNext = () => {
+    const now = new Date()
+    const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
+    const target = (isWeekendNow || isSchoolDayOver()) ? getNextSchoolDay(now) : now
+    setSelectedDateObject(target)
   }
 
   // Subject color mapping
@@ -120,18 +169,187 @@ export default function TimetablePage() {
     if (period.subject === "Break") {
       return period.period // Show "Recess", "Lunch 1", etc. instead of "Break"
     }
-    return period.subject
+    return (period as any)?.title || period.subject
   }
 
-  const selectedDayName = getSelectedDayName()
+  const getDisplayRoom = (period: any) => {
+    try {
+      if (!period) return ''
+      // NOTE: Do NOT include `.to` here - that field is commonly used for
+      // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
+      const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom
+      if (display && String(display).trim()) return String(display)
+    } catch (e) {}
+    return period.room || ''
+  }
+
+  const isSubstitutePeriod = (p: any) => {
+    try {
+      if (!p) return false
+      const orig = String((p as any).originalTeacher || '').trim()
+      const teacher = String(p.teacher || '').trim()
+      const full = String((p as any).fullTeacher || '').trim()
+      const disp = String((p as any).displayTeacher || '').trim()
+      const changedTeacher = orig && orig !== teacher
+      try {
+        const cleanedFull = stripLeadingCasualCode(full || disp || '')
+        const cleanedRaw = stripLeadingCasualCode(teacher || '')
+        if ((p.isSubstitute || (p as any).casualSurname || changedTeacher) && cleanedFull && cleanedRaw && cleanedFull !== cleanedRaw) return true
+      } catch (e) {}
+      
+      // Defensive: also treat as substitute when casualToken exists or
+      // when a displayTeacher is present and differs from the raw `teacher` value.
+      const hasCasual = Boolean((p as any).casualSurname || (p as any).casualToken || (p as any).casual)
+      const rawIsCode = /^[A-Z]{1,4}$/.test(teacher)
+      const dispLooksName = disp && !/^[A-Z0-9\s]{1,6}$/.test(disp)
+      const displayDiff = disp && teacher && stripLeadingCasualCode(disp) !== stripLeadingCasualCode(teacher)
+      // Only treat display-name differences as substitution when the raw
+      // teacher looks like a short code (e.g. "LIKV") or when we already
+      // have a casual marker. This avoids highlighting normal teacher
+      // display names that differ by formatting.
+      const displayIndicatesSub = (rawIsCode && dispLooksName) || (displayDiff && hasCasual)
+      return Boolean(p.isSubstitute || hasCasual || changedTeacher || displayIndicatesSub)
+    } catch (e) { return Boolean(p?.isSubstitute || (p as any)?.casualSurname) }
+  }
+
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+  const selectedDayName = days[displayDateObject.getDay()]
   const isWeekend = selectedDayName === "Sunday" || selectedDayName === "Saturday"
-  const todaysTimetable = timetableData[selectedDayName] || []
+  const todaysTimetableRaw = timetableData[selectedDayName] || []
+  // Provider bell bucket for the selected day (used when individual period.time is missing)
+  const bucketForSelectedDay = bellTimes ? (selectedDayName === 'Friday' ? bellTimes.Fri : (selectedDayName === 'Wednesday' || selectedDayName === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
+
+  // Defensive fallback: if the provider's bell bucket for the selected day
+  // is empty (commonly Friday), try to build an effective bucket from the
+  // resolved `timetableData` for that day. This allows the UI to display
+  // correct break times even when the dedicated `bellTimes` object is
+  // missing due to upstream/provider issues.
+  const buildBucketFromTimetable = (dayPeriods: any[]) => {
+    try {
+      if (!Array.isArray(dayPeriods) || dayPeriods.length === 0) return []
+      const map = new Map<string, any>()
+      for (const p of dayPeriods) {
+        const rawLabel = String(p?.period || p?.title || p?.bell || p?.name || '').trim()
+        const label = rawLabel || String(p?.period || '').trim()
+        const time = (p?.time && String(p.time).trim()) || ((p?.startTime || p?.start) ? `${p.startTime || p.start}${p.endTime || p.end ? ' - ' + (p.endTime || p.end) : ''}` : '')
+        const key = label || time || JSON.stringify(p)
+        // Prefer the first meaningful time we see for a given period label
+        if (!map.has(key)) map.set(key, { period: label || key, originalPeriod: label || key, time: time || '' })
+      }
+      // Convert to array and sort by parsed start time if possible
+      const arr = Array.from(map.values())
+      arr.sort((a: any, b: any) => {
+        try {
+          const pa = parseTimeRange(a.time || '')
+          const pb = parseTimeRange(b.time || '')
+          if (pa.start && pb.start) return pa.start.getTime() - pb.start.getTime()
+        } catch (e) {}
+        return 0
+      })
+      return arr
+    } catch (e) { return [] }
+  }
+
+  const effectiveBellBucket = (() => {
+    try {
+      if (!bellTimes) return buildBucketFromTimetable(todaysTimetableRaw)
+      const rawBucket = selectedDayName === 'Friday' ? bellTimes.Fri : (selectedDayName === 'Wednesday' || selectedDayName === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])
+      if (Array.isArray(rawBucket) && rawBucket.length > 0) return rawBucket
+      // fallback from timetableData for this day
+      return buildBucketFromTimetable(todaysTimetableRaw)
+    } catch (e) { return buildBucketFromTimetable(todaysTimetableRaw) }
+  })()
+
+  const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
+  // Keep Roll Call / Period 0 and Break rows visible — show all raw entries
+  const todaysTimetable = todaysTimetableRaw
+
+  // Helper: normalize labels and build a canonical key for matching.
+  const normalizeLabel = (s?: string) => {
+    if (!s) return ''
+    let t = String(s).trim().toLowerCase()
+    // common token aliases
+    t = t.replace(/^rc$/,'roll call')
+    t = t.replace(/^r$/,'recess')
+    t = t.replace(/^eod$/,'end of day')
+    t = t.replace(/^mtl1$/,'lunch 1')
+    t = t.replace(/^mtl2$/,'lunch 2')
+    // remove punctuation and collapse whitespace
+    t = t.replace(/[^a-z0-9 ]+/g, ' ')
+    t = t.replace(/\s+/g, ' ').trim()
+    return t
+  }
+
+  // Robust finder: prefer exact normalized label matches, then stricter fuzzy rules,
+  // then numeric-only matches, then fall back to a sorted-by-start-time index lookup.
+  const findBellTimeForPeriod = (p: any, bucket: any[] | null, index: number) => {
+    try {
+      if (!bucket || !Array.isArray(bucket) || bucket.length === 0) return ''
+
+      const periodLabelRaw = String(p?.period || p?.title || p?.bell || '').trim()
+      const periodKey = normalizeLabel(periodLabelRaw)
+
+      // Build normalized lookup map from bucket entries (preserve original ordering)
+      const entries = bucket.map((b: any, i: number) => {
+        const labels = [b?.originalPeriod, b?.period, b?.bellDisplay, b?.bell, b?.title]
+          .filter(Boolean)
+          .map((x: any) => normalizeLabel(String(x)))
+        const time = b?.time || (b?.startTime ? (b.startTime + (b.endTime ? ' - ' + b.endTime : '')) : '')
+        // parse start for sorting
+        let start: string | null = null
+        try {
+          const parsed = parseTimeRange(time || '')
+          start = parsed.start ? parsed.start.toISOString() : null
+        } catch (e) { start = null }
+        return { index: i, labels, raw: b, time, start }
+      })
+
+      // Exact normalized label match
+      if (periodKey) {
+        for (const e of entries) {
+          if (e.labels.includes(periodKey)) return e.time || ''
+        }
+      }
+
+      // Word-boundary contains match (both directions) to avoid accidental numeric substring matches
+      if (periodKey) {
+        for (const e of entries) {
+          for (const lbl of e.labels) {
+            if (lbl && (` ${lbl} `).includes(` ${periodKey} `)) return e.time || ''
+            if (periodKey && (` ${periodKey} `).includes(` ${lbl} `)) return e.time || ''
+          }
+        }
+      }
+
+      // Strict numeric match: only if both are simple numbers (e.g., '1' vs '1')
+      const pNum = (periodLabelRaw.match(/^\s*(\d+)\s*$/) || [])[1]
+      if (pNum) {
+        for (const e of entries) {
+          for (const lbl of e.labels) {
+            const eNum = (lbl.match(/^(\d+)$/) || [])[1]
+            if (eNum && eNum === pNum) return e.time || ''
+          }
+        }
+      }
+
+      // As a last resort: sort entries by parsed start time and pick by index if available
+      const sorted = entries.slice().sort((a, b) => {
+        if (a.start && b.start) return a.start < b.start ? -1 : a.start > b.start ? 1 : 0
+        if (a.start) return -1
+        if (b.start) return 1
+        return a.index - b.index
+      })
+      if (index >= 0 && index < sorted.length) return sorted[index].time || ''
+
+    } catch (e) {}
+    return ''
+  }
 
   if (!mounted) return null
 
   return (
     <PageTransition>
-      <div className="container max-w-6xl mx-auto px-4 py-6 pb-24">
+      <div className="w-full max-w-full mx-auto px-3 sm:px-6 py-4 pb-28 sm:pb-20 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -139,43 +357,15 @@ export default function TimetablePage() {
           >
             <ChevronLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-2xl font-bold text-on-surface md:text-center md:flex-1">My Synchron</h1>
-          {/* Data source badge and manual refresh */}
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-on-surface-variant flex items-center">
-              {timetableSource === 'fallback-sample' ? (
-                <span className="px-2 py-1 rounded-full bg-tertiary-container text-on-tertiary-container">Using sample data</span>
-              ) : timetableSource ? (
-                <span className="px-2 py-1 rounded-full bg-primary-container text-on-primary-container">Live data</span>
-              ) : null}
-            </div>
-            <button
-              onClick={async () => {
-                try {
-                  if (refreshExternal) await refreshExternal()
-                } catch (e) {
-                  // ignore user-facing errors here — provider will fall back to sample if needed
-                }
-              }}
-              className="hidden md:inline-flex px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm hover:bg-surface-container-highest transition-colors"
-              title="Retry loading live timetable"
-            >
-              Refresh
-            </button>
-            <button
-              onClick={() => fetchDiagnostics()}
-              className="hidden md:inline-flex px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm hover:bg-surface-container-highest transition-colors"
-              title="Run portal diagnostics"
-            >
-              {diagLoading ? 'Checking...' : 'Diagnostics'}
-            </button>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-on-surface md:text-center md:flex-1">My Synchron</h1>
+          {/* Debug badges & manual refresh removed per UX request */}
+          <div className="w-6 hidden md:block" />
           <div className="w-6 hidden md:block"></div>
         </div>
         {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
         {timetableSource === 'fallback-sample' && (
           <div className="w-full mb-6">
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
+            <Card className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
                   <div className="font-medium text-on-surface">Can't load your live timetable</div>
@@ -236,7 +426,7 @@ export default function TimetablePage() {
         {viewMode === "daily" && (
           <>
             {/* Date Navigation */}
-            <div className="flex items-center justify-between mb-4 max-w-lg mx-auto">
+            <div className="flex items-center justify-between mb-4 w-full max-w-full mx-auto">
               <button
                 className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
                 onClick={goToPreviousDay}
@@ -244,12 +434,50 @@ export default function TimetablePage() {
                 <ChevronLeft className="h-5 w-5" />
               </button>
 
-              <div className="text-center">
-                <h2 className="font-semibold text-on-surface">{selectedDayName}</h2>
-                <p className="text-sm text-on-surface-variant">
-                  {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </p>
-              </div>
+                <div className="text-center">
+                  {/* Clickable small boxed date that opens a calendar popover */}
+                  {(() => {
+                    try {
+                      const weekday = displayDateObject.toLocaleDateString('en-US', { weekday: 'short' })
+                      const dateShort = displayDateObject.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+                      const weekNum = getWeek(displayDateObject)
+                      const wt = (externalWeekType || currentWeek) || ''
+                      const weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
+                      const headerShort = `${weekday}, ${dateShort}${weekPart}`
+                      return (
+                        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                          <PopoverTrigger asChild>
+                            <button
+                              aria-label="Select date"
+                              className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest cursor-pointer"
+                              type="button"
+                            >
+                              {headerShort}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto">
+                            <DatePicker
+                              mode="single"
+                              selected={displayDateObject}
+                              onSelect={(d: any) => {
+                                try {
+                                  if (d) {
+                                    // DayPicker may pass a Date or an array; coerce to Date
+                                    const picked = Array.isArray(d) ? d[0] : d
+                                    if (picked instanceof Date && !Number.isNaN(picked.getTime())) {
+                                      setSelectedDateObject(new Date(picked))
+                                    }
+                                  }
+                                } catch (e) {}
+                                setDatePickerOpen(false)
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      )
+                    } catch (e) { return <h2 className="font-semibold text-on-surface">{selectedDayName}</h2> }
+                  })()}
+                </div>
 
               <button
                 className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
@@ -259,28 +487,75 @@ export default function TimetablePage() {
               </button>
             </div>
 
-            {/* Today Button */}
-            <div className="flex justify-center mb-6">
-              <Button
-                onClick={goToToday}
-                variant="outline"
-                size="sm"
-                className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
+            {/* Reset Button: show only when user has moved away from the default applying day */}
+            {defaultDisplayDate.toDateString() !== selectedDateObject.toDateString() && (
+              <div className="flex justify-center mb-6">
+                <Button
+                  onClick={resetToCurrentOrNext}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
+                >
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+              </div>
+            )}
+
+            {/* Debug: view persisted authoritative variations (localStorage) */}
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={() => {
+                  try {
+                    const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-authoritative-variations') : null
+                    if (!raw) {
+                      setAuthVarsPreview(null)
+                      setShowAuthVars(true)
+                      return
+                    }
+                    const parsed = JSON.parse(raw)
+                    // build a small preview: keys (dates) and first entry
+                    const keys = Object.keys(parsed || {})
+                    const sampleKey = keys[0]
+                    const sample = sampleKey ? parsed[sampleKey] : null
+                    setAuthVarsPreview({ keys, sampleKey, sample })
+                    setShowAuthVars(true)
+                  } catch (e) {
+                    setAuthVarsPreview({ error: String(e) })
+                    setShowAuthVars(true)
+                  }
+                }}
+                className="px-3 py-1 rounded-md text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+                type="button"
               >
-                <Calendar className="h-4 w-4 mr-2" />
-                Today
-              </Button>
+                View stored variations
+              </button>
             </div>
 
-            {/* Daily Schedule */}
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 max-w-lg mx-auto p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-full bg-primary/10 text-primary">
-                  <Calendar className="h-5 w-5" />
+            {showAuthVars && (
+              <div className="mb-4 max-w-3xl mx-auto">
+                <Card className="bg-surface-container-high p-3 border-none">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-on-surface">Persisted Authoritative Variations</div>
+                    <div>
+                      <button className="px-2 py-1 text-xs rounded-full bg-surface-container-highest text-on-surface" onClick={() => { setShowAuthVars(false); setAuthVarsPreview(null) }}>
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="text-xs overflow-x-auto max-h-60">{authVarsPreview ? JSON.stringify(authVarsPreview, null, 2) : 'No persisted variations found'}</pre>
+                </Card>
+              </div>
+            )}
+
+            {/* Daily Schedule (wide format) */}
+            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-2 sm:p-4 mx-auto max-w-full">
+              <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 rounded-full bg-primary/10 text-primary">
+                  <CalendarIcon className="h-5 w-5" />
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-on-surface">{selectedDayName} Schedule</h2>
-                  <p className="text-sm text-on-surface-variant">{formatSelectedDate()}</p>
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-bold text-on-surface truncate">{formatSelectedDate()}</h2>
                 </div>
               </div>
 
@@ -334,41 +609,120 @@ export default function TimetablePage() {
                     </div>
                   )}
 
-                  <div className="space-y-1.5">
-                    {todaysTimetable.map((period) => (
-                      <div
-                        key={period.id}
-                        className={`rounded-xl p-3 transition-all duration-200 ease-in-out ${
-                          period.subject === "Break" ? "bg-surface-container-high/50" : "bg-surface-container-high"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          {/* Time on the left */}
-                          <span className="text-sm font-medium text-on-surface-variant flex-shrink-0 w-[4.5rem] text-left">
-                            {period.time.split(" - ")[0]} {/* Only show start time */}
-                          </span>
+                  <div className="space-y-3 flex-1 pr-0 sm:pr-2">
+                    {todaysTimetable.map((period, idx) => {
+                      // Compute start time for display
+                      let startTime = ''
+                      try {
+                        const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
+                        const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                        const { start } = parseTimeRange(timeSrc || '')
+                        startTime = formatTo12Hour(start)
+                      } catch (e) {
+                        startTime = ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '')
+                      }
+                      
+                      // Treat Period 0, Roll Call, End of Day, and Break as non-class periods
+                      const periodLabel = String(period.period || '').trim().toLowerCase()
+                      const subjectLabel = String(period.subject || '').trim().toLowerCase()
+                      const isBreak = period.subject === 'Break' || 
+                        periodLabel === '0' || periodLabel === 'rc' || periodLabel === 'eod' ||
+                        subjectLabel.includes('period 0') || subjectLabel.includes('roll call') || subjectLabel.includes('end of day')
+                      // Get display label for non-class periods
+                      const nonClassLabel = (() => {
+                        if (period.subject === 'Break') return period.period
+                        if (periodLabel === '0' || subjectLabel.includes('period 0')) return 'Period 0'
+                        if (periodLabel === 'rc' || subjectLabel.includes('roll call')) return 'Roll Call'
+                        if (periodLabel === 'eod' || subjectLabel.includes('end of day')) return 'End of Day'
+                        return period.period || period.subject
+                      })()
+                      const teacherDisplay = (() => {
+                        if (!period) return null
+                        if ((period as any).displayTeacher) return stripLeadingCasualCode((period as any).displayTeacher)
+                        if (period.isSubstitute && (period as any).casualSurname) return (period as any).casualSurname
+                        const candidate = period.fullTeacher || period.teacher || null
+                        if (period.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
+                        return candidate
+                      })()
+                      const roomDisplay = (() => {
+                        const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                        return displayRoom
+                      })()
+                      
+                      const cardClass = 'flex-1 w-full min-w-0 px-3 py-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
 
-                          {/* Subject */}
-                          <span className="font-semibold text-sm flex-1 min-w-0 truncate text-on-surface">
-                            {getDisplaySubject(period)}
-                          </span>
+                      return (
+                        <div key={period.id ?? idx} className="flex gap-3 items-start group cursor-pointer w-full">
+                          <div className="flex flex-col items-center min-w-[2.5rem] sm:min-w-[3rem]">
+                            <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
+                          </div>
 
-                          {/* Teacher and Room (only for non-break periods) */}
-                          {period.subject !== "Break" && (
-                            <span className="text-xs text-on-surface-variant flex-shrink-0 ml-auto flex items-center gap-2">
-                              <span>{period.teacher} • {period.room}</span>
-                              {/* Substitution / room-change badges */}
-                              {period.isSubstitute && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
+                          {isBreak ? (
+                            <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
+                          ) : (
+                            <div className={`${cardClass} flex items-center gap-2`}>
+                              {/* Subject colour bar */}
+                              {period.colour && (
+                                <div 
+                                  className="w-1 min-w-[4px] rounded-lg self-stretch" 
+                                  style={{ backgroundColor: `#${period.colour}` }} 
+                                />
                               )}
-                              {period.isRoomChange && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                              )}
-                            </span>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}>
+                                      {period.subject}
+                                    </span>
+                                  </div>
+                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                    {isSubstitutePeriod(period) ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                      >
+                                        {teacherDisplay}
+                                      </span>
+                                    ) : (
+                                      <span className="text-on-surface-variant truncate max-w-[100px]">{teacherDisplay}</span>
+                                    )}
+                                    <span>•</span>
+                                    <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                      style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
+                                    >
+                                      {roomDisplay}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject)}`}>
+                                      <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0 text-right">
+                                    {isSubstitutePeriod(period) ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[92px]"
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
+                                      >
+                                        {teacherDisplay}
+                                      </span>
+                                    ) : (
+                                      <span className="text-on-surface-variant truncate max-w-[92px]">{teacherDisplay}</span>
+                                    )}
+                                    <span className="text-on-surface-variant">•</span>
+                                    <span className={`truncate max-w-[56px] text-xs ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                      style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
+                                    >
+                                      {roomDisplay}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </>
               )}
@@ -378,87 +732,177 @@ export default function TimetablePage() {
                   No classes scheduled for this day
                 </div>
               )}
-            </Card>
+            </div>
           </>
         )}
 
         {viewMode === "cycle" && (
           <>
-            {/* Week A/B Toggle */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-surface-container-high p-1 rounded-full">
-                <button
-                  onClick={() => setCurrentWeek("A")}
-                  className={`px-4 py-2 text-sm rounded-full transition-all ${
-                    currentWeek === "A" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  Week A
-                </button>
-                <button
-                  onClick={() => setCurrentWeek("B")}
-                  className={`px-4 py-2 text-sm rounded-full transition-all ${
-                    currentWeek === "B" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  Week B
-                </button>
-              </div>
-            </div>
+            {/* Full Cycle View (show both Week A and Week B) */}
 
             {/* Grid Timetable */}
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <div className="p-6">
                 <div className="text-center mb-6">
-                  <h2 className="text-xl font-semibold text-on-surface">Week {currentWeek} Timetable</h2>
-                  <p className="text-sm text-on-surface-variant">Grid View</p>
+                  <h2 className="text-xl font-semibold text-on-surface">Full Cycle Timetable</h2>
+                  <p className="text-sm text-on-surface-variant">Week A and Week B</p>
                 </div>
 
                 {/* Days Header */}
-                <div className="grid grid-cols-5 gap-6 mb-6">
-                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 mb-6">
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
                     <div key={day} className="text-center">
-                      <h3 className="font-semibold text-on-surface-variant text-base">
-                        {day.substring(0, 3)}
-                        {currentWeek}
-                      </h3>
+                      <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}{(externalWeekType ?? currentWeek) ? ` ${externalWeekType ?? currentWeek}` : ''}</h3>
                     </div>
                   ))}
                 </div>
 
-                {/* Timetable Grid */}
-                <div className="grid grid-cols-5 gap-6">
-                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
-                    <div key={day} className="space-y-3">
-                      {timetableData[day]
-                        .filter((period) => period.subject !== "Break")
-                        .map((period, index) => (
-                          <div key={period.id} className="flex items-center gap-3">
-                            <div
-                              className={`rounded-lg px-3 py-2 text-base font-bold flex-shrink-0 min-w-[48px] text-center ${getSubjectColor(period.subject)}`}
-                            >
-                              {getSubjectAbbr(period.subject)}
-                            </div>
-                            <div className="text-sm font-medium text-on-surface flex-1">
-                              {/* Desktop: keep room inline. Mobile: show subject name with room underneath */}
-                              <div className="hidden md:block flex items-center gap-2">
-                                <span>{period.room}</span>
-                                {period.isRoomChange && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-container text-on-secondary-container">Room</span>
-                                )}
-                                {period.isSubstitute && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-tertiary-container text-on-tertiary-container">Sub</span>
-                                )}
-                              </div>
-                              <div className="md:hidden flex flex-col">
-                                <span className="font-semibold text-sm truncate">{period.subject}</span>
-                                <span className="text-xs text-on-surface-variant truncate">{period.room}</span>
-                              </div>
-                            </div>
+                {/* Timetable Grid: each day shows Week A then Week B */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6">
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
+                    // prefer grouped timetableByWeek when available
+                    // fall back to showing the current week's data if grouped data isn't present.
+                    const tt = timetableByWeek
+                    return (
+                      <div key={day} className="space-y-3">
+                        {/* Week A */}
+                        <div className="p-2 rounded-md bg-surface-container-high">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">Week A</div>
                           </div>
-                        ))}
-                    </div>
-                  ))}
+                          {(() => {
+                            // Prefer provider's grouped data if available
+                            try {
+                              const itemsA = tt && tt[day] && Array.isArray(tt[day].A) ? tt[day].A : (timetableData[day] || [])
+                              const bucketA = bellTimes ? (day === 'Friday' ? bellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
+                              return itemsA.map((period: any, idx: number) => (
+                                period.subject === 'Break' ? (
+                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
+                                    <div className="w-14 sm:w-16 text-sm font-medium text-on-surface-variant">
+                                      {(() => {
+                                        try {
+                                          const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''
+                                          const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                                          const { start } = parseTimeRange(timeSrc || '')
+                                          return formatTo12Hour(start)
+                                        } catch (e) { return ((period.time || (bucketA && bucketA[idx] && bucketA[idx].time) || '').split(' - ')[0] || '') }
+                                      })()}
+                                    </div>
+                                    <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
+                                  </div>
+                                ) : (
+                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
+                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                      {(() => {
+                                        try {
+                                          if (period.time) {
+                                            const { start } = parseTimeRange(period.time || '')
+                                            return formatTo12Hour(start)
+                                          }
+                                            try {
+                                              const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''
+                                              const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                                              if (timeSrc) {
+                                                const { start } = parseTimeRange(timeSrc || '')
+                                                return formatTo12Hour(start)
+                                              }
+                                            } catch (e) {}
+                                        
+                                          return ''
+                                        } catch (e) {}
+                                        return ''
+                                      })()}
+                                    </div>
+                                    <div className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject)}`}>
+                                      {getSubjectAbbr(period.subject)}
+                                    </div>
+                                    <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        {/* Only show classroom on the right; remove duplicate class name and teacher */}
+                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              ))
+                            } catch (e) {
+                              return <div className="text-xs text-on-surface-variant">No data</div>
+                            }
+                          })()}
+                        </div>
+
+                        {/* Week B */}
+                        <div className="p-2 rounded-md bg-surface-container-high">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">Week B</div>
+                          </div>
+                          {(() => {
+                            try {
+                              const itemsB = tt && tt[day] && Array.isArray(tt[day].B) ? tt[day].B : []
+                              if ((!itemsB || itemsB.length === 0) && (!tt || !tt[day])) {
+                                // no grouped data available; indicate there's only one week available
+                                return <div className="text-xs text-on-surface-variant">Only one week available</div>
+                              }
+                              const bucketB = bellTimes ? (day === 'Friday' ? bellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
+                              return itemsB.map((period: any, idx: number) => (
+                                period.subject === 'Break' ? (
+                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
+                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                      {(() => {
+                                        try {
+                                          const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
+                                          const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                                          const { start } = parseTimeRange(timeSrc || '')
+                                          return formatTo12Hour(start)
+                                        } catch (e) { return ((period.time || (bucketB && bucketB[idx] && bucketB[idx].time) || '').split(' - ')[0] || '') }
+                                      })()}
+                                    </div>
+                                    <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
+                                  </div>
+                                ) : (
+                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
+                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
+                                      {(() => {
+                                        try {
+                                          if (period.time) {
+                                            const { start } = parseTimeRange(period.time || '')
+                                            return formatTo12Hour(start)
+                                          }
+                                            try {
+                                              const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
+                                              const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
+                                              if (timeSrc) {
+                                                const { start } = parseTimeRange(timeSrc || '')
+                                                return formatTo12Hour(start)
+                                              }
+                                            } catch (e) {}
+                                            return ''
+                                        } catch (e) {}
+                                        return ''
+                                      })()}
+                                    </div>
+                                    <div className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject)}`}>
+                                      {getSubjectAbbr(period.subject)}
+                                    </div>
+                                    <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        {/* Only show classroom on the right; remove duplicate class name and teacher */}
+                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              ))
+                            } catch (e) {
+                              return <div className="text-xs text-on-surface-variant">No data</div>
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </Card>

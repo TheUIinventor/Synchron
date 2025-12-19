@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+const cacheHeaders = (req: any) => { try { const hasCookie = req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie')); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } } }
+
 const PORTAL_BASE = 'https://student.sbhs.net.au'
 const API_BASE = 'https://api.sbhs.net.au'
 
@@ -65,28 +70,16 @@ export async function GET(req: Request) {
       apiResults.push(await probeEndpoint(url, { ...baseHeaders }))
     }
 
-    // Try to decode JWT payload for visibility (not verified)
-    let accessTokenPayload: any = null
-    if (accessTokenPresent && accessTokenValue) {
-      try {
-        const parts = accessTokenValue.split('.')
-        if (parts.length >= 2) {
-          const payload = parts[1]
-          const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=')
-          const decoded = Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
-          accessTokenPayload = JSON.parse(decoded)
-        }
-      } catch (e) {
-        accessTokenPayload = { error: 'unable to decode token payload', message: String(e) }
-      }
-    }
+    // Do not decode or introspect access tokens here. Token formats can change
+    // and should not be parsed for meaning. Keep payload null for safety.
+    const accessTokenPayload: any = null
 
     // Shorten Authorization value for safety
     const forwardedHeaders = { ...baseHeaders }
     if (forwardedHeaders['Authorization']) forwardedHeaders['Authorization'] = forwardedHeaders['Authorization'].slice(0, 32) + '...'
 
-    return NextResponse.json({ ok: true, accessTokenPresent, accessTokenPayload, forwardedHeaders, results, apiResults })
+    return NextResponse.json({ ok: true, accessTokenPresent, accessTokenPayload, forwardedHeaders, results, apiResults }, { headers: cacheHeaders(req) })
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
 }
