@@ -3709,7 +3709,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 export function useTimetable() {
   const context = useContext(TimetableContext)
   if (context === undefined) {
-    throw new Error("useTimetable must be used within a TimetableProvider")
+    // Return a safe fallback to avoid throwing when a component is
+    // accidentally rendered outside the provider (prevents ErrorBoundary
+    // from catching these predictable misses). Components that require
+    // live data should still work when the provider is present.
+    // NOTE: Prefer using `useTimetableSafe` in places where missing
+    // provider is expected; this fallback prevents hard crashes in
+    // production while preserving UX.
+    const noop = () => Promise.resolve()
+    const safe: TimetableContextType = {
+      currentWeek: null,
+      selectedDay: '',
+      selectedDateObject: new Date(),
+      setSelectedDay: (_d: string) => {},
+      setSelectedDateObject: (_d: Date) => {},
+      timetableData: { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] },
+      currentMomentPeriodInfo: { nextPeriod: null, timeUntil: '', isCurrentlyInClass: false, currentPeriod: null },
+      nextPeriodInfo: { nextPeriod: null, timeUntil: '', isCurrentlyInClass: false, currentPeriod: null },
+      isShowingCachedWhileLoading: false,
+      bellTimes: { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] },
+      isShowingNextDay: false,
+      timetableSource: null,
+      isLoading: false,
+      isRefreshing: false,
+      error: null,
+      refreshExternal: noop,
+      timetableByWeek: undefined,
+      externalWeekType: null,
+    }
+    return safe
   }
   return context
 }
