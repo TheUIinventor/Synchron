@@ -1,35 +1,338 @@
 "use client";
 
-<<<<<<< HEAD
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Bagel_Fat_One } from "next/font/google";
-
-// Prefetch notices in the background and cache in sessionStorage
-function prefetchNotices() {
-  if (typeof window === "undefined") return;
-  if (sessionStorage.getItem("notices-prefetched")) return;
-  fetch("/api/notices")
-    .then(res => res.ok ? res.json() : null)
-    .then(data => {
-      if (data) {
-        sessionStorage.setItem("notices-data", JSON.stringify(data));
-        sessionStorage.setItem("notices-prefetched", "1");
-      }
-    })
-    .catch(() => {});
-}
+import { useTimetable } from "@/contexts/timetable-context";
+import { useStudentProfile } from "@/lib/api/hooks";
+import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { getCurrentDay, formatDate, getCurrentTime, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils";
-import { trackSectionUsage } from "@/utils/usage-tracker";
+import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
+import { AuthButton } from "@/components/auth-button";
 import ThemeToggle from "@/components/theme-toggle";
 import SettingsMenu from "@/components/settings-menu";
-=======
->>>>>>> 5a8fbd17f6f66af4c908daa74515d0c2a0559aa0
+import { getCurrentDay, formatDate } from "@/utils/time-utils";
+
+export default function HomeClient() {
+  const { timetableData, currentMomentPeriodInfo, isLoading, error, refreshExternal, selectedDay } = useTimetable();
+  const { data: profileData, loading: profileLoading } = useStudentProfile();
+
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, []);
+
+  const bagel = Bagel_Fat_One({ weight: "400", subsets: ["latin"], display: "swap", variable: "--font-bagel-fat-one" });
+
+  const dayName = selectedDay || (currentDate ? format(currentDate, "EEEE") : getCurrentDay());
+  const todaysPeriods = useMemo(() => (timetableData?.[dayName] ?? []), [timetableData, dayName]);
+
+  if (isLoading || !currentDate) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Syncing…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 flex flex-col items-center justify-center h-[50vh] text-center">
+        <div className="mb-4">
+          <Loader2 className="h-10 w-10 animate-spin text-destructive" />
+        </div>
+        <h2 className="text-2xl font-semibold">Connection Error</h2>
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <div className="mt-4">
+          <Button onClick={() => refreshExternal && refreshExternal()}>Try again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen pb-20 relative px-4 pt-6">
+      <header className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className={`${bagel.className} text-2xl font-bold`}>Synchron</h1>
+          <p className="text-xs text-muted-foreground">{formatDate()}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <AuthButton />
+          <SettingsMenu />
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2">
+          <div className="rounded-xl p-4 bg-surface">
+            <h2 className="text-lg font-semibold">Today — {dayName}</h2>
+            <p className="text-sm text-muted-foreground">{formatDate()}</p>
+            <div className="mt-4 space-y-2">
+              {todaysPeriods.length === 0 ? (
+                <p className="text-muted-foreground">No classes today</p>
+              ) : (
+                todaysPeriods.map((p: any, i: number) => (
+                  <div key={p.id || i} className="p-3 rounded-md bg-surface-variant">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{p.subject || p.name}</div>
+                        <div className="text-xs text-muted-foreground">{p.room || p.teacher}</div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{p.time}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <aside className="md:col-span-1">
+          <div className="rounded-xl p-4 bg-surface">
+            <h3 className="font-semibold">Profile</h3>
+            <div className="mt-2 text-sm text-muted-foreground">
+              {profileLoading ? <Skeleton className="h-6 w-32" /> : <div>{(profileData && (profileData.name || profileData.username)) || "Guest"}</div>}
+            </div>
+            <div className="mt-4">
+              <Link href="/timetable"><Button>Open timetable</Button></Link>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
+}
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
+import { Bagel_Fat_One } from "next/font/google";
 import { useTimetable } from "@/contexts/timetable-context";
+import { useStudentProfile } from "@/lib/api/hooks";
+import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
+import { AuthButton } from "@/components/auth-button";
+import ThemeToggle from "@/components/theme-toggle";
+import SettingsMenu from "@/components/settings-menu";
+import { getCurrentDay, formatDate } from "@/utils/time-utils";
+
+export default function HomeClient() {
+  const { timetableData, currentMomentPeriodInfo, isLoading, error, refreshExternal, selectedDay } = useTimetable();
+  const { data: profileData, loading: profileLoading } = useStudentProfile();
+
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, []);
+
+  const bagel = Bagel_Fat_One({ weight: "400", subsets: ["latin"], display: "swap", variable: "--font-bagel-fat-one" });
+
+  const dayName = selectedDay || (currentDate ? format(currentDate, "EEEE") : getCurrentDay());
+  const todaysPeriods = useMemo(() => (timetableData?.[dayName] ?? []), [timetableData, dayName]);
+
+  if (isLoading || !currentDate) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Syncing…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 flex flex-col items-center justify-center h-[50vh] text-center">
+        <div className="mb-4">
+          <Loader2 className="h-10 w-10 animate-spin text-destructive" />
+        </div>
+        <h2 className="text-2xl font-semibold">Connection Error</h2>
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <div className="mt-4">
+          <Button onClick={() => refreshExternal && refreshExternal()}>Try again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen pb-20 relative px-4 pt-6">
+      <header className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className={`${bagel.className} text-2xl font-bold`}>Synchron</h1>
+          <p className="text-xs text-muted-foreground">{formatDate()}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <AuthButton />
+          <SettingsMenu />
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2">
+          <div className="rounded-xl p-4 bg-surface">
+            <h2 className="text-lg font-semibold">Today — {dayName}</h2>
+            <p className="text-sm text-muted-foreground">{formatDate()}</p>
+            <div className="mt-4 space-y-2">
+              {todaysPeriods.length === 0 ? (
+                <p className="text-muted-foreground">No classes today</p>
+              ) : (
+                todaysPeriods.map((p: any, i: number) => (
+                  <div key={p.id || i} className="p-3 rounded-md bg-surface-variant">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{p.subject || p.name}</div>
+                        <div className="text-xs text-muted-foreground">{p.room || p.teacher}</div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{p.time}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <aside className="md:col-span-1">
+          <div className="rounded-xl p-4 bg-surface">
+            <h3 className="font-semibold">Profile</h3>
+            <div className="mt-2 text-sm text-muted-foreground">
+              {profileLoading ? <Skeleton className="h-6 w-32" /> : <div>{(profileData && (profileData.name || profileData.username)) || "Guest"}</div>}
+            </div>
+            <div className="mt-4">
+              <Link href="/timetable"><Button>Open timetable</Button></Link>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
+}
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
+import { Bagel_Fat_One } from "next/font/google";
+import { useTimetable } from "@/contexts/timetable-context";
+import { useStudentProfile } from "@/lib/api/hooks";
+import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
+import { AuthButton } from "@/components/auth-button";
+import ThemeToggle from "@/components/theme-toggle";
+import SettingsMenu from "@/components/settings-menu";
+import { getCurrentDay, formatDate } from "@/utils/time-utils";
+
+export default function HomeClient() {
+  const { timetableData, currentMomentPeriodInfo, isLoading, error, refreshExternal, selectedDay } = useTimetable();
+  const { data: profileData, loading: profileLoading, refetch: refetchProfile } = useStudentProfile();
+
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, []);
+
+  const bagel = Bagel_Fat_One({ weight: "400", subsets: ["latin"], display: "swap", variable: "--font-bagel-fat-one" });
+
+  const dayName = selectedDay || (currentDate ? format(currentDate, "EEEE") : getCurrentDay());
+  const todaysPeriods = useMemo(() => (timetableData?.[dayName] ?? []), [timetableData, dayName]);
+
+  if (isLoading || !currentDate) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Syncing…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 flex flex-col items-center justify-center h-[50vh] text-center">
+        <div className="mb-4">
+          <Loader2 className="h-10 w-10 animate-spin text-destructive" />
+        </div>
+        <h2 className="text-2xl font-semibold">Connection Error</h2>
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <div className="mt-4">
+          <Button onClick={() => refreshExternal && refreshExternal()}>Try again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen pb-20 relative px-4 pt-6">
+      <header className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className={`${bagel.className} text-2xl font-bold`}>Synchron</h1>
+          <p className="text-xs text-muted-foreground">{formatDate()}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <AuthButton />
+          <SettingsMenu />
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2">
+          <div className="rounded-xl p-4 bg-surface">
+            <h2 className="text-lg font-semibold">Today — {dayName}</h2>
+            <p className="text-sm text-muted-foreground">{formatDate()}</p>
+            <div className="mt-4 space-y-2">
+              {todaysPeriods.length === 0 ? (
+                <p className="text-muted-foreground">No classes today</p>
+              ) : (
+                todaysPeriods.map((p: any, i: number) => (
+                  <div key={p.id || i} className="p-3 rounded-md bg-surface-variant">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{p.subject || p.name}</div>
+                        <div className="text-xs text-muted-foreground">{p.room || p.teacher}</div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{p.time}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <aside className="md:col-span-1">
+          <div className="rounded-xl p-4 bg-surface">
+            <h3 className="font-semibold">Profile</h3>
+            <div className="mt-2 text-sm text-muted-foreground">
+              {profileLoading ? <Skeleton className="h-6 w-32" /> : <div>{(profileData && (profileData.name || profileData.username)) || "Guest"}</div>}
+            </div>
+            <div className="mt-4">
+              <Link href="/timetable"><Button>Open timetable</Button></Link>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
+}
 import { format } from "date-fns";
 import { Loader2, Bell, MapPin, Calendar, ArrowRight } from "lucide-react";
-import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -50,7 +353,7 @@ export default function HomeClient() {
     setCurrentDate(new Date());
   }, []);
 
-<<<<<<< HEAD
+ 
   // Portal profile (preferred source for display name)
   const { data: profileData, loading: profileLoading, refetch: refetchProfile } = useStudentProfile();
   const [profileOverride, setProfileOverride] = useState<any | null>(null)
@@ -265,10 +568,8 @@ export default function HomeClient() {
     variable: "--font-bagel-fat-one",
   })
 
-  if (!mounted) {
-=======
   if (isLoading || !currentDate) {
->>>>>>> 5a8fbd17f6f66af4c908daa74515d0c2a0559aa0
+ 
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
