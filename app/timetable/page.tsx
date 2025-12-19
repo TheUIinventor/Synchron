@@ -252,18 +252,9 @@ export default function TimetablePage() {
 
   const effectiveBellBucket = (() => {
     try {
-      if (!bellTimes) {
-        try { console.debug('[timetable.page] bellTimes missing - using timetable-derived fallback for', selectedDayName) } catch (e) {}
-        return buildBucketFromTimetable(todaysTimetableRaw)
-      }
+      if (!bellTimes) return buildBucketFromTimetable(todaysTimetableRaw)
       const rawBucket = selectedDayName === 'Friday' ? bellTimes.Fri : (selectedDayName === 'Wednesday' || selectedDayName === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])
-      const rawLen = Array.isArray(rawBucket) ? rawBucket.length : 0
-      try { console.debug('[timetable.page] bellTimes lengths', { 'Mon/Tues': (bellTimes['Mon/Tues']||[]).length, 'Wed/Thurs': (bellTimes['Wed/Thurs']||[]).length, 'Fri': (bellTimes['Fri']||[]).length, selectedDayName, rawLen }) } catch (e) {}
-      if (Array.isArray(rawBucket) && rawBucket.length > 0) {
-        try { console.debug('[timetable.page] using provider bellTimes for', selectedDayName) } catch (e) {}
-        return rawBucket
-      }
-      try { console.debug('[timetable.page] provider bellTimes empty - using timetable-derived fallback for', selectedDayName) } catch (e) {}
+      if (Array.isArray(rawBucket) && rawBucket.length > 0) return rawBucket
       // fallback from timetableData for this day
       return buildBucketFromTimetable(todaysTimetableRaw)
     } catch (e) { return buildBucketFromTimetable(todaysTimetableRaw) }
@@ -623,13 +614,12 @@ export default function TimetablePage() {
                       // Compute start time for display
                       let startTime = ''
                       try {
-                        const apiTime = findBellTimeForPeriod(period, effectiveBellBucket, idx) || ''
-                        try { console.debug('[timetable.page] period match', { period: period.period || period.title || idx, apiTime, effectiveBucketLen: (effectiveBellBucket||[]).length }) } catch (e) {}
+                        const apiTime = findBellTimeForPeriod(period, bucketForSelectedDay, idx) || ''
                         const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
                         const { start } = parseTimeRange(timeSrc || '')
                         startTime = formatTo12Hour(start)
                       } catch (e) {
-                        startTime = ((bellTimes ? (findBellTimeForPeriod(period, effectiveBellBucket, idx) || period.time) : (period.time || findBellTimeForPeriod(period, effectiveBellBucket, idx)) || '').split(' - ')[0] || '')
+                        startTime = ((bellTimes ? (findBellTimeForPeriod(period, bucketForSelectedDay, idx) || period.time) : (period.time || findBellTimeForPeriod(period, bucketForSelectedDay, idx)) || '').split(' - ')[0] || '')
                       }
                       
                       // Treat Period 0, Roll Call, End of Day, and Break as non-class periods
