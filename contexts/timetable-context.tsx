@@ -2321,9 +2321,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
-              try { setSelectedDateIsHoliday(true) } catch (e) {}
-              try { holidayDateRef.current = true } catch (e) {}
-
               // Set empty timetable and mark source so UI shows 'No periods'
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
@@ -2532,34 +2529,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             source: j?.source,
             keys: Object.keys(j || {})
           })
-          // If the timetable API explicitly signals a holiday, treat the
-          // date as a holiday and return an empty timetable. This is a
-          // defensive fallback when `/api/calendar` is unavailable.
-          try {
-            if (j && (j.isHoliday === true || j.noTimetable === true)) {
-              try { setSelectedDateIsHoliday(true) } catch (e) {}
-              try { holidayDateRef.current = true } catch (e) {}
-              // Clear caches to avoid stale cached timetables rehydrating
-              try {
-                if (typeof window !== 'undefined' && window.localStorage) {
-                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                  try { clearClientCaches() } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                }
-              } catch (e) {}
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
-              setTimetableSource('external-empty')
-              setExternalWeekType(null)
-              try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ holiday: true, source: 'timetable' }) } catch (e) {}
-              try { setIsRefreshing(false) } catch (e) {}
-              if (!hadCache) try { setIsLoading(false) } catch (e) {}
-              return
-            }
-          } catch (e) {}
           // Compute a lightweight hash for this payload and try to reuse
           // any previously-processed result stored under that hash. This
           // allows the UI to show a fully-processed timetable instantly
@@ -2595,8 +2564,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore
               }
-              try { setSelectedDateIsHoliday(true) } catch (e) {}
-              try { holidayDateRef.current = true } catch (e) {}
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
