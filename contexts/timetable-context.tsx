@@ -889,6 +889,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 
+    // If calendar indicates the selected date is a holiday, force an
+    // empty timetable so the UI does not show classes. This is a final
+    // guard that prevents other refreshes from briefly showing periods
+    // on holiday dates.
+    try {
+      if (selectedDateIsHoliday || holidayDateRef.current) {
+        try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
+        return emptyByDay
+      }
+    } catch (e) {}
+
     // Prefer the live external timetable when available. The cached
     // `lastRecordedTimetable` is only a fallback for fast initial rendering
     // and should not be used when a fresh `externalTimetable` exists so
