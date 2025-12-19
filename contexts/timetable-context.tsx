@@ -615,6 +615,53 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // fallback paths from overwriting date-specific variations with stale data.
   // Key is ISO date string (YYYY-MM-DD), value is variations for that date.
   const authoritativeVariationsRef = useRef<Map<string, Record<string, { period: string; isSubstitute?: boolean; isRoomChange?: boolean; displayRoom?: string; displayTeacher?: string; casualSurname?: string; originalTeacher?: string; originalRoom?: string }[]>>>(__initialAuthoritativeVariations)
+  // Helper: overlay authoritative variations (from `authoritativeVariationsRef`) onto
+  // a provided timetable map for a given ISO date. Returns a shallow-cloned map
+  // with variations applied so callers can safely set state without losing
+  // previously-captured substitute/room-change information.
+  const applyAuthoritativeVariationsToMap = (mapInput: Record<string, Period[]> | null, isoDate?: string) => {
+    try {
+      if (!mapInput) return mapInput
+      const dateKey = isoDate || externalTimetableDateRef.current || (selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null)
+      if (!dateKey) return mapInput
+      const authMap = authoritativeVariationsRef.current
+      const authForDate = authMap.get(dateKey)
+      if (!authForDate) return mapInput
+      const out: Record<string, Period[]> = {}
+      for (const d of Object.keys(mapInput)) {
+        out[d] = (mapInput[d] || []).map(p => ({ ...(p as any) }))
+      }
+      for (const [day, variations] of Object.entries(authForDate)) {
+        try {
+          if (!out[day]) out[day] = []
+          for (const v of (variations || [])) {
+            const norm = String(v.period || '').trim().toLowerCase()
+            let target = out[day].find((x: any) => String(x.period || '').trim().toLowerCase() === norm)
+            if (!target) {
+              // Try fuzzy match by subject or create a placeholder
+              target = out[day].find((x: any) => String((x.subject||'')).trim().toLowerCase().includes((String(v.period||'')).trim().toLowerCase()))
+            }
+            if (!target) {
+              target = { period: v.period || '', time: '', subject: '', teacher: '', room: '' } as any
+              out[day].push(target)
+            }
+            if (v.isSubstitute) {
+              target.isSubstitute = true
+              if (v.casualSurname) target.casualSurname = v.casualSurname
+              if (v.displayTeacher) target.displayTeacher = v.displayTeacher
+              if (v.originalTeacher) target.originalTeacher = v.originalTeacher
+            }
+            if (v.isRoomChange && v.displayRoom) {
+              target.isRoomChange = true
+              target.displayRoom = v.displayRoom
+              target.originalRoom = target.room || ''
+            }
+          }
+        } catch (e) { /* ignore per-day apply errors */ }
+      }
+      return out
+    } catch (e) { return mapInput }
+  }
   // Debug: log authoritative variations presence on mount and when selected date changes
   useEffect(() => {
     try {
@@ -774,7 +821,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
                 const shouldApplyCachedSubs = isOffline && (cachedSubs && Array.isArray(cachedSubs) && cachedSubs.length)
                 const final = shouldApplyCachedSubs ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
-                setExternalTimetable(final)
+                setExternalTimetable(applyAuthoritativeVariationsToMap(final, null))
                 setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
                 try { console.debug('[timetable.provider] hydrate: setExternalBellTimes (initial cache)', __initialExternalBellTimes) } catch (e) {}
                 setExternalBellTimes(__initialExternalBellTimes || null)
@@ -783,7 +830,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
               // apply raw map if processing fails
               if (!cancelled && map) {
-                setExternalTimetable(map)
+                setExternalTimetable(applyAuthoritativeVariationsToMap(map, null))
                 setTimetableSource(__initialTimetableSource || 'cache')
                 setLastRecordedTimetable(map)
               }
@@ -2428,7 +2475,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
                     } catch (e) {}
-                    setExternalTimetable(parsedCache.timetable)
+                    setExternalTimetable(applyAuthoritativeVariationsToMap(parsedCache.timetable, null))
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     // Only restore cached bell times if we don't already have authoritative
                     // date-specific bells from /api/timetable
@@ -2663,7 +2710,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
                 // Track which date this timetable is FOR
                 externalTimetableDateRef.current = computedDate
-                setExternalTimetable(finalTimetable)
+                setExternalTimetable(applyAuthoritativeVariationsToMap(finalTimetable, computedDate))
                 setTimetableSource(computedSource)
                 setLastFetchedDate(computedDate)
                 if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
@@ -2757,7 +2804,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // the reasons described above.
               // Batch all related state updates atomically
               startTransition(() => {
-                setExternalTimetable(byDay)
+                setExternalTimetable(applyAuthoritativeVariationsToMap(byDay, todayDateStr2))
                 setTimetableSource(computedSourceArr)
                 if (j.weekType === 'A' || j.weekType === 'B') {
                   setExternalWeekType(j.weekType)
@@ -2776,7 +2823,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (hasData) {
             // Batch state updates for scraped HTML data
             startTransition(() => {
-              setExternalTimetable(parsed)
+              setExternalTimetable(applyAuthoritativeVariationsToMap(parsed, todayDateStr2))
               setTimetableSource('external-scraped')
               // Clear loading indicator as soon as we have valid data
               setIsRefreshing(false)
@@ -3039,7 +3086,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             startTransition(() => {
               // Track which date this timetable is FOR
               if (retryDate) externalTimetableDateRef.current = retryDate
-              setExternalTimetable(finalTimetable)
+              setExternalTimetable(applyAuthoritativeVariationsToMap(finalTimetable, retryDate))
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)
@@ -3089,7 +3136,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             startTransition(() => {
               // Track which date this timetable is FOR - use the date we fetched for
               externalTimetableDateRef.current = todayDateStr2
-              setExternalTimetable(finalTimetable)
+              setExternalTimetable(applyAuthoritativeVariationsToMap(finalTimetable, todayDateStr2))
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)
@@ -3108,7 +3155,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (hasData) {
             // Batch state updates for scraped HTML after retry
             startTransition(() => {
-              setExternalTimetable(parsed)
+              setExternalTimetable(applyAuthoritativeVariationsToMap(parsed, todayDateStr2))
               setTimetableSource('external-scraped')
               // Clear loading indicator as soon as we have valid data
               setIsRefreshing(false)
@@ -3128,7 +3175,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (lastRecordedTimetable) {
         // Prefer showing cached real data when available regardless of auth state.
         startTransition(() => {
-          setExternalTimetable(lastRecordedTimetable)
+          setExternalTimetable(applyAuthoritativeVariationsToMap(lastRecordedTimetable, null))
           setTimetableSource('cache')
           setError(null)
           // Clear loading indicator as soon as we have valid data
