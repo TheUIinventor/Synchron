@@ -605,6 +605,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Debug: record last fetched date and a small payload summary for diagnostics
   const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null)
   const [lastFetchedPayloadSummary, setLastFetchedPayloadSummary] = useState<any | null>(null)
+  const [selectedDateIsHoliday, setSelectedDateIsHoliday] = useState<boolean>(false)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
@@ -626,6 +627,67 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try { console.debug('[timetable.provider] selectedIso=', selIso, 'hasAuthVars=', map.has(selIso), 'authVarsForSelected=', map.get(selIso)) } catch (e) {}
       }
     } catch (e) {}
+  }, [selectedDateObject])
+
+  // Watch for selected date changes and consult the calendar API to
+  // determine whether the chosen date is a holiday. If the calendar
+  // reports a holiday for the selected date, ensure the UI does not
+  // display classes by setting the external timetable to an explicit
+  // empty map and marking the source accordingly.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const sel = selectedDateObject
+        if (!sel) return
+        const ds = sel.toISOString().slice(0,10)
+        try {
+          const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
+          const ctype = res.headers.get('content-type') || ''
+          if (res.ok && ctype.includes('application/json')) {
+            const calJson = await res.json()
+            let dayInfo: any = null
+            if (Array.isArray(calJson) && calJson.length) dayInfo = calJson[0]
+            else if (calJson && typeof calJson === 'object' && calJson[ds]) dayInfo = calJson[ds]
+            else if (calJson && typeof calJson === 'object') {
+              for (const k of Object.keys(calJson)) {
+                const v = calJson[k]
+                if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
+              }
+            }
+
+            const isHoliday = Boolean(
+              dayInfo && (
+                dayInfo.isHoliday === true ||
+                dayInfo.holiday === true ||
+                String(dayInfo.is_school_day).toLowerCase() === 'false' ||
+                String(dayInfo.status || '').toLowerCase().includes('holiday') ||
+                String(dayInfo.type || '').toLowerCase().includes('holiday') ||
+                String(dayInfo.dayType || '').toLowerCase().includes('holiday')
+              )
+            )
+
+            if (cancelled) return
+            setSelectedDateIsHoliday(isHoliday)
+            if (isHoliday) {
+              try { console.debug('[timetable.provider] selected date is holiday according to calendar:', ds) } catch (e) {}
+              setExternalTimetable(emptyByDay)
+              setExternalTimetableByWeek(null)
+              setTimetableSource('calendar-holiday')
+              setExternalWeekType(null)
+              try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+            } else {
+              // If it's not a holiday, do not forcibly fetch here; allow
+              // the normal refreshExternal paths to populate state.
+            }
+          }
+        } catch (e) {
+          // ignore calendar fetch errors; do not alter holiday flag
+        }
+      } catch (e) {}
+    })()
+    return () => { cancelled = true }
   }, [selectedDateObject])
   // Track the date that the current externalTimetable data is actually FOR (not the selected date)
   // This is critical for correctly associating variations with the right date when capturing them
