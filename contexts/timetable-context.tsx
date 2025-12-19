@@ -1000,7 +1000,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const authVarsForDate = authVarsMap.get(selectedIso)
           
           try { console.debug('[timetable.provider] variation lookup for', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
-          
+
+          // If the server/client has captured authoritative variations for
+          // this date but the live `filtered[day]` is empty (e.g., a
+          // background refresh briefly cleared the timetable), attempt to
+          // reconstruct minimal period rows from either the live day source
+          // or the last recorded timetable so substitutes/room-changes can
+          // remain visible instead of flashing then disappearing.
+          try {
+            if (Array.isArray(filtered[day]) && filtered[day].length === 0 && authVarsForDate && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
+              const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+              const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
+              const reconstructed: Period[] = []
+              for (const v of authVarsForDate[day]) {
+                try {
+                  let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                  if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                  const base: any = src ? { ...src } : { period: v.period || '', time: '', subject: '', teacher: '' }
+                  if (v.isSubstitute) {
+                    base.isSubstitute = true
+                    if (v.casualSurname) base.casualSurname = v.casualSurname
+                    if (v.displayTeacher) base.displayTeacher = v.displayTeacher
+                    if (v.originalTeacher) base.originalTeacher = v.originalTeacher
+                  }
+                  if (v.isRoomChange && v.displayRoom) {
+                    base.isRoomChange = true
+                    base.displayRoom = v.displayRoom
+                    base.originalRoom = base.room || ''
+                  }
+                  reconstructed.push(base)
+                } catch (e) {
+                  // ignore single-item reconstruction errors
+                }
+              }
+              if (reconstructed.length) filtered[day] = reconstructed
+            }
+          } catch (e) {
+            // ignore reconstruction errors
+          }
+
           // Apply variations to all periods in this day
           // STRATEGY: Always apply authoritative variations if they exist for this date.
           // Also overlay fresh match data if it has variations (to update the display with newest data).
