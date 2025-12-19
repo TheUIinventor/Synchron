@@ -2520,6 +2520,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const rctype = r.headers.get('content-type') || ''
         if (rctype.includes('application/json')) {
           const j = await r.json()
+          // Inspired by timetabl-app: some upstream shapes use boolean or
+          // empty timetable structures to indicate "no timetable". Treat
+          // these shapes as authoritative and show an empty timetable.
+          try {
+            const rawTimetable = j && j.timetable
+            const nestedBoolean = rawTimetable && (rawTimetable.timetable === true || rawTimetable.timetable === false)
+            const isBooleanTimetable = typeof rawTimetable === 'boolean' || Boolean(nestedBoolean)
+            const looksEmptyObject = ((): boolean => {
+              try {
+                if (!rawTimetable) return false
+                if (typeof rawTimetable === 'object') {
+                  // Common shapes: timetable.timetable.periods or timetable.days
+                  if (rawTimetable.timetable && typeof rawTimetable.timetable === 'object') {
+                    const inner = rawTimetable.timetable
+                    if (Array.isArray(inner) && inner.length === 0) return true
+                    if (inner.periods && typeof inner.periods === 'object' && Object.keys(inner.periods).length === 0) return true
+                    if (inner.days && typeof inner.days === 'object' && Object.keys(inner.days).length === 0) return true
+                  }
+                  // Top-level timetable may include a days map
+                  if (rawTimetable.days && typeof rawTimetable.days === 'object' && Object.keys(rawTimetable.days).length === 0) return true
+                }
+                return false
+              } catch (e) { return false }
+            })()
+
+            if (isBooleanTimetable || looksEmptyObject || j?.noTimetable === true) {
+              try { console.debug('[timetable.provider] JSON payload indicates no timetable (boolean/empty) - showing empty timetable') } catch (e) {}
+              setExternalTimetable(emptyByDay)
+              setExternalTimetableByWeek(null)
+              setTimetableSource('external-empty')
+              setExternalWeekType(null)
+              try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: 'no timetable (boolean/empty)' }) } catch (e) {}
+              setIsRefreshing(false)
+              if (!hadCache) setIsLoading(false)
+              return
+            }
+          } catch (e) {
+            // ignore detection errors and continue
+          }
           try { setIsAuthenticated(true); setReauthRequired(false) } catch (e) {}
           console.log('[DEBUG refreshExternal] got JSON response:', { 
             hasError: !!j?.error, 
