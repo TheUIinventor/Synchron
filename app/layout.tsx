@@ -49,7 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body className={`${roboto.className} font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
+      <body className={`font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
         <ClientLayout>
           {children}
           <Toaster />

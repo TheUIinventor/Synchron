@@ -35,10 +35,10 @@ export default function HomeClient() {
     );
   }
 
-  const { timetableData, currentMomentPeriodInfo, isLoading, error, refreshExternal, selectedDay } = useTimetable();
+  const { timetableData, currentMomentPeriodInfo, isLoading, error, refreshExternal, selectedDay, selectedDateObject } = useTimetable();
   const { data: profileData, loading: profileLoading } = useStudentProfile();
 
-  if (isLoading || !currentDate) {
+  if (isLoading || !selectedDateObject) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -71,7 +71,7 @@ export default function HomeClient() {
 
   // Get today's periods for the sidebar
   // Use selectedDay if available, otherwise fallback to current day name
-  const dayName = selectedDay || format(currentDate, "EEEE");
+  const dayName = selectedDay || format(selectedDateObject, "EEEE");
   const todaysPeriods = timetableData[dayName] || [];
 
   return (
