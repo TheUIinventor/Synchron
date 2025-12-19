@@ -405,12 +405,12 @@ export default function HomeClient() {
                 <div className="mt-3">
                   <h2 className="text-2xl sm:text-3xl md:text-5xl font-sans font-semibold leading-tight mb-2">
                     {currentPeriod?.subject ? (
-                      canvasLinks[currentPeriod.subject] ? (
-                        <a href={canvasLinks[currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                          {currentPeriod.subject}
+                      canvasLinks[(currentPeriod as any)?.title || currentPeriod.subject] ? (
+                        <a href={canvasLinks[(currentPeriod as any)?.title || currentPeriod.subject]} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                          {(currentPeriod as any)?.title || currentPeriod.subject}
                         </a>
                       ) : (
-                        <>{currentPeriod.subject}</>
+                        <>{(currentPeriod as any)?.title || currentPeriod.subject}</>
                       )
                     ) : (
                       "Free Period"
