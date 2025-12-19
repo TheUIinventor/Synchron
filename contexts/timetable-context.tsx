@@ -1218,6 +1218,109 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
+      // Apply any authoritative variations (subs/room-changes) captured
+      // previously so they are not lost when a fresh external timetable
+      // arrives. Use the timetable's date ref when available, otherwise
+      // fall back to the currently-selected date.
+      try {
+        const selectedIso = externalTimetableDateRef.current || (selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null)
+        const authVarsMap = authoritativeVariationsRef.current
+        const authVarsForDate = selectedIso && authVarsMap ? authVarsMap.get(selectedIso) : null
+        if (authVarsForDate) {
+          try { console.debug('[timetable.provider] applying authoritative variations (daily) for', selectedIso) } catch (e) {}
+          for (const day of Object.keys(filtered)) {
+            const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+            // If the fresh timetable is empty but we have authoritative
+            // variations for this day, attempt to reconstruct minimal rows
+            // so substitutes/room-changes remain visible.
+            try {
+              if (Array.isArray(filtered[day]) && filtered[day].length === 0 && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
+                const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
+                const reconstructed: Period[] = []
+                for (const v of authVarsForDate[day]) {
+                  try {
+                    let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                    if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                    const base: any = src ? { ...src } : { period: v.period || '', time: '', subject: '', teacher: '' }
+                    if (v.isSubstitute) {
+                      base.isSubstitute = true
+                      if (v.casualSurname) base.casualSurname = v.casualSurname
+                      if (v.displayTeacher) base.displayTeacher = v.displayTeacher
+                      if (v.originalTeacher) base.originalTeacher = v.originalTeacher
+                    }
+                    if (v.isRoomChange && v.displayRoom) {
+                      base.isRoomChange = true
+                      base.displayRoom = v.displayRoom
+                      base.originalRoom = base.room || ''
+                    }
+                    reconstructed.push(base)
+                  } catch (e) {}
+                }
+                if (reconstructed.length) filtered[day] = reconstructed
+              }
+            } catch (e) {}
+
+            for (const p of filtered[day]) {
+              try {
+                const normPeriod = String(p.period).trim().toLowerCase()
+                const authVariation = (authVarsForDate[day] || []).find((v: any) => String(v.period).trim().toLowerCase() === normPeriod)
+                if (authVariation) {
+                  if (authVariation.isSubstitute) {
+                    (p as any).isSubstitute = true
+                    if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
+                    if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
+                    if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
+                  }
+                  if (authVariation.isRoomChange && authVariation.displayRoom) {
+                    const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                    const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
+                    if (variationRoom && variationRoom !== scheduledRoom) {
+                      (p as any).isRoomChange = true
+                      (p as any).displayRoom = authVariation.displayRoom
+                      (p as any).originalRoom = p.room
+                    }
+                  }
+                }
+                // Also overlay fresh day-source variations if present
+                if (daySource.length) {
+                  const normSubject = String(p.subject || '').trim().toLowerCase()
+                  const match = daySource.find((src) => {
+                    const srcPeriod = String(src.period).trim().toLowerCase()
+                    const srcSubject = String(src.subject || '').trim().toLowerCase()
+                    if (srcPeriod !== normPeriod) return false
+                    if (srcSubject === normSubject) return true
+                    if (srcSubject.includes(normSubject) || normSubject.includes(srcSubject)) return true
+                    const srcCode = srcSubject.replace(/[^a-z0-9]/g, '')
+                    const pCode = normSubject.replace(/[^a-z0-9]/g, '')
+                    if (srcCode && pCode && (srcCode.includes(pCode) || pCode.includes(srcCode))) return true
+                    return false
+                  })
+                  if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
+                    if ((match as any).isSubstitute) {
+                      (p as any).isSubstitute = true
+                      if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
+                      if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
+                      if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
+                      if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
+                      if (match.teacher) p.teacher = match.teacher
+                    }
+                    if ((match as any).isRoomChange && (match as any).displayRoom) {
+                      const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                      const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
+                      if (variationRoom && variationRoom !== scheduledRoom) {
+                        (p as any).isRoomChange = true
+                        (p as any).displayRoom = (match as any).displayRoom
+                        (p as any).originalRoom = p.room
+                      }
+                    }
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (e) {}
+
       preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
     }
