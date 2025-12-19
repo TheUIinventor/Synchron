@@ -14,6 +14,8 @@ import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
 
+export const dynamic = 'force-dynamic';
+
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)

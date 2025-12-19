@@ -19,6 +19,8 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import InstallAppButton from "@/components/install-app-button"
 
+export const dynamic = 'force-dynamic';
+
 const CANVAS_LINKS_KEY = "synchron-canvas-links"
 
 function CanvasLinksEditor() {

@@ -14,6 +14,8 @@ import { useUserSettings } from "@/components/theme-provider" // Import useUserS
 import { useParticipation, useAwardPoints } from "@/lib/api/hooks"
 import { cn } from "@/lib/utils"
 
+export const dynamic = 'force-dynamic';
+
 export default function AwardsPage() {
   useEffect(() => {
     // Track awards usage

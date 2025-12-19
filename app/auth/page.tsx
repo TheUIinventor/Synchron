@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/api/hooks"
 import SignInButton from "@/components/auth/sign-in-button"
 import PageTransition from "@/components/page-transition"
 
+export const dynamic = 'force-dynamic';
+
 export default function AuthPage() {
   const { isAuthenticated, loading } = useAuth()
   const router = useRouter()

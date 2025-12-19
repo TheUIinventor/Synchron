@@ -6,6 +6,8 @@ import ClientLayout from "./client-layout";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 
+export const dynamic = 'force-dynamic';
+
 const roboto = Roboto_Flex({
   subsets: ["latin"],
   display: "swap",

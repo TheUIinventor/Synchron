@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import PageTransition from "@/components/page-transition"
 
+export const dynamic = 'force-dynamic';
+
 // Helper function to format date as YYYY-MM-DD
 const formatDateToYYYYMMDD = (date: Date): string => {
   const year = date.getFullYear()

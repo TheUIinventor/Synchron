@@ -5,6 +5,8 @@ import { ExternalLink, RefreshCw, X, LogIn } from "lucide-react"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import { Button } from "@/components/ui/button"
 
+export const dynamic = 'force-dynamic';
+
 export default function ClipboardPage() {
   const [showAuthHelper, setShowAuthHelper] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)

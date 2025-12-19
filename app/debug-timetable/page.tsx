@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
+export const dynamic = 'force-dynamic';
+
 export default function DebugTimetablePage() {
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
