@@ -670,6 +670,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
             if (cancelled) return
             setSelectedDateIsHoliday(isHoliday)
+            try { holidayDateRef.current = isHoliday } catch (e) {}
             if (isHoliday) {
               try { console.debug('[timetable.provider] selected date is holiday according to calendar:', ds) } catch (e) {}
               setExternalTimetable(emptyByDay)
@@ -787,6 +788,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             )
             if (isHoliday) {
               holidayDateRef.current = true
+              try { setSelectedDateIsHoliday(true) } catch (e) {}
               try { clearClientCaches() } catch (e) {}
               if (!cancelled) {
                 setExternalTimetable(emptyByDay)
@@ -1612,7 +1614,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
 
     return currentWeek === "B" ? timetableWeekB : timetableWeekA
-  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject])
+  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday])
 
   // Persist computed break-layouts (simple heuristic) so we can hydrate
   // break rows quickly on restart without recomputing from bells immediately.
@@ -3587,6 +3589,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               )
               if (isHolidaySel) {
                 holidayDateRef.current = true
+                try { setSelectedDateIsHoliday(true) } catch (e) {}
                 try {
                   if (typeof window !== 'undefined' && window.localStorage) {
                     try { clearClientCaches() } catch (e) {}
