@@ -2524,31 +2524,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           // empty timetable structures to indicate "no timetable". Treat
           // these shapes as authoritative and show an empty timetable.
           try {
-            // Broad detection inspired by timetabl-app: treat a variety of
-            // upstream shapes as "no timetable". This includes:
-            // - j.timetable being a boolean
-            // - nested boolean markers like j.timetable.timetable === false
-            // - empty objects/maps for 'periods' or 'days'
-            // - explicit j.noTimetable === true
-            const t = j && j.timetable
-
-            const isBoolean = typeof t === 'boolean' || (t && typeof t.timetable === 'boolean')
-
-            const isEmptyMap = (() => {
+            const rawTimetable = j && j.timetable
+            const nestedBoolean = rawTimetable && (rawTimetable.timetable === true || rawTimetable.timetable === false)
+            const isBooleanTimetable = typeof rawTimetable === 'boolean' || Boolean(nestedBoolean)
+            const looksEmptyObject = ((): boolean => {
               try {
-                if (!t) return false
-                if (t.days && typeof t.days === 'object' && Object.keys(t.days).length === 0) return true
-                if (t.periods && typeof t.periods === 'object' && Object.keys(t.periods).length === 0) return true
-                if (t.timetable && typeof t.timetable === 'object') {
-                  const inner = t.timetable
-                  if (inner.periods && typeof inner.periods === 'object' && Object.keys(inner.periods).length === 0) return true
-                  if (inner.days && typeof inner.days === 'object' && Object.keys(inner.days).length === 0) return true
+                if (!rawTimetable) return false
+                if (typeof rawTimetable === 'object') {
+                  // Common shapes: timetable.timetable.periods or timetable.days
+                  if (rawTimetable.timetable && typeof rawTimetable.timetable === 'object') {
+                    const inner = rawTimetable.timetable
+                    if (Array.isArray(inner) && inner.length === 0) return true
+                    if (inner.periods && typeof inner.periods === 'object' && Object.keys(inner.periods).length === 0) return true
+                    if (inner.days && typeof inner.days === 'object' && Object.keys(inner.days).length === 0) return true
+                  }
+                  // Top-level timetable may include a days map
+                  if (rawTimetable.days && typeof rawTimetable.days === 'object' && Object.keys(rawTimetable.days).length === 0) return true
                 }
                 return false
               } catch (e) { return false }
             })()
 
-            if (isBoolean || isEmptyMap || j?.noTimetable === true) {
+            if (isBooleanTimetable || looksEmptyObject || j?.noTimetable === true) {
               try { console.debug('[timetable.provider] JSON payload indicates no timetable (boolean/empty) - showing empty timetable') } catch (e) {}
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
