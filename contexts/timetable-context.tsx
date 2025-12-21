@@ -3151,14 +3151,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   setExternalTimetableByWeek(null)
                   setTimetableSource('calendar-holiday')
                   setExternalWeekType(null)
-                  try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+                  try { setLastFetchedDate(todayDateStr2); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
                 }
-                } catch (e) {}
-                setExternalTimetable(emptyByDay)
-                setExternalTimetableByWeek(null)
-                setTimetableSource('calendar-holiday')
-                setExternalWeekType(null)
-                try { setLastFetchedDate(todayDateStr2); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
                 setIsRefreshing(false)
                 if (!hadCache) setIsLoading(false)
                 return
