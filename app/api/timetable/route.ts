@@ -4,7 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 // control header to avoid public/shared caching at the edge/CDN.
 const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
 // Shared cache for unauthenticated requests (safe to cache by CDNs)
-const SHARED_CACHE = 'public, s-maxage=30, stale-while-revalidate=300'
+// Increased s-maxage to reduce edge misses for unauthenticated reads.
+const SHARED_CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
+
+// Lightweight in-memory cache used per-function-instance for short-term
+// deduplication of identical unauthenticated requests. This helps absorb
+// bursts of client polling without hitting upstream portal APIs repeatedly.
+type CachedResponse = { timestamp: number; payload: any }
+const inMemoryCache = new Map<string, CachedResponse>()
+const INMEM_TTL = 1000 * 60 * 5 // 5 minutes
 
 type WeekType = 'A' | 'B'
 
@@ -104,6 +112,17 @@ export async function GET(req: NextRequest) {
   // caching at the edge to reduce function invocations.
   const cacheControl = (incomingCookie || accessToken) ? NON_SHARED_CACHE : SHARED_CACHE
   try { console.debug('[timetable.route] incomingCookiePresent=', Boolean(incomingCookie), 'accessTokenPresent=', Boolean(accessToken), '-> Cache-Control=', cacheControl) } catch (e) {}
+
+  // Serve from lightweight in-memory cache for unauthenticated reads.
+  // This greatly reduces repeated upstream fetches when many clients poll.
+  const cacheKey = `timetable:${dateParam || 'all'}`
+  if (!incomingCookie && !accessToken) {
+    const cached = inMemoryCache.get(cacheKey)
+    if (cached && (Date.now() - cached.timestamp) < INMEM_TTL) {
+      try { console.debug('[timetable.route] served from in-memory cache', cacheKey) } catch (e) {}
+      return NextResponse.json(cached.payload, { status: 200, headers: { 'Cache-Control': cacheControl } })
+    }
+  }
 
   const baseHeaders: Record<string, string> = {
     'Accept': 'application/json, text/javascript, */*; q=0.9',
@@ -1398,7 +1417,7 @@ export async function GET(req: NextRequest) {
         }
       } catch (e) {}
 
-      return NextResponse.json({
+      const responsePayload = {
         timetable: byDay,
         timetableByWeek,
         bellTimes: typeof bellSchedules !== 'undefined' ? bellSchedules : undefined,
@@ -1423,7 +1442,19 @@ export async function GET(req: NextRequest) {
             bells: bellsRes?.json ?? null,
           }
         }
-      }, { status: 200, headers: { 'Cache-Control': cacheControl } })
+      }
+
+      // Cache successful unauthenticated responses in-memory for a short TTL
+      try {
+        if (!incomingCookie && !accessToken) {
+          inMemoryCache.set(cacheKey, { timestamp: Date.now(), payload: responsePayload })
+          try { console.debug('[timetable.route] cached in-memory', cacheKey) } catch (e) {}
+        }
+      } catch (e) {
+        // ignore cache set failures
+      }
+
+      return NextResponse.json(responsePayload, { status: 200, headers: { 'Cache-Control': cacheControl } })
     }
 
     return NextResponse.json(
