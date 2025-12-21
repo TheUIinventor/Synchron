@@ -16,6 +16,13 @@ export const dynamic = 'force-dynamic'
 
 const SBHS_API_BASE = 'https://student.sbhs.net.au/api'
 
+// Short-term in-memory cache for calendar responses to absorb polling bursts.
+type CalCached = { timestamp: number; payload: any }
+const calInMemory = new Map<string, CalCached>()
+const CAL_INMEM_TTL = 1000 * 60 * 5 // 5 minutes
+// Shared cache header (safe because calendar data is not user-specific)
+const SHARED_CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -28,9 +35,21 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // Get access token from cookies
+    // Get access token from cookies (SBHS requires auth for this proxy)
     const accessToken = request.cookies.get('sbhs_access_token')?.value
-    
+
+    // Build a cache key from endpoint + params. Calendar/terms data is
+    // canonical (not user-specific) so it's safe to cache regardless of
+    // which authenticated user requested it. This reduces upstream load.
+    const from = searchParams.get('from') || ''
+    const to = searchParams.get('to') || ''
+    const cacheKey = `calendar:${endpoint}:${from}:${to}`
+    const cached = calInMemory.get(cacheKey)
+    if (cached && (Date.now() - cached.timestamp) < CAL_INMEM_TTL) {
+      try { console.debug('[Calendar API] served from in-memory cache', cacheKey) } catch (e) {}
+      return NextResponse.json(cached.payload, { status: 200, headers: { 'Cache-Control': SHARED_CACHE } })
+    }
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Not authenticated' },
@@ -76,11 +95,20 @@ export async function GET(request: NextRequest) {
     }
     
     const data = await response.json()
-    
+
+    // Cache the response payload in-memory for a short TTL to reduce repeated
+    // upstream requests during client polling bursts.
+    try {
+      calInMemory.set(cacheKey, { timestamp: Date.now(), payload: data })
+      try { console.debug('[Calendar API] cached in-memory', cacheKey) } catch (e) {}
+    } catch (e) {
+      // ignore cache set failures
+    }
+
     // Log the response for debugging
     console.log(`[Calendar API] ${endpoint} response:`, JSON.stringify(data).slice(0, 500))
-    
-    return NextResponse.json(data)
+
+    return NextResponse.json(data, { headers: { 'Cache-Control': SHARED_CACHE } })
   } catch (error) {
     console.error('[Calendar API] Error:', error)
     return NextResponse.json(
