@@ -657,7 +657,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             }
 
-            const isHoliday = Boolean(
+            let isHoliday = Boolean(
               dayInfo && (
                 dayInfo.isHoliday === true ||
                 dayInfo.holiday === true ||
@@ -668,19 +668,78 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               )
             )
 
+            // If calendar/days didn't explicitly mark this date as a holiday,
+            // consult the terms endpoint for public holidays/development days
+            // as an additional authoritative source.
+            if (!isHoliday) {
+              try {
+                const year = ds.slice(0,4)
+                const tRes = await fetch(`/api/calendar?endpoint=terms&year=${encodeURIComponent(year)}`, { credentials: 'include' })
+                const tctype = tRes.headers.get('content-type') || ''
+                if (tRes.ok && tctype.includes('application/json')) {
+                  const tJson = await tRes.json()
+                  const scanForDate = (obj: any): boolean => {
+                    try {
+                      if (!obj) return false
+                      if (Array.isArray(obj)) {
+                        for (const it of obj) {
+                          if (scanForDate(it)) return true
+                        }
+                        return false
+                      }
+                      if (typeof obj === 'object') {
+                        // common fields: publicHolidays, publicholidays, developmentDays
+                        for (const k of Object.keys(obj)) {
+                          const v = obj[k]
+                          if (!v) continue
+                          if (typeof v === 'string' && String(v).trim() === ds) return true
+                          if (typeof v === 'object') {
+                            // If object has a `date` property
+                            if (v.date && String(v.date).slice(0,10) === ds) return true
+                            if (Array.isArray(v)) {
+                              for (const item of v) {
+                                if (scanForDate(item)) return true
+                              }
+                            } else if (typeof v === 'object') {
+                              // check nested
+                              if (scanForDate(v)) return true
+                            }
+                          }
+                        }
+                        return false
+                      }
+                      return false
+                    } catch (e) { return false }
+                  }
+                  if (scanForDate(tJson.publicHolidays || tJson.publicholidays || tJson) || scanForDate(tJson.developmentDays || tJson.developmentdays || tJson)) {
+                    isHoliday = true
+                  }
+                }
+              } catch (e) {
+                // ignore terms fetch errors
+              }
+            }
+
             if (cancelled) return
             setSelectedDateIsHoliday(isHoliday)
             try { holidayDateRef.current = isHoliday } catch (e) {}
             if (isHoliday) {
-              try { console.debug('[timetable.provider] selected date is holiday according to calendar:', ds) } catch (e) {}
+              try { console.debug('[timetable.provider] selected date is holiday according to calendar/terms:', ds) } catch (e) {}
+              try {
+                if (typeof window !== 'undefined' && window.localStorage) {
+                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                }
+              } catch (e) {}
+              try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
               setTimetableSource('calendar-holiday')
               setExternalWeekType(null)
-              try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
-            } else {
-              // If it's not a holiday, do not forcibly fetch here; allow
-              // the normal refreshExternal paths to populate state.
+              try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar/terms' }) } catch (e) {}
             }
           }
         } catch (e) {
@@ -3075,15 +3134,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 )
               )
               if (isHolidayCal2) {
+                holidayDateRef.current = true
+                try { setSelectedDateIsHoliday(true) } catch (e) {}
                 try {
                   if (typeof window !== 'undefined' && window.localStorage) {
                     try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                    try { clearClientCaches() } catch (e) {}
                     try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
                     try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
                     try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
                     try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
                   }
+                } catch (e) {}
+                try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
+                if (!cancelled) {
+                  setExternalTimetable(emptyByDay)
+                  setExternalTimetableByWeek(null)
+                  setTimetableSource('calendar-holiday')
+                  setExternalWeekType(null)
+                  try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+                }
                 } catch (e) {}
                 setExternalTimetable(emptyByDay)
                 setExternalTimetableByWeek(null)
@@ -3640,19 +3709,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 )
               )
               if (isHolidaySel) {
-                holidayDateRef.current = true
-                try { setSelectedDateIsHoliday(true) } catch (e) {}
-                try {
-                  if (typeof window !== 'undefined' && window.localStorage) {
-                    try { clearClientCaches() } catch (e) {}
-                  }
-                } catch (e) {}
-                setExternalTimetable(emptyByDay)
-                setExternalTimetableByWeek(null)
-                setTimetableSource('calendar-holiday')
-                setExternalWeekType(null)
-                try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
-                return
+                  holidayDateRef.current = true
+                  try { setSelectedDateIsHoliday(true) } catch (e) {}
+                  try {
+                    if (typeof window !== 'undefined' && window.localStorage) {
+                      try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                      try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                      try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                      try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                      try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                    }
+                  } catch (e) {}
+                  try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
+                  setExternalTimetable(emptyByDay)
+                  setExternalTimetableByWeek(null)
+                  setTimetableSource('calendar-holiday')
+                  setExternalWeekType(null)
+                  try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+                  return
               }
             }
           } catch (e) {
