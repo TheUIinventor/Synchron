@@ -619,6 +619,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // the initial calendar check. Prevents briefly showing cached classes
   // before we've confirmed the date is not a holiday.
   const [cacheHydrated, setCacheHydrated] = useState<boolean>(false)
+  const [initialCalendarChecked, setInitialCalendarChecked] = useState<boolean>(false)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
@@ -1687,6 +1688,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
     }
 
+    // If we have not yet completed the initial calendar check and we also
+    // have not hydrated the cache, avoid showing the bundled sample
+    // timetable (which would display classes) — return an empty map so
+    // the UI remains blank until we've determined whether the selected
+    // date is a holiday or live data is available.
+    if (!initialCalendarChecked && !useExternalTimetable && !cacheHydrated) {
+      try { console.debug('[timetable.provider] initial calendar check pending - returning empty timetable to avoid flash') } catch (e) {}
+      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    }
+
     return currentWeek === "B" ? timetableWeekB : timetableWeekA
   }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday])
 
@@ -2309,10 +2320,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const top = document.elementFromPoint(ev.clientX, ev.clientY)
             console.debug('[timetable.refresh.debug] capture', e.type, 'target=', e.target, 'top=', top)
             try { console.debug('[timetable.refresh.debug] composedPath', (ev as any).composedPath ? (ev as any).composedPath() : (ev as any).path || []) } catch (err) {}
-          } catch (err) {}
+              } catch (e) {}
         }
         const bub = (e: Event) => {
           try {
+        // Mark that the initial calendar check has completed (success or fail)
+        try { setInitialCalendarChecked(true) } catch (e) {}
             const ev = e as PointerEvent
             const top = document.elementFromPoint(ev.clientX, ev.clientY)
             console.debug('[timetable.refresh.debug] bubble', e.type, 'target=', e.target, 'defaultPrevented=', (e as any).defaultPrevented, 'top=', top)
