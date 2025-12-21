@@ -615,6 +615,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null)
   const [lastFetchedPayloadSummary, setLastFetchedPayloadSummary] = useState<any | null>(null)
   const [selectedDateIsHoliday, setSelectedDateIsHoliday] = useState<boolean>(false)
+  // Whether we've applied the locally-cached timetable after completing
+  // the initial calendar check. Prevents briefly showing cached classes
+  // before we've confirmed the date is not a holiday.
+  const [cacheHydrated, setCacheHydrated] = useState<boolean>(false)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
@@ -857,6 +861,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (isHoliday) {
               holidayDateRef.current = true
               try { setSelectedDateIsHoliday(true) } catch (e) {}
+                try { setCacheHydrated(false) } catch (e) {}
               try { clearClientCaches() } catch (e) {}
               if (!cancelled) {
                 setExternalTimetable(emptyByDay)
@@ -907,6 +912,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const shouldApplyCachedSubs = isOffline && (cachedSubs && Array.isArray(cachedSubs) && cachedSubs.length)
                 const final = shouldApplyCachedSubs ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
                 setExternalTimetable(final)
+                try { setCacheHydrated(true) } catch (e) {}
                 setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
                 try { console.debug('[timetable.provider] hydrate: setExternalBellTimes (initial cache)', __initialExternalBellTimes) } catch (e) {}
                 setExternalBellTimes(__initialExternalBellTimes || null)
@@ -916,6 +922,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // apply raw map if processing fails
               if (!cancelled && map) {
                 setExternalTimetable(map)
+                try { setCacheHydrated(true) } catch (e) {}
                 setTimetableSource(__initialTimetableSource || 'cache')
                 setLastRecordedTimetable(map)
               }
@@ -972,10 +979,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     // Prefer the live external timetable when available. The cached
     // `lastRecordedTimetable` is only a fallback for fast initial rendering
-    // and should not be used when a fresh `externalTimetable` exists so
-    // that live updates (e.g. substitute/casual teachers) are searchable
-    // and visible immediately.
-    const useExternalTimetable = externalTimetable ?? lastRecordedTimetable
+    // and should not be used until we've completed the initial calendar
+    // check; this prevents a brief flash of cached classes on holiday dates.
+    const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
     const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
@@ -3145,6 +3151,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (isHolidayCal2) {
                 holidayDateRef.current = true
                 try { setSelectedDateIsHoliday(true) } catch (e) {}
+                try { setCacheHydrated(false) } catch (e) {}
                 try {
                   if (typeof window !== 'undefined' && window.localStorage) {
                     try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
@@ -3431,6 +3438,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // Prefer showing cached real data when available regardless of auth state.
         startTransition(() => {
           setExternalTimetable(lastRecordedTimetable)
+          try { setCacheHydrated(true) } catch (e) {}
           setTimetableSource('cache')
           setError(null)
           // Clear loading indicator as soon as we have valid data
@@ -3457,6 +3465,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (lastRecordedTimetable) {
         startTransition(() => {
           setExternalTimetable(lastRecordedTimetable)
+          try { setCacheHydrated(true) } catch (e) {}
           setTimetableSource('cache')
           setError(null)
           setIsRefreshing(false)
@@ -3714,6 +3723,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (isHolidaySel) {
                   holidayDateRef.current = true
                   try { setSelectedDateIsHoliday(true) } catch (e) {}
+                  try { setCacheHydrated(false) } catch (e) {}
                   try {
                     if (typeof window !== 'undefined' && window.localStorage) {
                       try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
