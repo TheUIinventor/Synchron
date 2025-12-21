@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// In-memory cache to absorb polling bursts for anonymous homepage timetable scrapes.
+type HomeCached = { timestamp: number; payload: any }
+const homeInMem = new Map<string, HomeCached>()
+const HOME_INMEM_TTL = 1000 * 60 * 5 // 5 minutes
+const SHARED_CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
+
 // Fetch the SBHS portal homepage with forwarded cookies and scrape the on-page timetable into JSON
 export async function GET(req: NextRequest) {
   const incomingCookie = req.headers.get('cookie') || ''
+  // For anonymous clients (no cookie forwarded), try to serve a recent cached
+  // JSON timetable/holiday response to avoid repeated portal fetches.
+  const todayKey = `portal-home:${new Date().toISOString().slice(0,10)}`
+  if (!incomingCookie) {
+    const cached = homeInMem.get(todayKey)
+    if (cached && (Date.now() - cached.timestamp) < HOME_INMEM_TTL) {
+      try { console.debug('[portal-home] served from in-memory cache') } catch (e) {}
+      return NextResponse.json(cached.payload, { headers: { 'Cache-Control': SHARED_CACHE } })
+    }
+  }
   const headers: Record<string, string> = {
     'User-Agent': 'Mozilla/5.0',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -159,14 +175,24 @@ export async function GET(req: NextRequest) {
                 if ('dayType' in d && typeof d.dayType === 'string') if (/holiday/i.test(d.dayType)) return true
                 return false
               }
-              if (checkHoliday(day)) {
-                return NextResponse.json({ timetable: {}, source: 'portal-home', weekType: weekType ?? undefined, holiday: true })
-              }
+                    if (checkHoliday(day)) {
+                      const payload = { timetable: {}, source: 'portal-home', weekType: weekType ?? undefined, holiday: true }
+                      if (!incomingCookie) {
+                        try { homeInMem.set(todayKey, { timestamp: Date.now(), payload }) } catch (e) {}
+                      }
+                      return NextResponse.json(payload, { headers: { 'Cache-Control': SHARED_CACHE } })
+                    }
             } catch (e) { /* ignore individual host errors */ }
           }
         } catch (e) { /* ignore calendar check errors */ }
 
-      if (has) return NextResponse.json({ timetable: byDay, source: 'portal-home', weekType: weekType ?? undefined })
+      if (has) {
+        const payload = { timetable: byDay, source: 'portal-home', weekType: weekType ?? undefined }
+        if (!incomingCookie) {
+          try { homeInMem.set(todayKey, { timestamp: Date.now(), payload }) } catch (e) {}
+        }
+        return NextResponse.json(payload, { headers: { 'Cache-Control': SHARED_CACHE } })
+      }
 
       // If no timetable found, forward the HTML for client-side handling
       return new NextResponse(html, { headers: { 'content-type': ctype || 'text/html; charset=utf-8' }, status: res.status })

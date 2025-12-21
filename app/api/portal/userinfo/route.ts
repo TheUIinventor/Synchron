@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
-const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
+const SHARED_CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
 const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
 const cacheHeaders = (req: any) => {
   try { const hasCookie = req && req.cookies ? Boolean(req.cookies.get && (req.cookies.get('sbhs_access_token') || req.cookies.get('sbhs_refresh_token'))) : (req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie'))); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
@@ -12,6 +12,26 @@ export async function GET(req: NextRequest) {
   const apiUrl = 'https://student.sbhs.net.au/details/userinfo.json'
   const accessToken = req.cookies.get('sbhs_access_token')?.value
   const refreshToken = req.cookies.get('sbhs_refresh_token')?.value
+
+  // Short in-memory cache for anonymous probes (no tokens). This avoids
+  // repeated 401/diagnostic fetches from clients that poll while signed-out.
+  type UserCached = { timestamp: number; payload: any }
+  const USER_INMEM_KEY = 'portal-userinfo:anonymous'
+  try {
+    // top-level map allocated on first invocation and reused across worker
+    ;(globalThis as any).__portal_userinfo_cache = (globalThis as any).__portal_userinfo_cache || new Map<string, UserCached>()
+  } catch (e) {
+    // ignore
+  }
+  const userCache: Map<string, UserCached> = (globalThis as any).__portal_userinfo_cache
+  const USER_INMEM_TTL = 1000 * 60 * 5
+  if (!accessToken && !refreshToken) {
+    const cached = userCache && userCache.get(USER_INMEM_KEY)
+    if (cached && (Date.now() - cached.timestamp) < USER_INMEM_TTL) {
+      try { console.debug('[portal-userinfo] served anonymous cache') } catch (e) {}
+      return NextResponse.json(cached.payload, { status: 401, headers: cacheHeaders(req) })
+    }
+  }
 
   // Name validation helper (top-level so all fallbacks can reuse it)
   const isProbableName = (v: any) => {
@@ -65,7 +85,9 @@ export async function GET(req: NextRequest) {
 
   // If no access token, return 401 to signal signed-out; client will attempt refresh
   if (!accessToken && !refreshToken) {
-    return NextResponse.json({ success: false, error: 'Missing SBHS access token' }, { status: 401, headers: cacheHeaders(req) })
+    const payload = { success: false, error: 'Missing SBHS access token' }
+    try { userCache && userCache.set(USER_INMEM_KEY, { timestamp: Date.now(), payload }) } catch (e) {}
+    return NextResponse.json(payload, { status: 401, headers: cacheHeaders(req) })
   }
   // NOTE: Do not introspect access tokens (JWTs). Access tokens may change
   // format or content and should not be relied upon for user identity.
