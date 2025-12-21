@@ -777,12 +777,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Aggressive background refresh tuning
   // NOTE: reduced intervals to make visible-refresh more responsive.
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  // Relaxed defaults to reduce server CPU usage under concurrent load
-  const MIN_REFRESH_MS = 30 * 1000 // never refresh faster than ~30s
-  // When visible, poll at most once per minute
-  const VISIBLE_REFRESH_MS = 60 * 1000 // target interval while visible
-  // When hidden/in background, poll infrequently (5 minutes)
-  const HIDDEN_REFRESH_MS = 5 * 60 * 1000 // target interval while hidden (5m)
+  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
+  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
+  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
@@ -3653,11 +3650,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     const startWithInterval = (ms: number) => {
       if (intervalId != null) window.clearInterval(intervalId)
-      // Fire a refresh immediately but respect the provider's throttling
-      // so we don't create a burst of backend requests when many clients
-      // regain visibility at once.
-      void refreshExternal(false, false).catch(() => {})
-      intervalId = window.setInterval(() => { void refreshExternal(false, false).catch(() => {}) }, ms)
+      // Fire a refresh immediately and allow this visibility-triggered
+      // call to bypass the MIN refresh throttle by passing `force=true`.
+      void refreshExternal(false, true).catch(() => {})
+      intervalId = window.setInterval(() => { void refreshExternal(false, true).catch(() => {}) }, ms)
     }
 
     function handleVisibility() {
