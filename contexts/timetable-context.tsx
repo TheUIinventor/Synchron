@@ -777,9 +777,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Aggressive background refresh tuning
   // NOTE: reduced intervals to make visible-refresh more responsive.
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
-  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
-  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
+  // Tune intervals for performance at scale. These values reduce Vercel
+  // function churn while keeping the UI feeling responsive.
+  const MIN_REFRESH_MS = 30 * 1000 // never refresh faster than 30s
+  const VISIBLE_REFRESH_MS = 30 * 1000 // target interval while visible (30s)
+  const HIDDEN_REFRESH_MS = 180 * 1000 // target interval while hidden (3m)
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
@@ -3635,6 +3637,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
 
+    // Listen for leader changes in other tabs; if they become leader, stop
+    // attempting to refresh in this tab until lease expires.
+    const onStorage = (ev: StorageEvent) => {
+      try {
+        if (ev.key === 'synchron-refresh-leader') {
+          // no-op: presence of new leader will be considered on next tick
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('storage', onStorage)
+
     return () => {
       if (intervalId != null) window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibility)
@@ -3647,13 +3660,93 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
     let intervalId: number | null = null
+    let leaderRenewId: number | null = null
+    const TAB_ID = (() => {
+      try {
+        if (typeof window === 'undefined') return 'server'
+        let id = sessionStorage.getItem('synchron-tab-id')
+        if (!id) {
+          id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`
+          try { sessionStorage.setItem('synchron-tab-id', id) } catch (e) {}
+        }
+        return id
+      } catch (e) { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}` }
+    })()
+    const LEASE_KEY = 'synchron-refresh-leader'
+    const LEASE_MS = 30 * 1000
+
+    const getLeader = () => {
+      try {
+        const raw = localStorage.getItem(LEASE_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        return parsed
+      } catch (e) { return null }
+    }
+
+    const isLeader = () => {
+      try {
+        const l = getLeader()
+        if (!l) return false
+        if (l.id !== TAB_ID) return false
+        if (Date.now() - (l.ts || 0) > LEASE_MS) return false
+        return true
+      } catch (e) { return false }
+    }
+
+    const tryClaimLeader = () => {
+      try {
+        const l = getLeader()
+        if (!l || (Date.now() - (l.ts || 0) > LEASE_MS)) {
+          localStorage.setItem(LEASE_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() }))
+          return true
+        }
+        return l.id === TAB_ID
+      } catch (e) { return false }
+    }
+
+    const renewLease = () => {
+      try {
+        if (!isLeader()) return
+        localStorage.setItem(LEASE_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() }))
+      } catch (e) {}
+    }
 
     const startWithInterval = (ms: number) => {
       if (intervalId != null) window.clearInterval(intervalId)
-      // Fire a refresh immediately and allow this visibility-triggered
-      // call to bypass the MIN refresh throttle by passing `force=true`.
-      void refreshExternal(false, true).catch(() => {})
-      intervalId = window.setInterval(() => { void refreshExternal(false, true).catch(() => {}) }, ms)
+      // Try to claim leadership for background refreshes. Only the leader
+      // will actually perform network refreshes — this reduces duplicate
+      // polling when a user has multiple tabs open.
+      tryClaimLeader()
+
+      // Fire a refresh immediately; only the leader will execute it.
+      ;(async () => {
+        try {
+          if (isLeader()) await refreshExternal(false, true)
+        } catch (e) {}
+      })()
+
+      // Clear any previous renew interval
+      if (leaderRenewId != null) { window.clearInterval(leaderRenewId); leaderRenewId = null }
+
+      intervalId = window.setInterval(() => {
+        ;(async () => {
+          try {
+            // Only the leader performs the refresh. Non-leaders will attempt
+            // to claim leadership if the lease has expired.
+            if (!isLeader()) {
+              tryClaimLeader()
+              return
+            }
+            await refreshExternal(false, true)
+          } catch (e) {}
+        })()
+      }, ms)
+
+      // If we are leader, renew lease periodically at half the interval
+      try {
+        leaderRenewId = window.setInterval(() => { try { renewLease() } catch (e) {} }, Math.max(5000, Math.floor(ms / 2))) as unknown as number
+      } catch (e) { leaderRenewId = null }
     }
 
     function handleVisibility() {
@@ -3669,8 +3762,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     return () => {
       if (intervalId != null) window.clearInterval(intervalId)
+      try { if (leaderRenewId != null) window.clearInterval(leaderRenewId) } catch (e) {}
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
+      window.removeEventListener('storage', onStorage)
     }
   }, [])
 
