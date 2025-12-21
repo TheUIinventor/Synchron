@@ -549,6 +549,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const loadTimingStartedRef = useRef(false)
   const _initialMomentInfo = (() => {
     try {
+      // Only initialise from a cached timetable when the client is offline
+      // to avoid briefly showing cached classes on a holiday before the
+      // calendar check completes.
+      const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+      if (!isOffline) return { nextPeriod: null, timeUntil: "", isCurrentlyInClass: false, currentPeriod: null }
       if (!__initialExternalTimetable) return { nextPeriod: null, timeUntil: "", isCurrentlyInClass: false, currentPeriod: null }
       const today = getCurrentDay()
       const todays = (__initialExternalTimetable as any)[today] || []
@@ -569,6 +574,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       if (typeof window === 'undefined') return
+      // Avoid hydrating header cards from cache while online; only use
+      // cached timetable when offline so we don't flash classes on holiday
+      const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+      if (!isOffline) return
       const map = __initialExternalTimetable || null
       if (!map) return
       try {
