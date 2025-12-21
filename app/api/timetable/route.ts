@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 // Timetable responses are user/session specific. Use a private cache
 // control header to avoid public/shared caching at the edge/CDN.
 const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
+// Shared cache for unauthenticated requests (safe to cache by CDNs)
+const SHARED_CACHE = 'public, s-maxage=30, stale-while-revalidate=300'
 
 type WeekType = 'A' | 'B'
 
@@ -96,9 +98,12 @@ export async function GET(req: NextRequest) {
   const accessToken = req.cookies.get('sbhs_access_token')?.value
   const incomingCookie = req.headers.get('cookie') || ''
 
-  try {
-    console.debug('[timetable.route] incomingCookiePresent=', Boolean(incomingCookie), '-> forcing Cache-Control=', NON_SHARED_CACHE)
-  } catch (e) {}
+  // Choose cache header based on whether the request is authenticated.
+  // Keep responses private when cookies or access tokens are present to
+  // avoid leaking session-specific data. Otherwise allow short public
+  // caching at the edge to reduce function invocations.
+  const cacheControl = (incomingCookie || accessToken) ? NON_SHARED_CACHE : SHARED_CACHE
+  try { console.debug('[timetable.route] incomingCookiePresent=', Boolean(incomingCookie), 'accessTokenPresent=', Boolean(accessToken), '-> Cache-Control=', cacheControl) } catch (e) {}
 
   const baseHeaders: Record<string, string> = {
     'Accept': 'application/json, text/javascript, */*; q=0.9',
@@ -319,7 +324,7 @@ export async function GET(req: NextRequest) {
               isHoliday: true,
               noTimetable: true,
               upstream: { day: dj, full: null, bells: null },
-            }, { status: 200, headers: { 'Cache-Control': NON_SHARED_CACHE } })
+            }, { status: 200, headers: { 'Cache-Control': cacheControl } })
           }
           
           // Build periods from bells (like competitor's dttSchema.transform)
@@ -554,7 +559,7 @@ export async function GET(req: NextRequest) {
             hostTried: responses.map((r: any) => r?.status ?? null),
           },
         },
-        { status: authError.status, headers: { 'Cache-Control': NON_SHARED_CACHE } },
+        { status: authError.status, headers: { 'Cache-Control': cacheControl } },
       )
     }
 
@@ -581,16 +586,16 @@ export async function GET(req: NextRequest) {
             hostTried: responses.map((r: any) => r?.status ?? null),
           },
         },
-        { status: 401, headers: { 'Cache-Control': NON_SHARED_CACHE } },
+        { status: 401, headers: { 'Cache-Control': cacheControl } },
       )
     }
 
     // If any returned HTML (likely login), forward that HTML so the client can handle
     if ((dayRes as any).html) {
-      return new NextResponse((dayRes as any).html, { headers: { 'content-type': 'text/html; charset=utf-8', 'Cache-Control': NON_SHARED_CACHE }, status: (dayRes as any).status || 401 })
+      return new NextResponse((dayRes as any).html, { headers: { 'content-type': 'text/html; charset=utf-8', 'Cache-Control': cacheControl }, status: (dayRes as any).status || 401 })
     }
     if ((fullRes as any).html) {
-      return new NextResponse((fullRes as any).html, { headers: { 'content-type': 'text/html; charset=utf-8', 'Cache-Control': NON_SHARED_CACHE }, status: (fullRes as any).status || 401 })
+      return new NextResponse((fullRes as any).html, { headers: { 'content-type': 'text/html; charset=utf-8', 'Cache-Control': cacheControl }, status: (fullRes as any).status || 401 })
     }
 
     // Normalize into per-day buckets
@@ -1418,7 +1423,7 @@ export async function GET(req: NextRequest) {
             bells: bellsRes?.json ?? null,
           }
         }
-      }, { status: 200, headers: { 'Cache-Control': NON_SHARED_CACHE } })
+      }, { status: 200, headers: { 'Cache-Control': cacheControl } })
     }
 
     return NextResponse.json(
@@ -1439,9 +1444,9 @@ export async function GET(req: NextRequest) {
           forwardedCookies: incomingCookie ? true : false,
         },
       },
-      { status: 502, headers: { 'Cache-Control': NON_SHARED_CACHE } },
+      { status: 502, headers: { 'Cache-Control': cacheControl } },
     )
   } catch (error) {
-    return NextResponse.json({ error: 'Proxy error', details: String(error) }, { status: 500, headers: { 'Cache-Control': NON_SHARED_CACHE } })
+    return NextResponse.json({ error: 'Proxy error', details: String(error) }, { status: 500, headers: { 'Cache-Control': cacheControl } })
   }
 }
