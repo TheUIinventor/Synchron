@@ -2547,8 +2547,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
             if (isBooleanTimetable || looksEmptyObject || j?.noTimetable === true) {
               try { console.debug('[timetable.provider] JSON payload indicates no timetable (boolean/empty) - showing empty timetable') } catch (e) {}
+              // Clear client-side caches so we don't rehydrate stale timetable data
+              try {
+                if (typeof window !== 'undefined' && window.localStorage) {
+                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                }
+              } catch (e) {}
+
               setExternalTimetable(emptyByDay)
               setExternalTimetableByWeek(null)
+              setLastRecordedTimetable(null)
+              setLastRecordedTimetableByWeek(null)
               setTimetableSource('external-empty')
               setExternalWeekType(null)
               try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: 'no timetable (boolean/empty)' }) } catch (e) {}
