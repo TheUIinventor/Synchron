@@ -278,9 +278,18 @@ export async function GET(req: NextRequest) {
           
           // Extract periods - prefer building from bells + periods like competitor does
           const bells = dj.bells || []
-          const periodsObj = dj?.timetable?.timetable?.periods || dj?.timetable?.periods || {}
+          // Extract periods and subjects. These can be expensive to normalize
+          // for repeated requests, so use `getStatic` to cache the extracted
+          // structures per-date for a short TTL.
+          const periodsKey = `periods:${dateParam || 'all'}`
+          const subjectsKey = `subjects:${dateParam || 'all'}`
+
+          const periodsObj = await getStatic(periodsKey, 1000 * 60 * 30, async () => {
+            return dj?.timetable?.timetable?.periods || dj?.timetable?.periods || {}
+          }) || {}
+
           // subjects can be an object keyed by "9ENG A" or an empty array [] - handle both cases
-          const rawSubjects = dj?.timetable?.subjects
+          const rawSubjects = await getStatic(subjectsKey, 1000 * 60 * 30, async () => dj?.timetable?.subjects) || dj?.timetable?.subjects
           const subjectsObj = (!Array.isArray(rawSubjects) && rawSubjects) ? rawSubjects : {}
           const classVars = !Array.isArray(dj.classVariations) ? (dj.classVariations || {}) : {}
           const roomVars = !Array.isArray(dj.roomVariations) ? (dj.roomVariations || {}) : {}
