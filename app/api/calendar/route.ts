@@ -19,11 +19,9 @@ const SBHS_API_BASE = 'https://student.sbhs.net.au/api'
 // Short-term in-memory cache for calendar responses to absorb polling bursts.
 type CalCached = { timestamp: number; payload: any }
 const calInMemory = new Map<string, CalCached>()
-// Cache more aggressively: 10 minutes in-memory to absorb bursts and
-// reduce upstream invocations.
-const CAL_INMEM_TTL = 1000 * 60 * 10 // 10 minutes
-// Stronger shared CDN caching to reduce Active CPU across many invocations.
-const SHARED_CACHE = 'public, s-maxage=600, stale-while-revalidate=3600'
+const CAL_INMEM_TTL = 1000 * 60 * 5 // 5 minutes
+// Shared cache header (safe because calendar data is not user-specific)
+const SHARED_CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +76,8 @@ export async function GET(request: NextRequest) {
       sbhsUrl = `${SBHS_API_BASE}/calendar/terms.json`
     }
     
+    console.log(`[Calendar API] Fetching ${sbhsUrl}`)
+    
     // Fetch from SBHS API
     const response = await fetch(sbhsUrl, {
       headers: {
@@ -96,17 +96,18 @@ export async function GET(request: NextRequest) {
     
     const data = await response.json()
 
-    // Cache the raw response payload in-memory for a short TTL to reduce
-    // repeated upstream requests during client polling bursts.
+    // Cache the response payload in-memory for a short TTL to reduce repeated
+    // upstream requests during client polling bursts.
     try {
       calInMemory.set(cacheKey, { timestamp: Date.now(), payload: data })
+      try { console.debug('[Calendar API] cached in-memory', cacheKey) } catch (e) {}
     } catch (e) {
       // ignore cache set failures
     }
 
-    // Return the raw payload with strong shared caching headers. Do NOT
-    // perform any grouping, sorting, or heavy processing here — the client
-    // will do filtering and presentation.
+    // Log the response for debugging
+    console.log(`[Calendar API] ${endpoint} response:`, JSON.stringify(data).slice(0, 500))
+
     return NextResponse.json(data, { headers: { 'Cache-Control': SHARED_CACHE } })
   } catch (error) {
     console.error('[Calendar API] Error:', error)

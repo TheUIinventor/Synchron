@@ -970,120 +970,119 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }, [externalTimetable, externalTimetableByWeek, externalBellTimes, timetableSource, externalWeekType])
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
+    try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
+
+    // If calendar indicates the selected date is a holiday, force an
+    // empty timetable so the UI does not show classes. This is a final
+    // guard that prevents other refreshes from briefly showing periods
+    // on holiday dates.
     try {
-      try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
-
-      // If calendar indicates the selected date is a holiday, force an
-      // empty timetable so the UI does not show classes. This is a final
-      // guard that prevents other refreshes from briefly showing periods
-      // on holiday dates.
-      try {
-        if (selectedDateIsHoliday || holidayDateRef.current) {
-          try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
-          return emptyByDay
-        }
-      } catch (e) {}
-
-      // Prefer the live external timetable when available. The cached
-      // `lastRecordedTimetable` is only a fallback for fast initial rendering
-      // and should not be used until we've completed the initial calendar
-      // check; this prevents a brief flash of cached classes on holiday dates.
-      const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
-      const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
-      // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
-      // otherwise fall back to the last-seen cached bell times.
-      const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
-
-      // Cleanup helper: previously removed roll-call entries and orphaned period
-      // '0' placeholders, but user wants Period 0, Roll Call, and End of Day to
-      // show. Now we keep all entries and only normalize labels.
-      const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
-      const isRollCallEntry = (p: any) => {
-        const subj = String(p?.subject || '').toLowerCase()
-        const per = normalizePeriodLabel(p?.period)
-        return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
+      if (selectedDateIsHoliday || holidayDateRef.current) {
+        try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
+        return emptyByDay
       }
-      const cleanupMap = (m: Record<string, Period[]>) => {
-        // No longer filter out roll call or period 0 - user wants them visible
-        return m
-      }
-      // Normalize any explicit to-room fields left on period objects so the UI
-      // displays the destination room (toRoom / roomTo / room_to) in place of
-      // the original room. This is defensive: some upstream payloads include
-      // room variations directly on period objects instead of separate
-      // substitutions; prefer those when present.
-      const preferToRoomOnMap = (m: Record<string, Period[]>) => {
-        for (const day of Object.keys(m)) {
-          try {
-            m[day] = (m[day] || []).map((p) => {
-              // Check several common variant keys that might exist on the
-              // incoming period object.
-              // NOTE: Do NOT include `.to` here - that field is commonly used for
-              // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
-              const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || undefined
-              // Only treat as a change when a non-empty candidate exists and the
-              // normalized value differs from the scheduled room. This avoids
-              // false positives caused by casing or surrounding whitespace.
-              if (candidate && String(candidate).trim()) {
-                const candStr = String(candidate).trim()
-                const roomStr = String(p.room || '').trim()
-                if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                  // Do not mutate `room` coming from the upstream JSON. Use a
-                  // non-destructive `displayRoom` field which the UI will
-                  // prefer when rendering. Keep `isRoomChange` to signal
-                  // that the displayed destination differs from the schedule.
-                  return { ...p, displayRoom: candStr, isRoomChange: true }
-                }
+    } catch (e) {}
+
+    // Prefer the live external timetable when available. The cached
+    // `lastRecordedTimetable` is only a fallback for fast initial rendering
+    // and should not be used until we've completed the initial calendar
+    // check; this prevents a brief flash of cached classes on holiday dates.
+    const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
+    const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
+    // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
+    // otherwise fall back to the last-seen cached bell times.
+    const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
+
+    // Cleanup helper: previously removed roll-call entries and orphaned period
+    // '0' placeholders, but user wants Period 0, Roll Call, and End of Day to
+    // show. Now we keep all entries and only normalize labels.
+    const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
+    const isRollCallEntry = (p: any) => {
+      const subj = String(p?.subject || '').toLowerCase()
+      const per = normalizePeriodLabel(p?.period)
+      return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
+    }
+    const cleanupMap = (m: Record<string, Period[]>) => {
+      // No longer filter out roll call or period 0 - user wants them visible
+      return m
+    }
+    // Normalize any explicit to-room fields left on period objects so the UI
+    // displays the destination room (toRoom / roomTo / room_to) in place of
+    // the original room. This is defensive: some upstream payloads include
+    // room variations directly on period objects instead of separate
+    // substitutions; prefer those when present.
+    const preferToRoomOnMap = (m: Record<string, Period[]>) => {
+      for (const day of Object.keys(m)) {
+        try {
+          m[day] = (m[day] || []).map((p) => {
+            // Check several common variant keys that might exist on the
+            // incoming period object.
+            // NOTE: Do NOT include `.to` here - that field is commonly used for
+            // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
+            const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || undefined
+            // Only treat as a change when a non-empty candidate exists and the
+            // normalized value differs from the scheduled room. This avoids
+            // false positives caused by casing or surrounding whitespace.
+            if (candidate && String(candidate).trim()) {
+              const candStr = String(candidate).trim()
+              const roomStr = String(p.room || '').trim()
+              if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+                // Do not mutate `room` coming from the upstream JSON. Use a
+                // non-destructive `displayRoom` field which the UI will
+                // prefer when rendering. Keep `isRoomChange` to signal
+                // that the displayed destination differs from the schedule.
+                return { ...p, displayRoom: candStr, isRoomChange: true }
               }
+            }
 
-              // Defensive: clear any stale `isRoomChange` flag only when there
-              // was no explicit destination provided on the incoming period
-              // and there is no `displayRoom` already present. We must not
-              // remove a `displayRoom` that was applied earlier by
-              // `applySubstitutionsToTimetable` or other normalization logic.
-              if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom) {
-                // If a `displayRoom` is present, assume it is intentional and
-                // preserve it. Only remove the stale `isRoomChange` flag when
-                // there is no display override to show.
-                if ((p as any).isRoomChange && !(p as any).displayRoom) {
-                  const clean = { ...p }
-                  delete (clean as any).isRoomChange
-                  // Also ensure we compute a normalized displayTeacher for the UI
-                  try {
-                    const casual = (clean as any).casualSurname || undefined
-                    const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
-                    const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                    (clean as any).displayTeacher = dt
-                  } catch (e) {}
-                  return clean
-                }
+            // Defensive: clear any stale `isRoomChange` flag only when there
+            // was no explicit destination provided on the incoming period
+            // and there is no `displayRoom` already present. We must not
+            // remove a `displayRoom` that was applied earlier by
+            // `applySubstitutionsToTimetable` or other normalization logic.
+            if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom) {
+              // If a `displayRoom` is present, assume it is intentional and
+              // preserve it. Only remove the stale `isRoomChange` flag when
+              // there is no display override to show.
+              if ((p as any).isRoomChange && !(p as any).displayRoom) {
+                const clean = { ...p }
+                delete (clean as any).isRoomChange
+                // Also ensure we compute a normalized displayTeacher for the UI
+                try {
+                  const casual = (clean as any).casualSurname || undefined
+                  const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
+                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                  (clean as any).displayTeacher = dt
+                } catch (e) {}
+                return clean
               }
-              // Compute a normalized `displayTeacher` property used by the UI.
-              try {
-                const casual = (p as any).casualSurname || undefined
-                const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
-                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                (p as any).displayTeacher = dt
-              } catch (e) {}
-              return p
-            })
-          } catch (e) {
-            // ignore normalization errors
-          }
+            }
+            // Compute a normalized `displayTeacher` property used by the UI.
+            try {
+              const casual = (p as any).casualSurname || undefined
+              const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
+              const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+              (p as any).displayTeacher = dt
+            } catch (e) {}
+            return p
+          })
+        } catch (e) {
+          // ignore normalization errors
         }
-        return m
       }
+      return m
+    }
 
-      // Merge fresh timetable with previously-seen timetable entries to preserve
-      // casually-provided teacher fields (e.g. `casualSurname`). This ensures
-      // that when a background refresh returns a timetable lacking `casualSurname`
-      // we keep the cached casual display instead of reverting to a short code.
+    // Merge fresh timetable with previously-seen timetable entries to preserve
+    // casually-provided teacher fields (e.g. `casualSurname`). This ensures
+    // that when a background refresh returns a timetable lacking `casualSurname`
+    // we keep the cached casual display instead of reverting to a short code.
 
-      // Simplified: directly set external timetable without complex preservation.
-      // Reverting the previous experimental merge logic to keep behavior stable.
-      // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
-      
-      if (useExternalTimetableByWeek) {
+    // Simplified: directly set external timetable without complex preservation.
+    // Reverting the previous experimental merge logic to keep behavior stable.
+    // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
+    
+    if (useExternalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
       for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
         let list: Period[] = []
