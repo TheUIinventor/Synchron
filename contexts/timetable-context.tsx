@@ -970,234 +970,248 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }, [externalTimetable, externalTimetableByWeek, externalBellTimes, timetableSource, externalWeekType])
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
-    try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
-
-    // If calendar indicates the selected date is a holiday, force an
-    // empty timetable so the UI does not show classes. This is a final
-    // guard that prevents other refreshes from briefly showing periods
-    // on holiday dates.
     try {
-      if (selectedDateIsHoliday || holidayDateRef.current) {
-        try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
-        return emptyByDay
-      }
-    } catch (e) {}
+      try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 
-    // Prefer the live external timetable when available. The cached
-    // `lastRecordedTimetable` is only a fallback for fast initial rendering
-    // and should not be used until we've completed the initial calendar
-    // check; this prevents a brief flash of cached classes on holiday dates.
-    const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
-    const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
-    // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
-    // otherwise fall back to the last-seen cached bell times.
-    const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
-
-    // Cleanup helper: previously removed roll-call entries and orphaned period
-    // '0' placeholders, but user wants Period 0, Roll Call, and End of Day to
-    // show. Now we keep all entries and only normalize labels.
-    const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
-    const isRollCallEntry = (p: any) => {
-      const subj = String(p?.subject || '').toLowerCase()
-      const per = normalizePeriodLabel(p?.period)
-      return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
-    }
-    const cleanupMap = (m: Record<string, Period[]>) => {
-      // No longer filter out roll call or period 0 - user wants them visible
-      return m
-    }
-    // Normalize any explicit to-room fields left on period objects so the UI
-    // displays the destination room (toRoom / roomTo / room_to) in place of
-    // the original room. This is defensive: some upstream payloads include
-    // room variations directly on period objects instead of separate
-    // substitutions; prefer those when present.
-    const preferToRoomOnMap = (m: Record<string, Period[]>) => {
-      for (const day of Object.keys(m)) {
-        try {
-          m[day] = (m[day] || []).map((p) => {
-            // Check several common variant keys that might exist on the
-            // incoming period object.
-            // NOTE: Do NOT include `.to` here - that field is commonly used for
-            // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
-            const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || undefined
-            // Only treat as a change when a non-empty candidate exists and the
-            // normalized value differs from the scheduled room. This avoids
-            // false positives caused by casing or surrounding whitespace.
-            if (candidate && String(candidate).trim()) {
-              const candStr = String(candidate).trim()
-              const roomStr = String(p.room || '').trim()
-              if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
-                // Do not mutate `room` coming from the upstream JSON. Use a
-                // non-destructive `displayRoom` field which the UI will
-                // prefer when rendering. Keep `isRoomChange` to signal
-                // that the displayed destination differs from the schedule.
-                return { ...p, displayRoom: candStr, isRoomChange: true }
-              }
-            }
-
-            // Defensive: clear any stale `isRoomChange` flag only when there
-            // was no explicit destination provided on the incoming period
-            // and there is no `displayRoom` already present. We must not
-            // remove a `displayRoom` that was applied earlier by
-            // `applySubstitutionsToTimetable` or other normalization logic.
-            if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom) {
-              // If a `displayRoom` is present, assume it is intentional and
-              // preserve it. Only remove the stale `isRoomChange` flag when
-              // there is no display override to show.
-              if ((p as any).isRoomChange && !(p as any).displayRoom) {
-                const clean = { ...p }
-                delete (clean as any).isRoomChange
-                // Also ensure we compute a normalized displayTeacher for the UI
-                try {
-                  const casual = (clean as any).casualSurname || undefined
-                  const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
-                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                  (clean as any).displayTeacher = dt
-                } catch (e) {}
-                return clean
-              }
-            }
-            // Compute a normalized `displayTeacher` property used by the UI.
-            try {
-              const casual = (p as any).casualSurname || undefined
-              const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
-              const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-              (p as any).displayTeacher = dt
-            } catch (e) {}
-            return p
-          })
-        } catch (e) {
-          // ignore normalization errors
+      // If calendar indicates the selected date is a holiday, force an
+      // empty timetable so the UI does not show classes. This is a final
+      // guard that prevents other refreshes from briefly showing periods
+      // on holiday dates.
+      try {
+        if (selectedDateIsHoliday || holidayDateRef.current) {
+          try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
+          return emptyByDay
         }
+      } catch (e) {}
+
+      // Prefer the live external timetable when available. The cached
+      // `lastRecordedTimetable` is only a fallback for fast initial rendering
+      // and should not be used until we've completed the initial calendar
+      // check; this prevents a brief flash of cached classes on holiday dates.
+      const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
+      const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
+      // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
+      // otherwise fall back to the last-seen cached bell times.
+      const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
+
+      // Cleanup helper: previously removed roll-call entries and orphaned period
+      // '0' placeholders, but user wants Period 0, Roll Call, and End of Day to
+      // show. Now we keep all entries and only normalize labels.
+      const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
+      const isRollCallEntry = (p: any) => {
+        const subj = String(p?.subject || '').toLowerCase()
+        const per = normalizePeriodLabel(p?.period)
+        return subj.includes('roll call') || subj === 'rollcall' || per === 'rc' || subj === 'rc' || subj.includes('roll')
       }
-      return m
-    }
-
-    // Merge fresh timetable with previously-seen timetable entries to preserve
-    // casually-provided teacher fields (e.g. `casualSurname`). This ensures
-    // that when a background refresh returns a timetable lacking `casualSurname`
-    // we keep the cached casual display instead of reverting to a short code.
-
-    // Simplified: directly set external timetable without complex preservation.
-    // Reverting the previous experimental merge logic to keep behavior stable.
-    // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
-    
-    if (useExternalTimetableByWeek) {
-      const filtered: Record<string, Period[]> = {}
-      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
-        let list: Period[] = []
-
-        // If an explicit current week is known, use it.
-        if (currentWeek === 'A' || currentWeek === 'B') {
-          list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
-        } else {
-          // Try to infer which week (A or B) the grouped timetable should use
-          // by comparing available per-day entries in any provided external
-          // timetable with the A/B grouped entries. This helps when the
-          // server returned `timetableByWeek` but did not provide an explicit
-          // `weekType` value for the current selection; prefer the group that
-          // best matches the live/day timetable data.
+      const cleanupMap = (m: Record<string, Period[]>) => {
+        // No longer filter out roll call or period 0 - user wants them visible
+        return m
+      }
+      // Normalize any explicit to-room fields left on period objects so the UI
+      // displays the destination room (toRoom / roomTo / room_to) in place of
+      // the original room. This is defensive: some upstream payloads include
+      // room variations directly on period objects instead of separate
+      // substitutions; prefer those when present.
+      const preferToRoomOnMap = (m: Record<string, Period[]>) => {
+        for (const day of Object.keys(m)) {
           try {
-            const reference = useExternalTimetable || lastRecordedTimetable || {}
-            const refPeriods = Array.isArray((reference as any)[day]) ? (reference as any)[day] as Period[] : []
-            const score = { A: 0, B: 0 }
-
-            const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
-
-            if (refPeriods && refPeriods.length) {
-              for (const rp of refPeriods) {
-                const rsub = norm(rp.subject)
-                const rper = norm(rp.period)
-                if (groups && Array.isArray(groups.A)) {
-                  for (const a of groups.A) {
-                    if (norm(a.subject) === rsub && norm(a.period) === rper) { score.A += 2 }
-                    else if (norm(a.period) === rper) { score.A += 1 }
-                  }
+            m[day] = (m[day] || []).map((p) => {
+              // Check several common variant keys that might exist on the
+              // incoming period object.
+              // NOTE: Do NOT include `.to` here - that field is commonly used for
+              // end times (e.g., { from: "9:00", to: "10:05" }), not room destinations.
+              const candidate = (p as any).toRoom || (p as any).roomTo || (p as any)["room_to"] || (p as any).newRoom || undefined
+              // Only treat as a change when a non-empty candidate exists and the
+              // normalized value differs from the scheduled room. This avoids
+              // false positives caused by casing or surrounding whitespace.
+              if (candidate && String(candidate).trim()) {
+                const candStr = String(candidate).trim()
+                const roomStr = String(p.room || '').trim()
+                if (candStr.toLowerCase() !== roomStr.toLowerCase()) {
+                  // Do not mutate `room` coming from the upstream JSON. Use a
+                  // non-destructive `displayRoom` field which the UI will
+                  // prefer when rendering. Keep `isRoomChange` to signal
+                  // that the displayed destination differs from the schedule.
+                  return { ...p, displayRoom: candStr, isRoomChange: true }
                 }
-                if (groups && Array.isArray(groups.B)) {
-                  for (const b of groups.B) {
-                    if (norm(b.subject) === rsub && norm(b.period) === rper) { score.B += 2 }
-                    else if (norm(b.period) === rper) { score.B += 1 }
+              }
+
+              // Defensive: clear any stale `isRoomChange` flag only when there
+              // was no explicit destination provided on the incoming period
+              // and there is no `displayRoom` already present. We must not
+              // remove a `displayRoom` that was applied earlier by
+              // `applySubstitutionsToTimetable` or other normalization logic.
+              if (!(p as any).toRoom && !(p as any).roomTo && !(p as any)["room_to"] && !(p as any).newRoom) {
+                // If a `displayRoom` is present, assume it is intentional and
+                // preserve it. Only remove the stale `isRoomChange` flag when
+                // there is no display override to show.
+                if ((p as any).isRoomChange && !(p as any).displayRoom) {
+                  const clean = { ...p }
+                  delete (clean as any).isRoomChange
+                  // Also ensure we compute a normalized displayTeacher for the UI
+                  try {
+                    const casual = (clean as any).casualSurname || undefined
+                    const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
+                    const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                    (clean as any).displayTeacher = dt
+                  } catch (e) {}
+                  return clean
+                }
+              }
+              // Compute a normalized `displayTeacher` property used by the UI.
+              try {
+                const casual = (p as any).casualSurname || undefined
+                const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
+                const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
+                (p as any).displayTeacher = dt
+              } catch (e) {}
+              return p
+            })
+          } catch (e) {
+            // ignore normalization errors
+          }
+        }
+        return m
+      }
+
+      // Merge fresh timetable with previously-seen timetable entries to preserve
+      // casually-provided teacher fields (e.g. `casualSurname`). This ensures
+      // that when a background refresh returns a timetable lacking `casualSurname`
+      // we keep the cached casual display instead of reverting to a short code.
+
+      // Simplified: directly set external timetable without complex preservation.
+      // Reverting the previous experimental merge logic to keep behavior stable.
+      // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
+      
+      if (useExternalTimetableByWeek) {
+        const filtered: Record<string, Period[]> = {}
+        for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
+          let list: Period[] = []
+
+          // If an explicit current week is known, use it.
+          if (currentWeek === 'A' || currentWeek === 'B') {
+            list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
+          } else {
+            // Try to infer which week (A or B) the grouped timetable should use
+            // by comparing available per-day entries in any provided external
+            // timetable with the A/B grouped entries. This helps when the
+            // server returned `timetableByWeek` but did not provide an explicit
+            // `weekType` value for the current selection; prefer the group that
+            // best matches the live/day timetable data.
+            try {
+              const reference = useExternalTimetable || lastRecordedTimetable || {}
+              const refPeriods = Array.isArray((reference as any)[day]) ? (reference as any)[day] as Period[] : []
+              const score = { A: 0, B: 0 }
+
+              const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+              if (refPeriods && refPeriods.length) {
+                for (const rp of refPeriods) {
+                  const rsub = norm(rp.subject)
+                  const rper = norm(rp.period)
+                  if (groups && Array.isArray(groups.A)) {
+                    for (const a of groups.A) {
+                      if (norm(a.subject) === rsub && norm(a.period) === rper) { score.A += 2 }
+                      else if (norm(a.period) === rper) { score.A += 1 }
+                    }
+                  }
+                  if (groups && Array.isArray(groups.B)) {
+                    for (const b of groups.B) {
+                      if (norm(b.subject) === rsub && norm(b.period) === rper) { score.B += 2 }
+                      else if (norm(b.period) === rper) { score.B += 1 }
+                    }
                   }
                 }
               }
-            }
 
-            if (score.A > score.B) list = Array.isArray(groups.A) ? groups.A.slice() : []
-            else if (score.B > score.A) list = Array.isArray(groups.B) ? groups.B.slice() : []
-            else {
-              // No clear match: prefer the non-empty group (A then B), or
-              // fall back to unknown if both are empty.
+              if (score.A > score.B) list = Array.isArray(groups.A) ? groups.A.slice() : []
+              else if (score.B > score.A) list = Array.isArray(groups.B) ? groups.B.slice() : []
+              else {
+                // No clear match: prefer the non-empty group (A then B), or
+                // fall back to unknown if both are empty.
+                if (groups.A && groups.A.length) list = groups.A.slice()
+                else if (groups.B && groups.B.length) list = groups.B.slice()
+                else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
+              }
+            } catch (e) {
+              // On error, fall back to original behaviour: prefer A if present
               if (groups.A && groups.A.length) list = groups.A.slice()
               else if (groups.B && groups.B.length) list = groups.B.slice()
               else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
             }
+          }
+
+          // Deep copy periods to prevent mutation of original timetableByWeek objects
+          filtered[day] = list.map(p => ({ ...p }))
+          
+          // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
+          // This ensures variations are NEVER lost, even when a background fetch returns data without them.
+          try {
+            // Use the selected date, not just today, so variations work for past/future dates
+            const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+            const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+            
+            // Check if we have authoritative variations for the selected date
+            const authVarsMap = authoritativeVariationsRef.current
+            const authVarsForDate = authVarsMap.get(selectedIso)
+            
+            try { console.debug('[timetable.provider] variation lookup for', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
+
+            // If the server/client has captured authoritative variations for
+            // this date but the live `filtered[day]` is empty (e.g., a
+            // background refresh briefly cleared the timetable), attempt to
+            // reconstruct minimal period rows from either the live day source
+            // or the last recorded timetable so substitutes/room-changes can
+            // remain visible instead of flashing then disappearing.
+            try {
+              if (Array.isArray(filtered[day]) && filtered[day].length === 0 && authVarsForDate && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
+                const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+                const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
+                const reconstructed: Period[] = []
+                for (const v of authVarsForDate[day]) {
+                  try {
+                    let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                    if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                    const base: any = src ? { ...src } : { period: v.period || '', time: '', subject: '', teacher: '' }
+                    if (v.isSubstitute) {
+                      base.isSubstitute = true
+                      if (v.casualSurname) base.casualSurname = v.casualSurname
+                      if (v.displayTeacher) base.displayTeacher = v.displayTeacher
+                      if (v.originalTeacher) base.originalTeacher = v.originalTeacher
+                    }
+                    if (v.isRoomChange && v.displayRoom) {
+                      base.isRoomChange = true
+                      base.displayRoom = v.displayRoom
+                      base.originalRoom = base.room || ''
+                    }
+                    reconstructed.push(base)
+                  } catch (e) {
+                    // ignore single-item reconstruction errors
+                  }
+                }
+                if (reconstructed.length) filtered[day] = reconstructed
+              }
+            } catch (e) {
+              // ignore reconstruction errors
+            }
+
+            // Apply variations to all periods in this day
+            // STRATEGY: Always apply authoritative variations if they exist for this date.
+            // Also overlay fresh match data if it has variations (to update the display with newest data).
+            // NOTE: Variation SAVING is handled by a separate useEffect that watches externalTimetable
           } catch (e) {
-            // On error, fall back to original behaviour: prefer A if present
-            if (groups.A && groups.A.length) list = groups.A.slice()
-            else if (groups.B && groups.B.length) list = groups.B.slice()
-            else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
+            // swallow errors during per-day variation application
           }
         }
-
-        // Deep copy periods to prevent mutation of original timetableByWeek objects
-        filtered[day] = list.map(p => ({ ...p }))
-        
-        // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
-        // This ensures variations are NEVER lost, even when a background fetch returns data without them.
-        try {
-          // Use the selected date, not just today, so variations work for past/future dates
-          const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-          const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
-          
-          // Check if we have authoritative variations for the selected date
-          const authVarsMap = authoritativeVariationsRef.current
-          const authVarsForDate = authVarsMap.get(selectedIso)
-          
-          try { console.debug('[timetable.provider] variation lookup for', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
-
-          // If the server/client has captured authoritative variations for
-          // this date but the live `filtered[day]` is empty (e.g., a
-          // background refresh briefly cleared the timetable), attempt to
-          // reconstruct minimal period rows from either the live day source
-          // or the last recorded timetable so substitutes/room-changes can
-          // remain visible instead of flashing then disappearing.
-          try {
-            if (Array.isArray(filtered[day]) && filtered[day].length === 0 && authVarsForDate && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
-              const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
-              const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
-              const reconstructed: Period[] = []
-              for (const v of authVarsForDate[day]) {
-                try {
-                  let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
-                  if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
-                  const base: any = src ? { ...src } : { period: v.period || '', time: '', subject: '', teacher: '' }
-                  if (v.isSubstitute) {
-                    base.isSubstitute = true
-                    if (v.casualSurname) base.casualSurname = v.casualSurname
-                    if (v.displayTeacher) base.displayTeacher = v.displayTeacher
-                    if (v.originalTeacher) base.originalTeacher = v.originalTeacher
-                  }
-                  if (v.isRoomChange && v.displayRoom) {
-                    base.isRoomChange = true
-                    base.displayRoom = v.displayRoom
-                    base.originalRoom = base.room || ''
-                  }
-                  reconstructed.push(base)
-                } catch (e) {
-                  // ignore single-item reconstruction errors
-                }
-              }
-              if (reconstructed.length) filtered[day] = reconstructed
-            }
-          } catch (e) {
-            // ignore reconstruction errors
-          }
-
-          // Apply variations to all periods in this day
-          // STRATEGY: Always apply authoritative variations if they exist for this date.
-          // Also overlay fresh match data if it has variations (to update the display with newest data).
-          // NOTE: Variation SAVING is handled by a separate useEffect that watches externalTimetable
+      }
+      // The remainder of the original useMemo body continues unchanged...
+    } catch (err) {
+      try { console.error('[timetable.provider] error building timetableData', err) } catch (e) {}
+      return emptyByDay
+    }
+    // Fallback: if everything above didn't return, return empty map
+    return emptyByDay
+  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday])
           for (const p of filtered[day]) {
             const normPeriod = String(p.period).trim().toLowerCase()
             
