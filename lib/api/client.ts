@@ -289,28 +289,18 @@ class SBHSPortalClient {
     // If running in the browser, prefer our server-side proxy to avoid CORS and cookie issues
     try {
       if (typeof window !== "undefined") {
-        const res = await fetch(`/api/portal/userinfo`, { credentials: 'include' })
-        if (!res.ok) {
-          // If proxy returns unauthorized, do not attempt a direct cross-origin
-          // fetch from the browser (CORS will block it). Return a clear
-          // unauthenticated response so the UI can show sign-in flow.
-          if (res.status === 401 || res.status === 403) {
-            return { success: false, error: 'Unauthenticated' }
-          }
-          // For other proxy errors, avoid direct portal fetch from browser
-          // and return an error to let the caller decide how to proceed.
-          return { success: false, error: 'Portal proxy failed' }
+        // Use lightweight auth probe on most pages to avoid heavy profile fetches
+        const me = await fetch('/api/auth/me', { credentials: 'include' }).then(r => r.ok ? r.json().catch(() => null) : null)
+        if (!me || !me.authenticated) {
+          return { success: false, error: 'Unauthenticated' }
         }
-        const payload = await res.json()
-        // If proxy returns success wrapper, normalize it
-        if (payload && payload.success && payload.data) {
-          return { success: true, data: payload.data }
+        // Only fetch full profile when explicitly needed. Call the cached profile route.
+        const profRes = await fetch('/api/profile', { credentials: 'include' })
+        if (!profRes.ok) {
+          return { success: false, error: 'Failed to fetch profile', data: undefined }
         }
-        if (payload && payload.data) {
-          return { success: true, data: payload.data }
-        }
-        // If payload itself looks like profile, return it
-        return { success: true, data: payload }
+        const prof = await profRes.json().catch(() => null)
+        return { success: true, data: prof }
       }
     } catch (err) {
       // ignore and fall back to portal request
