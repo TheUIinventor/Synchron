@@ -2353,6 +2353,81 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       lastRefreshTsRef.current = now
     } catch (e) {}
     setError(null)
+    // First try the consolidated bootstrap endpoint which aggregates common
+    // home data (timetable, calendar, portal-home). This reduces multiple
+    // function invocations on the client by returning one payload.
+    try {
+      const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
+      try {
+        const boot = await fetch(`/api/bootstrap?date=${encodeURIComponent(ds)}`, { credentials: 'include' })
+        const ctypeBoot = boot.headers.get('content-type') || ''
+        if (boot.ok && ctypeBoot.includes('application/json')) {
+          const jb = await boot.json().catch(() => null)
+          if (jb) {
+            // If bootstrap reports a holiday or empty timetable, respect it
+            const isHolidaySignal = Boolean(
+              jb?.portalHome?.holiday === true || jb?.calendar?.holiday === true || jb?.timetable && jb.timetable && Object.keys(jb.timetable).length === 0
+            )
+            if (isHolidaySignal) {
+              try {
+                if (typeof window !== 'undefined' && window.localStorage) {
+                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
+                  try { clearClientCaches() } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
+                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
+                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
+                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
+                }
+              } catch (e) {}
+              setExternalTimetable(emptyByDay)
+              setExternalTimetableByWeek(null)
+              setTimetableSource('bootstrap-holiday')
+              setExternalWeekType(null)
+              try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'bootstrap' }) } catch (e) {}
+              setIsRefreshing(false)
+              if (!hadCache) setIsLoading(false)
+              return
+            }
+
+            // If bootstrap returned a timetable payload, use it and skip
+            // the heavier per-endpoint probes below.
+            if (jb.timetable) {
+              try {
+                setExternalTimetable(jb.timetable)
+                setExternalTimetableByWeek(jb.timetableByWeek || null)
+                setTimetableSource('bootstrap')
+                if (jb.timetable && !authoritativeBellsDateRef.current) {
+                  try {
+                    const computed = buildBellTimesFromPayload(jb.timetable)
+                    const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+                    const src = jb.timetable.bellTimes || {}
+                    for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+                      if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+                      else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+                      else finalBellTimes[k] = []
+                    }
+                    const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+                    if (hasAny) {
+                      setExternalBellTimes(finalBellTimes)
+                      lastSeenBellTimesRef.current = finalBellTimes
+                      lastSeenBellTsRef.current = Date.now()
+                    }
+                  } catch (e) {}
+                }
+                try { lastRequestedDateRef.current = (selectedDateObject || new Date()).toISOString().slice(0,10); setLastFetchedDate((selectedDateObject || new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ bootstrap: true }) } catch (e) {}
+                setIsRefreshing(false)
+                if (!hadCache) setIsLoading(false)
+                return
+              } catch (e) {
+                // fallthrough to regular probes on error
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // ignore bootstrap failures and proceed with existing probes
+      }
+    } catch (e) {}
     // First try the server-scraped homepage endpoint as a quick probe.
     // Note: We intentionally do NOT set any timetable state or return early
     // here because the home-timetable endpoint lacks classVariations and
