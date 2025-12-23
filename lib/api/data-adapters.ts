@@ -108,7 +108,8 @@ export function applySubstitutionsToTimetable(
     try { console.debug('[adapters] applySubstitutionsToTimetable subs=', substitutions ? substitutions.length : 0, substitutions && substitutions[0] ? substitutions[0] : null) } catch (e) {}
   }
 
-  substitutions.forEach((sub) => {
+  const subsArray = Array.isArray(substitutions) ? substitutions : (substitutions && typeof substitutions === 'object' && Array.isArray((substitutions as any).substitutions) ? (substitutions as any).substitutions : [])
+  subsArray.forEach((sub) => {
     if (!sub) return
     // Skip ambiguous substitutions that provide neither a period nor a subject.
     // These tended to match everything (periodMatch defaulted to `true`),

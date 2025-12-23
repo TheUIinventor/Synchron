@@ -291,8 +291,15 @@ class SBHSPortalClient {
       if (typeof window !== "undefined") {
         const res = await fetch(`/api/portal/userinfo`, { credentials: 'include' })
         if (!res.ok) {
-          // fall back to direct portal request if proxy fails
-          return this.makePortalRequest<StudentProfile>("/details/userinfo.json")
+          // If proxy returns unauthorized, do not attempt a direct cross-origin
+          // fetch from the browser (CORS will block it). Return a clear
+          // unauthenticated response so the UI can show sign-in flow.
+          if (res.status === 401 || res.status === 403) {
+            return { success: false, error: 'Unauthenticated' }
+          }
+          // For other proxy errors, avoid direct portal fetch from browser
+          // and return an error to let the caller decide how to proceed.
+          return { success: false, error: 'Portal proxy failed' }
         }
         const payload = await res.json()
         // If proxy returns success wrapper, normalize it
