@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cheapAuthCheck } from '@/lib/auth/checkAuth'
 
 export const runtime = 'edge'
 const SHARED_CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
@@ -10,8 +11,11 @@ const cacheHeaders = (req: any) => {
 // Proxy the SBHS portal userinfo endpoint server-side to avoid CORS issues
 export async function GET(req: NextRequest) {
   const apiUrl = 'https://student.sbhs.net.au/details/userinfo.json'
-  const accessToken = req.cookies.get('sbhs_access_token')?.value
   const refreshToken = req.cookies.get('sbhs_refresh_token')?.value
+  // Use cheapAuthCheck to extract and cache token metadata. This avoids
+  // repeated base64 decodes/parsing across requests.
+  const auth = await cheapAuthCheck(req)
+  const accessToken = auth.token
 
   // Short in-memory cache for anonymous probes (no tokens). This avoids
   // repeated 401/diagnostic fetches from clients that poll while signed-out.
