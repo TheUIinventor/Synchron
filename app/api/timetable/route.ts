@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getStatic } from '@/lib/cache/static-cache'
 
 // Timetable responses are user/session specific. Use a private cache
 // control header to avoid public/shared caching at the edge/CDN.
@@ -563,7 +564,9 @@ export async function GET(req: NextRequest) {
       const payload = authError.json ?? authError.text ?? authError.html ?? null
       // Try to salvage bell schedules from any available responses so clients
       // can still render breaks when the portal requires authentication.
-      const { schedules: _schedules, sources: _sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
+      const bellCacheKey = `bells:${dateParam || 'all'}`
+      const cached = await getStatic(bellCacheKey, 1000 * 60 * 5, async () => buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes))
+      const { schedules: _schedules, sources: _sources } = cached || { schedules: { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] }, sources: { 'Mon/Tues': 'empty', 'Wed/Thurs': 'empty', Fri: 'empty' } }
       const maybeBellSchedules = (_schedules && (Object.values(_schedules).some((a: any) => Array.isArray(a) && a.length))) ? _schedules : undefined
       const maybeBellSources = (_sources && (Object.values(_sources).some((a: any) => a !== 'empty'))) ? _sources : undefined
       return NextResponse.json(
@@ -590,7 +593,9 @@ export async function GET(req: NextRequest) {
       return message.includes('unauth') || message.includes('token') || message.includes('expired')
     })
     if (explicitError) {
-      const { schedules: _schedules, sources: _sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
+      const bellCacheKey2 = `bells:${dateParam || 'all'}`
+      const cached2 = await getStatic(bellCacheKey2, 1000 * 60 * 5, async () => buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes))
+      const { schedules: _schedules, sources: _sources } = cached2 || { schedules: { 'Mon/Tues': [], 'Wed/Thurs': [], Fri: [] }, sources: { 'Mon/Tues': 'empty', 'Wed/Thurs': 'empty', Fri: 'empty' } }
       const maybeBellSchedules = (_schedules && (Object.values(_schedules).some((a: any) => Array.isArray(a) && a.length))) ? _schedules : undefined
       const maybeBellSources = (_sources && (Object.values(_sources).some((a: any) => a !== 'empty'))) ? _sources : undefined
       return NextResponse.json(
