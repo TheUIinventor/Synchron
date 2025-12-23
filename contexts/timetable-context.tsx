@@ -873,6 +873,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setExternalWeekType(null)
                 try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
               }
+              try { setInitialCalendarChecked(true) } catch (e) {}
               return
             }
           }
@@ -916,6 +917,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const final = shouldApplyCachedSubs ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
                 setExternalTimetable(final)
                 try { setCacheHydrated(true) } catch (e) {}
+                try { setInitialCalendarChecked(true) } catch (e) {}
                 setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
                 try { console.debug('[timetable.provider] hydrate: setExternalBellTimes (initial cache)', __initialExternalBellTimes) } catch (e) {}
                 setExternalBellTimes(__initialExternalBellTimes || null)
@@ -926,6 +928,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (!cancelled && map) {
                 setExternalTimetable(map)
                 try { setCacheHydrated(true) } catch (e) {}
+                try { setInitialCalendarChecked(true) } catch (e) {}
                 setTimetableSource(__initialTimetableSource || 'cache')
                 setLastRecordedTimetable(map)
               }
