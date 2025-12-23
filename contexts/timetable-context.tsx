@@ -3652,122 +3652,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (intervalId != null) window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
+      try { window.removeEventListener('storage', onStorage) } catch (e) {}
     }
   }, [updateAllTimeStates])
 
-  // Visibility-aware background refresh: poll the server more frequently
-  // when the document is visible, and back off when hidden.
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return
-    let intervalId: number | null = null
-    let leaderRenewId: number | null = null
-    const TAB_ID = (() => {
-      try {
-        if (typeof window === 'undefined') return 'server'
-        let id = sessionStorage.getItem('synchron-tab-id')
-        if (!id) {
-          id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`
-          try { sessionStorage.setItem('synchron-tab-id', id) } catch (e) {}
-        }
-        return id
-      } catch (e) { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}` }
-    })()
-    const LEASE_KEY = 'synchron-refresh-leader'
-    const LEASE_MS = 30 * 1000
-
-    const getLeader = () => {
-      try {
-        const raw = localStorage.getItem(LEASE_KEY)
-        if (!raw) return null
-        const parsed = JSON.parse(raw)
-        return parsed
-      } catch (e) { return null }
-    }
-
-    const isLeader = () => {
-      try {
-        const l = getLeader()
-        if (!l) return false
-        if (l.id !== TAB_ID) return false
-        if (Date.now() - (l.ts || 0) > LEASE_MS) return false
-        return true
-      } catch (e) { return false }
-    }
-
-    const tryClaimLeader = () => {
-      try {
-        const l = getLeader()
-        if (!l || (Date.now() - (l.ts || 0) > LEASE_MS)) {
-          localStorage.setItem(LEASE_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() }))
-          return true
-        }
-        return l.id === TAB_ID
-      } catch (e) { return false }
-    }
-
-    const renewLease = () => {
-      try {
-        if (!isLeader()) return
-        localStorage.setItem(LEASE_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() }))
-      } catch (e) {}
-    }
-
-    const startWithInterval = (ms: number) => {
-      if (intervalId != null) window.clearInterval(intervalId)
-      // Try to claim leadership for background refreshes. Only the leader
-      // will actually perform network refreshes — this reduces duplicate
-      // polling when a user has multiple tabs open.
-      tryClaimLeader()
-
-      // Fire a refresh immediately; only the leader will execute it.
-      ;(async () => {
-        try {
-          if (isLeader()) await refreshExternal(false, true)
-        } catch (e) {}
-      })()
-
-      // Clear any previous renew interval
-      if (leaderRenewId != null) { window.clearInterval(leaderRenewId); leaderRenewId = null }
-
-      intervalId = window.setInterval(() => {
-        ;(async () => {
-          try {
-            // Only the leader performs the refresh. Non-leaders will attempt
-            // to claim leadership if the lease has expired.
-            if (!isLeader()) {
-              tryClaimLeader()
-              return
-            }
-            await refreshExternal(false, true)
-          } catch (e) {}
-        })()
-      }, ms)
-
-      // If we are leader, renew lease periodically at half the interval
-      try {
-        leaderRenewId = window.setInterval(() => { try { renewLease() } catch (e) {} }, Math.max(5000, Math.floor(ms / 2))) as unknown as number
-      } catch (e) { leaderRenewId = null }
-    }
-
-    function handleVisibility() {
-      try {
-        if (document.visibilityState === 'visible') startWithInterval(VISIBLE_REFRESH_MS)
-        else startWithInterval(HIDDEN_REFRESH_MS)
-      } catch (e) {}
-    }
-
-    handleVisibility()
-    document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('focus', handleVisibility)
-
-    return () => {
-      if (intervalId != null) window.clearInterval(intervalId)
-      try { if (leaderRenewId != null) window.clearInterval(leaderRenewId) } catch (e) {}
-      document.removeEventListener('visibilitychange', handleVisibility)
-      window.removeEventListener('focus', handleVisibility)
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [])
+  // Polling removed: refreshes now only occur on app open (initial mount),
+  // when the selected date changes, or when the user manually triggers
+  // `refreshExternal()`. This reduces background CPU usage and keeps
+  // behavior deterministic for clients.
 
   // When the selected date changes, fetch the authoritative timetable for that date
   useEffect(() => {
