@@ -57,17 +57,39 @@ export async function GET(req: Request) {
     if (accessTokenPresent) baseHeaders['Authorization'] = `Bearer ${accessTokenValue}`
 
     const endpoints = ['/timetable/timetable.json', '/timetable/daytimetable.json', '/timetable']
+    // Probe portal endpoints in parallel for faster diagnostics
     const results: any[] = []
-    for (const ep of endpoints) {
-      results.push(await probeEndpoint(ep, { ...baseHeaders }))
+    try {
+      const promises = endpoints.map(ep => probeEndpoint(ep, { ...baseHeaders }))
+      const settled = await Promise.allSettled(promises)
+      for (let i = 0; i < settled.length; i++) {
+        const s = settled[i]
+        if (s.status === 'fulfilled') results.push(s.value)
+        else results.push({ endpoint: endpoints[i], status: 0, ok: false, error: String((s as any).reason) })
+      }
+    } catch (e) {
+      // fallback to sequential probe if something unexpected fails
+      for (const ep of endpoints) {
+        results.push(await probeEndpoint(ep, { ...baseHeaders }))
+      }
     }
 
     // Also probe the API host (may accept Bearer tokens even when web host returns login HTML)
     const apiEndpoints = ['/api/timetable/timetable', '/api/timetable/timetable.json', '/api/timetable/daytimetable']
+    // Probe API host endpoints in parallel as well
     const apiResults: any[] = []
-    for (const ep of apiEndpoints) {
-      const url = `${API_BASE}${ep}`
-      apiResults.push(await probeEndpoint(url, { ...baseHeaders }))
+    try {
+      const apiPromises = apiEndpoints.map(ep => probeEndpoint(`${API_BASE}${ep}`, { ...baseHeaders }))
+      const settledApi = await Promise.allSettled(apiPromises)
+      for (let i = 0; i < settledApi.length; i++) {
+        const s = settledApi[i]
+        if (s.status === 'fulfilled') apiResults.push(s.value)
+        else apiResults.push({ endpoint: `${API_BASE}${apiEndpoints[i]}`, status: 0, ok: false, error: String((s as any).reason) })
+      }
+    } catch (e) {
+      for (const ep of apiEndpoints) {
+        apiResults.push(await probeEndpoint(`${API_BASE}${ep}`, { ...baseHeaders }))
+      }
     }
 
     // Do not decode or introspect access tokens here. Token formats can change
