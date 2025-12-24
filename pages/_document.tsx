@@ -1,17 +1,8 @@
-import Document, { Html, Head, Main, NextScript } from 'next/document'
+// pages/_document.tsx removed the usage of `next/document` to avoid
+// conflicts with the `app/` router's `app/layout.tsx` (which renders
+// the top-level <html> element). Keeping an empty default export so
+// any legacy pages continue to build without importing Html.
 
-class MyDocument extends Document {
-  render() {
-    return (
-      <Html lang="en">
-        <Head />
-        <body>
-          <Main />
-          <NextScript />
-        </body>
-      </Html>
-    )
-  }
+export default function LegacyDocumentPlaceholder() {
+  return null
 }
-
-export default MyDocument

@@ -8,6 +8,31 @@ const cacheHeaders = (req: any) => {
   try { const hasCookie = req && req.cookies ? Boolean(req.cookies.get && (req.cookies.get('sbhs_access_token') || req.cookies.get('sbhs_refresh_token'))) : (req && req.headers && typeof req.headers.get === 'function' && Boolean(req.headers.get('cookie'))); return { 'Cache-Control': hasCookie ? NON_SHARED_CACHE : SHARED_CACHE } } catch (e) { return { 'Cache-Control': SHARED_CACHE } }
 }
 
+// Helper: fetch with timeout (AbortController). Use small timeouts for probes
+async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, timeoutMs = 8000) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(input, { ...init, signal: controller.signal })
+    return res
+  } finally {
+    clearTimeout(id)
+  }
+}
+
+// Determine whether the caller requested diagnostics (scraping/probes).
+function diagnosticsRequested(req: NextRequest) {
+  try {
+    const header = req.headers.get('x-synchron-diagnostics')
+    if (header === '1' || header === 'true') return true
+    if ((req as any).nextUrl && (req as any).nextUrl.searchParams) {
+      return (req as any).nextUrl.searchParams.get('diagnostics') === '1'
+    }
+    // fallback: check raw url
+    try { return new URL(req.url).searchParams.get('diagnostics') === '1' } catch (e) { return false }
+  } catch (e) { return false }
+}
+
 // Proxy the SBHS portal userinfo endpoint server-side to avoid CORS issues
 export async function GET(req: NextRequest) {
   const apiUrl = 'https://student.sbhs.net.au/details/userinfo.json'
@@ -164,7 +189,7 @@ export async function GET(req: NextRequest) {
       for (const path of apiPaths) {
         try {
           const url = `${host.replace(/\/$/, '')}${path.startsWith('/') ? path : '/' + path}`
-          const r = await fetch(url, { headers })
+          const r = await fetchWithTimeout(url, { headers }, 3000)
           if (!r.ok) continue
           const ct = r.headers.get('content-type') || ''
           if (ct.includes('application/json')) {
@@ -190,86 +215,81 @@ export async function GET(req: NextRequest) {
     }
 
     // Fallback: request the configured API URL (keeps previous behavior)
-    const response = await fetch(apiUrl, {
-      headers,
-    })
+    const response = await fetchWithTimeout(apiUrl, { headers }, 8000)
 
     // Short-circuit on upstream server errors to avoid heavy parsing/scraping
     if (!response.ok && response.status >= 500 && response.status <= 599) {
       return NextResponse.json({ success: false, error: 'Portal upstream server error', status: response.status }, { status: 502, headers: cacheHeaders(req) })
     }
 
-    const text = await response.text()
-      // Collect a small set of response headers for diagnostics
-      const hdr = (name: string) => response.headers.get(name)
-      const respHeaders: Record<string,string> = {}
-      const interesting = ['content-type', 'set-cookie', 'location', 'www-authenticate', 'cache-control']
-      for (const h of interesting) {
-        const v = hdr(h)
-        if (v) respHeaders[h] = v
-      }
+    // Collect a small set of response headers for diagnostics
+    const hdr = (name: string) => response.headers.get(name)
+    const respHeaders: Record<string,string> = {}
+    const interesting = ['content-type', 'set-cookie', 'location', 'www-authenticate', 'cache-control']
+    for (const h of interesting) {
+      const v = hdr(h)
+      if (v) respHeaders[h] = v
+    }
 
-      // Masked view of incoming cookies for diagnostics (do not expose full values)
-      const mask = (v: string | null | undefined) => {
-        if (!v) return ''
-        return v.split(';').map(part => {
-          const idx = part.indexOf('=')
-          if (idx === -1) return part.trim()
-          const name = part.slice(0, idx).trim()
-          const val = part.slice(idx + 1).trim()
-          if (!val) return `${name}=`
-          if (val.length <= 8) return `${name}=${'*'.repeat(val.length)}`
-          return `${name}=${val.slice(0,4)}…${val.slice(-4)}`
-        }).join('; ')
-      }
-      const maskedIncomingCookies = mask(incomingCookieHeader)
+    // If the portal set cookies, prepare a forwarded Set-Cookie for the client.
+    // We strip any Domain attribute so the browser stores the cookie for our origin.
+    const rawSetCookie = response.headers.get('set-cookie')
+    let forwardedSetCookie: string | null = null
+    if (rawSetCookie) {
+      forwardedSetCookie = rawSetCookie.replace(/;\s*Domain=[^;]+/gi, '')
+    }
 
-      // If the portal set cookies, prepare a forwarded Set-Cookie for the client.
-      // We strip any Domain attribute so the browser stores the cookie for our origin.
-      const rawSetCookie = response.headers.get('set-cookie')
-      let forwardedSetCookie: string | null = null
-      if (rawSetCookie) {
-        forwardedSetCookie = rawSetCookie.replace(/;\s*Domain=[^;]+/gi, '')
-      }
     if (!response.ok) {
-      return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status, headers: cacheHeaders(req) })
+      // Try to avoid reading the full body for failures; only read when diagnostics requested
+      if (diagnosticsRequested(req)) {
+        const text = await response.text()
+        return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status, headers: cacheHeaders(req) })
+      }
+      return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status }, { status: response.status, headers: cacheHeaders(req) })
     }
 
     // Ensure response is either JSON or HTML before attempting heavy parsing/scraping.
     const contentType = response.headers.get("content-type") || ""
     const looksLikeJson = contentType.includes('application/json')
-    const looksLikeHtml = contentType.includes("text/html") || text.trim().startsWith("<!DOCTYPE html") || /<html/i.test(text)
+    const looksLikeHtml = contentType.includes("text/html")
+    const wantDiagnostics = diagnosticsRequested(req)
 
     if (!looksLikeJson && !looksLikeHtml) {
       // Unknown content type — fail fast.
       return NextResponse.json({ success: false, error: 'Unexpected content-type from portal', contentType }, { status: 502, headers: cacheHeaders(req) })
     }
 
-    let data: any
+    let data: any = null
+    let text: string | null = null
     try {
       if (looksLikeJson) {
-        data = JSON.parse(text)
-      } else {
-        // Not JSON — fall through to HTML handling below
-        data = null
+        try {
+          data = await response.json()
+        } catch (e) {
+          data = null
+        }
+      } else if (looksLikeHtml) {
+        if (wantDiagnostics) {
+          text = await response.text()
+        } else {
+          // Portal returned HTML (likely login). For normal calls do not run heavy scraping.
+          return forwardedSetCookie ? NextResponse.json({ success: false, error: 'Portal returned HTML (likely login page). SBHS session may be missing or expired.' }, { status: 401, headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) }) : NextResponse.json({ success: false, error: 'Portal returned HTML (likely login page). SBHS session may be missing or expired.' }, { status: 401, headers: cacheHeaders(req) })
+        }
       }
     } catch (e) {
       data = null
+      text = text || null
     }
 
     if (data === null && !looksLikeHtml) {
       // No usable JSON and not HTML — nothing we can do
-      return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500, headers: cacheHeaders(req) })
+      return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo' }, { status: 500, headers: cacheHeaders(req) })
     }
 
-    if (data === null && looksLikeHtml) {
-      // Portal returned HTML (likely login) — proceed to HTML scraping/diagnostics below
-    }
+    // Note: the flow below expects `text`, `respHeaders`, etc. to be present when diagnostics are enabled.
 
-    // Note: the flow below expects `text`, `respHeaders`, etc. to be present — continue as before.
-
-        // Truncate the HTML for the response body to avoid huge payloads in logs
-        const truncated = text.slice(0, 2048)
+    // When diagnostics are enabled, create truncated/diagnostic payloads; otherwise we've already returned.
+    const truncated = (text || '').slice(0, 2048)
         // Mask set-cookie values if present
         const maskedHeaders = { ...respHeaders }
         if (maskedHeaders['set-cookie']) {
@@ -278,6 +298,21 @@ export async function GET(req: NextRequest) {
             return s.replace(/=([^;\s]+)/g, (m, v) => `=${v.slice(0,4)}…${v.slice(-4)}`)
           }).join(',')
         }
+
+        // Mask incoming cookies for diagnostics only
+        const mask = (v: string | null | undefined) => {
+          if (!v) return ''
+          return v.split(';').map(part => {
+            const idx = part.indexOf('=')
+            if (idx === -1) return part.trim()
+            const name = part.slice(0, idx).trim()
+            const val = part.slice(idx + 1).trim()
+            if (!val) return `${name}=`
+            if (val.length <= 8) return `${name}=${'*'.repeat(val.length)}`
+            return `${name}=${val.slice(0,4)}…${val.slice(-4)}`
+          }).join('; ')
+        }
+        const maskedIncomingCookies = wantDiagnostics ? mask(incomingCookieHeader) : ''
 
         // Before returning diagnostics, attempt a best-effort scrape of the portal
         // homepage/profile to extract a student name. This helps when the portal
@@ -289,13 +324,18 @@ export async function GET(req: NextRequest) {
           for (const pp of profilePaths) {
             try {
               const url = `https://student.sbhs.net.au${pp}`
-              const r3 = await fetch(url, { headers })
+              const r3 = await fetchWithTimeout(url, { headers }, 3000)
               if (!r3.ok) continue
               const html3 = await r3.text()
               if (!html3 || html3.trim().length === 0) continue
               try {
-                const cheerioMod: any = await import('cheerio')
-                const $ = cheerioMod.load(html3)
+                let cheerioLoad: any = (globalThis as any).__cheerio_load
+                if (!cheerioLoad) {
+                  const cheerioMod: any = await import('cheerio')
+                  cheerioLoad = cheerioMod.load
+                  try { (globalThis as any).__cheerio_load = cheerioLoad } catch (e) {}
+                }
+                const $ = cheerioLoad(html3)
                 // Try common selectors first
                 const nameSelectors = ['.student-name', '.profile-name', '.student-info .name', '[class*="student"] .name', 'h1', 'h2', '.name', '.profile-header', '.user-name']
                 for (const sel of nameSelectors) {
@@ -383,12 +423,12 @@ export async function GET(req: NextRequest) {
           try {
             const url = `https://student.sbhs.net.au${pp}`
             const cookieHeader = response.headers.get('set-cookie') ?? headers['Cookie'] ?? ''
-            const r2 = await fetch(url, { headers: {
+            const r2 = await fetchWithTimeout(url, { headers: {
               'Accept': 'application/json',
               'User-Agent': 'Mozilla/5.0',
               'Referer': 'https://student.sbhs.net.au/',
               'Cookie': cookieHeader,
-            } })
+            } }, 3000)
             const ct2 = r2.headers.get('content-type') || ''
             let snippet: string | null = null
             try {
@@ -416,9 +456,6 @@ export async function GET(req: NextRequest) {
           },
           forwardedSetCookie ? { status: 401, headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) } : { status: 401, headers: cacheHeaders(req) },
         )
-
-      // Otherwise return a 500 with the raw body for debugging
-      return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500, headers: cacheHeaders(req) })
 
     // Also include a small headers object for debugging (mask set-cookie)
     const okHeaders = { ...respHeaders }
