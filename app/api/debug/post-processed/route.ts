@@ -33,23 +33,26 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const origin = url.origin
 
-    // Fetch normalized timetable from our own API route
-    const ttRes = await fetch(`${origin}/api/timetable`, { headers: { accept: 'application/json' } })
-    const subsRes = await fetch(`${origin}/api/portal/substitutions?debug=1`, { headers: { accept: 'application/json' } })
+    // Fetch normalized timetable and substitutions in parallel to reduce latency
+    const [ttSettled, subsSettled] = await Promise.allSettled([
+      fetch(`${origin}/api/timetable`, { headers: { accept: 'application/json' } }),
+      fetch(`${origin}/api/portal/substitutions?debug=1`, { headers: { accept: 'application/json' } })
+    ])
 
-    if (!ttRes.ok) return NextResponse.json({ error: 'Failed to fetch /api/timetable', status: ttRes.status }, { status: 502, headers: cacheHeaders(req) })
-    if (!subsRes.ok) return NextResponse.json({ error: 'Failed to fetch /api/portal/substitutions', status: subsRes.status }, { status: 502, headers: cacheHeaders(req) })
+    if (ttSettled.status !== 'fulfilled' || !(ttSettled.value && ttSettled.value.ok)) return NextResponse.json({ error: 'Failed to fetch /api/timetable' }, { status: 502, headers: cacheHeaders(req) })
+    if (subsSettled.status !== 'fulfilled' || !(subsSettled.value && subsSettled.value.ok)) return NextResponse.json({ error: 'Failed to fetch /api/portal/substitutions' }, { status: 502, headers: cacheHeaders(req) })
 
-    const ttJson = await ttRes.json()
-    const subsJson = await subsRes.json()
+    const ttJson = await ttSettled.value.json().catch(() => null)
+    const subsJson = await subsSettled.value.json().catch(() => null)
 
     const baseTimetable: Record<string, any[]> = ttJson?.timetable || {}
     const substitutions: any[] = subsJson?.substitutions || []
 
-    // Shallow clone timetable structure
+    // Shallow clone and trim timetable structure to only fields we need
     const processed: Record<string, any[]> = {}
+    const trimPeriod = (p: any) => ({ period: p?.period, time: p?.time, subject: p?.subject, teacher: p?.teacher, room: p?.room })
     Object.keys(baseTimetable).forEach((d) => {
-      processed[d] = (baseTimetable[d] || []).map((p: any) => ({ ...p }))
+      processed[d] = (baseTimetable[d] || []).map((p: any) => ({ ...trimPeriod(p) }))
     })
 
     // Apply simplified substitution logic for debugging purposes
@@ -103,7 +106,10 @@ export async function GET(req: Request) {
       })
     })
 
-    return NextResponse.json({ timetable: baseTimetable, processed, substitutions, upstreamRaw: subsJson.raw || null }, { headers: cacheHeaders(req) })
+    // Also return a trimmed view of the original timetable to avoid forwarding unnecessary fields
+    const trimmedOriginal: Record<string, any[]> = {}
+    Object.keys(baseTimetable).forEach((d) => trimmedOriginal[d] = (baseTimetable[d] || []).map((p: any) => trimPeriod(p)))
+    return NextResponse.json({ timetable: trimmedOriginal, processed, substitutions, upstreamRaw: subsJson?.raw || null }, { headers: cacheHeaders(req) })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }

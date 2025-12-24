@@ -33,24 +33,29 @@ export async function GET(req: Request) {
     const headers: Record<string, string> = { accept: 'application/json' }
     if (rawCookie) headers['cookie'] = rawCookie
 
-    let res = await fetch(`${origin}/api/timetable`, { headers })
-    let j: any
-    if (!res.ok && res.status === 401) {
-      // fallback to portal proxy
-      try {
-        const subsRes = await fetch(`${origin}/api/portal/substitutions?debug=1`, { headers })
-        if (subsRes.ok) {
-          const subsJson = await subsRes.json()
-          j = { timetable: subsJson.timetable || {}, upstream: subsJson.raw || subsJson }
-        } else {
-          return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502, headers: cacheHeaders(req) })
-        }
-      } catch (e) {
+    // Fetch /api/timetable and substitutions in parallel.
+    const ttPromise = fetch(`${origin}/api/timetable`, { headers })
+    const subsPromise = fetch(`${origin}/api/portal/substitutions?debug=1`, { headers })
+    const [ttSettled, subsSettled] = await Promise.allSettled([ttPromise, subsPromise])
+    let j: any = null
+
+    if (ttSettled.status === 'fulfilled' && ttSettled.value) {
+      const res = ttSettled.value
+      if (res.ok) {
+        j = await res.json().catch(() => null)
+      } else if (res.status === 401 && subsSettled.status === 'fulfilled' && subsSettled.value && subsSettled.value.ok) {
+        const subsJson = await subsSettled.value.json().catch(() => null)
+        j = { timetable: subsJson?.timetable || {}, upstream: subsJson?.raw || subsJson }
+      } else if (!res.ok) {
         return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502, headers: cacheHeaders(req) })
       }
     } else {
-      if (!res.ok) return NextResponse.json({ error: 'failed to fetch /api/timetable', status: res.status }, { status: 502 })
-      j = await res.json()
+      if (subsSettled.status === 'fulfilled' && subsSettled.value && subsSettled.value.ok) {
+        const subsJson = await subsSettled.value.json().catch(() => null)
+        j = { timetable: subsJson?.timetable || {}, upstream: subsJson?.raw || subsJson }
+      } else {
+        return NextResponse.json({ error: 'failed to fetch /api/timetable', status: 502 }, { status: 502, headers: cacheHeaders(req) })
+      }
     }
 
     const upstream = j?.upstream || j?.diagnostics?.upstream || null
@@ -59,8 +64,9 @@ export async function GET(req: Request) {
     const roomVars = collect(dayObj?.roomVariations || upstream?.roomVariations || upstream?.room_variations)
 
     const base: Record<string, any[]> = j?.timetable || { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    const trim = (p: any) => ({ period: p?.period, time: p?.time, subject: p?.subject, teacher: p?.teacher, room: p?.room })
     const mapped: Record<string, any[]> = {}
-    for (const d of Object.keys(base || {})) mapped[d] = (base[d] || []).map((p: any) => ({ ...(p as any) }))
+    for (const d of Object.keys(base || {})) mapped[d] = (base[d] || []).map((p: any) => ({ ...trim(p) }))
 
     const all = [...classVars, ...roomVars]
     for (const v of all) {
@@ -114,7 +120,9 @@ export async function GET(req: Request) {
       } catch (e) {}
     }
 
-    return NextResponse.json({ originalTimetable: base, processedTimetable: mapped, classVars, roomVars }, { headers: cacheHeaders(req) })
+    const trimmedOriginal: Record<string, any[]> = {}
+    for (const d of Object.keys(base || {})) trimmedOriginal[d] = (base[d] || []).map((p: any) => trim(p))
+    return NextResponse.json({ originalTimetable: trimmedOriginal, processedTimetable: mapped, classVars, roomVars }, { headers: cacheHeaders(req) })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500, headers: cacheHeaders(req) })
   }
