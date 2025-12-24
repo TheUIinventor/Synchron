@@ -1,7 +1,7 @@
 "use client";
 
 import { useTimetable } from "@/contexts/timetable-context";
-import { format } from "date-fns";
+// Use Intl.DateTimeFormat instead of importing date-fns for simple formatting
 import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { sbhsPortal } from "@/lib/api/client";
@@ -175,7 +175,7 @@ export default function HomeClient() {
   })()
 
   // Use the displayDate's weekday to pick today's timetable for the home page.
-  const dayName = format(displayDate, "EEEE");
+  const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
   const todaysPeriodsRaw = timetableData[dayName] || [];
 
   // Map provider bell buckets into the day-specific bucket keys used elsewhere.
@@ -597,7 +597,7 @@ export default function HomeClient() {
           <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  {format(displayDate, "EEEE, d MMMM")}
+                  {new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(displayDate)}
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
