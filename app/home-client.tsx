@@ -57,6 +57,7 @@ export default function HomeClient() {
     selectedDateObject,
     timetableSource,
     bellTimes,
+    isAuthenticated,
     reauthRequired } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects

@@ -1197,9 +1197,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const normPeriod = String(p.period).trim().toLowerCase()
             
             // Get authoritative variation for this period (if exists)
-            const authVariation = authVarsForDate ? (authVarsForDate[day] || []).find((v: any) => 
-              String(v.period).trim().toLowerCase() === normPeriod
-            ) : null
+            let authVariation: any = null
+            try {
+              const candidate = authVarsForDate && Array.isArray(authVarsForDate[day]) ? authVarsForDate[day] : []
+              authVariation = Array.isArray(candidate) ? candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod) : null
+            } catch (e) {
+              try { console.warn('[timetable.provider] unexpected authVarsForDate[day] type', typeof authVarsForDate, typeof authVarsForDate?.[day]) } catch (e2) {}
+              authVariation = null
+            }
             
             // ALWAYS apply authoritative variation if we have one - this is the source of truth
             if (authVariation) {
@@ -1413,7 +1418,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             for (const p of filtered[day]) {
               try {
                 const normPeriod = String(p.period).trim().toLowerCase()
-                const authVariation = (authVarsForDate[day] || []).find((v: any) => String(v.period).trim().toLowerCase() === normPeriod)
+                let authVariation: any = null
+                try {
+                  const candidate = authVarsForDate && Array.isArray(authVarsForDate[day]) ? authVarsForDate[day] : []
+                  authVariation = Array.isArray(candidate) ? candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod) : null
+                } catch (e) {
+                  try { console.warn('[timetable.provider] unexpected authVarsForDate[day] type (grouped)', typeof authVarsForDate, typeof authVarsForDate?.[day]) } catch (e2) {}
+                  authVariation = null
+                }
                 if (authVariation) {
                   if (authVariation.isSubstitute) {
                     (p as any).isSubstitute = true
