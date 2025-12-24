@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { normalizeVariation, collectFromJson } from '@/lib/api/normalizers'
+import { getStatic } from '@/lib/cache/static-cache'
 
 const PORTAL_BASE = 'https://student.sbhs.net.au'
 const API_BASE = 'https://api.sbhs.net.au'
@@ -64,27 +65,42 @@ export async function GET(req: Request) {
     const endpoints = ['/timetable/timetable.json', '/timetable/daytimetable.json']
     try {
       // Try portal JSON endpoints in parallel and return the first valid JSON response.
-      const reqs = endpoints.map(ep => fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' }))
-      const settled = await Promise.allSettled(reqs)
-      for (let i = 0; i < settled.length; i++) {
-        const s = settled[i]
-        const ep = endpoints[i]
-        if (s.status === 'fulfilled') {
+      // For anonymous requests (no cookie, no access token) use a short in-memory cache
+      const useCache = !rawCookie && !accessToken
+      const ttl = 30_000 // 30 seconds
+
+      const promises = endpoints.map(ep => {
+        if (useCache) {
+          const key = `portal:json:${ep}`
+          return getStatic<any>(key, ttl, async () => {
+            try {
+              const r = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
+              const ct = r.headers.get('content-type') || ''
+              if (!r.ok || !ct.includes('application/json')) return null
+              return await r.json().catch(() => null)
+            } catch (e) { return null }
+          })
+        }
+        // No cache for authenticated callers - probe live
+        return (async () => {
           try {
-            const res = s.value as Response
-            const ct = res.headers.get('content-type') || ''
-            if (res.ok && ct.includes('application/json')) {
-              const j = await res.json().catch(() => null)
-              if (j) {
-                const subs = collectFromJson(j)
-                const payload: any = { substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() }
-                if (wantDebugRaw) payload.raw = j
-                return NextResponse.json(payload)
-              }
-            }
-          } catch (e) {
-            // ignore parse errors for this candidate
-          }
+            const r = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
+            const ct = r.headers.get('content-type') || ''
+            if (!r.ok || !ct.includes('application/json')) return null
+            return await r.json().catch(() => null)
+          } catch (e) { return null }
+        })()
+      })
+
+      const settled = await Promise.all(promises.map(p => Promise.resolve(p)))
+      for (let i = 0; i < settled.length; i++) {
+        const j = settled[i]
+        const ep = endpoints[i]
+        if (j && typeof j === 'object') {
+          const subs = collectFromJson(j)
+          const payload: any = { substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() }
+          if (wantDebugRaw) payload.raw = j
+          return NextResponse.json(payload)
         }
       }
     } catch (e) {
