@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, startTransition, type ReactNode } from "react"
+import { startTimer } from '@/utils/profiler2'
 import { useToast } from "@/hooks/use-toast"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
 import { PortalScraper } from "@/lib/api/portal-scraper"
@@ -2350,7 +2351,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         console.debug('[timetable.refresh.debug] installed debug listeners')
       }
     } catch (e) {}
-    try { console.time('[timetable] refreshExternal') } catch (e) {}
+    const _t = startTimer('[timetable] refreshExternal')
     // Throttle aggressive refreshes: ensure we don't refresh more often than MIN_REFRESH_MS
     try {
       const now = Date.now()
@@ -2364,6 +2365,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
     setError(null)
     // First try the server-scraped homepage endpoint as a quick probe.
+    try { _t.lap('start-homepage-probe') } catch (e) {}
     // Note: We intentionally do NOT set any timetable state or return early
     // here because the home-timetable endpoint lacks classVariations and
     // roomVariations. We always want to proceed to /api/timetable?date=xxx
@@ -2373,6 +2375,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // that may include variations (e.g., modified schedules for special days).
       try {
         const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
+        try { _t.lap('homepage-fetched') } catch (e) {}
         const htctype = ht.headers.get('content-type') || ''
         if (ht.ok && htctype.includes('application/json')) {
           const jht = await ht.json()
@@ -2408,6 +2411,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               jht?.holiday === true || jht?.isHoliday === true || jht?.noTimetable === true || (jht && jht.timetable && Object.keys(jht.timetable).length === 0)
             )
             if (isHolidaySignal) {
+              try { _t.lap('detected-holiday-signal') } catch (e) {}
               // Clear caches to avoid stale cached timetables rehydrating
               try {
                 if (typeof window !== 'undefined' && window.localStorage) {
