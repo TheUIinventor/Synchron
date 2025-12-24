@@ -12,7 +12,12 @@ async function probeEndpoint(ep: string, headers: Record<string,string>) {
   try {
     const url = ep.startsWith('http') ? ep : `${PORTAL_BASE}${ep}`
     const res = await fetch(url, { headers, redirect: 'follow' })
+    const status = res.status
     const ct = res.headers.get('content-type') || ''
+    // Short-circuit on upstream server errors to avoid parsing large HTML/error pages
+    if (status >= 500 && status <= 599) {
+      return { endpoint: url, status, ok: false, contentType: ct, length: 0, parsedCount: 0, error: 'upstream server error' }
+    }
     const text = await res.text()
     let parsedCount = 0
     try {

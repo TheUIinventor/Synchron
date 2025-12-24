@@ -31,8 +31,12 @@ export async function POST(req: Request) {
     // start with initial request (include any browser cookies)
     let curUrl: string | null = loginUrl
     let curCookieHeader = incomingCookies || ''
-    for (let hop = 0; hop < maxHops && curUrl; hop++) {
+      for (let hop = 0; hop < maxHops && curUrl; hop++) {
       const r: Response = await fetch(curUrl, { headers: { ...HEADERS, Cookie: curCookieHeader }, redirect: 'manual' })
+      // Short-circuit if upstream returns server error
+      if (r.status >= 500 && r.status <= 599) {
+        return NextResponse.json({ ok: false, error: 'Portal upstream server error', status: r.status }, { status: 502, headers: cacheHeaders(req) })
+      }
       const sc: string | null = r.headers.get('set-cookie')
       if (sc) {
         // split possible combined string into individual cookies

@@ -194,6 +194,11 @@ export async function GET(req: NextRequest) {
       headers,
     })
 
+    // Short-circuit on upstream server errors to avoid heavy parsing/scraping
+    if (!response.ok && response.status >= 500 && response.status <= 599) {
+      return NextResponse.json({ success: false, error: 'Portal upstream server error', status: response.status }, { status: 502, headers: cacheHeaders(req) })
+    }
+
     const text = await response.text()
       // Collect a small set of response headers for diagnostics
       const hdr = (name: string) => response.headers.get(name)
@@ -230,16 +235,39 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status, headers: cacheHeaders(req) })
     }
 
+    // Ensure response is either JSON or HTML before attempting heavy parsing/scraping.
+    const contentType = response.headers.get("content-type") || ""
+    const looksLikeJson = contentType.includes('application/json')
+    const looksLikeHtml = contentType.includes("text/html") || text.trim().startsWith("<!DOCTYPE html") || /<html/i.test(text)
+
+    if (!looksLikeJson && !looksLikeHtml) {
+      // Unknown content type — fail fast.
+      return NextResponse.json({ success: false, error: 'Unexpected content-type from portal', contentType }, { status: 502, headers: cacheHeaders(req) })
+    }
+
     let data: any
     try {
-      data = JSON.parse(text)
+      if (looksLikeJson) {
+        data = JSON.parse(text)
+      } else {
+        // Not JSON — fall through to HTML handling below
+        data = null
+      }
     } catch (e) {
-      // Portal sometimes returns an HTML login page (when not authenticated) instead of JSON.
-      // Detect HTML and return 401 so the client can prompt for re-authentication.
-      const contentType = response.headers.get("content-type") || ""
-      const looksLikeHtml = contentType.includes("text/html") || text.trim().startsWith("<!DOCTYPE html") || /<html/i.test(text)
+      data = null
+    }
 
-      if (looksLikeHtml) {
+    if (data === null && !looksLikeHtml) {
+      // No usable JSON and not HTML — nothing we can do
+      return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500, headers: cacheHeaders(req) })
+    }
+
+    if (data === null && looksLikeHtml) {
+      // Portal returned HTML (likely login) — proceed to HTML scraping/diagnostics below
+    }
+
+    // Note: the flow below expects `text`, `respHeaders`, etc. to be present — continue as before.
+
         // Truncate the HTML for the response body to avoid huge payloads in logs
         const truncated = text.slice(0, 2048)
         // Mask set-cookie values if present
@@ -388,11 +416,9 @@ export async function GET(req: NextRequest) {
           },
           forwardedSetCookie ? { status: 401, headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) } : { status: 401, headers: cacheHeaders(req) },
         )
-      }
 
       // Otherwise return a 500 with the raw body for debugging
       return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo', responseBody: text }, { status: 500, headers: cacheHeaders(req) })
-    }
 
     // Also include a small headers object for debugging (mask set-cookie)
     const okHeaders = { ...respHeaders }

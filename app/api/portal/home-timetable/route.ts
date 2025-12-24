@@ -33,6 +33,10 @@ export async function GET(req: NextRequest) {
     for (let i = 0; i < 6; i++) {
       res = await fetch(nextUrl, { headers, redirect: 'manual' })
       const status = res.status
+      // Short-circuit on obvious upstream server errors to avoid parsing HTML
+      if (status >= 500 && status <= 599) {
+        return NextResponse.json({ error: 'Portal returned server error', status }, { status: 502 })
+      }
       if ([301,302,303,307,308].includes(status)) {
         const loc = res.headers.get('location')
         if (loc) {
@@ -46,8 +50,11 @@ export async function GET(req: NextRequest) {
 
     const html = await res.text()
     const ctype = res.headers.get('content-type') || ''
-
     // If we received HTML, attempt to scrape timetable table(s)
+    // Fail fast if response is neither HTML nor JSON
+    if (!html && !ctype.includes('text/html') && !ctype.includes('application/json')) {
+      return NextResponse.json({ error: 'Unexpected portal response type', contentType: ctype }, { status: 502 })
+    }
     if (html && /<html/i.test(html)) {
       // Load cheerio dynamically to avoid build-time type resolution issues
       const cheerioMod: any = await import('cheerio')

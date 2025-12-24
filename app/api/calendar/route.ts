@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
       },
     })
     
+    // If upstream returns an error status, short-circuit and forward the status.
     if (!response.ok) {
       console.error(`[Calendar API] SBHS returned ${response.status}: ${response.statusText}`)
       return NextResponse.json(
@@ -93,7 +94,14 @@ export async function GET(request: NextRequest) {
         { status: response.status }
       )
     }
-    
+
+    // Ensure the upstream returned JSON before attempting to parse.
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      console.error('[Calendar API] Upstream did not return JSON; content-type=', contentType)
+      return NextResponse.json({ error: 'SBHS API did not return JSON' }, { status: 502 })
+    }
+
     const data = await response.json()
 
     // Cache the response payload in-memory for a short TTL to reduce repeated

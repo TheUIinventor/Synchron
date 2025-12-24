@@ -32,6 +32,10 @@ export async function GET(req: Request) {
     if (rawCookie) headers['Cookie'] = rawCookie
 
     const res = await fetch(apiUrl, { headers })
+    // Short-circuit on upstream server errors to avoid reading large bodies
+    if (res.status >= 500 && res.status <= 599) {
+      return NextResponse.json({ ok: false, error: 'Portal upstream server error', status: res.status }, { status: 502 })
+    }
     const text = await res.text()
 
     // capture key response headers

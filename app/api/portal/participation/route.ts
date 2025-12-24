@@ -35,6 +35,11 @@ export async function GET(req: NextRequest) {
       headers,
     })
 
+    // Short-circuit on upstream server error
+    if (res.status >= 500 && res.status <= 599) {
+      return NextResponse.json({ success: false, error: 'Portal upstream server error', status: res.status }, { status: 502, headers: cacheHeaders(req) })
+    }
+
     // If portal returns 401 (token expired/invalid), try server-side refresh using refresh token and retry once
     if (res.status === 401) {
       const refreshToken = req.cookies.get('sbhs_refresh_token')?.value || null
@@ -62,6 +67,10 @@ export async function GET(req: NextRequest) {
           // Retry the portal request with the new access token
           headers['Authorization'] = `Bearer ${newAccess}`
           res = await fetch(PORTAL_PARTICIPATION, { method: 'GET', headers })
+
+          if (res.status >= 500 && res.status <= 599) {
+            return NextResponse.json({ success: false, error: 'Portal upstream server error', status: res.status }, { status: 502, headers: cacheHeaders(req) })
+          }
 
           // Build response and set updated cookies so browser receives refreshed tokens
           const contentType = res.headers.get('content-type') || 'text/plain'

@@ -21,6 +21,10 @@ export async function GET(req: Request) {
   try {
     const loginUrl = 'https://student.sbhs.net.au/auth/login'
     const r1 = await fetch(loginUrl, { headers: HEADERS, redirect: 'manual' })
+    // Fail fast on upstream server errors
+    if (r1.status >= 500 && r1.status <= 599) {
+      return NextResponse.json({ ok: false, error: 'Portal upstream server error', status: r1.status }, { status: 502, headers: cacheHeaders(req) })
+    }
     const text1 = await r1.text()
     const headers1 = getAllHeaders(r1)
 
@@ -35,9 +39,13 @@ export async function GET(req: Request) {
     if (location) {
       try {
         const r2 = await fetch(location.startsWith('http') ? location : `https://student.sbhs.net.au${location}`, { headers: HEADERS, redirect: 'manual' })
-        const text2 = await r2.text()
-        const headers2 = getAllHeaders(r2)
-        r2info = { status: r2.status, headers: headers2, snippet: text2.slice(0, 4096) }
+        if (r2.status >= 500 && r2.status <= 599) {
+          r2info = { status: r2.status, error: 'upstream server error' }
+        } else {
+          const text2 = await r2.text()
+          const headers2 = getAllHeaders(r2)
+          r2info = { status: r2.status, headers: headers2, snippet: text2.slice(0, 4096) }
+        }
       } catch (e) {
         r2info = { error: String(e) }
       }

@@ -2324,6 +2324,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (!hadCache) setIsLoading(true)
     // Mark that a background refresh is in progress for logging/debug
     setIsRefreshing(true)
+    // Short-circuit: if a refresh is already running and this call is not forced,
+    // avoid starting a duplicate refresh.
+    try {
+      if (isRefreshing && !force) {
+        try { console.debug('[timetable.provider] refresh already in progress; skipping') } catch (e) {}
+        if (!hadCache) setIsLoading(false)
+        return
+      }
+    } catch (e) {}
     // If developer debugging key is set, attach temporary event listeners
     try {
       if (typeof window !== 'undefined' && window.sessionStorage && window.sessionStorage.getItem('synchron:debug-refresh') === 'true') {
@@ -2364,6 +2373,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       lastRefreshTsRef.current = now
     } catch (e) {}
     setError(null)
+    // If the selected date is known to be a holiday, abort early to avoid
+    // fetching timetable data that should not exist for this date.
+    try {
+      if (selectedDateIsHoliday || (holidayDateRef && holidayDateRef.current)) {
+        try { console.debug('[timetable.provider] selected date is holiday; aborting refresh') } catch (e) {}
+        setIsRefreshing(false)
+        if (!hadCache) setIsLoading(false)
+        return
+      }
+    } catch (e) {}
     // First try the server-scraped homepage endpoint as a quick probe.
     try { _t.lap('start-homepage-probe') } catch (e) {}
     // Note: We intentionally do NOT set any timetable state or return early

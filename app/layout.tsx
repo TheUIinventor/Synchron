@@ -4,9 +4,11 @@ import ClientLayout from "./client-layout";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Roboto_Flex } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+// Analytics removed temporarily for build troubleshooting
 
 const roboto = Roboto_Flex({ subsets: ["latin"], display: "swap", variable: "--font-roboto-flex" });
+
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "Synchron",
@@ -43,7 +45,6 @@ export default function RootLayout({
           {children}
           <Toaster />
           <SonnerToaster />
-          <Analytics />
         </ClientLayout>
       </body>
     </html>

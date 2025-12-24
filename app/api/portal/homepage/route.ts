@@ -38,6 +38,10 @@ export async function GET(req: Request) {
 
     if (text === null) {
       const r = await fetch('https://student.sbhs.net.au/', { headers, redirect: 'follow' })
+      // If portal returned a server error, do not cache or attempt to forward HTML
+      if (r.status >= 500 && r.status <= 599) {
+        return NextResponse.json({ ok: false, error: 'Portal upstream server error' }, { status: 502 })
+      }
       text = await r.text()
       resHeaders = r.headers
     }
@@ -50,6 +54,11 @@ export async function GET(req: Request) {
     if (sc) {
       // Strip Domain attribute so cookies can be set for our app's domain (best-effort)
       options.headers['set-cookie'] = sc.replace(/;\s*Domain=[^;]+/gi, '')
+    }
+
+    // Do not cache or forward empty/error HTML pages
+    if (!text || text.trim().length === 0) {
+      return NextResponse.json({ ok: false, error: 'Empty portal response' }, { status: 502 })
     }
 
     return new NextResponse(text || '', options)

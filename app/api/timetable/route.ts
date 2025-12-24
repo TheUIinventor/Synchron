@@ -155,6 +155,10 @@ export async function GET(req: NextRequest) {
       break
     }
     if (!response) return { ok: false, status: 0, text: '' }
+    // Short-circuit on upstream server errors to avoid reading large/error bodies
+    if (response.status >= 500 && response.status <= 599) {
+      return { ok: false, status: response.status, text: '' }
+    }
     const text = await response.text()
     const ctype = response.headers.get('content-type') || ''
     if (ctype.includes('application/json')) {
