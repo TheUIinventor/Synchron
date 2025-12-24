@@ -62,6 +62,63 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Add a short in-process cache for authenticated users to absorb rapid
+  // repeated polling (e.g. clients hitting the endpoint every 2s). This
+  // cache is ephemeral (in-memory) and keyed by a non-cryptographic hash of
+  // the incoming cookie header or token string; it is not persisted.
+  function fnv1aHex(s: string) {
+    let h = 2166136261 >>> 0
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i)
+      h = Math.imul(h, 16777619) >>> 0
+    }
+    return ('00000000' + (h >>> 0).toString(16)).slice(-8)
+  }
+
+  const AUTH_CACHE_TTL = 1000 * 10 // 10s for authenticated responses
+  const rawCookieHeader = req.headers.get('cookie') || ''
+  const authKeySource = rawCookieHeader || accessToken || refreshToken || ''
+  const authCacheKey = authKeySource ? `portal-userinfo:${fnv1aHex(authKeySource)}` : null
+  // reuse same global map
+  try { (globalThis as any).__portal_userinfo_cache = (globalThis as any).__portal_userinfo_cache || new Map<string, any>() } catch (e) {}
+  const authCache: Map<string, any> = (globalThis as any).__portal_userinfo_cache
+
+  async function respondAndCache(key: string | null, body: any, opts: { status?: number, headers?: Record<string,string> } = {}) {
+    try {
+      if (key) {
+        try { authCache.set(key, { timestamp: Date.now(), payload: { status: opts.status || 200, body, headers: opts.headers || {} } }) } catch (e) {}
+      }
+    } catch (e) {}
+    const responseInit: any = {}
+    if (opts.headers) {
+      for (const k of Object.keys(opts.headers)) responseInit[k] = opts.headers[k]
+    }
+    if (opts.status) responseInit.status = opts.status
+    // merge cacheHeaders
+    const base = cacheHeaders(req)
+    responseInit.headers = Object.assign({}, base, opts.headers || {})
+    return NextResponse.json(body, responseInit)
+  }
+
+  // If we have a recent cached authenticated response, return it immediately
+  if (authCacheKey) {
+    try {
+      const hit = authCache.get(authCacheKey)
+      if (hit && (Date.now() - hit.timestamp) < AUTH_CACHE_TTL) {
+        try { console.debug('[portal-userinfo] served auth cache') } catch (e) {}
+        const init: any = { headers: Object.assign({}, cacheHeaders(req), hit.payload.headers || {}) }
+        if (hit.payload.status) init.status = hit.payload.status
+        return NextResponse.json(hit.payload.body, init)
+      }
+      // If there's an in-flight fetch promise stored, await it to avoid thundering herd
+      if (hit && hit.fetching && typeof hit.fetching.then === 'function') {
+        try { const res = await hit.fetching; return res } catch (e) {}
+      }
+    } catch (e) {
+      // ignore cache inspection errors
+    }
+  }
+
   // Name validation helper (top-level so all fallbacks can reuse it)
   const isProbableName = (v: any) => {
     if (!v) return false
@@ -198,11 +255,10 @@ export async function GET(req: NextRequest) {
               const found = extractNameFromJson(j)
               if (found) {
                 const given = found.split(/\s+/)[0]
-                const res = NextResponse.json({ success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${host}${path}` }, { headers: cacheHeaders(req) })
-                // propagate any set-cookie header we received
+                const body = { success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${host}${path}` }
                 const sc = r.headers.get('set-cookie')
-                if (sc) res.headers.set('set-cookie', sc.replace(/;\s*Domain=[^;]+/gi, ''))
-                return res
+                const headers = sc ? { 'set-cookie': sc.replace(/;\s*Domain=[^;]+/gi, '') } : undefined
+                return await respondAndCache(authCacheKey, body, headers ? { headers } : {})
               }
             } catch (e) {
               // ignore JSON parse errors and continue
@@ -219,7 +275,7 @@ export async function GET(req: NextRequest) {
 
     // Short-circuit on upstream server errors to avoid heavy parsing/scraping
     if (!response.ok && response.status >= 500 && response.status <= 599) {
-      return NextResponse.json({ success: false, error: 'Portal upstream server error', status: response.status }, { status: 502, headers: cacheHeaders(req) })
+      return await respondAndCache(authCacheKey, { success: false, error: 'Portal upstream server error', status: response.status }, { status: 502 })
     }
 
     // Collect a small set of response headers for diagnostics
@@ -243,9 +299,9 @@ export async function GET(req: NextRequest) {
       // Try to avoid reading the full body for failures; only read when diagnostics requested
       if (diagnosticsRequested(req)) {
         const text = await response.text()
-        return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status, headers: cacheHeaders(req) })
+        return await respondAndCache(authCacheKey, { success: false, error: 'Failed to fetch userinfo', status: response.status, responseBody: text }, { status: response.status })
       }
-      return NextResponse.json({ success: false, error: 'Failed to fetch userinfo', status: response.status }, { status: response.status, headers: cacheHeaders(req) })
+      return await respondAndCache(authCacheKey, { success: false, error: 'Failed to fetch userinfo', status: response.status }, { status: response.status })
     }
 
     // Ensure response is either JSON or HTML before attempting heavy parsing/scraping.
@@ -256,7 +312,7 @@ export async function GET(req: NextRequest) {
 
     if (!looksLikeJson && !looksLikeHtml) {
       // Unknown content type — fail fast.
-      return NextResponse.json({ success: false, error: 'Unexpected content-type from portal', contentType }, { status: 502, headers: cacheHeaders(req) })
+      return await respondAndCache(authCacheKey, { success: false, error: 'Unexpected content-type from portal', contentType }, { status: 502 })
     }
 
     let data: any = null
@@ -283,7 +339,7 @@ export async function GET(req: NextRequest) {
 
     if (data === null && !looksLikeHtml) {
       // No usable JSON and not HTML — nothing we can do
-      return NextResponse.json({ success: false, error: 'Invalid JSON from SBHS userinfo' }, { status: 500, headers: cacheHeaders(req) })
+      return await respondAndCache(authCacheKey, { success: false, error: 'Invalid JSON from SBHS userinfo' }, { status: 500 })
     }
 
     // Note: the flow below expects `text`, `respHeaders`, etc. to be present when diagnostics are enabled.
@@ -345,9 +401,8 @@ export async function GET(req: NextRequest) {
                     if (isProbableName(fullName)) {
                       const given = fullName.split(/\s+/)[0]
                       const result = { givenName: given, fullName }
-                      const res = NextResponse.json({ success: true, data: result, source: `scraped:${pp}` })
-                      if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
-                      return res
+                      const body = { success: true, data: result, source: `scraped:${pp}` }
+                      return await respondAndCache(authCacheKey, body, forwardedSetCookie ? { headers: { 'set-cookie': forwardedSetCookie } } : {})
                     }
                   }
                 }
@@ -361,9 +416,8 @@ export async function GET(req: NextRequest) {
                     const fullName = m[1].trim()
                     if (isProbableName(fullName)) {
                       const given = fullName.split(/\s+/)[0]
-                      const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `title:${pp}` })
-                      if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
-                      return res
+                      const body = { success: true, data: { givenName: given, fullName }, source: `title:${pp}` }
+                      return await respondAndCache(authCacheKey, body, forwardedSetCookie ? { headers: { 'set-cookie': forwardedSetCookie } } : {})
                     }
                   }
                 }
@@ -373,9 +427,8 @@ export async function GET(req: NextRequest) {
                   const fullName = metaAuthor
                   if (isProbableName(fullName)) {
                     const given = fullName.split(/\s+/)[0]
-                    const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `meta:${pp}` })
-                    if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
-                    return res
+                    const body = { success: true, data: { givenName: given, fullName }, source: `meta:${pp}` }
+                    return await respondAndCache(authCacheKey, body, forwardedSetCookie ? { headers: { 'set-cookie': forwardedSetCookie } } : {})
                   }
                 }
 
@@ -388,9 +441,8 @@ export async function GET(req: NextRequest) {
                     const fullName = greet[1].trim()
                     if (isProbableName(fullName)) {
                       const given = fullName.split(/\s+/)[0]
-                      const res = NextResponse.json({ success: true, data: { givenName: given, fullName }, source: `greeting:${pp}` })
-                      if (forwardedSetCookie) res.headers.set('set-cookie', forwardedSetCookie)
-                      return res
+                        const body = { success: true, data: { givenName: given, fullName }, source: `greeting:${pp}` }
+                        return await respondAndCache(authCacheKey, body, forwardedSetCookie ? { headers: { 'set-cookie': forwardedSetCookie } } : {})
                     }
                   }
                 }
@@ -443,19 +495,17 @@ export async function GET(req: NextRequest) {
           }
         }))
 
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Portal returned HTML (likely login page). SBHS session may be missing or expired.",
-            responseBody: truncated,
-            responseHeaders: maskedHeaders,
-            probeResults,
-            maskedIncomingCookies,
-            sentAuthorization: !!authHeader,
-            maskedAuthorization: maskedAuth,
-          },
-          forwardedSetCookie ? { status: 401, headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) } : { status: 401, headers: cacheHeaders(req) },
-        )
+        const body = {
+          success: false,
+          error: "Portal returned HTML (likely login page). SBHS session may be missing or expired.",
+          responseBody: truncated,
+          responseHeaders: maskedHeaders,
+          probeResults,
+          maskedIncomingCookies,
+          sentAuthorization: !!authHeader,
+          maskedAuthorization: maskedAuth,
+        }
+        return await respondAndCache(authCacheKey, body, forwardedSetCookie ? { status: 401, headers: { 'set-cookie': forwardedSetCookie } } : { status: 401 })
 
     // Also include a small headers object for debugging (mask set-cookie)
     const okHeaders = { ...respHeaders }
@@ -464,11 +514,12 @@ export async function GET(req: NextRequest) {
     }
 
     if (forwardedSetCookie) {
-      return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) })
+      const body = { success: true, data, responseHeaders: okHeaders }
+      return await respondAndCache(authCacheKey, body, { headers: { 'set-cookie': forwardedSetCookie } })
     }
 
-    return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: cacheHeaders(req) })
+    return await respondAndCache(authCacheKey, { success: true, data, responseHeaders: okHeaders })
   } catch (error) {
-    return NextResponse.json({ success: false, error: 'Proxy error', details: String(error) }, { status: 500, headers: cacheHeaders(req) })
+    return await respondAndCache(authCacheKey, { success: false, error: 'Proxy error', details: String(error) }, { status: 500 })
   }
 }

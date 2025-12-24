@@ -3,7 +3,7 @@
 import { useTimetable } from "@/contexts/timetable-context";
 // Use Intl.DateTimeFormat instead of importing date-fns for simple formatting
 import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils";
@@ -73,6 +73,11 @@ export default function HomeClient() {
     }
   })
 
+  // Refs to avoid frequent profile fetches across effect re-runs
+  const inFlightRef = useRef(false)
+  const lastProfileFetchRef = useRef<number | null>(null)
+  const mountedRef = useRef(true)
+
   useEffect(() => {
     // keep clock updated every second so countdowns refresh on mobile pill
     const t = setInterval(() => setCurrentDate(new Date()), 1000);
@@ -103,15 +108,17 @@ export default function HomeClient() {
     // This ensures the displayed name updates after a background auth refresh
     // or when the provider completes initial calendar checks that may have
     // prevented earlier proxy requests from succeeding.
-    let mounted = true
-    let inFlight = false
+    const COOLDOWN_MS = 10 * 1000 // don't fetch profile more than once per 10s
+
     ;(async () => {
       try {
-        // Avoid duplicate concurrent requests
-        if (inFlight) return
-        inFlight = true
+        if (inFlightRef.current) return
+        const now = Date.now()
+        if (lastProfileFetchRef.current && (now - lastProfileFetchRef.current) < COOLDOWN_MS) return
+        inFlightRef.current = true
+        lastProfileFetchRef.current = now
         const res = await sbhsPortal.getStudentProfile()
-        if (!mounted) return
+        if (!mountedRef.current) return
         if (res && res.success && res.data && res.data.givenName) {
           const name = res.data.givenName
           setGivenName(name)
@@ -120,10 +127,10 @@ export default function HomeClient() {
       } catch (e) {
         // ignore
       } finally {
-        inFlight = false
+        inFlightRef.current = false
       }
     })()
-    return () => { mounted = false }
+    return () => { mountedRef.current = false }
   }, [timetableSource, isAuthenticated, reauthRequired])
 
   useEffect(() => {
