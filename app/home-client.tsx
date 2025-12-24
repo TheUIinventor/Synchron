@@ -98,26 +98,32 @@ export default function HomeClient() {
   }, []);
 
   useEffect(() => {
+    // Re-run profile fetch when authentication or timetable sync state changes.
+    // This ensures the displayed name updates after a background auth refresh
+    // or when the provider completes initial calendar checks that may have
+    // prevented earlier proxy requests from succeeding.
     let mounted = true
+    let inFlight = false
     ;(async () => {
       try {
+        // Avoid duplicate concurrent requests
+        if (inFlight) return
+        inFlight = true
         const res = await sbhsPortal.getStudentProfile()
         if (!mounted) return
         if (res && res.success && res.data && res.data.givenName) {
           const name = res.data.givenName
           setGivenName(name)
-          try {
-            localStorage.setItem('synchron-given-name', String(name))
-          } catch (e) {
-            // ignore storage errors
-          }
+          try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
         }
       } catch (e) {
         // ignore
+      } finally {
+        inFlight = false
       }
     })()
     return () => { mounted = false }
-  }, [])
+  }, [timetableSource, isAuthenticated, reauthRequired])
 
   useEffect(() => {
     function reload(e?: Event) {
