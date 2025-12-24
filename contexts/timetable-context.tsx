@@ -3448,15 +3448,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // continues to follow API-derived break rows.
       try { console.log('[timetable.provider] falling back to sample timetable (refresh)') } catch (e) {}
       if (lastRecordedTimetable) {
-        // Prefer showing cached real data when available regardless of auth state.
-        startTransition(() => {
-          setExternalTimetable(lastRecordedTimetable)
-          try { setCacheHydrated(true) } catch (e) {}
-          setTimetableSource('cache')
-          setError(null)
-          // Clear loading indicator as soon as we have valid data
-          setIsRefreshing(false)
-        })
+        // Do not hydrate cached timetable during the initial calendar check
+        // (to avoid flashing cached classes) unless we've already
+        // intentionally hydrated cache or the client is offline.
+        const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+        if (initialCalendarChecked || cacheHydrated || isOffline) {
+          // Prefer showing cached real data when available regardless of auth state.
+          startTransition(() => {
+            setExternalTimetable(lastRecordedTimetable)
+            try { setCacheHydrated(true) } catch (e) {}
+            setTimetableSource('cache')
+            setError(null)
+            // Clear loading indicator as soon as we have valid data
+            setIsRefreshing(false)
+          })
+        }
       } else if (isAuthenticated) {
         startTransition(() => {
           setExternalTimetable(null)
@@ -3476,13 +3482,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
       if (lastRecordedTimetable) {
-        startTransition(() => {
-          setExternalTimetable(lastRecordedTimetable)
-          try { setCacheHydrated(true) } catch (e) {}
-          setTimetableSource('cache')
-          setError(null)
-          setIsRefreshing(false)
-        })
+        const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+        if (initialCalendarChecked || cacheHydrated || isOffline) {
+          startTransition(() => {
+            setExternalTimetable(lastRecordedTimetable)
+            try { setCacheHydrated(true) } catch (e) {}
+            setTimetableSource('cache')
+            setError(null)
+            setIsRefreshing(false)
+          })
+        }
       } else if (isAuthenticated) {
         startTransition(() => {
           setExternalTimetable(null)
