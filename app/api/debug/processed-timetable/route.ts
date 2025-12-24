@@ -66,7 +66,20 @@ export async function GET(req: Request) {
     const base: Record<string, any[]> = j?.timetable || { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
     const trim = (p: any) => ({ period: p?.period, time: p?.time, subject: p?.subject, teacher: p?.teacher, room: p?.room })
     const mapped: Record<string, any[]> = {}
-    for (const d of Object.keys(base || {})) mapped[d] = (base[d] || []).map((p: any) => ({ ...trim(p) }))
+    // Precompute normalized metadata per period to avoid repeated work in inner loops
+    const mappedMeta: Record<string, { p: any; normPeriod: string; normSubject: string; numericPeriod?: string }[]> = {}
+    for (const d of Object.keys(base || {})) {
+      const arr = (base[d] || []).map((p: any) => ({ ...trim(p) }))
+      mapped[d] = arr
+      mappedMeta[d] = (base[d] || []).map((p: any) => {
+        const perStr = String(p?.period || '')
+        const subjStr = String(p?.subject || '')
+        const nk = norm(perStr)
+        const sk = norm(subjStr)
+        const dp = (perStr.match(/\d+/) || [])[0]
+        return { p, normPeriod: nk, normSubject: sk, numericPeriod: dp }
+      })
+    }
 
     const all = [...classVars, ...roomVars]
     for (const v of all) {
@@ -75,23 +88,25 @@ export async function GET(req: Request) {
         const subj = v.title || v.subject || v.class || undefined
         const dateRaw = dayObj && (dayObj.date || dayObj.day) ? String(dayObj.date || dayObj.day) : undefined
         const targetDays = dateRaw ? Object.keys(mapped).filter(k => k && k.toLowerCase().includes(new Date(dateRaw).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase())) : Object.keys(mapped)
+        // Normalize variation keys once per variation
+        const perKeyStr = String(periodKey || '')
+        const perKeyNorm = norm(perKeyStr)
+        const perKeyNum = (perKeyStr.match(/\d+/) || [])[0]
+        const subjNorm = norm(String(subj || ''))
         for (const day of targetDays) {
-          const arr = mapped[day] || []
-          for (const p of arr) {
+          const metaArr = mappedMeta[day] || []
+          for (const m of metaArr) {
             try {
-              const perKey = String(periodKey || '')
-              const perStr = String(p.period || '')
-              const nk = norm(perKey)
-              const np = norm(perStr)
-              const dk = (perKey.match(/\d+/) || [])[0]
-              const dp = (perStr.match(/\d+/) || [])[0]
+              const np = m.normPeriod
+              const dp = m.numericPeriod
               const perMatch = periodKey
-                ? ( (nk && nk === np) || (dk && dp && dk === dp) || (np.includes(nk) && nk.length>0) || (nk.includes(np) && np.length>0) )
+                ? ((perKeyNorm && perKeyNorm === np) || (perKeyNum && dp && perKeyNum === dp) || (np.includes(perKeyNorm) && perKeyNorm.length>0) || (perKeyNorm.includes(np) && np.length>0))
                 : true
-              const sk = norm(String(subj || ''))
-              const sp = norm(String(p.subject || ''))
-              const subjMatch = subj ? ( (sk && sk === sp) || sp.includes(sk) || sk.includes(sp) ) : true
+              const sp = m.normSubject
+              const subjMatch = subj ? ((subjNorm && subjNorm === sp) || sp.includes(subjNorm) || subjNorm.includes(sp)) : true
               if (perMatch && subjMatch) {
+                const p = mapped[day].find((pp: any) => String(pp.period || '') === String(m.p?.period || ''))
+                if (!p) continue
                 // apply casual/substitute metadata when present
                 if (v.casualSurname && !(p as any).casualSurname) {
                   (p as any).casualSurname = String(v.casualSurname)
