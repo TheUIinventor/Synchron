@@ -30,35 +30,65 @@ export async function GET(req: Request) {
     // (Some environments may accept unauthenticated API reads; requesters can force API via ?source=api.)
     const jsonPaths = ['/api/timetable/timetable.json', '/api/timetable/daytimetable.json']
     if (accessToken || forceApi) {
-      for (const p of jsonPaths) {
-        try {
-          const res = await fetch(`${API_BASE}${p}`, { headers, redirect: 'follow' })
-          const ct = res.headers.get('content-type') || ''
-            if (res.ok && ct.includes('application/json')) {
-            const j = await res.json()
-            const subs = collectFromJson(j)
-            const payload: any = { substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() }
-            if (wantDebugRaw) payload.raw = j
-            return NextResponse.json(payload)
+      try {
+        // Fire both API JSON endpoint requests in parallel and pick the first valid JSON response.
+        const reqs = jsonPaths.map(p => fetch(`${API_BASE}${p}`, { headers, redirect: 'follow' }))
+        const settled = await Promise.allSettled(reqs)
+        for (let i = 0; i < settled.length; i++) {
+          const s = settled[i]
+          const p = jsonPaths[i]
+          if (s.status === 'fulfilled') {
+            try {
+              const res = s.value as Response
+              const ct = res.headers.get('content-type') || ''
+              if (res.ok && ct.includes('application/json')) {
+                const j = await res.json().catch(() => null)
+                if (j) {
+                  const subs = collectFromJson(j)
+                  const payload: any = { substitutions: subs, source: `${API_BASE}${p}`, lastUpdated: new Date().toISOString() }
+                  if (wantDebugRaw) payload.raw = j
+                  return NextResponse.json(payload)
+                }
+              }
+            } catch (e) {
+              // ignore parsing errors for this candidate and continue
+            }
           }
-        } catch (e) {
-          // ignore and fall back to portal
         }
+      } catch (e) {
+        // ignore and fall back to portal
       }
     }
 
     // Try portal JSON endpoints next (may require session cookie)
     const endpoints = ['/timetable/timetable.json', '/timetable/daytimetable.json']
-    for (const ep of endpoints) {
-      const res = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
-      const ct = res.headers.get('content-type') || ''
-      if (res.ok && ct.includes('application/json')) {
-        const j = await res.json()
-        const subs = collectFromJson(j)
-        const payload: any = { substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() }
-        if (wantDebugRaw) payload.raw = j
-        return NextResponse.json(payload)
+    try {
+      // Try portal JSON endpoints in parallel and return the first valid JSON response.
+      const reqs = endpoints.map(ep => fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' }))
+      const settled = await Promise.allSettled(reqs)
+      for (let i = 0; i < settled.length; i++) {
+        const s = settled[i]
+        const ep = endpoints[i]
+        if (s.status === 'fulfilled') {
+          try {
+            const res = s.value as Response
+            const ct = res.headers.get('content-type') || ''
+            if (res.ok && ct.includes('application/json')) {
+              const j = await res.json().catch(() => null)
+              if (j) {
+                const subs = collectFromJson(j)
+                const payload: any = { substitutions: subs, source: `${PORTAL_BASE}${ep}`, lastUpdated: new Date().toISOString() }
+                if (wantDebugRaw) payload.raw = j
+                return NextResponse.json(payload)
+              }
+            }
+          } catch (e) {
+            // ignore parse errors for this candidate
+          }
+        }
       }
+    } catch (e) {
+      // ignore and fall back to empty response below
     }
 
     // If JSON endpoints not available, return empty array

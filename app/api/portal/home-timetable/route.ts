@@ -130,9 +130,23 @@ export async function GET(req: NextRequest) {
           const hosts = ['https://student.sbhs.net.au', 'https://api.sbhs.net.au']
           for (const host of hosts) {
             try {
-              const dr = await fetch(`${host}/api/timetable/daytimetable.json`, { headers: headersForApi })
-              const fr = await fetch(`${host}/api/timetable/timetable.json`, { headers: headersForApi })
-              const candidate = (await (dr.ok ? dr.json().catch(() => null) : Promise.resolve(null))) || (await (fr.ok ? fr.json().catch(() => null) : Promise.resolve(null)))
+              // Fetch both possible JSON endpoints in parallel for this host and use the first valid JSON
+              const p1 = fetch(`${host}/api/timetable/daytimetable.json`, { headers: headersForApi })
+              const p2 = fetch(`${host}/api/timetable/timetable.json`, { headers: headersForApi })
+              const settled = await Promise.allSettled([p1, p2])
+              let candidate: any = null
+              for (const s of settled) {
+                if (s.status === 'fulfilled') {
+                  try {
+                    const res = s.value as Response
+                    if (!res.ok) continue
+                    const ct = res.headers.get('content-type') || ''
+                    if (!ct.includes('application/json')) continue
+                    const json = await res.json().catch(() => null)
+                    if (json) { candidate = json; break }
+                  } catch (e) { /* ignore parse errors */ }
+                }
+              }
               if (candidate && typeof candidate === 'object') {
                 const maybe = (candidate.weekType || candidate.week || candidate.week_label || candidate.cycle || candidate.rotation || candidate.weekLabel || candidate.week_type)
                 if (maybe) {
