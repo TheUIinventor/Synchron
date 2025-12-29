@@ -52,10 +52,31 @@ export async function GET(req: NextRequest) {
   // tabs that authentication completed, then redirect to the app home.
   const homeUrl = new URL('/', req.nextUrl.origin)
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>
-try {
-  localStorage.setItem('synchron-auth-updated', Date.now().toString());
-} catch (e) {}
-window.location.replace('${homeUrl.toString()}');
+(async function(){
+  try {
+    // Try to fetch the user's profile via the proxy so we can populate
+    // localStorage with the given name immediately for the next page.
+    try {
+      const resp = await fetch('/api/portal/userinfo', { credentials: 'include', cache: 'no-store' });
+      if (resp && resp.ok) {
+        try {
+          const payload = await resp.json().catch(() => null);
+          let name = null;
+          if (payload) {
+            if (payload.success && payload.data && payload.data.givenName) name = payload.data.givenName;
+            else if (payload.givenName) name = payload.givenName;
+            else if (payload.data && payload.data.student && (payload.data.student.givenName || payload.data.student.name)) name = payload.data.student.givenName || payload.data.student.name;
+          }
+          if (name) {
+            try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
+  } catch (e) {}
+  try { localStorage.setItem('synchron-auth-updated', Date.now().toString()); } catch (e) {}
+  window.location.replace('${homeUrl.toString()}');
+})()
 </script></body></html>`
   const res = new NextResponse(html, { status: 200 })
     res.headers.set('Content-Type', 'text/html; charset=utf-8')
