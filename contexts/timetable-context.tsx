@@ -836,10 +836,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const ds = (selectedDateObject || new Date()).toISOString().slice(0,10)
+        let calendarCheckSucceeded = false
         try {
           const calRes = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
           const cctype = calRes.headers.get('content-type') || ''
           if (calRes.ok && cctype.includes('application/json')) {
+            calendarCheckSucceeded = true
             const calJson = await calRes.json()
             let dayInfo: any = null
             if (Array.isArray(calJson) && calJson.length) dayInfo = calJson[0]
@@ -863,7 +865,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (isHoliday) {
               holidayDateRef.current = true
               try { setSelectedDateIsHoliday(true) } catch (e) {}
-                try { setCacheHydrated(false) } catch (e) {}
+              try { setCacheHydrated(false) } catch (e) {}
               try { clearClientCaches() } catch (e) {}
               if (!cancelled) {
                 setExternalTimetable(emptyByDay)
@@ -876,11 +878,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch (e) {
-          // ignore calendar check failures and fall back to cached data
+          // calendar check failed - do NOT fall back to cached data when online
+          try { console.debug('[timetable.provider] calendar check failed during mount; will not hydrate cache while online', e) } catch (err) {}
         }
 
         // If not a holiday, apply cached processed payload (if any) quickly
         try {
+          const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+          // If calendar check did not complete successfully and the client
+          // is online, skip hydrating the cache now to avoid flashing stale
+          // timetable data before holiday detection completes.
+          if (!calendarCheckSucceeded && !isOffline) {
+            try { console.debug('[timetable.provider] skipping cache hydration because calendar check did not complete and client is online') } catch (e) {}
+            return
+          }
           const src = __initialProcessedCache || __initialParsedCache
           let map: Record<string, Period[]> | null = null
           if (src && src.timetable) map = __extractMapFromCache(src.timetable) || __extractMapFromCache(src)
@@ -969,9 +980,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 
     // If calendar indicates the selected date is a holiday, force an
-    // empty timetable so the UI does not show classes. This is a final
-    // guard that prevents other refreshes from briefly showing periods
-    // on holiday dates.
+    // empty timetable so the UI does not show any class data. This is a
+    // final guard that prevents other refreshes from briefly showing
+    // periods on holiday dates.
     try {
       if (selectedDateIsHoliday || holidayDateRef.current) {
         try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
