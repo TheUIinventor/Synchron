@@ -48,9 +48,18 @@ export async function GET(req: NextRequest) {
     const access = data.access_token
     const refresh = data.refresh_token
     const expiresIn = data.expires_in || 3600
-  // Redirect back to app home with an absolute URL (relative URLs can throw in some runtimes)
+  // Return a small HTML page that sets a localStorage flag to notify other
+  // tabs that authentication completed, then redirect to the app home.
   const homeUrl = new URL('/', req.nextUrl.origin)
-  const res = NextResponse.redirect(homeUrl.toString())
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>
+try {
+  localStorage.setItem('synchron-auth-updated', Date.now().toString());
+} catch (e) {}
+window.location.replace('${homeUrl.toString()}');
+</script></body></html>`
+  const res = new NextResponse(html, { status: 200 })
+    res.headers.set('Content-Type', 'text/html; charset=utf-8')
+    res.headers.set('Cache-Control', NON_SHARED_CACHE)
     res.cookies.set('sbhs_access_token', access, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== 'development',

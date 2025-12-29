@@ -548,6 +548,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
   const loadTimingStartedRef = useRef(false)
+  const loadProfilerRef = useRef<any>(null)
   const _initialMomentInfo = (() => {
     try {
       // Only initialise from a cached timetable when the client is offline
@@ -823,7 +824,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Start a simple mount->ready timer so we can measure app load time
   useEffect(() => {
     if (typeof window === 'undefined') return
-    try { console.time('[timetable] mount->ready') } catch (e) {}
+    try { loadProfilerRef.current = startTimer('[timetable] mount->ready') } catch (e) {}
     loadTimingStartedRef.current = true
   }, [])
 
@@ -3555,7 +3556,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         })
       }
     } finally {
-      try { console.timeEnd('[timetable] refreshExternal') } catch (e) {}
+      try { if (_t && typeof _t.end === 'function') _t.end() } catch (e) {}
       try { setIsRefreshing(false) } catch (e) {}
       // Remove debug listeners if present
       try {
@@ -3576,7 +3577,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // End the mount->ready timer when the provider finishes loading
   useEffect(() => {
     if (loadTimingStartedRef.current && !isLoading) {
-      try { console.timeEnd('[timetable] mount->ready') } catch (e) {}
+      try { if (loadProfilerRef.current && typeof loadProfilerRef.current.end === 'function') loadProfilerRef.current.end() } catch (e) {}
       loadTimingStartedRef.current = false
     }
   }, [isLoading])

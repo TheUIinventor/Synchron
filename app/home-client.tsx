@@ -148,6 +148,24 @@ export default function HomeClient() {
     return () => { mountedRef.current = false; window.removeEventListener('focus', onFocus) }
   }, [timetableSource, isAuthenticated, reauthRequired])
 
+  // Listen for cross-tab auth notifications (optional helper).
+  // Other tabs or the auth callback can set `localStorage.setItem('synchron-auth-updated', Date.now().toString())`
+  // to notify this tab that auth state changed and we should retry profile/timetable fetching.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onStorage = (ev: StorageEvent) => {
+      try {
+        if (!ev || !ev.key) return
+        if (ev.key === 'synchron-auth-updated') {
+          try { if (refreshExternal) { void refreshExternal().catch(() => {}) } } catch (e) {}
+          try { const name = localStorage.getItem('synchron-given-name'); if (name) setGivenName(name) } catch (e) {}
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [refreshExternal])
+
   useEffect(() => {
     function reload(e?: Event) {
       try {
