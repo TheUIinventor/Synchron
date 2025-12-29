@@ -1003,6 +1003,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         } catch (e) {}
       } catch (e) {}
     })()
+    // Ensure we mark the initial calendar check as completed once the
+    // mount hydration flow finishes so consumers can safely decide when
+    // to show cached timetable data.
+    try { if (!cancelled) try { setInitialCalendarChecked(true) } catch (e) {} } catch (e) {}
     return () => { cancelled = true }
   }, [])
 
