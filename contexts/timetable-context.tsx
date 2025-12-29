@@ -3132,21 +3132,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const computedSource = j.source ?? 'external'
               // Use the actual date we fetched for, not the current date
               const computedDate = todayDateStr
-              startTransition(() => {
-                if (j.weekType === 'A' || j.weekType === 'B') {
-                  setExternalWeekType(j.weekType)
-                  setCurrentWeek(j.weekType)
+              try {
+                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+                if (!selectedDateCalendarChecked && selIso && computedDate && selIso === computedDate && !isOfflineNow) {
+                  try { console.debug('[timetable.provider] withholding fetched timetable (processed payload) until per-date calendar check completes', { computedDate, selIso }) } catch (e) {}
+                  setIsRefreshing(false)
+                } else {
+                  startTransition(() => {
+                    if (j.weekType === 'A' || j.weekType === 'B') {
+                      setExternalWeekType(j.weekType)
+                      setCurrentWeek(j.weekType)
+                    }
+                    if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                    // Track which date this timetable is FOR
+                    externalTimetableDateRef.current = computedDate
+                    setExternalTimetable(finalTimetable)
+                    setTimetableSource(computedSource)
+                    setLastFetchedDate(computedDate)
+                    if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
+                    // Clear loading indicator as soon as we have valid data
+                    setIsRefreshing(false)
+                  })
                 }
-                if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-                // Track which date this timetable is FOR
-                externalTimetableDateRef.current = computedDate
-                setExternalTimetable(finalTimetable)
-                setTimetableSource(computedSource)
-                setLastFetchedDate(computedDate)
-                if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
-                // Clear loading indicator as soon as we have valid data
-                setIsRefreshing(false)
-              })
+              } catch (e) {
+                // If guard check fails for any reason, apply normally to avoid leaving UI stuck
+                startTransition(() => {
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
+                  if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                  externalTimetableDateRef.current = computedDate
+                  setExternalTimetable(finalTimetable)
+                  setTimetableSource(computedSource)
+                  setLastFetchedDate(computedDate)
+                  if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
+                  setIsRefreshing(false)
+                })
+              }
               // Note: do not override provider-selected date here. The
               // `selectedDateObject` is driven by user choice and time-based
               // auto-selection logic; forcing it from a general `/api/timetable`
@@ -3233,15 +3257,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // Intentionally not overriding `selectedDateObject` here for
               // the reasons described above.
               // Batch all related state updates atomically
-              startTransition(() => {
-                setExternalTimetable(byDay)
-                setTimetableSource(computedSourceArr)
-                if (j.weekType === 'A' || j.weekType === 'B') {
-                  setExternalWeekType(j.weekType)
-                  setCurrentWeek(j.weekType)
+              try {
+                const payloadDate = extractDateFromPayload(j.upstream || j) || null
+                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+                if (payloadDate && !selectedDateCalendarChecked && selIso && payloadDate === selIso && !isOfflineNow) {
+                  try { console.debug('[timetable.provider] withholding fetched timetable (array path) until per-date calendar check completes', { payloadDate, selIso }) } catch (e) {}
+                  setIsRefreshing(false)
+                } else {
+                  startTransition(() => {
+                    setExternalTimetable(byDay)
+                    setTimetableSource(computedSourceArr)
+                    if (j.weekType === 'A' || j.weekType === 'B') {
+                      setExternalWeekType(j.weekType)
+                      setCurrentWeek(j.weekType)
+                    }
+                    setIsRefreshing(false)
+                  })
                 }
-                setIsRefreshing(false)
-              })
+              } catch (e) {
+                startTransition(() => {
+                  setExternalTimetable(byDay)
+                  setTimetableSource(computedSourceArr)
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
+                  setIsRefreshing(false)
+                })
+              }
               return
             }
           }
@@ -3518,20 +3562,42 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               retrySummary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
             } catch (e) {}
             // Use startTransition to batch ALL updates and prevent flash
-            startTransition(() => {
-              // Track which date this timetable is FOR
-              if (retryDate) externalTimetableDateRef.current = retryDate
-              setExternalTimetable(finalTimetable)
-              setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
+            try {
+              const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+              const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+              if (retryDate && !selectedDateCalendarChecked && selIso && retryDate === selIso && !isOfflineNow) {
+                try { console.debug('[timetable.provider] withholding fetched timetable (retry path) until per-date calendar check completes', { retryDate, selIso }) } catch (e) {}
+                setIsRefreshing(false)
+              } else {
+                startTransition(() => {
+                  // Track which date this timetable is FOR
+                  if (retryDate) externalTimetableDateRef.current = retryDate
+                  setExternalTimetable(finalTimetable)
+                  setTimetableSource(j.source ?? 'external')
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
+                  if (retryDate) setLastFetchedDate(retryDate)
+                  if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
+                  // Clear loading indicator as soon as we have valid data
+                  setIsRefreshing(false)
+                })
               }
-              if (retryDate) setLastFetchedDate(retryDate)
-              if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
-              // Clear loading indicator as soon as we have valid data
-              setIsRefreshing(false)
-            })
+            } catch (e) {
+              startTransition(() => {
+                if (retryDate) externalTimetableDateRef.current = retryDate
+                setExternalTimetable(finalTimetable)
+                setTimetableSource(j.source ?? 'external')
+                if (j.weekType === 'A' || j.weekType === 'B') {
+                  setExternalWeekType(j.weekType)
+                  setCurrentWeek(j.weekType)
+                }
+                if (retryDate) setLastFetchedDate(retryDate)
+                if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
+                setIsRefreshing(false)
+              })
+            }
             return
           }
 
