@@ -418,6 +418,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   try {
     if (typeof window !== 'undefined') __initialRawCache = localStorage.getItem('synchron-last-timetable')
     if (__initialRawCache) __initialParsedCache = JSON.parse(__initialRawCache)
+    try { console.debug('[timetable.provider] initial raw cache present=', Boolean(__initialRawCache)) } catch (e) {}
   } catch (e) {
     __initialRawCache = null
     __initialParsedCache = null
@@ -645,6 +646,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {}
   }, [selectedDateObject])
+
+  useEffect(() => {
+    try { console.debug('[timetable.provider] selectedDateCalendarChecked=', selectedDateCalendarChecked, 'selectedDateIsHoliday=', selectedDateIsHoliday) } catch (e) {}
+  }, [selectedDateCalendarChecked, selectedDateIsHoliday])
 
   // Watch for selected date changes and consult the calendar API to
   // determine whether the chosen date is a holiday. If the calendar
@@ -960,6 +965,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   } else {
                     try { console.debug('[timetable.provider] hydrate: no date found in cached payload') } catch (e) {}
                   }
+                } catch (e) {}
+
+                // Conservative guard: if the cached payload is for a different
+                // date than the currently-selected date, and we have not yet
+                // completed the per-selected-date calendar check (and we're
+                // online), do NOT hydrate the cache now. This prevents a
+                // brief flash where cached classes appear before the holiday
+                // detection completes.
+                try {
+                  const selIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
+                  const payloadDate = externalTimetableDateRef.current
+                  const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+                  if (payloadDate && selIso && payloadDate !== selIso && !selectedDateCalendarChecked && !isOffline) {
+                    try { console.debug('[timetable.provider] skipping cache hydration: cached payload date', payloadDate, 'does not match selected', selIso, 'and per-date calendar check pending') } catch (e) {}
+                    return
+                  }
+                } catch (e) {}
                 } catch (e) {}
 
                 setExternalTimetable(final)
