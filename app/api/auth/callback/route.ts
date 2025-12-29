@@ -48,12 +48,40 @@ export async function GET(req: NextRequest) {
     const access = data.access_token
     const refresh = data.refresh_token
     const expiresIn = data.expires_in || 3600
+      // Try a server-side userinfo probe using the access token so we can
+      // embed the given name directly into the callback page. This avoids
+      // client-side cookie-propagation races on first sign-in.
+      let serverGivenName: string | null = null
+      try {
+        if (access) {
+          try {
+            const up = await fetch('https://student.sbhs.net.au/details/userinfo.json', { headers: { 'Authorization': `Bearer ${access}`, 'Accept': 'application/json' } })
+            if (up && up.ok) {
+              try {
+                const uj = await up.json().catch(() => null)
+                if (uj) {
+                  if (uj.success && uj.data && uj.data.givenName) serverGivenName = uj.data.givenName
+                  else if (uj.givenName) serverGivenName = uj.givenName
+                  else if (uj.data && uj.data.student && (uj.data.student.givenName || uj.data.student.name)) serverGivenName = uj.data.student.givenName || uj.data.student.name
+                  else if (uj.name) serverGivenName = uj.name
+                }
+              } catch (e) {}
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
   // Return a small HTML page that sets a localStorage flag to notify other
   // tabs that authentication completed, then redirect to the app home.
   const homeUrl = new URL('/', req.nextUrl.origin)
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>
 (async function(){
     try {
+      // If we obtained a server-side name, write it immediately so the
+      // app can show the user's name right after redirect.
+      const serverName = ${serverGivenName ? JSON.stringify(serverGivenName) : 'null'}
+      if (serverName) {
+        try { localStorage.setItem('synchron-given-name', serverName) } catch (e) {}
+      }
       // Retry a few times to robustly fetch profile while cookies propagate.
       let nameFound = null
       const statuses = []
