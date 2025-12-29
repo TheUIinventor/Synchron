@@ -117,20 +117,49 @@ export default function HomeClient() {
         if (lastProfileFetchRef.current && (now - lastProfileFetchRef.current) < COOLDOWN_MS) return
         inFlightRef.current = true
         lastProfileFetchRef.current = now
-        const res = await sbhsPortal.getStudentProfile()
-        if (!mountedRef.current) return
-        if (res && res.success && res.data && res.data.givenName) {
-          const name = res.data.givenName
-          setGivenName(name)
-          try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
-        } else {
-          // If profile fetch failed or returned no name, trigger a timetable
-          // refresh which may update auth/session state and allow profile
-          // fetching to succeed (e.g., after a recent login).
+
+        // Try multiple times with small backoff to handle cookie propagation
+        let attempts = 0
+        let gotName: string | null = null
+        const maxAttempts = 4
+        while (attempts < maxAttempts && !gotName && mountedRef.current) {
           try {
-            if (refreshExternal) { void refreshExternal().catch(() => {}) }
-          } catch (e) {}
+            console.debug('[home-client] profile fetch attempt', attempts + 1)
+            const res = await sbhsPortal.getStudentProfile()
+            if (res && res.success && res.data && res.data.givenName) {
+              gotName = res.data.givenName
+              break
+            }
+          } catch (e) {
+            console.debug('[home-client] profile fetch error', e)
+          }
+          attempts++
+          // small backoff
+          try { await new Promise((r) => setTimeout(r, 250 * attempts)) } catch (e) {}
         }
+
+        if (!mountedRef.current) return
+        if (gotName) {
+          setGivenName(gotName)
+          try { localStorage.setItem('synchron-given-name', String(gotName)) } catch (e) {}
+          console.debug('[home-client] profile fetched - name set', gotName)
+          return
+        }
+
+        // If unable to fetch profile after retries, attempt a background refresh
+        try {
+          if (refreshExternal) { void refreshExternal().catch(() => {}) }
+        } catch (e) {}
+
+        // Final fallback: if the callback prefilled localStorage, use it
+        try {
+          const storename = localStorage.getItem('synchron-given-name')
+          if (storename) {
+            setGivenName(storename)
+            console.debug('[home-client] name loaded from localStorage fallback', storename)
+          }
+        } catch (e) {}
+
       } catch (e) {
         // ignore
       } finally {
