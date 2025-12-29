@@ -4135,6 +4135,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         timetableByWeek: lastRecordedTimetableByWeek || externalTimetableByWeek || undefined,
         externalWeekType,
         selectedDateCalendarChecked,
+        selectedDateIsHoliday,
         isLoading,
         isRefreshing,
         isAuthenticated,

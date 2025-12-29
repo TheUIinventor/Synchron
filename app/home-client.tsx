@@ -59,7 +59,8 @@ export default function HomeClient() {
     bellTimes,
     isAuthenticated,
     reauthRequired,
-    selectedDateCalendarChecked } = useTimetable() as any;
+    selectedDateCalendarChecked,
+    selectedDateIsHoliday } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -258,7 +259,7 @@ export default function HomeClient() {
     );
   }
 
-  const effectiveMoment = (homeCalendarChecked && !homeIsHoliday) ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
+  const effectiveMoment = (homeCalendarChecked && selectedDateCalendarChecked && !homeIsHoliday && !selectedDateIsHoliday) ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
   
   // Determine the date to display for the HOME page. The home page should
@@ -748,7 +749,7 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
-                  {(homeCalendarChecked && !homeIsHoliday && todaysPeriods.length > 0) ? (
+                  {(homeCalendarChecked && selectedDateCalendarChecked && !homeIsHoliday && !selectedDateIsHoliday && todaysPeriods.length > 0) ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
