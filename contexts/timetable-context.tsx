@@ -869,12 +869,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.dayType || '').toLowerCase().includes('holiday')
               )
             )
-          }
+            
+            if (isHoliday) {
               holidayDateRef.current = true
-      } finally {
-        // Mark that the per-selected-date calendar check has completed (success or failure)
-        try { setSelectedDateCalendarChecked(true) } catch (e) {}
-      }
               try { setSelectedDateIsHoliday(true) } catch (e) {}
               try { setCacheHydrated(false) } catch (e) {}
               try { clearClientCaches() } catch (e) {}
@@ -885,8 +882,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setExternalWeekType(null)
                 try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
               }
+              // Mark that the per-selected-date calendar check has completed
+              try { setSelectedDateCalendarChecked(true) } catch (e) {}
               return
             }
+            // Mark that the per-selected-date calendar check completed for non-holiday
+            try { setSelectedDateCalendarChecked(true) } catch (e) {}
           }
         } catch (e) {
           // calendar check failed - do NOT fall back to cached data when online
