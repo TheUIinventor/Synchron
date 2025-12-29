@@ -149,6 +149,20 @@ export default function HomeClient() {
     return () => { mountedRef.current = false; window.removeEventListener('focus', onFocus) }
   }, [timetableSource, isAuthenticated, reauthRequired])
 
+  // Global error hooks to surface unexpected runtime errors during debug
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onErr = (evt: ErrorEvent) => {
+      try { console.error('[home-client] global error', evt.error || evt.message, evt) } catch (e) {}
+    }
+    const onRej = (evt: PromiseRejectionEvent) => {
+      try { console.error('[home-client] unhandled rejection', evt.reason) } catch (e) {}
+    }
+    window.addEventListener('error', onErr)
+    window.addEventListener('unhandledrejection', onRej)
+    return () => { window.removeEventListener('error', onErr); window.removeEventListener('unhandledrejection', onRej) }
+  }, [])
+
   // Check calendar for displayed date to avoid showing cached/term data on holidays
   useEffect(() => {
     let cancelled = false

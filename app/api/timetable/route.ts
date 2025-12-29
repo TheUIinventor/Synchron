@@ -265,6 +265,28 @@ export async function GET(req: NextRequest) {
       try {
         if (dayRes && (dayRes as any).json) {
           const dj = (dayRes as any).json
+          // If upstream returned a payload for a different date than requested
+          // (some portal endpoints return the last school day when asked for
+          // a holiday), treat that as "no timetable" for the requested
+          // date to avoid showing prior-term data for holidays.
+          try {
+            const upstreamDate = dj && (dj.date || (dj.day && dj.day.date) || null)
+            if (upstreamDate && String(upstreamDate).slice(0,10) !== String(dateParam).slice(0,10)) {
+              console.log(`[timetable.route] upstream returned data for ${upstreamDate} when requested ${dateParam} - treating as no timetable`)
+              return NextResponse.json({
+                timetable: byDay,
+                timetableByWeek: null,
+                bellTimes: undefined,
+                source: 'sbhs-api-day-mismatched-date',
+                weekType: detectedWeekType,
+                isHoliday: true,
+                noTimetable: true,
+                upstream: { day: dj, full: null, bells: null },
+              }, { status: 200, headers: { 'Cache-Control': cacheControl } })
+            }
+          } catch (e) {
+            // ignore mismatch check errors
+          }
           console.log(`[API DEBUG] Processing date-specific path for ${dateParam}`)
           console.log(`[API DEBUG] dj.bells length=${Array.isArray(dj.bells) ? dj.bells.length : 'not array'}`)
           console.log(`[API DEBUG] dj.classVariations keys=${dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'none'}`)

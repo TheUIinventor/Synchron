@@ -4,6 +4,20 @@ import { createContext, useContext, useState, useEffect, useMemo, useCallback, u
 import { startTimer } from '@/utils/profiler2'
 import { useToast } from "@/hooks/use-toast"
 import { applySubstitutionsToTimetable } from "@/lib/api/data-adapters"
+
+// Safe wrapper to apply substitutions with defensive error handling.
+function safeApplySubstitutions(timetable: Record<string, any>, subs: any, opts?: any) {
+  try {
+    if (!subs) return timetable
+    // If subs is an object with a `length` or array-like, allow; else if it's an object with `.substitutions` prefer that
+    const arr = Array.isArray(subs) ? subs : (subs && typeof subs === 'object' && Array.isArray((subs as any).substitutions) ? (subs as any).substitutions : null)
+    if (!arr || !Array.isArray(arr) || arr.length === 0) return timetable
+    return applySubstitutionsToTimetable(timetable, arr, opts)
+  } catch (err) {
+    try { console.debug('[timetable.provider] safeApplySubstitutions error', err, { subs }) } catch (e) {}
+    return timetable
+  }
+}
 import { PortalScraper } from "@/lib/api/portal-scraper"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
@@ -925,7 +939,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // known variations.
                 const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
                 const shouldApplyCachedSubs = isOffline && (cachedSubs && Array.isArray(cachedSubs) && cachedSubs.length)
-                const final = shouldApplyCachedSubs ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
+                const final = shouldApplyCachedSubs ? safeApplySubstitutions(cleaned, cachedSubs, { debug: false }) : cleaned
                 setExternalTimetable(final)
                 try { setCacheHydrated(true) } catch (e) {}
                 setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
@@ -2172,7 +2186,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
       // Apply cached substitutions to the fresh timetable
       try {
-        const applied = applySubstitutionsToTimetable(externalTimetable, cached, { debug: false })
+        const applied = safeApplySubstitutions(externalTimetable, cached, { debug: false })
         try { console.debug('[timetable.provider] applied cached substitutions (hydrate/refresh)') } catch (e) {}
         setExternalTimetable(applied)
         subsAppliedRef.current = Date.now()
@@ -2202,7 +2216,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try { console.debug('[timetable.provider] substitutions fetched', Array.isArray(subs) ? subs.length : 0) } catch (e) {}
         if (!cancelled && subs.length > 0) {
           try {
-            const applied = applySubstitutionsToTimetable(externalTimetable, subs, { debug: true })
+            const applied = safeApplySubstitutions(externalTimetable, subs, { debug: true })
             // Count how many periods were marked as substitutes for logging
             let appliedCount = 0
             try {
@@ -2883,7 +2897,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       try { console.debug('[timetable.provider] applying substitutions from homepage payload', subs.length) } catch (e) {}
                       // Apply all substitutions (date-specific + generic) to the
                       // per-day timetable so the daily view reflects exact dates.
-                      finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                      finalTimetable = safeApplySubstitutions(j.timetable, subs, { debug: true })
                       let appliedCount = 0
                       try {
                         for (const d of Object.keys(finalTimetable)) {
@@ -2918,7 +2932,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         for (const d of Object.keys(transformed)) {
                           weekMap[d] = transformed[d][weekKey] || []
                         }
-                        const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
+                        const applied = safeApplySubstitutions(weekMap, genericSubs)
                         for (const d of Object.keys(transformed)) {
                           transformed[d][weekKey] = applied[d] || []
                         }
@@ -3067,7 +3081,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (Array.isArray(subs) && subs.length) {
                   try {
                     console.debug('[timetable.provider] applying substitutions to array payload', subs.length)
-                    byDay = applySubstitutionsToTimetable(byDay, subs, { debug: true })
+                    byDay = safeApplySubstitutions(byDay, subs, { debug: true })
                   } catch (e) {
                     console.debug('[timetable.provider] array substitution apply error', e)
                   }
@@ -3389,7 +3403,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (Array.isArray(subs) && subs.length) {
                 try {
                   console.debug('[timetable.provider] applying substitutions from retry path', subs.length)
-                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                  finalTimetable = safeApplySubstitutions(j.timetable, subs, { debug: true })
                 } catch (e) {
                   console.debug('[timetable.provider] retry substitution apply error', e)
                 }
@@ -3446,7 +3460,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (Array.isArray(subs) && subs.length) {
                 try {
                   console.debug('[timetable.provider] applying substitutions from array retry path', subs.length)
-                  finalTimetable = applySubstitutionsToTimetable(byDay, subs, { debug: true })
+                  finalTimetable = safeApplySubstitutions(byDay, subs, { debug: true })
                 } catch (e) {
                   console.debug('[timetable.provider] array retry substitution apply error', e)
                 }
@@ -3895,7 +3909,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (Array.isArray(subs) && subs.length) {
                 try {
                   // Apply all substitutions (date-specific + generic) to the per-day timetable
-                  finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                  finalTimetable = safeApplySubstitutions(j.timetable, subs, { debug: true })
                   // Count variations in the result
                   let varCount = 0
                   for (const day of Object.keys(finalTimetable)) {
@@ -3925,7 +3939,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       for (const d of Object.keys(transformed)) {
                         weekMap[d] = transformed[d][weekKey] || []
                       }
-                      const applied = applySubstitutionsToTimetable(weekMap, genericSubs, { debug: true })
+                      const applied = safeApplySubstitutions(weekMap, genericSubs, { debug: true })
                       for (const d of Object.keys(transformed)) {
                         transformed[d][weekKey] = applied[d] || []
                       }
