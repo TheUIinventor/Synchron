@@ -780,9 +780,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Aggressive background refresh tuning
   // NOTE: reduced intervals to make visible-refresh more responsive.
   // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
-  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
-  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
+  // Reduce background refresh aggressiveness to avoid frequent network calls
+  // while keeping reasonably fresh data when visible.
+  const MIN_REFRESH_MS = 30 * 1000 // never refresh faster than ~30s
+  const VISIBLE_REFRESH_MS = 60 * 1000 // target interval while visible (~60s)
+  const HIDDEN_REFRESH_MS = 5 * 60 * 1000 // target interval while hidden (~5m)
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
@@ -3714,7 +3716,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const now = Date.now()
         const last = lastFocusTsRef.current || 0
-        const MIN_FOCUS_REFRESH_MS = 5 * 1000 // 5s
+        const MIN_FOCUS_REFRESH_MS = 30 * 1000 // 30s
         if ((now - last) > MIN_FOCUS_REFRESH_MS) {
           lastFocusTsRef.current = now
           void refreshExternal(false, true).catch(() => {})
