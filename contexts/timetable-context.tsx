@@ -4098,12 +4098,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const ts = Date.now()
     lastUserSelectedRef.current = ts
     setLastUserSelectedAt(ts)
+    // Mark that the calendar check for the newly-selected date is pending
+    try { setSelectedDateCalendarChecked(false) } catch (e) {}
+    try { setSelectedDateIsHoliday(false) } catch (e) {}
     setSelectedDay(day)
   }
   const userSetSelectedDateObject = (d: Date) => {
     const ts = Date.now()
     lastUserSelectedRef.current = ts
     setLastUserSelectedAt(ts)
+    // Mark that the calendar check for the newly-selected date is pending
+    try { setSelectedDateCalendarChecked(false) } catch (e) {}
+    try { setSelectedDateIsHoliday(false) } catch (e) {}
     setSelectedDateObject(d)
   }
 
