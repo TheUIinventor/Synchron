@@ -53,27 +53,40 @@ export async function GET(req: NextRequest) {
   const homeUrl = new URL('/', req.nextUrl.origin)
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>
 (async function(){
-  try {
-    // Try to fetch the user's profile via the proxy so we can populate
-    // localStorage with the given name immediately for the next page.
     try {
-      const resp = await fetch('/api/portal/userinfo', { credentials: 'include', cache: 'no-store' });
-      if (resp && resp.ok) {
+      // Retry a few times to robustly fetch profile while cookies propagate.
+      let nameFound = null
+      const statuses: number[] = []
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const payload = await resp.json().catch(() => null);
-          let name = null;
-          if (payload) {
-            if (payload.success && payload.data && payload.data.givenName) name = payload.data.givenName;
-            else if (payload.givenName) name = payload.givenName;
-            else if (payload.data && payload.data.student && (payload.data.student.givenName || payload.data.student.name)) name = payload.data.student.givenName || payload.data.student.name;
+          const resp = await fetch('/api/portal/userinfo', { credentials: 'include', cache: 'no-store' });
+          statuses.push(resp ? resp.status : 0)
+          if (resp && resp.ok) {
+            try {
+              const payload = await resp.json().catch(() => null);
+              let name = null;
+              if (payload) {
+                if (payload.success && payload.data && payload.data.givenName) name = payload.data.givenName;
+                else if (payload.givenName) name = payload.givenName;
+                else if (payload.data && payload.data.student && (payload.data.student.givenName || payload.data.student.name)) name = payload.data.student.givenName || payload.data.student.name;
+              }
+              if (name) {
+                nameFound = name
+                try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
+                break
+              }
+            } catch (e) {
+              // ignore JSON parse errors
+            }
           }
-          if (name) {
-            try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
-          }
-        } catch (e) {}
+        } catch (e) {
+          statuses.push(0)
+        }
+        // small delay before retrying
+        try { await new Promise((r) => setTimeout(r, 300)) } catch (e) {}
       }
+      try { localStorage.setItem('synchron-userinfo-status', JSON.stringify({ attempts: statuses })) } catch (e) {}
     } catch (e) {}
-  } catch (e) {}
   try { localStorage.setItem('synchron-auth-updated', Date.now().toString()); } catch (e) {}
   window.location.replace('${homeUrl.toString()}');
 })()
