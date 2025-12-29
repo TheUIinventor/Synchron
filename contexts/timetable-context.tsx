@@ -622,6 +622,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // before we've confirmed the date is not a holiday.
   const [cacheHydrated, setCacheHydrated] = useState<boolean>(false)
   const [initialCalendarChecked, setInitialCalendarChecked] = useState<boolean>(false)
+  const [selectedDateCalendarChecked, setSelectedDateCalendarChecked] = useState<boolean>(false)
   const [externalBellTimes, setExternalBellTimes] = useState<Record<string, { period: string; time: string }[]> | null>(() => __initialExternalBellTimes)
   const lastSeenBellTimesRef = useRef<Record<string, { period: string; time: string }[]> | null>(null)
   const lastSeenBellTsRef = useRef<number | null>(null)
@@ -654,6 +655,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return
     let cancelled = false
     ;(async () => {
+      // Mark that we're about to check the calendar for the newly-selected date
+      try { setSelectedDateCalendarChecked(false) } catch (e) {}
       try {
         const sel = selectedDateObject
         if (!sel) return
@@ -866,8 +869,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.dayType || '').toLowerCase().includes('holiday')
               )
             )
-            if (isHoliday) {
+          }
               holidayDateRef.current = true
+      } finally {
+        // Mark that the per-selected-date calendar check has completed (success or failure)
+        try { setSelectedDateCalendarChecked(true) } catch (e) {}
+      }
               try { setSelectedDateIsHoliday(true) } catch (e) {}
               try { setCacheHydrated(false) } catch (e) {}
               try { clearClientCaches() } catch (e) {}
@@ -1005,6 +1012,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
       const hasCached = Boolean(lastRecordedTimetable || typeof __initialExternalTimetable !== 'undefined' && __initialExternalTimetable)
+      // If the currently-held external timetable is for a different date
+      // than the one the user just selected, avoid showing it until we've
+      // completed the per-selected-date calendar check. This prevents a
+      // visible flash of stale timetable rows for dates (for example,
+      // showing last week's substitutes when viewing a holiday date).
+      const selectedIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
+      const externalDateRefVal = externalTimetableDateRef.current
+      if (externalDateRefVal && selectedIso && externalDateRefVal !== selectedIso) {
+        if (!selectedDateCalendarChecked && !isOffline) {
+          try { console.debug('[timetable.provider] external timetable is for', externalDateRefVal, 'but selected is', selectedIso, '; withholding cached/external data until calendar check completes') } catch (e) {}
+          return emptyByDay
+        }
+      }
+
       if (!initialCalendarChecked && !isOffline && hasCached && !cacheHydrated && !externalTimetable) {
         try { console.debug('[timetable.provider] initial calendar check pending; hiding cached timetable to avoid flash') } catch (e) {}
         return emptyByDay
