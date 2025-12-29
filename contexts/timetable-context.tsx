@@ -982,7 +982,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     return
                   }
                 } catch (e) {}
-                } catch (e) {}
 
                 setExternalTimetable(final)
                 try { setCacheHydrated(true) } catch (e) {}
