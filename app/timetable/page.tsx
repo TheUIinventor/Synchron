@@ -21,7 +21,7 @@ export default function TimetablePage() {
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
+  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes, selectedDateIsHoliday } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -87,7 +87,10 @@ export default function TimetablePage() {
       // null on initial load; once the user changes dates we avoid
       // auto-advancing until a reload.
       const userHasManuallySelected = Boolean(lastUserSelectedAt)
-      if (!userHasManuallySelected && sameDate && (isWeekendNow || isSchoolDayOver())) {
+      // Do not auto-advance when the provider explicitly marked the
+      // selected date as a holiday — in that case we want to show the
+      // holiday empty-state rather than advancing to the next school day.
+      if (!userHasManuallySelected && sameDate && !selectedDateIsHoliday && (isWeekendNow || isSchoolDayOver())) {
         return getNextSchoolDay(now)
       }
     } catch (e) {}
