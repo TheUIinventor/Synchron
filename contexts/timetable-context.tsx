@@ -773,6 +773,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
+  const lastFocusTsRef = useRef<number | null>(null)
   const holidayDateRef = useRef<boolean>(false)
 
   // Aggressive background refresh tuning
@@ -3705,9 +3706,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     const startWithInterval = (ms: number) => {
       if (intervalId != null) window.clearInterval(intervalId)
-      // Fire a refresh immediately and allow this visibility-triggered
-      // call to bypass the MIN refresh throttle by passing `force=true`.
-      void refreshExternal(false, true).catch(() => {})
+      // Throttle immediate refreshes triggered by visibility/focus so
+      // repeated focus events don't hammer the server. Allow an immediate
+      // refresh only if the last focus-triggered refresh was sufficiently
+      // long ago.
+      try {
+        const now = Date.now()
+        const last = lastFocusTsRef.current || 0
+        const MIN_FOCUS_REFRESH_MS = 5 * 1000 // 5s
+        if ((now - last) > MIN_FOCUS_REFRESH_MS) {
+          lastFocusTsRef.current = now
+          void refreshExternal(false, true).catch(() => {})
+        } else {
+          try { console.debug('[timetable.provider] skipping immediate refresh on focus - throttled') } catch (e) {}
+        }
+      } catch (e) {}
       intervalId = window.setInterval(() => { void refreshExternal(false, true).catch(() => {}) }, ms)
     }
 

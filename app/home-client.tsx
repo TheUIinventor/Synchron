@@ -110,7 +110,7 @@ export default function HomeClient() {
     // prevented earlier proxy requests from succeeding.
     const COOLDOWN_MS = 10 * 1000 // don't fetch profile more than once per 10s
 
-    ;(async () => {
+    const fetchProfile = async () => {
       try {
         if (inFlightRef.current) return
         const now = Date.now()
@@ -123,14 +123,29 @@ export default function HomeClient() {
           const name = res.data.givenName
           setGivenName(name)
           try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
+        } else {
+          // If profile fetch failed or returned no name, trigger a timetable
+          // refresh which may update auth/session state and allow profile
+          // fetching to succeed (e.g., after a recent login).
+          try {
+            if (refreshExternal) { void refreshExternal().catch(() => {}) }
+          } catch (e) {}
         }
       } catch (e) {
         // ignore
       } finally {
         inFlightRef.current = false
       }
-    })()
-    return () => { mountedRef.current = false }
+    }
+
+    // Run once on mount / dependency changes
+    void fetchProfile()
+
+    // Also attempt profile fetch when the window regains focus (bounded by same cooldown)
+    const onFocus = () => { void fetchProfile() }
+    window.addEventListener('focus', onFocus)
+
+    return () => { mountedRef.current = false; window.removeEventListener('focus', onFocus) }
   }, [timetableSource, isAuthenticated, reauthRequired])
 
   useEffect(() => {
