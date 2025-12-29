@@ -157,8 +157,31 @@ export default function HomeClient() {
       try {
         if (!ev || !ev.key) return
         if (ev.key === 'synchron-auth-updated') {
-          try { if (refreshExternal) { void refreshExternal().catch(() => {}) } } catch (e) {}
-          try { const name = localStorage.getItem('synchron-given-name'); if (name) setGivenName(name) } catch (e) {}
+          // When auth updates in another tab, refresh timetable/auth state
+          // and then explicitly re-fetch the profile so the name is populated.
+          (async () => {
+            try {
+              console.debug('[home-client] storage event: synchron-auth-updated received')
+              if (refreshExternal) {
+                try { await refreshExternal() } catch (e) { console.debug('[home-client] refreshExternal after storage event failed', e) }
+              }
+              // After refreshExternal completes (or fails), try to fetch profile
+              try {
+                const p = await sbhsPortal.getStudentProfile()
+                if (p && p.success && p.data && p.data.givenName) {
+                  const name = p.data.givenName
+                  setGivenName(name)
+                  try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
+                  console.debug('[home-client] profile fetched after storage event - name set', name)
+                  return
+                }
+              } catch (e) {
+                console.debug('[home-client] profile fetch after storage event failed', e)
+              }
+              // Fallback: if backend callback set the given name in localStorage, use it
+              try { const name = localStorage.getItem('synchron-given-name'); if (name) { setGivenName(name); console.debug('[home-client] name loaded from localStorage after storage event', name) } } catch (e) {}
+            } catch (e) {}
+          })()
         }
       } catch (e) {}
     }
