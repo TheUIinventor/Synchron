@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     try {
       // Retry a few times to robustly fetch profile while cookies propagate.
       let nameFound = null
-      const statuses: number[] = []
+      const statuses = []
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const resp = await fetch('/api/portal/userinfo', { credentials: 'include', cache: 'no-store' });
