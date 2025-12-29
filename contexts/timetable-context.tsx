@@ -4187,6 +4187,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         externalWeekType,
         selectedDateCalendarChecked,
         selectedDateIsHoliday,
+        initialCalendarChecked,
+        cacheHydrated,
         isLoading,
         isRefreshing,
         isAuthenticated,
