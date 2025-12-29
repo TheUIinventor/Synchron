@@ -1321,7 +1321,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             let authVariation: any = null
             try {
               const candidate = authVarsForDate && Array.isArray(authVarsForDate[day]) ? authVarsForDate[day] : []
-              authVariation = Array.isArray(candidate) ? candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod) : null
+              if (Array.isArray(candidate)) {
+                authVariation = candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod)
+              } else {
+                try { console.debug('[timetable.provider] unexpected candidate type for authVarsForDate[day]', typeof authVarsForDate?.[day], authVarsForDate?.[day]) } catch (e) {}
+                authVariation = null
+              }
             } catch (e) {
               try { console.warn('[timetable.provider] unexpected authVarsForDate[day] type', typeof authVarsForDate, typeof authVarsForDate?.[day]) } catch (e2) {}
               authVariation = null
@@ -1349,7 +1354,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // Also check daySource for FRESH variations that might be newer than cached
             // (This handles the case where a new variation was just added)
-            if (daySource.length) {
+            if (Array.isArray(daySource) && daySource.length) {
               const normSubject = String(p.subject || '').trim().toLowerCase()
               const match = daySource.find((src) => {
                 const srcPeriod = String(src.period).trim().toLowerCase()
