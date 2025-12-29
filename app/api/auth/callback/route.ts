@@ -79,9 +79,11 @@ export async function GET(req: NextRequest) {
       // If we obtained a server-side name, write it immediately so the
       // app can show the user's name right after redirect.
       const serverName = ${serverGivenName ? JSON.stringify(serverGivenName) : 'null'}
+      const serverProbeOk = ${serverGivenName ? 'true' : 'false'}
       if (serverName) {
         try { localStorage.setItem('synchron-given-name', serverName) } catch (e) {}
       }
+      try { localStorage.setItem('synchron-server-userinfo-status', JSON.stringify({ probeOk: serverProbeOk })) } catch (e) {}
       // Retry a few times to robustly fetch profile while cookies propagate.
       let nameFound = null
       const statuses = []
@@ -125,7 +127,7 @@ export async function GET(req: NextRequest) {
     res.cookies.set('sbhs_access_token', access, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'development' ? 'lax' : 'none',
       path: '/',
       maxAge: Number(expiresIn),
     })
@@ -133,13 +135,13 @@ export async function GET(req: NextRequest) {
       res.cookies.set('sbhs_refresh_token', refresh, {
         httpOnly: true,
         secure: process.env.NODE_ENV !== 'development',
-        sameSite: 'lax',
+        sameSite: process.env.NODE_ENV === 'development' ? 'lax' : 'none',
         path: '/',
         maxAge: 60 * 60 * 24 * 30,
       })
     }
     // Clear state cookie
-    res.cookies.set('sbhs_oauth_state', '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV !== 'development', path: '/', maxAge: 0 })
+    res.cookies.set('sbhs_oauth_state', '', { httpOnly: true, sameSite: process.env.NODE_ENV === 'development' ? 'lax' : 'none', secure: process.env.NODE_ENV !== 'development', path: '/', maxAge: 0 })
     // Auth callbacks must not be public-cached
     res.headers.set('Cache-Control', NON_SHARED_CACHE)
     return res
