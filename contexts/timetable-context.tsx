@@ -936,6 +936,32 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
                 const shouldApplyCachedSubs = isOffline && (cachedSubs && Array.isArray(cachedSubs) && cachedSubs.length)
                 const final = shouldApplyCachedSubs ? applySubstitutionsToTimetable(cleaned, cachedSubs, { debug: false }) : cleaned
+                // If the cached payload includes an authoritative date, record
+                // which date the cached timetable is FOR so downstream guards
+                // can withhold it when the user has selected a different date
+                // and the per-date calendar check has not completed.
+                try {
+                  const srcForDate = __initialProcessedCache || __initialParsedCache || null
+                  let payloadDate: string | null = null
+                  try {
+                    if (srcForDate) payloadDate = extractDateFromPayload(srcForDate) || null
+                    // Fallback: if savedAt is present (number or ISO string), derive date
+                    if (!payloadDate && srcForDate && srcForDate.savedAt) {
+                      const saved = srcForDate.savedAt
+                      if (typeof saved === 'number') payloadDate = (new Date(saved)).toISOString().slice(0,10)
+                      else if (typeof saved === 'string' && saved.length >= 10) payloadDate = saved.slice(0,10)
+                    }
+                  } catch (e) {
+                    payloadDate = null
+                  }
+                  if (payloadDate) {
+                    externalTimetableDateRef.current = payloadDate
+                    try { console.debug('[timetable.provider] hydrate: externalTimetableDateRef set from cache', payloadDate) } catch (e) {}
+                  } else {
+                    try { console.debug('[timetable.provider] hydrate: no date found in cached payload') } catch (e) {}
+                  }
+                } catch (e) {}
+
                 setExternalTimetable(final)
                 try { setCacheHydrated(true) } catch (e) {}
                 setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
