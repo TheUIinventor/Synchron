@@ -261,7 +261,8 @@ export default function HomeClient() {
     );
   }
 
-  const effectiveMoment = (initialCalendarChecked && homeCalendarChecked && selectedDateCalendarChecked && !homeIsHoliday && !selectedDateIsHoliday) ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
+  const canShowTimetable = Boolean(initialCalendarChecked && homeCalendarChecked && selectedDateCalendarChecked && !homeIsHoliday && !selectedDateIsHoliday)
+  const effectiveMoment = canShowTimetable ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
   
   // Determine the date to display for the HOME page. The home page should
@@ -751,7 +752,7 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
-                  {(initialCalendarChecked && homeCalendarChecked && selectedDateCalendarChecked && !homeIsHoliday && !selectedDateIsHoliday && todaysPeriods.length > 0) ? (
+                  {canShowTimetable && todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
