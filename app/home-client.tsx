@@ -271,6 +271,7 @@ export default function HomeClient() {
     if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
     return now
   })()
+  const displayDateIso = displayDate.toISOString().slice(0,10)
 
   // Use the displayDate's weekday to pick today's timetable for the home page.
   const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
@@ -282,11 +283,14 @@ export default function HomeClient() {
   // visible flash of stale timetable rows on initial load.
   useEffect(() => {
     let cancelled = false
+    // Only re-run when the display date (ISO) changes — avoid running
+    // every second due to the local clock ticking which caused visual
+    // thrash. Use the stable ISO date string as the dependency.
     setHomeCalendarChecked(false)
     setHomeIsHoliday(false)
     void (async () => {
       try {
-        const ds = (displayDate || new Date()).toISOString().slice(0,10)
+        const ds = displayDateIso
         const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
         const ctype = res.headers.get('content-type') || ''
         if (res.ok && ctype.includes('application/json')) {
@@ -319,7 +323,7 @@ export default function HomeClient() {
       }
     })()
     return () => { cancelled = true }
-  }, [displayDate])
+  }, [displayDateIso])
 
   // Map provider bell buckets into the day-specific bucket keys used elsewhere.
   const bellsForDay = (() => {
