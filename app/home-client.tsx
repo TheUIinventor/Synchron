@@ -79,6 +79,10 @@ export default function HomeClient() {
   const lastProfileFetchRef = useRef<number | null>(null)
   const mountedRef = useRef(true)
 
+  // Home-specific calendar check to avoid flashing cached timetable
+  const [homeCalendarChecked, setHomeCalendarChecked] = useState<boolean>(false)
+  const [homeIsHoliday, setHomeIsHoliday] = useState<boolean>(false)
+
   useEffect(() => {
     // keep clock updated every second so countdowns refresh on mobile pill
     const t = setInterval(() => setCurrentDate(new Date()), 1000);
@@ -254,7 +258,8 @@ export default function HomeClient() {
     );
   }
 
-  const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = currentMomentPeriodInfo;
+  const effectiveMoment = (homeCalendarChecked && !homeIsHoliday) ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
+  const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
   
   // Determine the date to display for the HOME page. The home page should
   // not be influenced by a manual date selection on the timetable page, so
@@ -270,6 +275,51 @@ export default function HomeClient() {
   // Use the displayDate's weekday to pick today's timetable for the home page.
   const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
   const todaysPeriodsRaw = timetableData[dayName] || [];
+
+  // Run a quick calendar check for the home display date so we can avoid
+  // rendering cached/external timetable rows for holiday dates while the
+  // provider is still performing its background refresh. This prevents a
+  // visible flash of stale timetable rows on initial load.
+  useEffect(() => {
+    let cancelled = false
+    setHomeCalendarChecked(false)
+    setHomeIsHoliday(false)
+    void (async () => {
+      try {
+        const ds = (displayDate || new Date()).toISOString().slice(0,10)
+        const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
+        const ctype = res.headers.get('content-type') || ''
+        if (res.ok && ctype.includes('application/json')) {
+          const calJson = await res.json()
+          let dayInfo: any = null
+          if (Array.isArray(calJson) && calJson.length) dayInfo = calJson[0]
+          else if (calJson && typeof calJson === 'object' && calJson[ds]) dayInfo = calJson[ds]
+          else if (calJson && typeof calJson === 'object') {
+            for (const k of Object.keys(calJson)) {
+              const v = calJson[k]
+              if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
+            }
+          }
+          const isHoliday = Boolean(
+            dayInfo && (
+              dayInfo.isHoliday === true ||
+              dayInfo.holiday === true ||
+              String(dayInfo.is_school_day).toLowerCase() === 'false' ||
+              String(dayInfo.status || '').toLowerCase().includes('holiday') ||
+              String(dayInfo.type || '').toLowerCase().includes('holiday') ||
+              String(dayInfo.dayType || '').toLowerCase().includes('holiday')
+            )
+          )
+          if (!cancelled) setHomeIsHoliday(Boolean(isHoliday))
+        }
+      } catch (e) {
+        // ignore - we'll just allow rendering after this
+      } finally {
+        if (!cancelled) setHomeCalendarChecked(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [displayDate])
 
   // Map provider bell buckets into the day-specific bucket keys used elsewhere.
   const bellsForDay = (() => {
@@ -694,7 +744,7 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
-                  {(selectedDateCalendarChecked && todaysPeriods.length > 0) ? (
+                  {(homeCalendarChecked && !homeIsHoliday && todaysPeriods.length > 0) ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
