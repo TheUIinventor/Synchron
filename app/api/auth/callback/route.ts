@@ -55,7 +55,12 @@ export async function GET(req: NextRequest) {
       try {
         if (access) {
           try {
-            const up = await fetch('https://student.sbhs.net.au/details/userinfo.json', { headers: { 'Authorization': `Bearer ${access}`, 'Accept': 'application/json' } })
+            // Call our internal proxy route which contains robust probing/scraping
+            // logic. Forward Authorization and a Cookie header containing the
+            // generated access/refresh tokens so the proxy can use them.
+            const proxyUrl = `${req.nextUrl.origin}/api/portal/userinfo`
+            const cookieHeader = `sbhs_access_token=${access}` + (refresh ? `; sbhs_refresh_token=${refresh}` : '')
+            const up = await fetch(proxyUrl, { headers: { 'Authorization': `Bearer ${access}`, 'Accept': 'application/json', 'Cookie': cookieHeader } })
             if (up && up.ok) {
               try {
                 const uj = await up.json().catch(() => null)
