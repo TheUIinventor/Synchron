@@ -423,6 +423,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     __initialRawCache = null
     __initialParsedCache = null
   }
+  // If the persisted last-timetable explicitly included a `forDate` field
+  // capture it now so we can use it to initialise `externalTimetableDateRef`
+  // later (the ref is declared further below).
+  let __initialCachedForDate: string | null = null
+  try {
+    if (__initialParsedCache && __initialParsedCache.forDate) __initialCachedForDate = __initialParsedCache.forDate
+    else {
+      try {
+        const maybe = extractDateFromPayload(__initialParsedCache)
+        if (maybe) __initialCachedForDate = maybe
+      } catch (e) {}
+    }
+  } catch (e) {}
   // Look for any previously-processed payloads cached under
   // `synchron-processed-<hash>` and prefer the most-recent one for
   // instant hydration. This allows us to load a fully-applied timetable
@@ -776,6 +789,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Track the date that the current externalTimetable data is actually FOR (not the selected date)
   // This is critical for correctly associating variations with the right date when capturing them
   const externalTimetableDateRef = useRef<string | null>(null)
+  // If we discovered a cached-for-date at startup, seed the ref so the
+  // hydration gating logic can make use of it immediately.
+  try { if (__initialCachedForDate) externalTimetableDateRef.current = __initialCachedForDate } catch (e) {}
   // Track the currently selected date as a ref so interval callbacks can access the latest value
   // without stale closure issues
   const selectedDateObjectRef = useRef<Date | null>(null)
@@ -1021,6 +1037,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           source: timetableSource,
           weekType: externalWeekType || null,
           savedAt: (new Date()).toISOString(),
+          // Record which date this external timetable payload is FOR so
+          // startup hydration logic can decide whether to apply cached
+          // data when the user has selected a different date.
+          forDate: externalTimetableDateRef.current || lastFetchedDate || null,
         }
         try {
           localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
