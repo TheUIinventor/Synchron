@@ -58,7 +58,8 @@ export default function HomeClient() {
     timetableSource,
     bellTimes,
     isAuthenticated,
-    reauthRequired } = useTimetable() as any;
+    reauthRequired,
+    selectedDateCalendarChecked } = useTimetable() as any;
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -693,7 +694,7 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
-                  {todaysPeriods.length > 0 ? (
+                  {(selectedDateCalendarChecked && todaysPeriods.length > 0) ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
