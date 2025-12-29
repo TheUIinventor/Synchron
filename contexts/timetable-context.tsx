@@ -848,7 +848,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const calRes = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
           const cctype = calRes.headers.get('content-type') || ''
           if (calRes.ok && cctype.includes('application/json')) {
-            calendarCheckSucceeded = true
             const calJson = await calRes.json()
             let dayInfo: any = null
             if (Array.isArray(calJson) && calJson.length) dayInfo = calJson[0]
@@ -887,6 +886,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               return
             }
             // Mark that the per-selected-date calendar check completed for non-holiday
+            try { calendarCheckSucceeded = true } catch (e) {}
             try { setSelectedDateCalendarChecked(true) } catch (e) {}
           }
         } catch (e) {
