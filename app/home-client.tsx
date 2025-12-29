@@ -856,7 +856,17 @@ export default function HomeClient() {
                       <AuthButton />
                     </div>
                   ) : (
-                    <p className="text-muted-foreground text-center py-8">No classes today</p>
+                    <div className="py-8 text-center bg-surface-container-high/50 rounded-xl">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-3 rounded-full bg-primary/10 text-primary">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-on-surface">No classes today</h3>
+                        <p className="text-sm text-on-surface-variant max-w-md">You don't have any scheduled classes for this day — enjoy the free time or check another date.</p>
+                      </div>
+                    </div>
                   )}
                 </div>
             </div>
