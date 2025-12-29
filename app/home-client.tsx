@@ -77,6 +77,7 @@ export default function HomeClient() {
   const inFlightRef = useRef(false)
   const lastProfileFetchRef = useRef<number | null>(null)
   const mountedRef = useRef(true)
+  const [displayDateIsHoliday, setDisplayDateIsHoliday] = useState<boolean>(false)
 
   useEffect(() => {
     // keep clock updated every second so countdowns refresh on mobile pill
@@ -148,6 +149,34 @@ export default function HomeClient() {
     return () => { mountedRef.current = false; window.removeEventListener('focus', onFocus) }
   }, [timetableSource, isAuthenticated, reauthRequired])
 
+  // Check calendar for displayed date to avoid showing cached/term data on holidays
+  useEffect(() => {
+    let cancelled = false
+    const ds = displayDate.toISOString().slice(0,10)
+    (async () => {
+      try {
+        const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`)
+        if (!res.ok) return
+        const j = await res.json().catch(() => null)
+        if (cancelled) return
+        let dayInfo = null
+        if (Array.isArray(j) && j.length) dayInfo = j[0]
+        else if (j && typeof j === 'object' && j[ds]) dayInfo = j[ds]
+        else if (j && typeof j === 'object') {
+          for (const k of Object.keys(j)) {
+            const v = j[k]
+            if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
+          }
+        }
+        const isHoliday = Boolean(dayInfo && (dayInfo.isHoliday === true || dayInfo.holiday === true || String(dayInfo.is_school_day).toLowerCase() === 'false' || String(dayInfo.status || '').toLowerCase().includes('holiday')))
+        setDisplayDateIsHoliday(Boolean(isHoliday))
+      } catch (e) {
+        // ignore
+      }
+    })()
+    return () => { cancelled = true }
+  }, [displayDate])
+
   // Listen for cross-tab auth notifications (optional helper).
   // Other tabs or the auth callback can set `localStorage.setItem('synchron-auth-updated', Date.now().toString())`
   // to notify this tab that auth state changed and we should retry profile/timetable fetching.
@@ -156,33 +185,38 @@ export default function HomeClient() {
     const onStorage = (ev: StorageEvent) => {
       try {
         if (!ev || !ev.key) return
-        if (ev.key === 'synchron-auth-updated') {
-          // When auth updates in another tab, refresh timetable/auth state
-          // and then explicitly re-fetch the profile so the name is populated.
-          (async () => {
-            try {
-              console.debug('[home-client] storage event: synchron-auth-updated received')
-              if (refreshExternal) {
-                try { await refreshExternal() } catch (e) { console.debug('[home-client] refreshExternal after storage event failed', e) }
-              }
-              // After refreshExternal completes (or fails), try to fetch profile
-              try {
-                const p = await sbhsPortal.getStudentProfile()
-                if (p && p.success && p.data && p.data.givenName) {
-                  const name = p.data.givenName
-                  setGivenName(name)
-                  try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
-                  console.debug('[home-client] profile fetched after storage event - name set', name)
-                  return
-                }
-              } catch (e) {
-                console.debug('[home-client] profile fetch after storage event failed', e)
-              }
-              // Fallback: if backend callback set the given name in localStorage, use it
-              try { const name = localStorage.getItem('synchron-given-name'); if (name) { setGivenName(name); console.debug('[home-client] name loaded from localStorage after storage event', name) } } catch (e) {}
-            } catch (e) {}
-          })()
-        }
+            if (ev.key === 'synchron-auth-updated') {
+              (async () => {
+                try {
+                  console.debug('[home-client] storage event: synchron-auth-updated received')
+                  if (refreshExternal) {
+                    try { await refreshExternal() } catch (e) { console.debug('[home-client] refreshExternal after storage event failed', e) }
+                  }
+
+                  // Retry profile fetch with exponential backoff to tolerate short auth propagation delays
+                  const attempts = [200, 500, 1000, 2000, 4000]
+                  for (let i = 0; i < attempts.length; i++) {
+                    try {
+                      const p = await sbhsPortal.getStudentProfile()
+                      if (p && p.success && p.data && p.data.givenName) {
+                        const name = p.data.givenName
+                        setGivenName(name)
+                        try { localStorage.setItem('synchron-given-name', String(name)) } catch (e) {}
+                        console.debug('[home-client] profile fetched after storage event - name set', name)
+                        return
+                      }
+                    } catch (e) {
+                      console.debug('[home-client] profile fetch attempt failed', i, e)
+                    }
+                    // wait before next attempt
+                    await new Promise((res) => setTimeout(res, attempts[i]))
+                  }
+
+                  // Fallback: if backend callback set the given name in localStorage, use it
+                  try { const name = localStorage.getItem('synchron-given-name'); if (name) { setGivenName(name); console.debug('[home-client] name loaded from localStorage after storage event', name) } } catch (e) {}
+                } catch (e) {}
+              })()
+            }
       } catch (e) {}
     }
     window.addEventListener('storage', onStorage)
@@ -239,7 +273,7 @@ export default function HomeClient() {
 
   // Use the displayDate's weekday to pick today's timetable for the home page.
   const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
-  const todaysPeriodsRaw = timetableData[dayName] || [];
+  const todaysPeriodsRaw = displayDateIsHoliday ? [] : (timetableData[dayName] || []);
 
   // Map provider bell buckets into the day-specific bucket keys used elsewhere.
   const bellsForDay = (() => {
