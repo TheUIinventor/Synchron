@@ -998,6 +998,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // `lastRecordedTimetable` is only a fallback for fast initial rendering
     // and should not be used until we've completed the initial calendar
     // check; this prevents a brief flash of cached classes on holiday dates.
+    // If we haven't completed the initial calendar check and the client
+    // is online, do NOT show cached/initial data (this prevents briefly
+    // flashing stale classes on holiday dates). Allow cached data when
+    // offline or after we've explicitly hydrated cache.
+    try {
+      const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+      const hasCached = Boolean(lastRecordedTimetable || typeof __initialExternalTimetable !== 'undefined' && __initialExternalTimetable)
+      if (!initialCalendarChecked && !isOffline && hasCached && !cacheHydrated && !externalTimetable) {
+        try { console.debug('[timetable.provider] initial calendar check pending; hiding cached timetable to avoid flash') } catch (e) {}
+        return emptyByDay
+      }
+    } catch (e) {}
+
     const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
     const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
