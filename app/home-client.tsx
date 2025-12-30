@@ -750,12 +750,6 @@ export default function HomeClient() {
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
                   {!homeIsHoliday && new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(displayDate)}
-                  {homeIsHoliday && (
-                    <span className="ml-2 inline-flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /></svg>
-                      HOLIDAY
-                    </span>
-                  )}
                 </h3>
 
                 <div className="space-y-3 flex-1 pr-2">

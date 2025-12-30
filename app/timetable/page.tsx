@@ -521,17 +521,11 @@ export default function TimetablePage() {
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
                 </div>
-                <div className="min-w-0 flex items-center gap-2">
+                <div className="min-w-0">
                   {!selectedDateIsHoliday ? (
                     <h2 className="text-base sm:text-lg font-bold text-on-surface truncate">{formatSelectedDate()}</h2>
                   ) : (
                     <div className="h-6 w-40 bg-transparent" />
-                  )}
-                  {selectedDateIsHoliday && (
-                    <span className="ml-2 inline-flex items-center gap-2 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /></svg>
-                      HOLIDAY
-                    </span>
                   )}
                 </div>
               </div>
