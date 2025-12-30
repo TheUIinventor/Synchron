@@ -664,6 +664,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { console.debug('[timetable.provider] selectedDateCalendarChecked=', selectedDateCalendarChecked, 'selectedDateIsHoliday=', selectedDateIsHoliday) } catch (e) {}
   }, [selectedDateCalendarChecked, selectedDateIsHoliday])
 
+  // Centralized debug + apply wrapper to capture all timetable applies
+  const debugApplyTimetable = (source: string, payloadDate: string | null, note?: any) => {
+    try {
+      const ts = (new Date()).toISOString()
+      const selIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
+      console.debug('[timetable.provider.apply]', ts, source, { payloadDate, selectedIso: selIso, selectedDateCalendarChecked, initialCalendarChecked, note })
+    } catch (e) {}
+  }
+
+  const applyExternalTimetable = (payload: Record<string, Period[]> | null, meta?: { source?: string; payloadDate?: string | null }) => {
+    try {
+      debugApplyTimetable(meta?.source || 'unknown', meta?.payloadDate || externalTimetableDateRef.current || null, { payloadKeys: payload ? Object.keys(payload).slice(0,5) : null })
+    } catch (e) {}
+    try { setExternalTimetable(payload) } catch (e) {}
+  }
+
   // Watch for selected date changes and consult the calendar API to
   // determine whether the chosen date is a holiday. If the calendar
   // reports a holiday for the selected date, ensure the UI does not
@@ -772,7 +788,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
               try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
-              setExternalTimetable(emptyByDay)
+              applyExternalTimetable(emptyByDay, { source: 'calendar-holiday', payloadDate: ds })
               setExternalTimetableByWeek(null)
               setTimetableSource('calendar-holiday')
               setExternalWeekType(null)
@@ -945,7 +961,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try { setCacheHydrated(false) } catch (e) {}
               try { clearClientCaches() } catch (e) {}
               if (!cancelled) {
-                setExternalTimetable(emptyByDay)
+                applyExternalTimetable(emptyByDay, { source: 'calendar-holiday', payloadDate: ds })
                 setExternalTimetableByWeek(null)
                 setTimetableSource('calendar-holiday')
                 setExternalWeekType(null)
@@ -1068,7 +1084,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   console.debug('[timetable.provider]', nowTs, 'applying cached timetable (final) — source=cache, payloadDate=', externalTimetableDateRef.current)
                 } catch (e) {}
 
-                setExternalTimetable(final)
+                applyExternalTimetable(final, { source: 'cache', payloadDate: externalTimetableDateRef.current || null })
                 try { setCacheHydrated(true) } catch (e) {}
                 setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
                 try { console.debug('[timetable.provider] hydrate: setExternalBellTimes (initial cache)', __initialExternalBellTimes) } catch (e) {}
@@ -1078,7 +1094,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
               // apply raw map if processing fails
               if (!cancelled && map) {
-                setExternalTimetable(map)
+                applyExternalTimetable(map, { source: 'cache', payloadDate: externalTimetableDateRef.current || null })
                 try { setCacheHydrated(true) } catch (e) {}
                 setTimetableSource(__initialTimetableSource || 'cache')
                 setLastRecordedTimetable(map)
@@ -2366,7 +2382,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const applied = applySubstitutionsToTimetable(externalTimetable, cached, { debug: false })
         try { console.debug('[timetable.provider] applied cached substitutions (hydrate/refresh)') } catch (e) {}
-        setExternalTimetable(applied)
+        applyExternalTimetable(applied, { source: 'cached-subs-apply', payloadDate: externalTimetableDateRef.current || null })
         subsAppliedRef.current = Date.now()
       } catch (e) {
         try { console.debug('[timetable.provider] error applying cached subs', e) } catch (err) {}
@@ -2412,7 +2428,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 cachedSubsRef.current = subs
               }
             } catch (e) {}
-            setExternalTimetable(applied)
+            applyExternalTimetable(applied, { source: 'fetched-subs-apply', payloadDate: externalTimetableDateRef.current || null })
             subsAppliedRef.current = Date.now()
           } catch (e) {
             try { console.debug('[timetable.provider] error applying substitutions', e) } catch (err) {}
@@ -2649,7 +2665,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
 
               // Set empty timetable and mark source so UI shows 'No periods'
-              setExternalTimetable(emptyByDay)
+              applyExternalTimetable(emptyByDay, { source: 'portal-home-empty', payloadDate: (new Date()).toISOString().slice(0,10) })
               setExternalTimetableByWeek(null)
               setTimetableSource('portal-home-empty')
               setExternalWeekType(null)
@@ -2803,7 +2819,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                 } catch (e) {}
 
-                setExternalTimetable(emptyByDay)
+                applyExternalTimetable(emptyByDay, { source: 'calendar-holiday', payloadDate: todayDateStr })
                 setExternalTimetableByWeek(null)
                 setTimetableSource('calendar-holiday')
                 setExternalWeekType(null)
@@ -2885,7 +2901,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
 
-              setExternalTimetable(emptyByDay)
+              applyExternalTimetable(emptyByDay, { source: 'external-empty', payloadDate: (new Date()).toISOString().slice(0,10) })
               setExternalTimetableByWeek(null)
               setLastRecordedTimetable(null)
               setLastRecordedTimetableByWeek(null)
@@ -2943,7 +2959,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore
               }
-              setExternalTimetable(emptyByDay)
+              applyExternalTimetable(emptyByDay, { source: 'external-empty', payloadDate: (new Date()).toISOString().slice(0,10) })
               setExternalTimetableByWeek(null)
               setTimetableSource('external-empty')
               setExternalWeekType(null)
@@ -2985,7 +3001,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         }
                       }
                     } catch (e) {}
-                    setExternalTimetable(parsedCache.timetable)
+                    applyExternalTimetable(parsedCache.timetable, { source: 'processed-cache', payloadDate: parsedCache.forDate || parsedCache.savedAt || null })
                     setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
                     // Only restore cached bell times if we don't already have authoritative
                     // date-specific bells from /api/timetable
@@ -3040,7 +3056,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore extraction errors and preserve any previously-seen bells
               }
-              setExternalTimetable(emptyByDay)
+              applyExternalTimetable(emptyByDay, { source: 'external-empty', payloadDate: (new Date()).toISOString().slice(0,10) })
               setExternalTimetableByWeek(null)
               // Do not clear previously discovered bell times when upstream
               // reports no timetable; keep existing bells where available.
@@ -3227,7 +3243,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
                     // Track which date this timetable is FOR
                     externalTimetableDateRef.current = computedDate
-                    setExternalTimetable(finalTimetable)
+                    applyExternalTimetable(finalTimetable, { source: 'fetch-processed', payloadDate: computedDate })
                     setTimetableSource(computedSource)
                     setLastFetchedDate(computedDate)
                     if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
@@ -3244,7 +3260,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                   if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
                   externalTimetableDateRef.current = computedDate
-                  setExternalTimetable(finalTimetable)
+                  applyExternalTimetable(finalTimetable, { source: 'fetch-processed', payloadDate: computedDate })
                   setTimetableSource(computedSource)
                   setLastFetchedDate(computedDate)
                   if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
@@ -3346,7 +3362,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   setIsRefreshing(false)
                 } else {
                   startTransition(() => {
-                    setExternalTimetable(byDay)
+                    applyExternalTimetable(byDay, { source: 'fetch-array', payloadDate: payloadDate || null })
                     setTimetableSource(computedSourceArr)
                     if (j.weekType === 'A' || j.weekType === 'B') {
                       setExternalWeekType(j.weekType)
@@ -3357,7 +3373,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {
                 startTransition(() => {
-                  setExternalTimetable(byDay)
+                  applyExternalTimetable(byDay, { source: 'fetch-array', payloadDate: extractDateFromPayload(j.upstream || j) || null })
                   setTimetableSource(computedSourceArr)
                   if (j.weekType === 'A' || j.weekType === 'B') {
                     setExternalWeekType(j.weekType)
@@ -3377,7 +3393,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (hasData) {
             // Batch state updates for scraped HTML data
             startTransition(() => {
-              setExternalTimetable(parsed)
+              applyExternalTimetable(parsed, { source: 'external-scraped', payloadDate: null })
               setTimetableSource('external-scraped')
               // Clear loading indicator as soon as we have valid data
               setIsRefreshing(false)
@@ -3460,7 +3476,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 } catch (e) {}
                 try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
                 if (!cancelled) {
-                  setExternalTimetable(emptyByDay)
+                  applyExternalTimetable(emptyByDay, { source: 'calendar-holiday', payloadDate: todayDateStr2 })
                   setExternalTimetableByWeek(null)
                   setTimetableSource('calendar-holiday')
                   setExternalWeekType(null)
@@ -3547,7 +3563,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             } catch (e) {}
 
-            setExternalTimetable(emptyByDay)
+            applyExternalTimetable(emptyByDay, { source: 'external-empty', payloadDate: (new Date()).toISOString().slice(0,10) })
             setExternalTimetableByWeek(null)
             setTimetableSource('external-empty')
             setExternalWeekType(null)
@@ -3652,7 +3668,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 startTransition(() => {
                   // Track which date this timetable is FOR
                   if (retryDate) externalTimetableDateRef.current = retryDate
-                  setExternalTimetable(finalTimetable)
+                  applyExternalTimetable(finalTimetable, { source: 'fetch-retry', payloadDate: retryDate })
                   setTimetableSource(j.source ?? 'external')
                   if (j.weekType === 'A' || j.weekType === 'B') {
                     setExternalWeekType(j.weekType)
@@ -3667,7 +3683,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             } catch (e) {
               startTransition(() => {
                 if (retryDate) externalTimetableDateRef.current = retryDate
-                setExternalTimetable(finalTimetable)
+                applyExternalTimetable(finalTimetable, { source: 'fetch-retry', payloadDate: retryDate })
                 setTimetableSource(j.source ?? 'external')
                 if (j.weekType === 'A' || j.weekType === 'B') {
                   setExternalWeekType(j.weekType)
@@ -3717,7 +3733,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             startTransition(() => {
               // Track which date this timetable is FOR - use the date we fetched for
               externalTimetableDateRef.current = todayDateStr2
-              setExternalTimetable(finalTimetable)
+              applyExternalTimetable(finalTimetable, { source: 'fetch-array-retry', payloadDate: todayDateStr2 })
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
                 setExternalWeekType(j.weekType)
@@ -3736,7 +3752,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (hasData) {
             // Batch state updates for scraped HTML after retry
             startTransition(() => {
-              setExternalTimetable(parsed)
+              applyExternalTimetable(parsed, { source: 'external-scraped', payloadDate: null })
               setTimetableSource('external-scraped')
               // Clear loading indicator as soon as we have valid data
               setIsRefreshing(false)
@@ -3761,7 +3777,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (initialCalendarChecked || cacheHydrated || isOffline) {
           // Prefer showing cached real data when available regardless of auth state.
           startTransition(() => {
-            setExternalTimetable(lastRecordedTimetable)
+            applyExternalTimetable(lastRecordedTimetable, { source: 'cache', payloadDate: externalTimetableDateRef.current || null })
             try { setCacheHydrated(true) } catch (e) {}
             setTimetableSource('cache')
             setError(null)
@@ -3771,7 +3787,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       } else if (isAuthenticated) {
         startTransition(() => {
-          setExternalTimetable(null)
+          applyExternalTimetable(null, { source: 'fallback-sample', payloadDate: null })
           setTimetableSource('fallback-sample')
           setError("Could not refresh timetable. Showing sample data.")
           setIsRefreshing(false)
@@ -3779,7 +3795,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } else {
         // No cached data and auth unknown/false: keep whatever we have and surface an error
         startTransition(() => {
-          setExternalTimetable(null)
+          applyExternalTimetable(null, { source: 'fallback-sample', payloadDate: null })
           setTimetableSource('fallback-sample')
           setError("Could not refresh timetable. Showing sample data.")
           setIsRefreshing(false)
@@ -3791,7 +3807,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
         if (initialCalendarChecked || cacheHydrated || isOffline) {
           startTransition(() => {
-            setExternalTimetable(lastRecordedTimetable)
+            applyExternalTimetable(lastRecordedTimetable, { source: 'cache', payloadDate: externalTimetableDateRef.current || null })
             try { setCacheHydrated(true) } catch (e) {}
             setTimetableSource('cache')
             setError(null)
@@ -3800,14 +3816,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       } else if (isAuthenticated) {
         startTransition(() => {
-          setExternalTimetable(null)
+          applyExternalTimetable(null, { source: 'fallback-sample', payloadDate: null })
           setTimetableSource('fallback-sample')
           setError("An error occurred while refreshing timetable.")
           setIsRefreshing(false)
         })
       } else {
-        startTransition(() => {
-          setExternalTimetable(null)
+          startTransition(() => {
+          applyExternalTimetable(null, { source: 'fallback-sample', payloadDate: null })
           setTimetableSource('fallback-sample')
           setError("An error occurred while refreshing timetable.")
           setIsRefreshing(false)
@@ -4018,7 +4034,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (cached && cached.timetable) {
                   // Use the cached processed timetable immediately and skip fetch
                   externalTimetableDateRef.current = ds
-                  setExternalTimetable(cached.timetable)
+                  applyExternalTimetable(cached.timetable, { source: 'react-query-cache', payloadDate: ds })
                   setExternalTimetableByWeek(cached.timetableByWeek || null)
                   if (cached.bellTimes && !authoritativeBellsDateRef.current) {
                     setExternalBellTimes(cached.bellTimes)
@@ -4074,7 +4090,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     }
                   } catch (e) {}
                   try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
-                  setExternalTimetable(emptyByDay)
+                  applyExternalTimetable(emptyByDay, { source: 'calendar-holiday', payloadDate: ds })
                   setExternalTimetableByWeek(null)
                   setTimetableSource('calendar-holiday')
                   setExternalWeekType(null)
@@ -4206,7 +4222,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               // CRITICAL: Track which date this timetable data is FOR before setting it
               externalTimetableDateRef.current = ds
-              setExternalTimetable(finalTimetable)
+              applyExternalTimetable(finalTimetable, { source: 'fetch-for-date', payloadDate: ds })
             setTimetableSource(j.source ?? 'external')
             // record debug summary
             try {
@@ -4306,7 +4322,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       if (changed) {
         try { console.debug('[timetable.provider] merged casualSurname from cache into refreshed timetable') } catch (e) {}
-        setExternalTimetable(merged)
+        applyExternalTimetable(merged, { source: 'merge-cache', payloadDate: externalTimetableDateRef.current || null })
       }
     } catch (e) {
       // ignore merge errors
