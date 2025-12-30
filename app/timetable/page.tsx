@@ -651,6 +651,12 @@ export default function TimetablePage() {
                                   style={{ backgroundColor: `#${period.colour}` }} 
                                 />
                               )}
+                              {/* Holiday debug indicator: small badge when selected date is a holiday */}
+                              {selectedDateIsHoliday && (
+                                <div className="ml-2 mr-1 flex-shrink-0" title="Holiday (debug)">
+                                  <span className="inline-block h-3 w-3 rounded-full bg-amber-400 border border-amber-700" aria-hidden="true" />
+                                </div>
+                              )}
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
