@@ -309,6 +309,7 @@ export default function HomeClient() {
               if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
             }
           }
+          try { console.debug('[home-client] calendar API response for', ds, calJson) } catch (e) {}
           const isHoliday = Boolean(
             dayInfo && (
               dayInfo.isHoliday === true ||
@@ -319,6 +320,7 @@ export default function HomeClient() {
               String(dayInfo.dayType || '').toLowerCase().includes('holiday')
             )
           )
+          try { console.debug('[home-client] parsed dayInfo for', ds, dayInfo, 'isHoliday=', Boolean(isHoliday)) } catch (e) {}
           if (!cancelled) setHomeIsHoliday(Boolean(isHoliday))
         }
       } catch (e) {

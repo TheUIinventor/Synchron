@@ -617,6 +617,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               )
             )
 
+            try { console.debug('[timetable.provider.selectedDate] days response for', ds, calJson) } catch (e) {}
+            try { console.debug('[timetable.provider.selectedDate] parsed dayInfo', dayInfo, 'isHoliday=', isHoliday) } catch (e) {}
+
             // If calendar/days didn't explicitly mark this date as a holiday,
             // consult the terms endpoint for public holidays/development days
             // as an additional authoritative source.
@@ -801,6 +804,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.dayType || '').toLowerCase().includes('holiday')
               )
             )
+
+            try { console.debug('[timetable.provider.mount] days response for', ds, calJson) } catch (e) {}
+            try { console.debug('[timetable.provider.mount] parsed dayInfo', dayInfo, 'isHoliday=', isHoliday) } catch (e) {}
 
             // If days endpoint didn't mark holiday, consult terms endpoint
             // for authoritative public holidays/development days (same logic
