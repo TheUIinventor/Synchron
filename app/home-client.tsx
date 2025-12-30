@@ -309,7 +309,6 @@ export default function HomeClient() {
               if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
             }
           }
-          try { console.debug('[home-client] calendar API response for', ds, calJson) } catch (e) {}
           const isHoliday = Boolean(
             dayInfo && (
               dayInfo.isHoliday === true ||
@@ -317,11 +316,9 @@ export default function HomeClient() {
               String(dayInfo.is_school_day).toLowerCase() === 'false' ||
               String(dayInfo.status || '').toLowerCase().includes('holiday') ||
               String(dayInfo.type || '').toLowerCase().includes('holiday') ||
-              String(dayInfo.dayType || '').toLowerCase().includes('holiday') ||
-              String(dayInfo.dayName || '').toLowerCase().includes('holiday')
+              String(dayInfo.dayType || '').toLowerCase().includes('holiday')
             )
           )
-          try { console.debug('[home-client] parsed dayInfo for', ds, dayInfo, 'isHoliday=', Boolean(isHoliday)) } catch (e) {}
           if (!cancelled) setHomeIsHoliday(Boolean(isHoliday))
         }
       } catch (e) {
@@ -752,18 +749,12 @@ export default function HomeClient() {
           <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  {new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(displayDate)}
-                  <span className="ml-3 inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted/10 text-muted-foreground">
-                    Holiday: {homeIsHoliday ? 'yes' : 'no'}
-                  </span>
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted/10 text-muted-foreground">
-                    SelectedHoliday: {selectedDateIsHoliday ? 'yes' : 'no'}
-                  </span>
+                  {!homeIsHoliday && new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(displayDate)}
                 </h3>
 
                 <div className="space-y-3 flex-1 pr-2">
                   {homeIsHoliday ? (
-                    <HolidayShimmer rows={10} />
+                    <HolidayShimmer />
                   ) : canShowTimetable && todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
