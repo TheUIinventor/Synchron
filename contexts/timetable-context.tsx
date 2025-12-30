@@ -967,12 +967,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // Require the per-selected-date calendar check to complete
                   // before applying cached payloads when online. This is a
                   // stricter guard to prevent any flash of classes on dates
-                  // that may be holidays.
+                  // that may be holidays. However, allow showing cached data
+                  // for past dates (historical) even when the per-date check
+                  // hasn't completed to avoid hiding historical timetables.
                   if (!isOffline && !selectedDateCalendarChecked) {
                     try {
-                      console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
-                    } catch (e) {}
-                    return
+                      const todayIso = (new Date()).toISOString().slice(0,10)
+                      const isSelectedPast = selIso ? (selIso < todayIso) : false
+                      if (!isSelectedPast) {
+                        console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
+                        return
+                      }
+                    } catch (e) {
+                      try { console.debug('[timetable.provider]', nowTs, 'withholding cache apply (fallback): selectedDateCalendarChecked=', selectedDateCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso) } catch (e2) {}
+                      return
+                    }
                   }
 
                   // If cached payload is explicitly for a different date than
@@ -1067,8 +1076,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
       if (!isOffline && !selectedDateCalendarChecked) {
-        try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
-        return emptyByDay
+        try {
+          // If the user selected a past date, allow showing timetable data
+          // immediately (historical data) even if the calendar check is
+          // pending. We only withhold for today/future dates to avoid
+          // briefly showing classes on potential holidays.
+          const selectedIsoTmp = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
+          const todayIsoTmp = (new Date()).toISOString().slice(0,10)
+          const isSelectedPastTmp = selectedIsoTmp ? (selectedIsoTmp < todayIsoTmp) : false
+          if (!isSelectedPastTmp) {
+            try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
+            return emptyByDay
+          }
+        } catch (e) {
+          try { console.debug('[timetable.provider] per-selected-date calendar check pending (error evaluating past-date exception); withholding timetable display') } catch (e2) {}
+          return emptyByDay
+        }
       }
     } catch (e) {}
 
