@@ -1073,24 +1073,54 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // If the per-selected-date calendar check has not completed and the
     // client is online, withhold any timetable data to avoid briefly
     // showing cached or fetched classes on dates that may be holidays.
+    // However, if we already have cached/live data that applies to the
+    // selected date, show it immediately so switching dates feels instant
+    // for already-cached days. We still withhold for today/future dates
+    // when no cached data for the selected date exists.
     try {
       const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+
+      // Determine selected ISO and weekday name
+      const selectedIsoTmp = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
+      const selectedDayNameTmp = selectedDateObject ? new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(selectedDateObject) : null
+
+      // Check if we have cached/live timetable data specifically for the selected day
+      let hasCachedForSelected = false
+      try {
+        if (useExternalTimetable && selectedDayNameTmp && Array.isArray((useExternalTimetable as any)[selectedDayNameTmp]) && (useExternalTimetable as any)[selectedDayNameTmp].length) hasCachedForSelected = true
+        if (!hasCachedForSelected && lastRecordedTimetable && selectedDayNameTmp && Array.isArray((lastRecordedTimetable as any)[selectedDayNameTmp]) && (lastRecordedTimetable as any)[selectedDayNameTmp].length) hasCachedForSelected = true
+        if (!hasCachedForSelected && externalTimetableDateRef.current && selectedIsoTmp && externalTimetableDateRef.current === selectedIsoTmp) hasCachedForSelected = true
+        if (!hasCachedForSelected && useExternalTimetableByWeek && selectedDayNameTmp) {
+          const group = (useExternalTimetableByWeek as any)[selectedDayNameTmp]
+          if (group && typeof group === 'object') {
+            for (const k of Object.keys(group)) {
+              const arr = (group as any)[k]
+              if (Array.isArray(arr) && arr.length) { hasCachedForSelected = true; break }
+            }
+          }
+        }
+      } catch (e) {}
+
       if (!isOffline && !selectedDateCalendarChecked) {
-        try {
-          // If the user selected a past date, allow showing timetable data
-          // immediately (historical data) even if the calendar check is
-          // pending. We only withhold for today/future dates to avoid
-          // briefly showing classes on potential holidays.
-          const selectedIsoTmp = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
-          const todayIsoTmp = (new Date()).toISOString().slice(0,10)
-          const isSelectedPastTmp = selectedIsoTmp ? (selectedIsoTmp < todayIsoTmp) : false
-          if (!isSelectedPastTmp) {
-            try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
+        // If we have cached data for the selected date, let it show immediately
+        if (hasCachedForSelected) {
+          try { console.debug('[timetable.provider] per-selected-date check pending but cached data available for selected date - showing cached') } catch (e) {}
+        } else {
+          try {
+            // If the user selected a past date, allow showing timetable data
+            // immediately (historical data) even if the calendar check is
+            // pending. We only withhold for today/future dates to avoid
+            // briefly showing classes on potential holidays.
+            const todayIsoTmp = (new Date()).toISOString().slice(0,10)
+            const isSelectedPastTmp = selectedIsoTmp ? (selectedIsoTmp < todayIsoTmp) : false
+            if (!isSelectedPastTmp) {
+              try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
+              return emptyByDay
+            }
+          } catch (e) {
+            try { console.debug('[timetable.provider] per-selected-date calendar check pending (error evaluating past-date exception); withholding timetable display') } catch (e2) {}
             return emptyByDay
           }
-        } catch (e) {
-          try { console.debug('[timetable.provider] per-selected-date calendar check pending (error evaluating past-date exception); withholding timetable display') } catch (e2) {}
-          return emptyByDay
         }
       }
     } catch (e) {}
