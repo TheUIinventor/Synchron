@@ -879,7 +879,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
               }
             }
-            const isHoliday = Boolean(
+            let isHoliday = Boolean(
               dayInfo && (
                 dayInfo.isHoliday === true ||
                 dayInfo.holiday === true ||
@@ -889,7 +889,56 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.dayType || '').toLowerCase().includes('holiday')
               )
             )
-            
+
+            // If days endpoint didn't mark holiday, consult terms endpoint
+            // for authoritative public holidays/development days (same logic
+            // used in per-selected-date effect).
+            if (!isHoliday) {
+              try {
+                const year = ds.slice(0,4)
+                const tRes = await fetch(`/api/calendar?endpoint=terms&year=${encodeURIComponent(year)}`, { credentials: 'include' })
+                const tctype = tRes.headers.get('content-type') || ''
+                if (tRes.ok && tctype.includes('application/json')) {
+                  const tJson = await tRes.json()
+                  const scanForDate = (obj: any): boolean => {
+                    try {
+                      if (!obj) return false
+                      if (Array.isArray(obj)) {
+                        for (const it of obj) {
+                          if (scanForDate(it)) return true
+                        }
+                        return false
+                      }
+                      if (typeof obj === 'object') {
+                        for (const k of Object.keys(obj)) {
+                          const v = obj[k]
+                          if (!v) continue
+                          if (typeof v === 'string' && String(v).trim() === ds) return true
+                          if (typeof v === 'object') {
+                            if (v.date && String(v.date).slice(0,10) === ds) return true
+                            if (Array.isArray(v)) {
+                              for (const item of v) {
+                                if (scanForDate(item)) return true
+                              }
+                            } else if (typeof v === 'object') {
+                              if (scanForDate(v)) return true
+                            }
+                          }
+                        }
+                        return false
+                      }
+                      return false
+                    } catch (e) { return false }
+                  }
+                  if (scanForDate(tJson.publicHolidays || tJson.publicholidays || tJson) || scanForDate(tJson.developmentDays || tJson.developmentdays || tJson)) {
+                    isHoliday = true
+                  }
+                }
+              } catch (e) {
+                // ignore terms fetch errors
+              }
+            }
+
             if (isHoliday) {
               holidayDateRef.current = true
               try { setSelectedDateIsHoliday(true) } catch (e) {}
@@ -906,6 +955,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try { setSelectedDateCalendarChecked(true) } catch (e) {}
               return
             }
+
             // Mark that the per-selected-date calendar check completed for non-holiday
             try { calendarCheckSucceeded = true } catch (e) {}
             try { setSelectedDateCalendarChecked(true) } catch (e) {}
