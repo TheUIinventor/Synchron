@@ -2250,13 +2250,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
   }, [externalBellTimes])
 
+  // Safety fallback: if we have a timetable but no external bell-times
+  // available (race or missing persistence), populate bell buckets from
+  // last-seen cached buckets or the in-file default `bellTimesData` so
+  // the UI can render break rows and canonical ordering.
+  useEffect(() => {
+    try {
+      if (externalBellTimes) return
+      const hasTimetable = Boolean(externalTimetable || lastRecordedTimetable)
+      if (!hasTimetable) return
+      const candidate = lastSeenBellTimesRef.current || bellTimesData
+      if (candidate) {
+        try { console.debug('[timetable.provider] fallback: setting externalBellTimes from cache/default', { fromCache: !!lastSeenBellTimesRef.current }) } catch (e) {}
+        setExternalBellTimes(candidate)
+        lastSeenBellTimesRef.current = candidate
+        lastSeenBellTsRef.current = Date.now()
+      }
+    } catch (e) {}
+  }, [externalTimetable, lastRecordedTimetable, externalBellTimes])
+
   // If we have cached substitutions from a previous session, apply them
   // immediately to the freshly-hydrated external timetable so the UI
   // benefits from substitutions while the live fetch completes.
   useEffect(() => {
     try {
       if (!externalTimetable) return
-      if (!timetableSource) return
+      // NOTE: do not require `timetableSource` here — subs should be applied
+      // whenever we have an external timetable available (regardless of
+      // the source marker). Requiring `timetableSource` caused substitutions
+      // to be skipped when the source was cleared during fallback paths.
 
       // FIRST: Check if the timetable already has subs applied (from the API).
       // If so, mark subsAppliedRef immediately to prevent Effect 2 from
@@ -2294,11 +2316,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try { console.debug('[timetable.provider] error applying cached subs', e) } catch (err) {}
       }
     } catch (e) {}
-  }, [externalTimetable, timetableSource])
+  }, [externalTimetable])
 
   useEffect(() => {
     if (!externalTimetable) return
-    if (!timetableSource) return
     // If we already applied substitutions, skip. Otherwise, limit retry
     // frequency so we don't hammer the AI/portal endpoint when no subs exist.
     const SUBS_RETRY_MS = 2 * 60 * 1000 // 2 minutes
