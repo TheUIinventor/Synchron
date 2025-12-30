@@ -55,7 +55,6 @@ function HomeClient() {
     refreshExternal,
     selectedDay,
     selectedDateObject,
-        const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({});
     bellTimes,
     isAuthenticated,
     reauthRequired,
