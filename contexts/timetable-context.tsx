@@ -1049,10 +1049,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // stricter guard to prevent any flash of classes on dates
                   // that may be holidays.
                   if (!isOffline && !selectedDateCalendarChecked) {
-                    try {
-                      console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
-                    } catch (e) {}
-                    return
+                    // Allow cached payloads that are explicitly FOR the
+                    // currently-selected date to be applied immediately
+                    // (useful for past dates), but withhold otherwise until
+                    // the per-selected-date calendar check completes.
+                    if (!(payloadDate && selIso && payloadDate === selIso)) {
+                      try {
+                        console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
+                      } catch (e) {}
+                      return
+                    } else {
+                      try { console.debug('[timetable.provider]', nowTs, 'allowing cache apply because payload.forDate matches selected date', payloadDate) } catch (e) {}
+                    }
                   }
 
                   // If cached payload is explicitly for a different date than
