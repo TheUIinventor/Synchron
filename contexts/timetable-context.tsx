@@ -1141,6 +1141,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {}
 
+    // If the per-selected-date calendar check has not completed and the
+    // client is online, withhold any timetable data to avoid briefly
+    // showing cached or fetched classes on dates that may be holidays.
+    try {
+      const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+      if (!isOffline && !selectedDateCalendarChecked) {
+        try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
+        return emptyByDay
+      }
+    } catch (e) {}
+
     // Prefer the live external timetable when available. The cached
     // `lastRecordedTimetable` is only a fallback for fast initial rendering
     // and should not be used until we've completed the initial calendar
