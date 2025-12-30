@@ -673,58 +673,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
   }
 
-  // Pending apply ref used to stash a payload when the per-selected-date
-  // calendar check is still pending. We will flush this when the calendar
-  // check completes to avoid any flash of timetable data on holiday dates.
-  const pendingApplyRef = useRef<{ payload: Record<string, Period[]> | null; meta?: { source?: string; payloadDate?: string | null } } | null>(null)
-
-  const doApplyNow = (payload: Record<string, Period[]> | null, meta?: { source?: string; payloadDate?: string | null }) => {
-    try {
-      debugApplyTimetable(meta?.source || 'forced-apply', meta?.payloadDate || externalTimetableDateRef.current || null, { forced: true })
-    } catch (e) {}
-    try { setExternalTimetable(payload) } catch (e) {}
-  }
-
   const applyExternalTimetable = (payload: Record<string, Period[]> | null, meta?: { source?: string; payloadDate?: string | null }) => {
     try {
       debugApplyTimetable(meta?.source || 'unknown', meta?.payloadDate || externalTimetableDateRef.current || null, { payloadKeys: payload ? Object.keys(payload).slice(0,5) : null })
     } catch (e) {}
-
-    try {
-      const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
-      const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
-      const payloadDate = meta?.payloadDate ?? externalTimetableDateRef.current ?? null
-
-      // If we're online and the per-selected-date calendar check hasn't
-      // completed yet, stash the payload and avoid applying it now. This
-      // prevents cached or fetched timetables from briefly appearing on
-      // holiday dates while calendar detection finishes.
-      if (!isOffline && !selectedDateCalendarChecked) {
-        try {
-          console.debug('[timetable.provider.apply] withholding apply until calendar check completes', { source: meta?.source, payloadDate, selectedIso: selIso })
-        } catch (e) {}
-        pendingApplyRef.current = { payload, meta }
-        return
-      }
-
-      // Otherwise apply immediately
-      doApplyNow(payload, meta)
-    } catch (e) {
-      try { doApplyNow(payload, meta) } catch (err) {}
-    }
+    try { setExternalTimetable(payload) } catch (e) {}
   }
-
-  // Flush any pending apply when the per-selected-date calendar check completes
-  useEffect(() => {
-    try {
-      if (selectedDateCalendarChecked && pendingApplyRef.current) {
-        const p = pendingApplyRef.current
-        pendingApplyRef.current = null
-        try { console.debug('[timetable.provider.apply] flushing pending apply after calendar check', { source: p.meta?.source, payloadDate: p.meta?.payloadDate }) } catch (e) {}
-        try { doApplyNow(p.payload, p.meta) } catch (e) {}
-      }
-    } catch (e) {}
-  }, [selectedDateCalendarChecked])
 
   // Watch for selected date changes and consult the calendar API to
   // determine whether the chosen date is a holiday. If the calendar
