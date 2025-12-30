@@ -1033,20 +1033,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                 } catch (e) {}
 
-                // Conservative guard: if the cached payload is for a different
-                // date than the currently-selected date, and we have not yet
-                // completed the per-selected-date calendar check (and we're
-                // online), do NOT hydrate the cache now. This prevents a
-                // brief flash where cached classes appear before the holiday
-                // detection completes.
+                // Conservative guard: if calendar checks haven't completed,
+                // withhold applying cached payloads to avoid flashing stale
+                // classes on potentially-holiday dates. Require both the
+                // per-selected-date check and the initial mount check to have
+                // completed, unless the client is offline.
                 try {
+                  const nowTs = (new Date()).toISOString()
                   const selIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
                   const payloadDate = externalTimetableDateRef.current
                   const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
-                  if (payloadDate && selIso && payloadDate !== selIso && !selectedDateCalendarChecked && !isOffline) {
-                    try { console.debug('[timetable.provider] skipping cache hydration: cached payload date', payloadDate, 'does not match selected', selIso, 'and per-date calendar check pending') } catch (e) {}
+
+                  if (!isOffline && (!selectedDateCalendarChecked || !initialCalendarChecked)) {
+                    try {
+                      console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'initialCalendarChecked=', initialCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
+                    } catch (e) {}
                     return
                   }
+
+                  // If cached payload is explicitly for a different date than
+                  // the selected date, withhold when calendar check is pending.
+                  if (!isOffline && payloadDate && selIso && payloadDate !== selIso && !selectedDateCalendarChecked) {
+                    try { console.debug('[timetable.provider]', nowTs, 'skipping cache hydration: cached payload date', payloadDate, 'does not match selected', selIso, 'and per-date calendar check pending') } catch (e) {}
+                    return
+                  }
+                } catch (e) {}
+
+                try {
+                  const nowTs = (new Date()).toISOString()
+                  console.debug('[timetable.provider]', nowTs, 'applying cached timetable (final) — source=cache, payloadDate=', externalTimetableDateRef.current)
                 } catch (e) {}
 
                 setExternalTimetable(final)
