@@ -365,44 +365,7 @@ export default function TimetablePage() {
           <div className="w-6 hidden md:block" />
           <div className="w-6 hidden md:block"></div>
         </div>
-        {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
-        {timetableSource === 'fallback-sample' && (
-          <div className="w-full mb-6">
-            <Card className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <div className="font-medium text-on-surface">Can't load your live timetable</div>
-                  <div className="text-sm text-on-surface-variant">Sign in to the SBHS Portal and then click Retry to load your live timetable.</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      try { window.location.href = '/api/auth/login' } catch { window.location.assign('/api/auth/login') }
-                    }}
-                    className="rounded-full"
-                  >
-                    Sign in to portal
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        if (refreshExternal) await refreshExternal()
-                      } catch (e) {
-                        // ignore — provider will fall back to sample if needed
-                      }
-                    }}
-                    className="rounded-full"
-                  >
-                    Retry
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
+        {/* Removed sample fallback UI: app no longer shows bundled sample data */}
 
         {/* View Mode Toggle */}
         <div className="flex justify-center mb-6">
