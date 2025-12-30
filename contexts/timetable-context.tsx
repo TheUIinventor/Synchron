@@ -1058,8 +1058,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
       if (!isOffline && !selectedDateCalendarChecked) {
-        try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
-        return emptyByDay
+        try {
+          // Allow cached display when the user is viewing a non-current date
+          // (e.g., looking back at past term dates) and we have cached data
+          // available. This avoids hiding classes for past-term dates when the
+          // calendar check is slow or fails.
+          const todayIso = (new Date()).toISOString().slice(0,10)
+          const selIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
+          const hasCached = Boolean(lastRecordedTimetable || typeof __initialExternalTimetable !== 'undefined' && __initialExternalTimetable)
+          if (selIso && selIso !== todayIso && hasCached) {
+            try { console.debug('[timetable.provider] per-selected-date calendar check pending, but showing cached data for non-current date', selIso) } catch (e) {}
+            // allow downstream logic to render the cached timetable
+          } else {
+            try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
+            return emptyByDay
+          }
+        } catch (e) {
+          try { console.debug('[timetable.provider] per-selected-date calendar guard error', e) } catch (err) {}
+          return emptyByDay
+        }
       }
     } catch (e) {}
 
