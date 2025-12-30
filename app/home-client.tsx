@@ -3,6 +3,7 @@
 import { useTimetable } from "@/contexts/timetable-context";
 // Use Intl.DateTimeFormat instead of importing date-fns for simple formatting
 import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check } from "lucide-react";
+import HolidayShimmer from "@/components/holiday-shimmer";
 import { useEffect, useState, useRef } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
@@ -748,11 +749,13 @@ export default function HomeClient() {
           <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  {new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(displayDate)}
+                  {!homeIsHoliday && new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(displayDate)}
                 </h3>
-                
+
                 <div className="space-y-3 flex-1 pr-2">
-                  {canShowTimetable && todaysPeriods.length > 0 ? (
+                  {homeIsHoliday ? (
+                    <HolidayShimmer />
+                  ) : canShowTimetable && todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')

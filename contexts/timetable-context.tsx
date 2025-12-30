@@ -41,6 +41,7 @@ type TimetableContextType = {
   setSelectedDay: (day: string) => void
   setSelectedDateObject: (d: Date) => void
   timetableData: Record<string, Period[]>
+  selectedDateIsHoliday: boolean
   currentMomentPeriodInfo: {
     // Renamed from nextPeriodInfo to be clearer
     nextPeriod: Period | null
@@ -4270,6 +4271,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         isShowingCachedWhileLoading: Boolean((isLoading || isRefreshing) && lastRecordedTimetable),
         error,
         refreshExternal,
+        selectedDateIsHoliday,
       }}
     >
       {children}
@@ -4308,6 +4310,7 @@ export function useTimetable() {
       refreshExternal: noop,
       timetableByWeek: undefined,
       externalWeekType: null,
+      selectedDateIsHoliday: false,
     }
     return safe
   }
