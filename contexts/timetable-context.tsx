@@ -423,6 +423,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     __initialRawCache = null
     __initialParsedCache = null
   }
+  // If the persisted last-timetable explicitly included a `forDate` field
+  // capture it now so we can use it to initialise `externalTimetableDateRef`
+  // later (the ref is declared further below).
+  let __initialCachedForDate: string | null = null
+  try {
+    if (__initialParsedCache && __initialParsedCache.forDate) __initialCachedForDate = __initialParsedCache.forDate
+    else {
+      try {
+        const maybe = extractDateFromPayload(__initialParsedCache)
+        if (maybe) __initialCachedForDate = maybe
+      } catch (e) {}
+    }
+  } catch (e) {}
   // Look for any previously-processed payloads cached under
   // `synchron-processed-<hash>` and prefer the most-recent one for
   // instant hydration. This allows us to load a fully-applied timetable
@@ -776,6 +789,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Track the date that the current externalTimetable data is actually FOR (not the selected date)
   // This is critical for correctly associating variations with the right date when capturing them
   const externalTimetableDateRef = useRef<string | null>(null)
+  // If we discovered a cached-for-date at startup, seed the ref so the
+  // hydration gating logic can make use of it immediately.
+  try { if (__initialCachedForDate) externalTimetableDateRef.current = __initialCachedForDate } catch (e) {}
   // Track the currently selected date as a ref so interval callbacks can access the latest value
   // without stale closure issues
   const selectedDateObjectRef = useRef<Date | null>(null)
@@ -863,7 +879,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
               }
             }
-            const isHoliday = Boolean(
+            let isHoliday = Boolean(
               dayInfo && (
                 dayInfo.isHoliday === true ||
                 dayInfo.holiday === true ||
@@ -873,7 +889,56 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.dayType || '').toLowerCase().includes('holiday')
               )
             )
-            
+
+            // If days endpoint didn't mark holiday, consult terms endpoint
+            // for authoritative public holidays/development days (same logic
+            // used in per-selected-date effect).
+            if (!isHoliday) {
+              try {
+                const year = ds.slice(0,4)
+                const tRes = await fetch(`/api/calendar?endpoint=terms&year=${encodeURIComponent(year)}`, { credentials: 'include' })
+                const tctype = tRes.headers.get('content-type') || ''
+                if (tRes.ok && tctype.includes('application/json')) {
+                  const tJson = await tRes.json()
+                  const scanForDate = (obj: any): boolean => {
+                    try {
+                      if (!obj) return false
+                      if (Array.isArray(obj)) {
+                        for (const it of obj) {
+                          if (scanForDate(it)) return true
+                        }
+                        return false
+                      }
+                      if (typeof obj === 'object') {
+                        for (const k of Object.keys(obj)) {
+                          const v = obj[k]
+                          if (!v) continue
+                          if (typeof v === 'string' && String(v).trim() === ds) return true
+                          if (typeof v === 'object') {
+                            if (v.date && String(v.date).slice(0,10) === ds) return true
+                            if (Array.isArray(v)) {
+                              for (const item of v) {
+                                if (scanForDate(item)) return true
+                              }
+                            } else if (typeof v === 'object') {
+                              if (scanForDate(v)) return true
+                            }
+                          }
+                        }
+                        return false
+                      }
+                      return false
+                    } catch (e) { return false }
+                  }
+                  if (scanForDate(tJson.publicHolidays || tJson.publicholidays || tJson) || scanForDate(tJson.developmentDays || tJson.developmentdays || tJson)) {
+                    isHoliday = true
+                  }
+                }
+              } catch (e) {
+                // ignore terms fetch errors
+              }
+            }
+
             if (isHoliday) {
               holidayDateRef.current = true
               try { setSelectedDateIsHoliday(true) } catch (e) {}
@@ -890,6 +955,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try { setSelectedDateCalendarChecked(true) } catch (e) {}
               return
             }
+
             // Mark that the per-selected-date calendar check completed for non-holiday
             try { calendarCheckSucceeded = true } catch (e) {}
             try { setSelectedDateCalendarChecked(true) } catch (e) {}
@@ -967,20 +1033,47 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                 } catch (e) {}
 
-                // Conservative guard: if the cached payload is for a different
-                // date than the currently-selected date, and we have not yet
-                // completed the per-selected-date calendar check (and we're
-                // online), do NOT hydrate the cache now. This prevents a
-                // brief flash where cached classes appear before the holiday
-                // detection completes.
+                // Conservative guard: if calendar checks haven't completed,
+                // withhold applying cached payloads to avoid flashing stale
+                // classes on potentially-holiday dates. Require both the
+                // per-selected-date check and the initial mount check to have
+                // completed, unless the client is offline.
                 try {
+                  const nowTs = (new Date()).toISOString()
                   const selIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
                   const payloadDate = externalTimetableDateRef.current
                   const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
-                  if (payloadDate && selIso && payloadDate !== selIso && !selectedDateCalendarChecked && !isOffline) {
-                    try { console.debug('[timetable.provider] skipping cache hydration: cached payload date', payloadDate, 'does not match selected', selIso, 'and per-date calendar check pending') } catch (e) {}
+
+                  // Require the per-selected-date calendar check to complete
+                  // before applying cached payloads when online. This is a
+                  // stricter guard to prevent any flash of classes on dates
+                  // that may be holidays.
+                  if (!isOffline && !selectedDateCalendarChecked) {
+                    // Allow cached payloads that are explicitly FOR the
+                    // currently-selected date to be applied immediately
+                    // (useful for past dates), but withhold otherwise until
+                    // the per-selected-date calendar check completes.
+                    if (!(payloadDate && selIso && payloadDate === selIso)) {
+                      try {
+                        console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
+                      } catch (e) {}
+                      return
+                    } else {
+                      try { console.debug('[timetable.provider]', nowTs, 'allowing cache apply because payload.forDate matches selected date', payloadDate) } catch (e) {}
+                    }
+                  }
+
+                  // If cached payload is explicitly for a different date than
+                  // the selected date, withhold when calendar check is pending.
+                  if (!isOffline && payloadDate && selIso && payloadDate !== selIso && !selectedDateCalendarChecked) {
+                    try { console.debug('[timetable.provider]', nowTs, 'skipping cache hydration: cached payload date', payloadDate, 'does not match selected', selIso, 'and per-date calendar check pending') } catch (e) {}
                     return
                   }
+                } catch (e) {}
+
+                try {
+                  const nowTs = (new Date()).toISOString()
+                  console.debug('[timetable.provider]', nowTs, 'applying cached timetable (final) — source=cache, payloadDate=', externalTimetableDateRef.current)
                 } catch (e) {}
 
                 setExternalTimetable(final)
@@ -1002,6 +1095,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {}
       } catch (e) {}
+      finally {
+        try { if (!cancelled) try { setInitialCalendarChecked(true) } catch (e) {} } catch (e) {}
+      }
     })()
     return () => { cancelled = true }
   }, [])
@@ -1018,10 +1114,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           source: timetableSource,
           weekType: externalWeekType || null,
           savedAt: (new Date()).toISOString(),
+          // Record which date this external timetable payload is FOR so
+          // startup hydration logic can decide whether to apply cached
+          // data when the user has selected a different date.
+          forDate: externalTimetableDateRef.current || lastFetchedDate || null,
         }
         try {
           localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
-          try { console.debug('[timetable.provider] wrote synchron-last-timetable (externalTimetable payload)') } catch (e) {}
+          try { console.debug('[timetable.provider] wrote synchron-last-timetable (externalTimetable payload)', { forDate: payload.forDate, savedAt: payload.savedAt }) } catch (e) {}
         } catch (e) {
           // ignore storage errors
         }
@@ -1045,6 +1145,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       if (selectedDateIsHoliday || holidayDateRef.current) {
         try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
+        return emptyByDay
+      }
+    } catch (e) {}
+
+    // If the per-selected-date calendar check has not completed and the
+    // client is online, withhold any timetable data to avoid briefly
+    // showing cached or fetched classes on dates that may be holidays.
+    try {
+      const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+      if (!isOffline && !selectedDateCalendarChecked) {
+        try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
         return emptyByDay
       }
     } catch (e) {}
@@ -1298,7 +1409,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             let authVariation: any = null
             try {
               const candidate = authVarsForDate && Array.isArray(authVarsForDate[day]) ? authVarsForDate[day] : []
-              authVariation = Array.isArray(candidate) ? candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod) : null
+              if (Array.isArray(candidate)) {
+                authVariation = candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod)
+              } else {
+                try { console.debug('[timetable.provider] unexpected candidate type for authVarsForDate[day]', typeof authVarsForDate?.[day], authVarsForDate?.[day]) } catch (e) {}
+                authVariation = null
+              }
             } catch (e) {
               try { console.warn('[timetable.provider] unexpected authVarsForDate[day] type', typeof authVarsForDate, typeof authVarsForDate?.[day]) } catch (e2) {}
               authVariation = null
@@ -1326,7 +1442,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // Also check daySource for FRESH variations that might be newer than cached
             // (This handles the case where a new variation was just added)
-            if (daySource.length) {
+            if (Array.isArray(daySource) && daySource.length) {
               const normSubject = String(p.subject || '').trim().toLowerCase()
               const match = daySource.find((src) => {
                 const srcPeriod = String(src.period).trim().toLowerCase()
@@ -3104,21 +3220,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const computedSource = j.source ?? 'external'
               // Use the actual date we fetched for, not the current date
               const computedDate = todayDateStr
-              startTransition(() => {
-                if (j.weekType === 'A' || j.weekType === 'B') {
-                  setExternalWeekType(j.weekType)
-                  setCurrentWeek(j.weekType)
+              try {
+                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+                if (!selectedDateCalendarChecked && selIso && computedDate && selIso === computedDate && !isOfflineNow) {
+                  try { console.debug('[timetable.provider] withholding fetched timetable (processed payload) until per-date calendar check completes', { computedDate, selIso }) } catch (e) {}
+                  setIsRefreshing(false)
+                } else {
+                  startTransition(() => {
+                    if (j.weekType === 'A' || j.weekType === 'B') {
+                      setExternalWeekType(j.weekType)
+                      setCurrentWeek(j.weekType)
+                    }
+                    if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                    // Track which date this timetable is FOR
+                    externalTimetableDateRef.current = computedDate
+                    setExternalTimetable(finalTimetable)
+                    setTimetableSource(computedSource)
+                    setLastFetchedDate(computedDate)
+                    if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
+                    // Clear loading indicator as soon as we have valid data
+                    setIsRefreshing(false)
+                  })
                 }
-                if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-                // Track which date this timetable is FOR
-                externalTimetableDateRef.current = computedDate
-                setExternalTimetable(finalTimetable)
-                setTimetableSource(computedSource)
-                setLastFetchedDate(computedDate)
-                if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
-                // Clear loading indicator as soon as we have valid data
-                setIsRefreshing(false)
-              })
+              } catch (e) {
+                // If guard check fails for any reason, apply normally to avoid leaving UI stuck
+                startTransition(() => {
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
+                  if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                  externalTimetableDateRef.current = computedDate
+                  setExternalTimetable(finalTimetable)
+                  setTimetableSource(computedSource)
+                  setLastFetchedDate(computedDate)
+                  if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)
+                  setIsRefreshing(false)
+                })
+              }
               // Note: do not override provider-selected date here. The
               // `selectedDateObject` is driven by user choice and time-based
               // auto-selection logic; forcing it from a general `/api/timetable`
@@ -3205,15 +3345,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // Intentionally not overriding `selectedDateObject` here for
               // the reasons described above.
               // Batch all related state updates atomically
-              startTransition(() => {
-                setExternalTimetable(byDay)
-                setTimetableSource(computedSourceArr)
-                if (j.weekType === 'A' || j.weekType === 'B') {
-                  setExternalWeekType(j.weekType)
-                  setCurrentWeek(j.weekType)
+              try {
+                const payloadDate = extractDateFromPayload(j.upstream || j) || null
+                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+                if (payloadDate && !selectedDateCalendarChecked && selIso && payloadDate === selIso && !isOfflineNow) {
+                  try { console.debug('[timetable.provider] withholding fetched timetable (array path) until per-date calendar check completes', { payloadDate, selIso }) } catch (e) {}
+                  setIsRefreshing(false)
+                } else {
+                  startTransition(() => {
+                    setExternalTimetable(byDay)
+                    setTimetableSource(computedSourceArr)
+                    if (j.weekType === 'A' || j.weekType === 'B') {
+                      setExternalWeekType(j.weekType)
+                      setCurrentWeek(j.weekType)
+                    }
+                    setIsRefreshing(false)
+                  })
                 }
-                setIsRefreshing(false)
-              })
+              } catch (e) {
+                startTransition(() => {
+                  setExternalTimetable(byDay)
+                  setTimetableSource(computedSourceArr)
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
+                  setIsRefreshing(false)
+                })
+              }
               return
             }
           }
@@ -3490,20 +3650,42 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               retrySummary = { weekType: j.weekType ?? null, hasByWeek: !!j.timetableByWeek }
             } catch (e) {}
             // Use startTransition to batch ALL updates and prevent flash
-            startTransition(() => {
-              // Track which date this timetable is FOR
-              if (retryDate) externalTimetableDateRef.current = retryDate
-              setExternalTimetable(finalTimetable)
-              setTimetableSource(j.source ?? 'external')
-              if (j.weekType === 'A' || j.weekType === 'B') {
-                setExternalWeekType(j.weekType)
-                setCurrentWeek(j.weekType)
+            try {
+              const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+              const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+              if (retryDate && !selectedDateCalendarChecked && selIso && retryDate === selIso && !isOfflineNow) {
+                try { console.debug('[timetable.provider] withholding fetched timetable (retry path) until per-date calendar check completes', { retryDate, selIso }) } catch (e) {}
+                setIsRefreshing(false)
+              } else {
+                startTransition(() => {
+                  // Track which date this timetable is FOR
+                  if (retryDate) externalTimetableDateRef.current = retryDate
+                  setExternalTimetable(finalTimetable)
+                  setTimetableSource(j.source ?? 'external')
+                  if (j.weekType === 'A' || j.weekType === 'B') {
+                    setExternalWeekType(j.weekType)
+                    setCurrentWeek(j.weekType)
+                  }
+                  if (retryDate) setLastFetchedDate(retryDate)
+                  if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
+                  // Clear loading indicator as soon as we have valid data
+                  setIsRefreshing(false)
+                })
               }
-              if (retryDate) setLastFetchedDate(retryDate)
-              if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
-              // Clear loading indicator as soon as we have valid data
-              setIsRefreshing(false)
-            })
+            } catch (e) {
+              startTransition(() => {
+                if (retryDate) externalTimetableDateRef.current = retryDate
+                setExternalTimetable(finalTimetable)
+                setTimetableSource(j.source ?? 'external')
+                if (j.weekType === 'A' || j.weekType === 'B') {
+                  setExternalWeekType(j.weekType)
+                  setCurrentWeek(j.weekType)
+                }
+                if (retryDate) setLastFetchedDate(retryDate)
+                if (retrySummary) setLastFetchedPayloadSummary(retrySummary)
+                setIsRefreshing(false)
+              })
+            }
             return
           }
 
@@ -4183,6 +4365,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         externalWeekType,
         selectedDateCalendarChecked,
         selectedDateIsHoliday,
+        initialCalendarChecked,
+        cacheHydrated,
         isLoading,
         isRefreshing,
         isAuthenticated,
