@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { ChevronLeft, Calendar as CalendarIcon } from "lucide-react"
-import HolidayShimmer from "@/components/holiday-shimmer"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Calendar as DatePicker } from "@/components/ui/calendar"
@@ -522,19 +521,11 @@ export default function TimetablePage() {
                   <CalendarIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  {!selectedDateIsHoliday ? (
-                    <h2 className="text-base sm:text-lg font-bold text-on-surface truncate">{formatSelectedDate()}</h2>
-                  ) : (
-                    <div className="h-6 w-40 bg-transparent" />
-                  )}
+                  <h2 className="text-base sm:text-lg font-bold text-on-surface truncate">{formatSelectedDate()}</h2>
                 </div>
               </div>
 
-              {selectedDateIsHoliday ? (
-                <div className="py-6">
-                  <HolidayShimmer />
-                </div>
-              ) : isWeekend && (
+              {isWeekend && (
                 <div className="py-8 text-center bg-surface-container-high/50 rounded-xl">
                   <div className="flex flex-col items-center gap-3">
                     <div className="p-3 rounded-full bg-primary/10 text-primary">
