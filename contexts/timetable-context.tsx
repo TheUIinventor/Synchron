@@ -1044,9 +1044,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   const payloadDate = externalTimetableDateRef.current
                   const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
 
-                  if (!isOffline && (!selectedDateCalendarChecked || !initialCalendarChecked)) {
+                  // Require the per-selected-date calendar check to complete
+                  // before applying cached payloads when online. This is a
+                  // stricter guard to prevent any flash of classes on dates
+                  // that may be holidays.
+                  if (!isOffline && !selectedDateCalendarChecked) {
                     try {
-                      console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'initialCalendarChecked=', initialCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
+                      console.debug('[timetable.provider]', nowTs, 'withholding cache apply: selectedDateCalendarChecked=', selectedDateCalendarChecked, 'payloadDate=', payloadDate, 'selected=', selIso)
                     } catch (e) {}
                     return
                   }
@@ -1109,7 +1113,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         try {
           localStorage.setItem('synchron-last-timetable', JSON.stringify(payload))
-          try { console.debug('[timetable.provider] wrote synchron-last-timetable (externalTimetable payload)') } catch (e) {}
+          try { console.debug('[timetable.provider] wrote synchron-last-timetable (externalTimetable payload)', { forDate: payload.forDate, savedAt: payload.savedAt }) } catch (e) {}
         } catch (e) {
           // ignore storage errors
         }
