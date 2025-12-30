@@ -613,7 +613,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.is_school_day).toLowerCase() === 'false' ||
                 String(dayInfo.status || '').toLowerCase().includes('holiday') ||
                 String(dayInfo.type || '').toLowerCase().includes('holiday') ||
-                String(dayInfo.dayType || '').toLowerCase().includes('holiday')
+                String(dayInfo.dayType || '').toLowerCase().includes('holiday') ||
+                String(dayInfo.dayName || '').toLowerCase().includes('holiday')
               )
             )
 
@@ -801,7 +802,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 String(dayInfo.is_school_day).toLowerCase() === 'false' ||
                 String(dayInfo.status || '').toLowerCase().includes('holiday') ||
                 String(dayInfo.type || '').toLowerCase().includes('holiday') ||
-                String(dayInfo.dayType || '').toLowerCase().includes('holiday')
+                String(dayInfo.dayType || '').toLowerCase().includes('holiday') ||
+                String(dayInfo.dayName || '').toLowerCase().includes('holiday')
               )
             )
 

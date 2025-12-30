@@ -317,7 +317,8 @@ export default function HomeClient() {
               String(dayInfo.is_school_day).toLowerCase() === 'false' ||
               String(dayInfo.status || '').toLowerCase().includes('holiday') ||
               String(dayInfo.type || '').toLowerCase().includes('holiday') ||
-              String(dayInfo.dayType || '').toLowerCase().includes('holiday')
+              String(dayInfo.dayType || '').toLowerCase().includes('holiday') ||
+              String(dayInfo.dayName || '').toLowerCase().includes('holiday')
             )
           )
           try { console.debug('[home-client] parsed dayInfo for', ds, dayInfo, 'isHoliday=', Boolean(isHoliday)) } catch (e) {}
