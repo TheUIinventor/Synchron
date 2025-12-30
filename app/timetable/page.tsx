@@ -522,7 +522,12 @@ export default function TimetablePage() {
                   <CalendarIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base sm:text-lg font-bold text-on-surface truncate">{formatSelectedDate()}</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-base sm:text-lg font-bold text-on-surface truncate">{formatSelectedDate()}</h2>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted/10 text-muted-foreground">
+                      Holiday: {selectedDateIsHoliday ? 'yes' : 'no'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
