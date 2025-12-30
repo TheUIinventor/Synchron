@@ -1,14 +1,19 @@
 import React from 'react'
 
-export default function HolidayShimmer({ className = '' }: { className?: string }) {
+type Props = {
+  className?: string
+  rows?: number
+}
+
+export default function HolidayShimmer({ className = '', rows = 10 }: Props) {
+  const items = Array.from({ length: rows })
   return (
     <div className={`w-full ${className}`}>
       <div className="animate-pulse">
-        <div className="h-6 w-40 bg-surface-variant rounded-md mb-4" />
-        <div className="space-y-2">
-          <div className="h-12 bg-surface-container rounded-lg" />
-          <div className="h-12 bg-surface-container rounded-lg" />
-          <div className="h-12 bg-surface-container rounded-lg" />
+        <div className="space-y-3">
+          {items.map((_, i) => (
+            <div key={i} className="h-12 bg-surface-variant rounded-md" />
+          ))}
         </div>
       </div>
     </div>
