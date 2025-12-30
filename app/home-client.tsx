@@ -3,7 +3,7 @@
 import { useTimetable } from "@/contexts/timetable-context";
 // Use Intl.DateTimeFormat instead of importing date-fns for simple formatting
 import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils";
@@ -45,7 +45,7 @@ import { cn, stripLeadingCasualCode } from "@/lib/utils";
     return abbrMap[subject] || String(subject || '').substring(0,3).toUpperCase()
   }
 
-export default function HomeClient() {
+function HomeClient() {
   const { 
     timetableData, 
     currentMomentPeriodInfo, 
@@ -55,7 +55,7 @@ export default function HomeClient() {
     refreshExternal,
     selectedDay,
     selectedDateObject,
-    timetableSource,
+        const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({});
     bellTimes,
     isAuthenticated,
     reauthRequired,
@@ -81,6 +81,7 @@ export default function HomeClient() {
   const inFlightRef = useRef(false)
   const lastProfileFetchRef = useRef<number | null>(null)
   const mountedRef = useRef(true)
+      export default memo(HomeClient);
 
   // Home-specific calendar check to avoid flashing cached timetable
   const [homeCalendarChecked, setHomeCalendarChecked] = useState<boolean>(false)
@@ -265,17 +266,15 @@ export default function HomeClient() {
   const effectiveMoment = canShowTimetable ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
   
-  // Determine the date to display for the HOME page. The home page should
-  // not be influenced by a manual date selection on the timetable page, so
-  // do not use `selectedDateObject` from the provider here. Instead use the
-  // local clock and auto-advance after school hours/weekends.
-  const displayDate = (() => {
+  // Determine the date to display for the HOME page. Memoize to avoid
+  // unnecessary recalculation on every render.
+  const displayDate = useMemo(() => {
     const now = currentDate
     const isWeekend = now.getDay() === 0 || now.getDay() === 6
     if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
     return now
-  })()
-  const displayDateIso = displayDate.toISOString().slice(0,10)
+  }, [currentDate])
+  const displayDateIso = useMemo(() => displayDate.toISOString().slice(0,10), [displayDate])
 
   // Use the displayDate's weekday to pick today's timetable for the home page.
   const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
@@ -330,17 +329,17 @@ export default function HomeClient() {
   }, [displayDateIso])
 
   // Map provider bell buckets into the day-specific bucket keys used elsewhere.
-  const bellsForDay = (() => {
+  // Memoized to avoid reallocations.
+  const bellsForDay = useMemo(() => {
     if (!bellTimes) return []
     if (dayName === 'Friday') return (bellTimes as any).Fri || []
     if (dayName === 'Wednesday' || dayName === 'Thursday') return (bellTimes as any)['Wed/Thurs'] || []
     return (bellTimes as any)['Mon/Tues'] || []
-  })()
+  }, [bellTimes, dayName])
 
-  // Debug: log timetable state to help diagnose missing classes on home page
-  if (typeof window !== 'undefined') {
+  // Debug logs only in non-production to avoid noise and runtime cost.
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
     try {
-      // keep these logs lightweight and helpful
       console.debug('[home-client] dayName', dayName)
       console.debug('[home-client] todaysPeriodsRaw', (todaysPeriodsRaw || []).map(p => ({ period: p.period, subject: p.subject, time: p.time })))
       console.debug('[home-client] bellTimes', bellTimes)
@@ -351,7 +350,7 @@ export default function HomeClient() {
   // Helper: normalize period label for comparison
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
   // Keep roll call and period 0 visible — show all entries
-  const todaysPeriods = todaysPeriodsRaw
+  const todaysPeriods = useMemo(() => todaysPeriodsRaw, [todaysPeriodsRaw])
 
   // Helper: find a bell time for a given period by label matching, falling
   // back to index-based lookup when a direct label match isn't found.
