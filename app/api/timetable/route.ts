@@ -1633,8 +1633,13 @@ export async function GET(req: NextRequest) {
           variationTargetDay: dayResDay,
           variationPeriodNumbers: dayPeriodNumbers,
           // Include raw upstream payloads to help diagnose where A/B info may be present
+          // CRITICAL FIX: If we successfully recovered a timetable (byDay has entries),
+          // do NOT pass through an upstream day error, as it will cause the client
+          // to discard the valid backfilled data.
           upstream: {
-            day: dayRes?.json ?? null,
+            day: (Object.values(byDay).some(arr => arr.length > 0) && (dayRes?.json?.status === 'Error' || dayRes?.json?.error)) 
+              ? null 
+              : (dayRes?.json ?? null),
             full: fullRes?.json ?? null,
             bells: bellsRes?.json ?? null,
           }
