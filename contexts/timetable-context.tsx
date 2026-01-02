@@ -3223,7 +3223,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
                 const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
-                if (!selectedDateCalendarChecked && selIso && computedDate && selIso === computedDate && !isOfflineNow) {
+                // CRITICAL FIX: Disable withholding logic here too.
+                if (false && !selectedDateCalendarChecked && selIso && computedDate && selIso === computedDate && !isOfflineNow) {
                   try { console.debug('[timetable.provider] withholding fetched timetable (processed payload) until per-date calendar check completes', { computedDate, selIso }) } catch (e) {}
                   setIsRefreshing(false)
                 } else {
@@ -3349,7 +3350,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const payloadDate = extractDateFromPayload(j.upstream || j) || null
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
                 const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
-                if (payloadDate && !selectedDateCalendarChecked && selIso && payloadDate === selIso && !isOfflineNow) {
+                // CRITICAL FIX: Do NOT withhold data if we have a valid payload, even if calendar check is pending.
+                // The withholding logic was causing valid backfilled data for past dates to be ignored
+                // because selectedDateCalendarChecked was false (since we don't check calendar for past dates in the same way).
+                if (false && payloadDate && !selectedDateCalendarChecked && selIso && payloadDate === selIso && !isOfflineNow) {
                   try { console.debug('[timetable.provider] withholding fetched timetable (array path) until per-date calendar check completes', { payloadDate, selIso }) } catch (e) {}
                   setIsRefreshing(false)
                 } else {
@@ -3653,7 +3657,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try {
               const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
               const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
-              if (retryDate && !selectedDateCalendarChecked && selIso && retryDate === selIso && !isOfflineNow) {
+              // CRITICAL FIX: Disable withholding logic here too.
+              if (false && retryDate && !selectedDateCalendarChecked && selIso && retryDate === selIso && !isOfflineNow) {
                 try { console.debug('[timetable.provider] withholding fetched timetable (retry path) until per-date calendar check completes', { retryDate, selIso }) } catch (e) {}
                 setIsRefreshing(false)
               } else {

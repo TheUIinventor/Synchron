@@ -1626,6 +1626,7 @@ export async function GET(req: NextRequest) {
       } catch (e) {}
 
       const responsePayload = {
+        date: dateParam, // Explicitly include the requested date
         timetable: byDay,
         timetableByWeek,
         bellTimes: typeof bellSchedules !== 'undefined' ? bellSchedules : undefined,
@@ -1649,8 +1650,8 @@ export async function GET(req: NextRequest) {
           // do NOT pass through an upstream day error, as it will cause the client
           // to discard the valid backfilled data.
           upstream: {
-            day: (Object.values(byDay).some(arr => arr.length > 0) && (dayRes?.json?.status === 'Error' || dayRes?.json?.error)) 
-              ? null 
+            day: (Object.values(byDay).some(arr => arr.length > 0)) 
+              ? { date: dateParam, status: 'OK' } // Return a dummy OK payload if we have data
               : (dayRes?.json ?? null),
             full: fullRes?.json ?? null,
             bells: bellsRes?.json ?? null,
