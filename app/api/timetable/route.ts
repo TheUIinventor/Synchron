@@ -1241,6 +1241,18 @@ export async function GET(req: NextRequest) {
         const hasTeacher = p.teacher && p.teacher.trim().length > 0
         const hasRoom = p.room && p.room.trim().length > 0
         const hasTimeRange = typeof p.time === 'string' && p.time.includes('-')
+        
+        // CRITICAL FIX: If we are backfilling from cycle data (fullRes), the periods
+        // might not have times yet if backfill failed. But we shouldn't discard them
+        // if they have valid subject/teacher/room info. The client can display them
+        // without times or we can try to infer times later.
+        // Discarding them here causes "empty timetable" when backfill fails.
+        if (!hasTimeRange && (hasSubject || hasTeacher || hasRoom)) {
+           // If we have valid class info but no time, keep it!
+           // The client might be able to render it or we can fix the time backfill logic.
+           return true
+        }
+
         return hasTimeRange && (hasSubject || hasTeacher || hasRoom)
       })
       if (dateParam && dayName === requestedWeekdayString) {
