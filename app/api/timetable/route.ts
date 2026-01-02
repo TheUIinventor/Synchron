@@ -280,6 +280,18 @@ export async function GET(req: NextRequest) {
           } catch (e) {
             // ignore mismatch check errors
           }
+
+          // Also check bellsRes for date mismatch
+          if (bellsRes && (bellsRes as any).json) {
+            const bj = (bellsRes as any).json
+            try {
+              const upstreamDate = bj && (bj.date || (bj.day && bj.day.date) || null)
+              if (upstreamDate && String(upstreamDate).slice(0,10) !== String(dateParam).slice(0,10)) {
+                console.log(`[timetable.route] upstream bells returned data for ${upstreamDate} when requested ${dateParam} - ignoring bellsRes`)
+                bellsRes = null
+              }
+            } catch (e) {}
+          }
           
           if (shouldProcessDayRes) {
           console.log(`[API DEBUG] Processing date-specific path for ${dateParam}`)
@@ -1008,6 +1020,47 @@ export async function GET(req: NextRequest) {
       const { schedules, sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
       bellSchedules = schedules
       bellTimesSources = sources
+    }
+
+    // Fallback to hardcoded bells if we still have empty schedules
+    // This happens if upstream API returns wrong date for bells AND full timetable lacks times
+    const FALLBACK_BELLS: Record<string, { period: string; time: string }[]> = {
+      'Mon/Tues': [
+        { period: '1', time: '09:00 - 10:05' },
+        { period: '2', time: '10:05 - 11:05' },
+        { period: 'Recess', time: '11:05 - 11:25' },
+        { period: '3', time: '11:25 - 12:25' },
+        { period: '4', time: '12:30 - 13:30' },
+        { period: 'Lunch', time: '13:30 - 14:10' },
+        { period: '5', time: '14:10 - 15:10' }
+      ],
+      'Wed/Thurs': [
+        { period: '1', time: '09:00 - 10:00' },
+        { period: '2', time: '10:05 - 11:05' },
+        { period: 'Recess', time: '11:05 - 11:25' },
+        { period: '3', time: '11:25 - 12:25' },
+        { period: '4', time: '12:30 - 13:30' },
+        { period: 'Lunch', time: '13:30 - 14:00' },
+        { period: '5', time: '14:00 - 14:55' }
+      ],
+      'Fri': [
+        { period: '1', time: '09:00 - 10:05' },
+        { period: '2', time: '10:05 - 11:05' },
+        { period: 'Recess', time: '11:05 - 11:25' },
+        { period: '3', time: '11:25 - 12:25' },
+        { period: '4', time: '12:30 - 13:30' },
+        { period: 'Lunch', time: '13:30 - 14:10' },
+        { period: '5', time: '14:10 - 15:10' }
+      ]
+    }
+
+    if (bellSchedules) {
+      for (const bucket of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+         if (!bellSchedules[bucket] || bellSchedules[bucket].length === 0) {
+            bellSchedules[bucket] = FALLBACK_BELLS[bucket]
+            if (bellTimesSources) bellTimesSources[bucket] = 'static-fallback'
+         }
+      }
     }
 
     // Backfill missing times in byDay using bellSchedules
