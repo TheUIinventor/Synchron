@@ -225,6 +225,7 @@ export async function GET(req: NextRequest) {
     let dayRes: any = null
     let fullRes: any = null
     let bellsRes: any = null
+    let calendarRes: any = null
 
     // Try each host until we get a JSON response
     for (const host of hosts) {
@@ -236,20 +237,26 @@ export async function GET(req: NextRequest) {
         : `${host}/api/timetable/bells.json`
       const fullUrl = `${host}/api/timetable/timetable.json`
       
-      // OPTIMIZATION: Fetch all 3 endpoints in parallel for faster loading
-      const [dr, fr, br] = await Promise.all([
+      // Fetch calendar data to determine week type reliably, especially when daytimetable fails
+      const calendarUrl = dateParam
+        ? `${host}/api/calendar/days.json?from=${dateParam}&to=${dateParam}`
+        : `${host}/api/calendar/days.json`
+
+      // OPTIMIZATION: Fetch all 4 endpoints in parallel for faster loading
+      const [dr, fr, br, cr] = await Promise.all([
         getJson(dayUrl),
         getJson(fullUrl),
-        getJson(bellUrl)
+        getJson(bellUrl),
+        getJson(calendarUrl)
       ])
       
       // If any of these responded with JSON, adopt them and stop trying further hosts
       if ((dr as any).json || (fr as any).json || (br as any).json) {
-        dayRes = dr; fullRes = fr; bellsRes = br
+        dayRes = dr; fullRes = fr; bellsRes = br; calendarRes = cr
         break
       }
       // Keep last responses for potential HTML forwarding below
-      dayRes = dr; fullRes = fr; bellsRes = br
+      dayRes = dr; fullRes = fr; bellsRes = br; calendarRes = cr
     }
 
     // Shared byDay structure - declared once here so date-specific path
@@ -291,6 +298,24 @@ export async function GET(req: NextRequest) {
                 bellsRes = null
               }
             } catch (e) {}
+          }
+
+          // If dayRes is invalid/mismatched, try to recover weekType from calendarRes
+          if (!shouldProcessDayRes && calendarRes && (calendarRes as any).json) {
+            try {
+              const cj = (calendarRes as any).json
+              // calendar/days.json returns an array of day objects
+              const dayInfo = Array.isArray(cj) ? cj.find((d: any) => d.date === dateParam) : (cj[dateParam] || null)
+              if (dayInfo) {
+                const wt = normalizeWeekType(dayInfo.weekType || dayInfo.week_type || dayInfo.week || dayInfo.cycle)
+                if (wt) {
+                  console.log(`[timetable.route] Recovered weekType ${wt} from calendarRes for ${dateParam}`)
+                  detectedWeekType = wt
+                }
+              }
+            } catch (e) {
+              console.log('[timetable.route] Failed to recover weekType from calendarRes', e)
+            }
           }
           
           if (shouldProcessDayRes) {
@@ -1177,6 +1202,12 @@ export async function GET(req: NextRequest) {
     }
     for (const dayName of Object.keys(byDay)) {
       byDay[dayName] = byDay[dayName].filter(p => {
+        // If we have a detected week type (e.g. from calendar), filter out mismatched weeks
+        // This is critical when falling back to full timetable which contains both A and B weeks
+        if (detectedWeekType && p.weekType && p.weekType !== detectedWeekType) {
+           return false
+        }
+
         // Always keep special periods (Period 0, RC, EoD, breaks)
         if (isSpecialPeriod(p)) return true
         const hasSubject = p.subject && p.subject.toLowerCase() !== 'class'
