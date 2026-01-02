@@ -177,7 +177,10 @@ export async function GET(req: NextRequest) {
     // differ in CI/edge environments) and causing the client to see
     // the wrong weekday (e.g. Monday when the requested date is Friday).
     const requestedDate = dateParam ? new Date(dateParam) : null
-    const requestedDayIndex = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.getDay() : new Date().getDay()
+    const rawDayIndex = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.getDay() : new Date().getDay()
+    // Fix: getDay() returns 0=Sun, 1=Mon... but dayNames array (from byDay keys) is 0=Mon, 1=Tue...
+    // So we need to shift the index.
+    const requestedDayIndex = rawDayIndex === 0 ? 6 : rawDayIndex - 1
     const requestedWeekdayString = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.toLocaleDateString('en-US', { weekday: 'long' }) : new Date().toLocaleDateString('en-US', { weekday: 'long' })
 
     // Helper to coerce various SBHS JSON shapes into an array of period-like entries
@@ -987,10 +990,12 @@ export async function GET(req: NextRequest) {
       // weekday the bells apply to). This prevents the common case where
       // the bells.json payload is generic and lacks a `pattern` field.
       try {
+        // Only use dayRes if it wasn't discarded due to date mismatch
+        const safeDayRes = shouldProcessDayRes ? dayRes : null
         const upstreamDay = (fullRes && (fullRes as any).json && (fullRes as any).json.day && Array.isArray((fullRes as any).json.day.bells) && (fullRes as any).json.day.bells.length)
           ? (fullRes as any).json.day
-          : (dayRes && (dayRes as any).json && (dayRes as any).json.day && Array.isArray((dayRes as any).json.day.bells) && (dayRes as any).json.day.bells.length)
-            ? (dayRes as any).json.day
+          : (safeDayRes && (safeDayRes as any).json && (safeDayRes as any).json.day && Array.isArray((safeDayRes as any).json.day.bells) && (safeDayRes as any).json.day.bells.length)
+            ? (safeDayRes as any).json.day
             : null
 
         if (upstreamDay) {
@@ -1042,7 +1047,9 @@ export async function GET(req: NextRequest) {
 
     // Ensure bellSchedules is populated if it wasn't already (e.g. in fallthrough path)
     if (!bellSchedules) {
-      const { schedules, sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
+      // Only use dayRes if it wasn't discarded due to date mismatch
+      const safeDayRes = shouldProcessDayRes ? dayRes : null
+      const { schedules, sources } = buildBellSchedulesFromResponses(safeDayRes, fullRes, bellsRes)
       bellSchedules = schedules
       bellTimesSources = sources
     }
@@ -1086,6 +1093,11 @@ export async function GET(req: NextRequest) {
             if (bellTimesSources) bellTimesSources[bucket] = 'static-fallback'
          }
       }
+      // Debug: Log final bell schedules for requested day
+      if (dateParam) {
+         const bucket = requestedWeekdayString.match(/^Mon|Tue/i) ? 'Mon/Tues' : requestedWeekdayString.match(/^Wed|Thu/i) ? 'Wed/Thurs' : 'Fri'
+         console.log(`[timetable.route] Final bell schedule for ${requestedWeekdayString} (${bucket}):`, bellSchedules[bucket] ? bellSchedules[bucket].length + ' bells' : 'empty')
+      }
     }
 
     // Backfill missing times in byDay using bellSchedules
@@ -1117,9 +1129,18 @@ export async function GET(req: NextRequest) {
               })
               if (match && match.time) {
                 p.time = match.time
+              } else {
+                 // Debug: Log failed backfill
+                 if (dateParam && dayName === requestedWeekdayString) {
+                    console.log(`[timetable.route] Failed to backfill time for ${dayName} P${pLabel}. Available bells:`, bells.map(b => b.period).join(','))
+                 }
               }
             }
           }
+        } else {
+           if (dateParam && dayName === requestedWeekdayString) {
+              console.log(`[timetable.route] No bell bucket found for ${dayName} (bucket=${bucket})`)
+           }
         }
       }
     }
@@ -1187,6 +1208,11 @@ export async function GET(req: NextRequest) {
 
     dedupePerDay(byDay)
 
+    // Debug: Log byDay counts after fullRes processing
+    if (dateParam) {
+       console.log(`[timetable.route] byDay counts after fullRes:`, Object.keys(byDay).map(k => `${k}=${byDay[k].length}`).join(', '))
+    }
+
     // If some weekdays remain empty but the full timetable has entries, backfill from the detailed days object
     // Remove obvious placeholder entries with no useful information
     // But preserve Period 0, Roll Call, End of Day, and break periods
@@ -1201,6 +1227,7 @@ export async function GET(req: NextRequest) {
       return false
     }
     for (const dayName of Object.keys(byDay)) {
+      const originalCount = byDay[dayName].length
       byDay[dayName] = byDay[dayName].filter(p => {
         // If we have a detected week type (e.g. from calendar), filter out mismatched weeks
         // This is critical when falling back to full timetable which contains both A and B weeks
@@ -1216,6 +1243,9 @@ export async function GET(req: NextRequest) {
         const hasTimeRange = typeof p.time === 'string' && p.time.includes('-')
         return hasTimeRange && (hasSubject || hasTeacher || hasRoom)
       })
+      if (dateParam && dayName === requestedWeekdayString) {
+         console.log(`[timetable.route] Filtered ${dayName}: ${originalCount} -> ${byDay[dayName].length}. detectedWeekType=${detectedWeekType}`)
+      }
     }
 
     // Build a grouped view per weekday split by week-type (A/B/unknown).
@@ -1596,6 +1626,7 @@ export async function GET(req: NextRequest) {
           inferredWeekParityFallback: null,
           weekTally,
           perDayWeekCounts,
+          byDayCounts: Object.keys(byDay).reduce((acc, k) => ({ ...acc, [k]: byDay[k].length }), {}),
           weekBreakdown,
           // Variation application debug info
           variations: variationsDiag,
