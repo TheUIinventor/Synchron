@@ -986,8 +986,11 @@ export async function GET(req: NextRequest) {
         // ignore backfill errors
       }
       // expose schedules variable outside so response can include it
-      bellSchedules = schedules
-      bellTimesSources = bellSources
+      // Only overwrite bellSchedules if it wasn't already set (e.g. by date-specific path)
+      if (!bellSchedules) {
+        bellSchedules = schedules
+        bellTimesSources = bellSources
+      }
       try {
         // Helpful debug output during development: show which buckets were
         // populated and whether a top-level day or upstream day bells were
@@ -997,6 +1000,49 @@ export async function GET(req: NextRequest) {
         console.debug('[timetable.route] bellTimesSources:', bellTimesSources)
       } catch (e) {
         /* ignore logging errors */
+      }
+    }
+
+    // Ensure bellSchedules is populated if it wasn't already (e.g. in fallthrough path)
+    if (!bellSchedules) {
+      const { schedules, sources } = buildBellSchedulesFromResponses(dayRes, fullRes, bellsRes)
+      bellSchedules = schedules
+      bellTimesSources = sources
+    }
+
+    // Backfill missing times in byDay using bellSchedules
+    // This is critical when falling back to full timetable which often lacks explicit times
+    if (bellSchedules) {
+      for (const [dayName, periods] of Object.entries(byDay)) {
+        let bucket: string | null = null
+        if (/^mon|tue/i.test(dayName)) bucket = 'Mon/Tues'
+        else if (/^wed|thu/i.test(dayName)) bucket = 'Wed/Thurs'
+        else if (/^fri/i.test(dayName)) bucket = 'Fri'
+        
+        if (bucket && bellSchedules[bucket] && Array.isArray(bellSchedules[bucket])) {
+          const bells = bellSchedules[bucket]
+          for (const p of periods) {
+            if (!p.time || !p.time.includes('-')) {
+              // Try to find matching bell
+              const pLabel = String(p.period || '').trim().toLowerCase()
+              const match = bells.find(b => {
+                const bLabel = String(b.period || '').trim().toLowerCase()
+                // Match exact period, or handle special cases like RC/Roll Call
+                if (bLabel === pLabel) return true
+                if (pLabel === 'rc' && bLabel.includes('roll')) return true
+                if (pLabel === '0' && bLabel.includes('0')) return true
+                // Match numeric periods (e.g. "1" vs "Period 1")
+                const pNum = (pLabel.match(/\d+/) || [])[0]
+                const bNum = (bLabel.match(/\d+/) || [])[0]
+                if (pNum && bNum && pNum === bNum) return true
+                return false
+              })
+              if (match && match.time) {
+                p.time = match.time
+              }
+            }
+          }
+        }
       }
     }
 
