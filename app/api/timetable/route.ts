@@ -269,24 +269,19 @@ export async function GET(req: NextRequest) {
           // (some portal endpoints return the last school day when asked for
           // a holiday), treat that as "no timetable" for the requested
           // date to avoid showing prior-term data for holidays.
+          let shouldProcessDayRes = true
           try {
             const upstreamDate = dj && (dj.date || (dj.day && dj.day.date) || null)
             if (upstreamDate && String(upstreamDate).slice(0,10) !== String(dateParam).slice(0,10)) {
-              console.log(`[timetable.route] upstream returned data for ${upstreamDate} when requested ${dateParam} - treating as no timetable`)
-              return NextResponse.json({
-                timetable: byDay,
-                timetableByWeek: null,
-                bellTimes: undefined,
-                source: 'sbhs-api-day-mismatched-date',
-                weekType: detectedWeekType,
-                isHoliday: true,
-                noTimetable: true,
-                upstream: { day: dj, full: null, bells: null },
-              }, { status: 200, headers: { 'Cache-Control': cacheControl } })
+              console.log(`[timetable.route] upstream returned data for ${upstreamDate} when requested ${dateParam} - treating as no timetable and falling back to full timetable`)
+              shouldProcessDayRes = false
+              dayRes = null
             }
           } catch (e) {
             // ignore mismatch check errors
           }
+          
+          if (shouldProcessDayRes) {
           console.log(`[API DEBUG] Processing date-specific path for ${dateParam}`)
           console.log(`[API DEBUG] dj.bells length=${Array.isArray(dj.bells) ? dj.bells.length : 'not array'}`)
           console.log(`[API DEBUG] dj.classVariations keys=${dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'none'}`)
@@ -532,6 +527,7 @@ export async function GET(req: NextRequest) {
           // 3. Apply classVariations/roomVariations to the correct day
           // This ensures clients get ALL days, not just the requested one
           console.log(`[API DEBUG] Falling through to full timetable processing for date ${dateParam}`)
+          }
         }
       } catch (e) {
         console.error('[API] Error in date-specific path:', e)
