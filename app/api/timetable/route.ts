@@ -785,6 +785,95 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Optionally refine times using bells
+    if (fullRes && (fullRes as any).json) {
+      const j = (fullRes as any).json
+      const dayNames = Object.keys(byDay)
+      const resolveDayKey = (input: any): string => {
+        if (!input) return dayNames[requestedDayIndex] || 'Monday'
+        const raw = typeof input === 'string' ? input : input.name || input.label || ''
+        if (!raw) return dayNames[requestedDayIndex] || 'Monday'
+        const lower = raw.toLowerCase()
+        const lettersOnly = lower.replace(/[^a-z]/g, '')
+        const exact = dayNames.find(d => d.toLowerCase() === lower)
+        if (exact) return exact
+        const contains = dayNames.find(d => lower.includes(d.toLowerCase()))
+        if (contains) return contains
+        if (lettersOnly) {
+          const prefix = dayNames.find(d => lettersOnly.startsWith(d.slice(0, 3).toLowerCase()))
+          if (prefix) return prefix
+        }
+        const asDate = new Date(raw)
+        if (!Number.isNaN(asDate.getTime())) {
+          const fromDate = asDate.toLocaleDateString('en-US', { weekday: 'long' })
+          if (dayNames.includes(fromDate)) return fromDate
+        }
+        return dayNames[requestedDayIndex] || 'Monday'
+      }
+
+      const assign = (dayKey: any, items: any[], source?: any) => {
+        if (!Array.isArray(items)) return
+        const normalizedKey = resolveDayKey(dayKey)
+        if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+        const inferred: WeekType | null = inferWeekType(dayKey, source) || detectedWeekType
+        if (inferred) detectedWeekType = inferred
+        // Append instead of replace so structured 'days' entries for A/B don't overwrite
+        byDay[normalizedKey] = byDay[normalizedKey].concat(items.map((entry: any) => toPeriod(entry, inferred)))
+      }
+
+      const candidateObjects = [j.days, j.timetable, j.week, j.data, j.schedule]
+      for (const obj of candidateObjects) {
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+          for (const [k, v] of Object.entries(obj)) {
+            const derivedKey = deriveDayCandidate(k, v)
+            if (Array.isArray(v)) assign(derivedKey, v, v)
+            else if (v && typeof v === 'object') {
+              const extracted = extractPeriods(v)
+              if (extracted) assign(derivedKey, extracted, v)
+            }
+          }
+        }
+      }
+
+      const candidateArrays = [j.periods, j.entries, j.lessons, j.items, j.data, j.timetable, j.days, Array.isArray(j) ? j : null]
+      for (const arr of candidateArrays) {
+        if (Array.isArray(arr)) {
+          for (const item of arr) {
+            const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
+            const normalizedKey = resolveDayKey(dayField)
+            if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+            byDay[normalizedKey].push(toPeriod(item))
+          }
+        } else {
+          const extracted = extractPeriods(arr)
+          if (Array.isArray(extracted)) {
+            for (const item of extracted) {
+              const dayField = item?.day || item?.dayName || item?.dayname || item?.weekday || item?.week_day || item?.day_of_week || item?.date
+              const normalizedKey = resolveDayKey(dayField)
+              if (!byDay[normalizedKey]) byDay[normalizedKey] = []
+              byDay[normalizedKey].push(toPeriod(item))
+            }
+          }
+        }
+      }
+
+      // Backfill days that are still empty using the structured `days` object
+      if (j.days && typeof j.days === 'object') {
+        for (const [rawKey, value] of Object.entries(j.days)) {
+          if (!value || typeof value !== 'object') continue
+          const derivedKey = deriveDayCandidate(rawKey, value)
+          const periods = extractPeriods((value as any).periods ? { periods: (value as any).periods } : value)
+          if (!periods || !periods.length) continue
+          const normalizedKey = resolveDayKey(derivedKey || rawKey)
+          if (!byDay[normalizedKey] || byDay[normalizedKey].length === 0) {
+            const inferred: WeekType | null = inferWeekType(derivedKey || rawKey, value) || detectedWeekType
+            if (inferred) detectedWeekType = inferred
+            byDay[normalizedKey] = periods.map((entry: any) => toPeriod(entry, inferred))
+          }
+        }
+      }
+    }
+
     if (bellsRes && (bellsRes as any).json) {
       const bj = (bellsRes as any).json
       // Expect bj contains a collection of bell times with period names and start/end
@@ -1049,23 +1138,6 @@ export async function GET(req: NextRequest) {
       return -1
     }
 
-    // Debug: Check if we have periods but no times
-    for (const [dayName, periods] of Object.entries(byDay)) {
-        if (periods.length > 0) {
-            const hasTimes = periods.some(p => p.time && p.time.includes('-'));
-            if (!hasTimes) {
-                // Add debug period
-                byDay[dayName].push({
-                    period: 'DEBUG',
-                    time: '00:00 - 00:00',
-                    subject: `No Times Found (Bells: ${bellSchedules ? Object.keys(bellSchedules).join(',') : 'None'})`,
-                    room: 'ERR',
-                    teacher: 'SYS'
-                });
-            }
-        }
-    }
-
     const dedupePerDay = (b: Record<string, any[]>) => {
       for (const [dayName, periods] of Object.entries(b)) {
         const seen = new Map<string, any>()
@@ -1097,7 +1169,7 @@ export async function GET(req: NextRequest) {
       const period = String(p.period || '').trim().toLowerCase()
       const subject = String(p.subject || '').trim().toLowerCase()
       // Period 0, Roll Call (RC), End of Day (EoD) should always be kept
-      if (period === '0' || period === 'rc' || period === 'eod' || period === 'debug') return true
+      if (period === '0' || period === 'rc' || period === 'eod') return true
       if (subject.includes('period 0') || subject.includes('roll call') || subject.includes('end of day')) return true
       // Also keep breaks (Recess, Lunch)
       if (/(recess|lunch|break)/i.test(subject) || /(recess|lunch|break|^r$|^l\d?$|mtl|wfl)/i.test(period)) return true
@@ -1111,11 +1183,6 @@ export async function GET(req: NextRequest) {
         const hasTeacher = p.teacher && p.teacher.trim().length > 0
         const hasRoom = p.room && p.room.trim().length > 0
         const hasTimeRange = typeof p.time === 'string' && p.time.includes('-')
-        
-        // Relaxed filter: allow periods without time if they have subject/teacher/room
-        // This is critical for fallback scenarios where times might be missing
-        if (!hasTimeRange && (hasSubject || hasTeacher || hasRoom)) return true
-        
         return hasTimeRange && (hasSubject || hasTeacher || hasRoom)
       })
     }
