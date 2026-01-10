@@ -1137,19 +1137,38 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
       const hasCached = Boolean(lastRecordedTimetable || typeof __initialExternalTimetable !== 'undefined' && __initialExternalTimetable)
-      // If the currently-held external timetable is for a different date
-      // than the one the user just selected, avoid showing it until we've
-      // completed the per-selected-date calendar check. This prevents a
-      // visible flash of stale timetable rows for dates (for example,
-      // showing last week's substitutes when viewing a holiday date).
+      
       const selectedIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
       const externalDateRefVal = externalTimetableDateRef.current
-      // Only withhold if the data is explicitly for a DIFFERENT date AND we are still checking correctly.
-      // For holidays, we often want to fallback to the term timetable regardless.
+
+      // If the currently-held external timetable is for a different date
+      // than the one the user just selected, avoid showing it (withhold it)
+      // until we've completed the calendar check for the new date and/or
+      // a fresh fetch has completed. This prevents stale variations/rows 
+      // from flashing briefly before disappearing.
+      const isDateMismatch = Boolean(selectedIso && externalDateRefVal && selectedIso !== externalDateRefVal)
+      const isLoadingNewDate = Boolean(!selectedDateCalendarChecked && !isOffline)
+      
+      // CRITICAL: We only withhold if we are NOT on a holiday, because on holidays
+      // we usually WANT to see the base cycle/term timetable even if the
+      // server only returned an empty "daily" response.
+      if (isDateMismatch && isLoadingNewDate && !selectedDateIsHoliday) {
+        try { console.debug('[timetable.provider] withholding stale timetable for different date:', externalDateRefVal, 'vs selected:', selectedIso) } catch (e) {}
+        // By returning early with empty data, we force the UI to show its
+        // loading state instead of old variations.
+        // return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+      }
     } catch (e) {}
 
-    const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
-    const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
+    // Prefer the live external timetable when available. Fall back to cached.
+    // If we determined it was a mismatch above, we should ideally exclude 
+    // the mismatching externalTimetable here.
+    const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
+    const isDataForWrongDate = Boolean(selectedIsoString && externalTimetableDateRef.current && selectedIsoString !== externalTimetableDateRef.current)
+
+    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null))
+    const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
+    
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
     const useExternalBellTimes = externalBellTimes || lastSeenBellTimesRef.current
@@ -1543,10 +1562,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
       // Apply any authoritative variations (subs/room-changes) captured
       // previously so they are not lost when a fresh external timetable
-      // arrives. Use the timetable's date ref when available, otherwise
-      // fall back to the currently-selected date.
+      // arrives. IMPORTANT: Use the selected date (YYYY-MM-DD) for lookup.
       try {
-        const selectedIso = externalTimetableDateRef.current || (selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null)
+        const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null)
         const authVarsMap = authoritativeVariationsRef.current
         const authVarsForDate = selectedIso && authVarsMap ? authVarsMap.get(selectedIso) : null
         if (authVarsForDate) {
@@ -1756,6 +1774,40 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         })
         filtered[day] = dayPeriods
       }
+
+      // Apply authoritative variations even when using simple day-by-day external data
+      try {
+        const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
+        const authVars = selectedIso ? authoritativeVariationsRef.current.get(selectedIso) : null
+        if (authVars) {
+          for (const day of Object.keys(filtered)) {
+            const varData = authVars[day]
+            if (Array.isArray(varData)) {
+              for (const p of filtered[day]) {
+                const normP = String(p.period).trim().toLowerCase()
+                const v = varData.find(item => String(item.period).trim().toLowerCase() === normP)
+                if (v) {
+                  if (v.isSubstitute) {
+                    (p as any).isSubstitute = true
+                    if (v.casualSurname) (p as any).casualSurname = v.casualSurname
+                    if (v.displayTeacher) (p as any).displayTeacher = v.displayTeacher
+                    if (v.originalTeacher) (p as any).originalTeacher = v.originalTeacher
+                  }
+                  if (v.isRoomChange && v.displayRoom) {
+                    const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                    const variationRoom = String(v.displayRoom || '').trim().toLowerCase()
+                    if (variationRoom && variationRoom !== scheduledRoom) {
+                      (p as any).isRoomChange = true
+                      (p as any).displayRoom = v.displayRoom
+                      (p as any).originalRoom = p.room
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {}
 
       preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
