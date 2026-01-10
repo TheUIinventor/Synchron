@@ -1789,18 +1789,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // If re-authentication is required and we have no cached/external data,
     // return empty timetable so the UI can prompt the user to sign in.
     if (reauthRequired && !useExternalTimetable) {
-      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+      return emptyByDay
     }
 
     // If we have not yet completed the initial calendar check and we also
     // have not hydrated the cache, return an empty map.
     if (!initialCalendarChecked && !useExternalTimetable && !cacheHydrated) {
       try { console.debug('[timetable.provider] initial calendar check pending - returning empty timetable to avoid flash') } catch (e) {}
-      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+      return emptyByDay
     }
 
     // Default to empty if no data is available
-    return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+    return emptyByDay
   }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday, selectedDateCalendarChecked, initialCalendarChecked])
 
   // Persist computed break-layouts (simple heuristic) so we can hydrate
