@@ -111,14 +111,17 @@ const bellTimesData = {
 const canonicalIndex = (label?: string) => {
   if (!label) return 999
   const s = String(label).toLowerCase()
-  if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 0
-  if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 1
-  if (/recess|break|interval|morning break/.test(s)) return 2
-  if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 3
-  if (/lunch\s*1|lunch1/.test(s)) return 4
-  if (/lunch\s*2|lunch2/.test(s)) return 5
-  if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 6
-  if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 7
+  if (/period\s*0|^p\s*0/.test(s)) return -1
+  if (/roll\s*call|homeroom|registration|wellbeing|tutorial|rc\b/.test(s)) return -0.5
+  if (/period\s*1|^p\s*1|\b1\b/.test(s)) return 1
+  if (/period\s*2|^p\s*2|\b2\b/.test(s)) return 2
+  if (/recess|break|interval|morning break/.test(s)) return 3
+  if (/period\s*3|^p\s*3|\b3\b/.test(s)) return 4
+  if (/lunch|lunch\s*1|lunch1/.test(s)) return 5
+  if (/lunch\s*2|lunch2/.test(s)) return 6
+  if (/period\s*4|^p\s*4|\b4\b/.test(s)) return 7
+  if (/period\s*5|^p\s*5|\b5\b/.test(s)) return 8
+  if (/end of day|eod\b/.test(s)) return 999
   return 998
 }
 
@@ -762,18 +765,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try { holidayDateRef.current = isHoliday } catch (e) {}
             if (isHoliday) {
               try { console.debug('[timetable.provider] selected date is holiday according to calendar/terms:', ds) } catch (e) {}
-              try {
-                if (typeof window !== 'undefined' && window.localStorage) {
-                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                }
-              } catch (e) {}
-              try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              
+              // We no longer clear the timetable on holidays, allowing the term
+              // timetable to show even when there are no classes.
+              
               setTimetableSource('calendar-holiday')
               setExternalWeekType(null)
               try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar/terms' }) } catch (e) {}
@@ -1493,17 +1488,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // If the server provided `externalBellTimes`, always respect the
-        // API ordering; otherwise, sort bells by canonical order.
-        if (!useExternalBellTimes) {
-          // Sort bells by canonical order, falling back to time when labels are ambiguous
-          bells.sort((a, b) => {
-            const ai = canonicalIndex(a?.period)
-            const bi = canonicalIndex(b?.period)
-            if (ai !== bi) return ai - bi
-            return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
-          })
-        }
+        // Always sort bells into canonical order, falling back to time when labels are ambiguous.
+        // This ensures consistent ordering even when buckets from the API are unsorted.
+        bells.sort((a, b) => {
+          const ai = canonicalIndex(a?.period)
+          const bi = canonicalIndex(b?.period)
+          if (ai !== bi) return ai - bi
+          return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
+        })
 
         for (const b of bells) {
           // Use the API ordering and decide whether this bell represents a
@@ -1716,20 +1708,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const bells = getBellForDay(day) || []
         const dayPeriods = filtered[day]
 
-        // If the server provided an explicit bellTimes object, respect the
-        // original API ordering for that day's bucket. Otherwise, sort bells
-        // into canonical order as a fallback.
-        const externalBucket = useExternalBellTimes ? (day === 'Friday' ? useExternalBellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? useExternalBellTimes['Wed/Thurs'] : useExternalBellTimes['Mon/Tues'])) : null
-        const shouldRespectApiOrder = !!externalBucket && Array.isArray(externalBucket)
-
-        if (!shouldRespectApiOrder) {
-          bells.sort((a, b) => {
-            const ai = canonicalIndex(a?.period)
-            const bi = canonicalIndex(b?.period)
-            if (ai !== bi) return ai - bi
-            return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
-          })
-        }
+        // Always sort bells into canonical order, falling back to time when labels are ambiguous.
+        // This ensures consistent ordering even when buckets from the API are unsorted.
+        bells.sort((a, b) => {
+          const ai = canonicalIndex(a?.period)
+          const bi = canonicalIndex(b?.period)
+          if (ai !== bi) return ai - bi
+          return parseStartMinutesForDay(dayPeriods, a.time) - parseStartMinutesForDay(dayPeriods, b.time)
+        })
 
         for (const b of bells) {
           try {
@@ -3334,19 +3320,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 holidayDateRef.current = true
                 try { setSelectedDateIsHoliday(true) } catch (e) {}
                 try { setCacheHydrated(false) } catch (e) {}
-                try {
-                  if (typeof window !== 'undefined' && window.localStorage) {
-                    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                  }
-                } catch (e) {}
-                try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
+                
+                // Do NOT clear timetable cache on holidays
+                
                 if (!cancelled) {
-                  setExternalTimetable(emptyByDay)
-                  setExternalTimetableByWeek(null)
                   setTimetableSource('calendar-holiday')
                   setExternalWeekType(null)
                   try { setLastFetchedDate(todayDateStr2); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
@@ -3413,27 +3390,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             } catch (e) {
               // ignore
             }
-            // Clear any persisted client-side caches to avoid showing stale classes
-            try {
-              if (typeof window !== 'undefined' && window.localStorage) {
-                try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                try {
-                  // Remove any processed payload caches
-                  for (const k of Object.keys(localStorage)) {
-                    try {
-                      if (k && k.startsWith('synchron-processed-')) localStorage.removeItem(k)
-                    } catch (e) {}
-                  }
-                } catch (e) {}
-                try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-              }
-            } catch (e) {}
+            // Do NOT clear persisted timetable cache to avoid flashing empty state 
+            // when the server returns an empty payload (e.g. during holidays).
 
-            setExternalTimetable(emptyByDay)
-            setExternalTimetableByWeek(null)
             setTimetableSource('external-empty')
             setExternalWeekType(null)
             try {
@@ -3950,18 +3909,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   holidayDateRef.current = true
                   try { setSelectedDateIsHoliday(true) } catch (e) {}
                   try { setCacheHydrated(false) } catch (e) {}
-                  try {
-                    if (typeof window !== 'undefined' && window.localStorage) {
-                      try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                      try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                      try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                      try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                      try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                    }
-                  } catch (e) {}
-                  try { setLastRecordedTimetable(null); setLastRecordedTimetableByWeek(null) } catch (e) {}
-                  setExternalTimetable(emptyByDay)
-                  setExternalTimetableByWeek(null)
+                  
+                  // For holidays, we no longer clear the cache or effectively reset
+                  // the timetable. This allows "classes that were in the school term"
+                  // to continue showing during holidays, allowing users to peek at
+                  // their schedule.
+                  
                   setTimetableSource('calendar-holiday')
                   setExternalWeekType(null)
                   try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
