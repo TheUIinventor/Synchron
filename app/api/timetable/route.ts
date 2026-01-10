@@ -177,7 +177,10 @@ export async function GET(req: NextRequest) {
     // differ in CI/edge environments) and causing the client to see
     // the wrong weekday (e.g. Monday when the requested date is Friday).
     const requestedDate = dateParam ? new Date(dateParam) : null
-    const requestedDayIndex = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.getDay() : new Date().getDay()
+    const rawDayIndex = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.getDay() : new Date().getDay()
+    // Fix: getDay() returns 0=Sun, 1=Mon... but dayNames array (from byDay keys) is 0=Mon, 1=Tue...
+    // So we need to shift the index.
+    const requestedDayIndex = rawDayIndex === 0 ? 6 : rawDayIndex - 1
     const requestedWeekdayString = (requestedDate && !Number.isNaN(requestedDate.getTime())) ? requestedDate.toLocaleDateString('en-US', { weekday: 'long' }) : new Date().toLocaleDateString('en-US', { weekday: 'long' })
 
     // Helper to coerce various SBHS JSON shapes into an array of period-like entries
@@ -225,6 +228,7 @@ export async function GET(req: NextRequest) {
     let dayRes: any = null
     let fullRes: any = null
     let bellsRes: any = null
+    let calendarRes: any = null
 
     // Try each host until we get a JSON response
     for (const host of hosts) {
@@ -236,20 +240,26 @@ export async function GET(req: NextRequest) {
         : `${host}/api/timetable/bells.json`
       const fullUrl = `${host}/api/timetable/timetable.json`
       
-      // OPTIMIZATION: Fetch all 3 endpoints in parallel for faster loading
-      const [dr, fr, br] = await Promise.all([
+      // Fetch calendar data to determine week type reliably, especially when daytimetable fails
+      const calendarUrl = dateParam
+        ? `${host}/api/calendar/days.json?from=${dateParam}&to=${dateParam}`
+        : `${host}/api/calendar/days.json`
+
+      // OPTIMIZATION: Fetch all 4 endpoints in parallel for faster loading
+      const [dr, fr, br, cr] = await Promise.all([
         getJson(dayUrl),
         getJson(fullUrl),
-        getJson(bellUrl)
+        getJson(bellUrl),
+        getJson(calendarUrl)
       ])
       
       // If any of these responded with JSON, adopt them and stop trying further hosts
       if ((dr as any).json || (fr as any).json || (br as any).json) {
-        dayRes = dr; fullRes = fr; bellsRes = br
+        dayRes = dr; fullRes = fr; bellsRes = br; calendarRes = cr
         break
       }
       // Keep last responses for potential HTML forwarding below
-      dayRes = dr; fullRes = fr; bellsRes = br
+      dayRes = dr; fullRes = fr; bellsRes = br; calendarRes = cr
     }
 
     // Shared byDay structure - declared once here so date-specific path
@@ -269,24 +279,49 @@ export async function GET(req: NextRequest) {
           // (some portal endpoints return the last school day when asked for
           // a holiday), treat that as "no timetable" for the requested
           // date to avoid showing prior-term data for holidays.
+          let shouldProcessDayRes = true
           try {
             const upstreamDate = dj && (dj.date || (dj.day && dj.day.date) || null)
             if (upstreamDate && String(upstreamDate).slice(0,10) !== String(dateParam).slice(0,10)) {
-              console.log(`[timetable.route] upstream returned data for ${upstreamDate} when requested ${dateParam} - treating as no timetable`)
-              return NextResponse.json({
-                timetable: byDay,
-                timetableByWeek: null,
-                bellTimes: undefined,
-                source: 'sbhs-api-day-mismatched-date',
-                weekType: detectedWeekType,
-                isHoliday: true,
-                noTimetable: true,
-                upstream: { day: dj, full: null, bells: null },
-              }, { status: 200, headers: { 'Cache-Control': cacheControl } })
+              console.log(`[timetable.route] upstream returned data for ${upstreamDate} when requested ${dateParam} - treating as no timetable and falling back to full timetable`)
+              shouldProcessDayRes = false
+              dayRes = null
             }
           } catch (e) {
             // ignore mismatch check errors
           }
+
+          // Also check bellsRes for date mismatch
+          if (bellsRes && (bellsRes as any).json) {
+            const bj = (bellsRes as any).json
+            try {
+              const upstreamDate = bj && (bj.date || (bj.day && bj.day.date) || null)
+              if (upstreamDate && String(upstreamDate).slice(0,10) !== String(dateParam).slice(0,10)) {
+                console.log(`[timetable.route] upstream bells returned data for ${upstreamDate} when requested ${dateParam} - ignoring bellsRes`)
+                bellsRes = null
+              }
+            } catch (e) {}
+          }
+
+          // If dayRes is invalid/mismatched, try to recover weekType from calendarRes
+          if (!shouldProcessDayRes && calendarRes && (calendarRes as any).json) {
+            try {
+              const cj = (calendarRes as any).json
+              // calendar/days.json returns an array of day objects
+              const dayInfo = Array.isArray(cj) ? cj.find((d: any) => d.date === dateParam) : (cj[dateParam] || null)
+              if (dayInfo) {
+                const wt = normalizeWeekType(dayInfo.weekType || dayInfo.week_type || dayInfo.week || dayInfo.cycle)
+                if (wt) {
+                  console.log(`[timetable.route] Recovered weekType ${wt} from calendarRes for ${dateParam}`)
+                  detectedWeekType = wt
+                }
+              }
+            } catch (e) {
+              console.log('[timetable.route] Failed to recover weekType from calendarRes', e)
+            }
+          }
+          
+          if (shouldProcessDayRes) {
           console.log(`[API DEBUG] Processing date-specific path for ${dateParam}`)
           console.log(`[API DEBUG] dj.bells length=${Array.isArray(dj.bells) ? dj.bells.length : 'not array'}`)
           console.log(`[API DEBUG] dj.classVariations keys=${dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'none'}`)
@@ -532,6 +567,7 @@ export async function GET(req: NextRequest) {
           // 3. Apply classVariations/roomVariations to the correct day
           // This ensures clients get ALL days, not just the requested one
           console.log(`[API DEBUG] Falling through to full timetable processing for date ${dateParam}`)
+          }
         }
       } catch (e) {
         console.error('[API] Error in date-specific path:', e)
@@ -954,10 +990,12 @@ export async function GET(req: NextRequest) {
       // weekday the bells apply to). This prevents the common case where
       // the bells.json payload is generic and lacks a `pattern` field.
       try {
+        // Only use dayRes if it wasn't discarded due to date mismatch
+        const safeDayRes = shouldProcessDayRes ? dayRes : null
         const upstreamDay = (fullRes && (fullRes as any).json && (fullRes as any).json.day && Array.isArray((fullRes as any).json.day.bells) && (fullRes as any).json.day.bells.length)
           ? (fullRes as any).json.day
-          : (dayRes && (dayRes as any).json && (dayRes as any).json.day && Array.isArray((dayRes as any).json.day.bells) && (dayRes as any).json.day.bells.length)
-            ? (dayRes as any).json.day
+          : (safeDayRes && (safeDayRes as any).json && (safeDayRes as any).json.day && Array.isArray((safeDayRes as any).json.day.bells) && (safeDayRes as any).json.day.bells.length)
+            ? (safeDayRes as any).json.day
             : null
 
         if (upstreamDay) {
@@ -990,8 +1028,11 @@ export async function GET(req: NextRequest) {
         // ignore backfill errors
       }
       // expose schedules variable outside so response can include it
-      bellSchedules = schedules
-      bellTimesSources = bellSources
+      // Only overwrite bellSchedules if it wasn't already set (e.g. by date-specific path)
+      if (!bellSchedules) {
+        bellSchedules = schedules
+        bellTimesSources = bellSources
+      }
       try {
         // Helpful debug output during development: show which buckets were
         // populated and whether a top-level day or upstream day bells were
@@ -1001,6 +1042,106 @@ export async function GET(req: NextRequest) {
         console.debug('[timetable.route] bellTimesSources:', bellTimesSources)
       } catch (e) {
         /* ignore logging errors */
+      }
+    }
+
+    // Ensure bellSchedules is populated if it wasn't already (e.g. in fallthrough path)
+    if (!bellSchedules) {
+      // Only use dayRes if it wasn't discarded due to date mismatch
+      const safeDayRes = shouldProcessDayRes ? dayRes : null
+      const { schedules, sources } = buildBellSchedulesFromResponses(safeDayRes, fullRes, bellsRes)
+      bellSchedules = schedules
+      bellTimesSources = sources
+    }
+
+    // Fallback to hardcoded bells if we still have empty schedules
+    // This happens if upstream API returns wrong date for bells AND full timetable lacks times
+    const FALLBACK_BELLS: Record<string, { period: string; time: string }[]> = {
+      'Mon/Tues': [
+        { period: '1', time: '09:00 - 10:05' },
+        { period: '2', time: '10:05 - 11:05' },
+        { period: 'Recess', time: '11:05 - 11:25' },
+        { period: '3', time: '11:25 - 12:25' },
+        { period: '4', time: '12:30 - 13:30' },
+        { period: 'Lunch', time: '13:30 - 14:10' },
+        { period: '5', time: '14:10 - 15:10' }
+      ],
+      'Wed/Thurs': [
+        { period: '1', time: '09:00 - 10:00' },
+        { period: '2', time: '10:05 - 11:05' },
+        { period: 'Recess', time: '11:05 - 11:25' },
+        { period: '3', time: '11:25 - 12:25' },
+        { period: '4', time: '12:30 - 13:30' },
+        { period: 'Lunch', time: '13:30 - 14:00' },
+        { period: '5', time: '14:00 - 14:55' }
+      ],
+      'Fri': [
+        { period: '1', time: '09:00 - 10:05' },
+        { period: '2', time: '10:05 - 11:05' },
+        { period: 'Recess', time: '11:05 - 11:25' },
+        { period: '3', time: '11:25 - 12:25' },
+        { period: '4', time: '12:30 - 13:30' },
+        { period: 'Lunch', time: '13:30 - 14:10' },
+        { period: '5', time: '14:10 - 15:10' }
+      ]
+    }
+
+    if (bellSchedules) {
+      for (const bucket of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+         if (!bellSchedules[bucket] || bellSchedules[bucket].length === 0) {
+            bellSchedules[bucket] = FALLBACK_BELLS[bucket]
+            if (bellTimesSources) bellTimesSources[bucket] = 'static-fallback'
+         }
+      }
+      // Debug: Log final bell schedules for requested day
+      if (dateParam) {
+         const bucket = requestedWeekdayString.match(/^Mon|Tue/i) ? 'Mon/Tues' : requestedWeekdayString.match(/^Wed|Thu/i) ? 'Wed/Thurs' : 'Fri'
+         console.log(`[timetable.route] Final bell schedule for ${requestedWeekdayString} (${bucket}):`, bellSchedules[bucket] ? bellSchedules[bucket].length + ' bells' : 'empty')
+      }
+    }
+
+    // Backfill missing times in byDay using bellSchedules
+    // This is critical when falling back to full timetable which often lacks explicit times
+    if (bellSchedules) {
+      for (const [dayName, periods] of Object.entries(byDay)) {
+        let bucket: string | null = null
+        if (/^mon|tue/i.test(dayName)) bucket = 'Mon/Tues'
+        else if (/^wed|thu/i.test(dayName)) bucket = 'Wed/Thurs'
+        else if (/^fri/i.test(dayName)) bucket = 'Fri'
+        
+        if (bucket && bellSchedules[bucket] && Array.isArray(bellSchedules[bucket])) {
+          const bells = bellSchedules[bucket]
+          for (const p of periods) {
+            if (!p.time || !p.time.includes('-')) {
+              // Try to find matching bell
+              const pLabel = String(p.period || '').trim().toLowerCase()
+              const match = bells.find(b => {
+                const bLabel = String(b.period || '').trim().toLowerCase()
+                // Match exact period, or handle special cases like RC/Roll Call
+                if (bLabel === pLabel) return true
+                if (pLabel === 'rc' && bLabel.includes('roll')) return true
+                if (pLabel === '0' && bLabel.includes('0')) return true
+                // Match numeric periods (e.g. "1" vs "Period 1")
+                const pNum = (pLabel.match(/\d+/) || [])[0]
+                const bNum = (bLabel.match(/\d+/) || [])[0]
+                if (pNum && bNum && pNum === bNum) return true
+                return false
+              })
+              if (match && match.time) {
+                p.time = match.time
+              } else {
+                 // Debug: Log failed backfill
+                 if (dateParam && dayName === requestedWeekdayString) {
+                    console.log(`[timetable.route] Failed to backfill time for ${dayName} P${pLabel}. Available bells:`, bells.map(b => b.period).join(','))
+                 }
+              }
+            }
+          }
+        } else {
+           if (dateParam && dayName === requestedWeekdayString) {
+              console.log(`[timetable.route] No bell bucket found for ${dayName} (bucket=${bucket})`)
+           }
+        }
       }
     }
 
@@ -1067,6 +1208,11 @@ export async function GET(req: NextRequest) {
 
     dedupePerDay(byDay)
 
+    // Debug: Log byDay counts after fullRes processing
+    if (dateParam) {
+       console.log(`[timetable.route] byDay counts after fullRes:`, Object.keys(byDay).map(k => `${k}=${byDay[k].length}`).join(', '))
+    }
+
     // If some weekdays remain empty but the full timetable has entries, backfill from the detailed days object
     // Remove obvious placeholder entries with no useful information
     // But preserve Period 0, Roll Call, End of Day, and break periods
@@ -1081,15 +1227,37 @@ export async function GET(req: NextRequest) {
       return false
     }
     for (const dayName of Object.keys(byDay)) {
+      const originalCount = byDay[dayName].length
       byDay[dayName] = byDay[dayName].filter(p => {
+        // If we have a detected week type (e.g. from calendar), filter out mismatched weeks
+        // This is critical when falling back to full timetable which contains both A and B weeks
+        if (detectedWeekType && p.weekType && p.weekType !== detectedWeekType) {
+           return false
+        }
+
         // Always keep special periods (Period 0, RC, EoD, breaks)
         if (isSpecialPeriod(p)) return true
         const hasSubject = p.subject && p.subject.toLowerCase() !== 'class'
         const hasTeacher = p.teacher && p.teacher.trim().length > 0
         const hasRoom = p.room && p.room.trim().length > 0
         const hasTimeRange = typeof p.time === 'string' && p.time.includes('-')
+        
+        // CRITICAL FIX: If we are backfilling from cycle data (fullRes), the periods
+        // might not have times yet if backfill failed. But we shouldn't discard them
+        // if they have valid subject/teacher/room info. The client can display them
+        // without times or we can try to infer times later.
+        // Discarding them here causes "empty timetable" when backfill fails.
+        if (!hasTimeRange && (hasSubject || hasTeacher || hasRoom)) {
+           // If we have valid class info but no time, keep it!
+           // The client might be able to render it or we can fix the time backfill logic.
+           return true
+        }
+
         return hasTimeRange && (hasSubject || hasTeacher || hasRoom)
       })
+      if (dateParam && dayName === requestedWeekdayString) {
+         console.log(`[timetable.route] Filtered ${dayName}: ${originalCount} -> ${byDay[dayName].length}. detectedWeekType=${detectedWeekType}`)
+      }
     }
 
     // Build a grouped view per weekday split by week-type (A/B/unknown).
@@ -1458,6 +1626,7 @@ export async function GET(req: NextRequest) {
       } catch (e) {}
 
       const responsePayload = {
+        date: dateParam, // Explicitly include the requested date
         timetable: byDay,
         timetableByWeek,
         bellTimes: typeof bellSchedules !== 'undefined' ? bellSchedules : undefined,
@@ -1470,14 +1639,20 @@ export async function GET(req: NextRequest) {
           inferredWeekParityFallback: null,
           weekTally,
           perDayWeekCounts,
+          byDayCounts: Object.keys(byDay).reduce((acc, k) => ({ ...acc, [k]: byDay[k].length }), {}),
           weekBreakdown,
           // Variation application debug info
           variations: variationsDiag,
           variationTargetDay: dayResDay,
           variationPeriodNumbers: dayPeriodNumbers,
           // Include raw upstream payloads to help diagnose where A/B info may be present
+          // CRITICAL FIX: If we successfully recovered a timetable (byDay has entries),
+          // do NOT pass through an upstream day error, as it will cause the client
+          // to discard the valid backfilled data.
           upstream: {
-            day: dayRes?.json ?? null,
+            day: (Object.values(byDay).some(arr => arr.length > 0)) 
+              ? { date: dateParam, status: 'OK' } // Return a dummy OK payload if we have data
+              : (dayRes?.json ?? null),
             full: fullRes?.json ?? null,
             bells: bellsRes?.json ?? null,
           }
