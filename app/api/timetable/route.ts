@@ -1227,14 +1227,7 @@ export async function GET(req: NextRequest) {
       return false
     }
     for (const dayName of Object.keys(byDay)) {
-      const originalCount = byDay[dayName].length
       byDay[dayName] = byDay[dayName].filter(p => {
-        // If we have a detected week type (e.g. from calendar), filter out mismatched weeks
-        // This is critical when falling back to full timetable which contains both A and B weeks
-        if (detectedWeekType && p.weekType && p.weekType !== detectedWeekType) {
-           return false
-        }
-
         // Always keep special periods (Period 0, RC, EoD, breaks)
         if (isSpecialPeriod(p)) return true
         const hasSubject = p.subject && p.subject.toLowerCase() !== 'class'
@@ -1255,9 +1248,6 @@ export async function GET(req: NextRequest) {
 
         return hasTimeRange && (hasSubject || hasTeacher || hasRoom)
       })
-      if (dateParam && dayName === requestedWeekdayString) {
-         console.log(`[timetable.route] Filtered ${dayName}: ${originalCount} -> ${byDay[dayName].length}. detectedWeekType=${detectedWeekType}`)
-      }
     }
 
     // Build a grouped view per weekday split by week-type (A/B/unknown).
@@ -1318,6 +1308,24 @@ export async function GET(req: NextRequest) {
       groups.B = dedupeArray(groups.B)
       groups.unknown = dedupeArray(groups.unknown)
       timetableByWeek[dayName] = groups
+    }
+
+    // Now that timetableByWeek is built with all A/B data, we can optionally
+    // filter the main byDay result by weekType if one was detected for the
+    // currently requested date.
+    for (const dayName of Object.keys(byDay)) {
+      const originalCount = byDay[dayName].length
+      byDay[dayName] = byDay[dayName].filter(p => {
+        // If we have a detected week type (e.g. from calendar), filter out mismatched weeks
+        // This is critical when falling back to full timetable which contains both A and B weeks
+        if (detectedWeekType && p.weekType && p.weekType !== detectedWeekType) {
+           return false
+        }
+        return true
+      })
+      if (dateParam && dayName === requestedWeekdayString) {
+         console.log(`[timetable.route] Filtered ${dayName} for Daily view: ${originalCount} -> ${byDay[dayName].length}. detectedWeekType=${detectedWeekType}`)
+      }
     }
 
     const weekTally: Record<WeekType, number> = { A: 0, B: 0 }

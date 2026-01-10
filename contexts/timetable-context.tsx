@@ -2718,14 +2718,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 )
               )
               if (isHolidayCal) {
-                // Do NOT clear caches or set timetable to empty.
-                // Mark as holiday and finish refresh.
+                // Mark as holiday but DO NOT return early.
+                // We still want to proceed to /api/timetable to fetch the 
+                // full cycle (timetableByWeek) and bell times, which are 
+                // still useful for the Cycle View even during holidays.
                 setSelectedDateIsHoliday(true)
-                setTimetableSource('calendar-holiday')
-                try { setLastFetchedDate(todayDateStr); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
-                setIsRefreshing(false)
-                if (!hadCache) setIsLoading(false)
-                return
+                // If we don't have a cycle cache yet, we definitely want to continue.
+                // If we do have one, we can still continue to ensure it's up to date.
               }
             }
           } catch (e) {
