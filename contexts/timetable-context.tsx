@@ -69,6 +69,9 @@ type TimetableContextType = {
   externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
 }
 
+// Explicit empty timetable used when the upstream API reports "no timetable".
+const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+
 // Create the context
 const TimetableContext = createContext<TimetableContextType | undefined>(undefined)
 
@@ -257,7 +260,7 @@ const canonicalIndex = (label?: string) => {
 
   // Explicit empty timetable used when the upstream API reports "no timetable".
   // Restored to module scope to avoid potential reference errors in minified code
-  const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+  // const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
   const payloadHasNoTimetable = (payload: any) => {
     try {
