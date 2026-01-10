@@ -58,7 +58,7 @@ type TimetableContextType = {
   isShowingCachedWhileLoading?: boolean
   bellTimes: Record<string, BellTime[]>
   isShowingNextDay: boolean // Indicates if the main timetable is showing next day
-  timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
+  timetableSource?: string | null // indicates where timetable data came from (e.g. 'cache' or external url)
   isLoading: boolean
   isRefreshing?: boolean
   error: string | null
@@ -302,112 +302,9 @@ const canonicalIndex = (label?: string) => {
   }
 }
 
-// Mock data for the timetable - memoized
-const timetableWeekA = {
-        Monday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-        ],
-        Tuesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "402" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-        ],
-        Wednesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-        ],
-        Thursday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
-        ],
-        Friday: [
-          { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-        ],
-      }
-
-      const timetableWeekB = {
-        Monday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Art", teacher: "Ms. Wilson", room: "Art Studio" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Computing", teacher: "Ms. Lee", room: "Computer Lab" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "PE", teacher: "Mr. Davis", room: "101" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-        ],
-        Tuesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "PE", teacher: "Mr. Davis", room: "101" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:30", subject: "Art", teacher: "Ms. Wilson", room: "505" },
-          { id: 5, period: "4", time: "12:30 - 1:30", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 6, period: "Lunch 1", time: "1:30 - 1:50", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "Lunch 2", time: "1:50 - 2:10", subject: "Break", teacher: "", room: "" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-        ],
-        Wednesday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "PE", teacher: "Mr. Davis", room: "101" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Art", teacher: "Ms. Wilson", room: "505" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "English", teacher: "Ms. Smith", room: "301" },
-        ],
-        Thursday: [
-          { id: 1, period: "1", time: "9:00 - 10:05", subject: "English", teacher: "Ms. Smith", room: "301" },
-          { id: 2, period: "2", time: "10:05 - 11:05", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-          { id: 3, period: "Recess", time: "11:05 - 11:25", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:25 - 12:25", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 5, period: "Lunch 1", time: "12:25 - 12:45", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:45 - 1:05", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:05 - 2:10", subject: "Computing", teacher: "Ms. Lee", room: "405" },
-          { id: 8, period: "5", time: "2:10 - 3:10", subject: "Science", teacher: "Dr. Williams", room: "402" },
-        ],
-        Friday: [
-          { id: 1, period: "1", time: "9:25 - 10:20", subject: "Mathematics", teacher: "Mr. Johnson", room: "304" },
-          { id: 2, period: "2", time: "10:20 - 11:10", subject: "History", teacher: "Mr. Brown", room: "205" },
-          { id: 3, period: "Recess", time: "11:10 - 11:40", subject: "Break", teacher: "", room: "" },
-          { id: 4, period: "3", time: "11:40 - 12:35", subject: "Science", teacher: "Dr. Williams", room: "Lab 2" },
-          { id: 5, period: "Lunch 1", time: "12:35 - 12:55", subject: "Break", teacher: "", room: "" },
-          { id: 6, period: "Lunch 2", time: "12:55 - 1:15", subject: "Break", teacher: "", room: "" },
-          { id: 7, period: "4", time: "1:15 - 2:15", subject: "Music", teacher: "Mr. Anderson", room: "501" },
-          { id: 8, period: "5", time: "2:15 - 3:10", subject: "Geography", teacher: "Ms. Taylor", room: "207" },
-        ],
-      }
+// Mock data for the timetable - removed
+const timetableWeekA: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+const timetableWeekB: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
@@ -1094,7 +991,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // app can immediately show the most-recent real data after a reload.
   useEffect(() => {
     try {
-      if (externalTimetable && timetableSource && timetableSource !== 'fallback-sample') {
+      if (externalTimetable && timetableSource) {
         const payload = {
           timetable: externalTimetable,
           timetableByWeek: externalTimetableByWeek || null,
@@ -1821,11 +1718,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // have already arrived.
     if (useExternalBellTimes) {
       const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-      const sample = (timetableSource === 'fallback-sample' && (currentWeek !== 'A' && currentWeek !== 'B'))
-        ? emptyByDay
-        : (currentWeek === "B" ? timetableWeekB : timetableWeekA)
       const filtered: Record<string, Period[]> = {}
-      for (const [day, periods] of Object.entries(sample)) filtered[day] = (periods || []).slice()
+      for (const [day, periods] of Object.entries(emptyByDay)) filtered[day] = (periods || []).slice()
 
       const getBellForDay = (dayName: string) => {
         // Only respect API-provided bell buckets here; if none exist, don't insert hardcoded breaks.
@@ -1891,32 +1785,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       return cleanupMap(filtered)
     }
 
-    // If we're displaying the bundled sample because live data couldn't be obtained,
-    // and the API hasn't explicitly specified A/B (currentWeek is null), do not
-    // assume a default week — return an empty timetable so the UI can show a
-    // clear message instead of presenting potentially incorrect week data.
-    if (timetableSource === 'fallback-sample' && (currentWeek !== 'A' && currentWeek !== 'B')) {
-      return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-    }
-
     // If re-authentication is required and we have no cached/external data,
-    // return empty timetable so the UI can prompt the user to sign in
-    // instead of showing sample data.
+    // return empty timetable so the UI can prompt the user to sign in.
     if (reauthRequired && !useExternalTimetable) {
       return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
     }
 
     // If we have not yet completed the initial calendar check and we also
-    // have not hydrated the cache, avoid showing the bundled sample
-    // timetable (which would display classes) — return an empty map so
-    // the UI remains blank until we've determined whether the selected
-    // date is a holiday or live data is available.
+    // have not hydrated the cache, return an empty map.
     if (!initialCalendarChecked && !useExternalTimetable && !cacheHydrated) {
       try { console.debug('[timetable.provider] initial calendar check pending - returning empty timetable to avoid flash') } catch (e) {}
       return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
     }
 
-    return currentWeek === "B" ? timetableWeekB : timetableWeekA
+    // Default to empty if no data is available
+    return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
   }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday, selectedDateCalendarChecked, initialCalendarChecked])
 
   // Persist computed break-layouts (simple heuristic) so we can hydrate
@@ -2334,7 +2217,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       if (!externalTimetable) return
       if (!timetableSource) return
-      if (timetableSource === 'fallback-sample') return
 
       // FIRST: Check if the timetable already has subs applied (from the API).
       // If so, mark subsAppliedRef immediately to prevent Effect 2 from
@@ -2377,7 +2259,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!externalTimetable) return
     if (!timetableSource) return
-    if (timetableSource === 'fallback-sample') return
     // If we already applied substitutions, skip. Otherwise, limit retry
     // frequency so we don't hammer the AI/portal endpoint when no subs exist.
     const SUBS_RETRY_MS = 2 * 60 * 1000 // 2 minutes
@@ -2434,7 +2315,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Remember last known-good external timetable data so we can continue
   // showing it while a reload is in progress or when a refresh falls back.
   useEffect(() => {
-    if (externalTimetable && timetableSource && timetableSource !== 'fallback-sample') {
+    if (externalTimetable && timetableSource) {
       setLastRecordedTimetable(externalTimetable)
     }
   }, [externalTimetable, timetableSource])
@@ -3668,21 +3549,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } else if (isAuthenticated) {
         startTransition(() => {
           setExternalTimetable(null)
-          setTimetableSource('fallback-sample')
-          setError("Could not refresh timetable. Showing sample data.")
+          setTimetableSource(null)
+          setError("Could not refresh timetable.")
           setIsRefreshing(false)
         })
       } else {
         // No cached data and auth unknown/false: keep whatever we have and surface an error
         startTransition(() => {
           setExternalTimetable(null)
-          setTimetableSource('fallback-sample')
-          setError("Could not refresh timetable. Showing sample data.")
+          setTimetableSource(null)
+          setError("Could not refresh timetable.")
           setIsRefreshing(false)
         })
       }
     } catch (e) {
-      try { console.log('[timetable.provider] falling back to sample timetable (refresh error)') } catch (e) {}
+      try { console.log('[timetable.provider] failing back (refresh error)') } catch (e) {}
       if (lastRecordedTimetable) {
         const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
         if (initialCalendarChecked || cacheHydrated || isOffline) {
@@ -3697,14 +3578,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } else if (isAuthenticated) {
         startTransition(() => {
           setExternalTimetable(null)
-          setTimetableSource('fallback-sample')
+          setTimetableSource(null)
           setError("An error occurred while refreshing timetable.")
           setIsRefreshing(false)
         })
       } else {
         startTransition(() => {
           setExternalTimetable(null)
-          setTimetableSource('fallback-sample')
+          setTimetableSource(null)
           setError("An error occurred while refreshing timetable.")
           setIsRefreshing(false)
         })

@@ -508,7 +508,7 @@ export default function HomeClient() {
             <div className="flex items-center">
               {(isLoading || isRefreshing) ? (
                 <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
-              ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
+              ) : (timetableSource && timetableSource !== 'cache') ? (
                 <div className="relative w-5 h-5" title="Synced to cloud">
                   <Cloud className="h-5 w-5 text-muted-foreground" />
                   <span className="absolute -right-0 -top-0 bg-white rounded-full">

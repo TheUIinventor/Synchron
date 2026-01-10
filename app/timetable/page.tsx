@@ -365,8 +365,8 @@ export default function TimetablePage() {
           <div className="w-6 hidden md:block" />
           <div className="w-6 hidden md:block"></div>
         </div>
-        {/* When we're using the bundled sample because live data couldn't be obtained, show a clear, non-technical call-to-action */}
-        {timetableSource === 'fallback-sample' && (
+        {/* When we're using empty data because live data couldn't be obtained, show a clear, non-technical call-to-action */}
+        {(!timetableData || Object.values(timetableData).every(day => day.length === 0)) && (
           <div className="w-full mb-6">
             <Card className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -391,7 +391,7 @@ export default function TimetablePage() {
                       try {
                         if (refreshExternal) await refreshExternal()
                       } catch (e) {
-                        // ignore — provider will fall back to sample if needed
+                        // ignore — provider will fall back to empty if needed
                       }
                     }}
                     className="rounded-full"
