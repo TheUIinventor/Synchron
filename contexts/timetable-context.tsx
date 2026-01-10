@@ -256,7 +256,7 @@ const canonicalIndex = (label?: string) => {
   }
 
   // Explicit empty timetable used when the upstream API reports "no timetable".
-  const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+  // const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
 
   const payloadHasNoTimetable = (payload: any) => {
     try {
@@ -303,8 +303,8 @@ const canonicalIndex = (label?: string) => {
 }
 
 // Mock data for the timetable - removed
-const timetableWeekA: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-const timetableWeekB: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+// (Declarations for timetableWeekA/B removed as they are no longer used)
+
 
 // Create the provider component
 export function TimetableProvider({ children }: { children: ReactNode }) {
@@ -1717,9 +1717,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // the timetable payload may be lost or fall back to sample after bells
     // have already arrived.
     if (useExternalBellTimes) {
-      const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
+      const baseTemplate: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
       const filtered: Record<string, Period[]> = {}
-      for (const [day, periods] of Object.entries(emptyByDay)) filtered[day] = (periods || []).slice()
+      for (const [day, periods] of Object.entries(baseTemplate)) filtered[day] = (periods || []).slice()
 
       const getBellForDay = (dayName: string) => {
         // Only respect API-provided bell buckets here; if none exist, don't insert hardcoded breaks.
