@@ -423,6 +423,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
   const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
+  // Track the currently selected date as a ref so interval callbacks can access the latest value
+  // without stale closure issues - MUST be declared before first useEffect that references it
+  const selectedDateObjectRef = useRef<Date | null>(null)
   // Keep selectedDateObjectRef in sync with state so interval callbacks can access the latest value
   useEffect(() => {
     selectedDateObjectRef.current = selectedDateObject
@@ -690,9 +693,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // If we discovered a cached-for-date at startup, seed the ref so the
   // hydration gating logic can make use of it immediately.
   try { if (__initialCachedForDate) externalTimetableDateRef.current = __initialCachedForDate } catch (e) {}
-  // Track the currently selected date as a ref so interval callbacks can access the latest value
-  // without stale closure issues
-  const selectedDateObjectRef = useRef<Date | null>(null)
+  // selectedDateObjectRef is declared earlier in the component (before useEffect references)
   const cachedSubsRef = useRef<any[] | null>(__initialCachedSubs)
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
