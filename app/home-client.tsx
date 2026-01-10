@@ -261,7 +261,7 @@ export default function HomeClient() {
     );
   }
 
-  const canShowTimetable = Boolean(initialCalendarChecked && homeCalendarChecked && selectedDateCalendarChecked)
+  const canShowTimetable = Boolean(initialCalendarChecked && (todaysPeriodsRaw.length > 0 || (homeCalendarChecked && selectedDateCalendarChecked)))
   const effectiveMoment = canShowTimetable ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
   

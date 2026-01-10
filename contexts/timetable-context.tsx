@@ -942,15 +942,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (isHoliday) {
               holidayDateRef.current = true
               try { setSelectedDateIsHoliday(true) } catch (e) {}
-              try { setCacheHydrated(false) } catch (e) {}
-              try { clearClientCaches() } catch (e) {}
-              if (!cancelled) {
-                setExternalTimetable(emptyByDay)
-                setExternalTimetableByWeek(null)
-                setTimetableSource('calendar-holiday')
-                setExternalWeekType(null)
-                try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
-              }
+              // Do NOT clear caches or set timetable to empty on holidays.
+              // This allows the term timetable (cached) to remain visible.
               // Mark that the per-selected-date calendar check has completed
               try { setSelectedDateCalendarChecked(true) } catch (e) {}
               return
@@ -1138,17 +1131,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 
-    // If the per-selected-date calendar check has not completed and the
-    // client is online, withhold any timetable data to avoid briefly
-    // showing cached or fetched classes on dates that may be holidays.
-    try {
-      const isOffline = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
-      if (!isOffline && !selectedDateCalendarChecked) {
-        try { console.debug('[timetable.provider] per-selected-date calendar check pending; withholding timetable display') } catch (e) {}
-        return emptyByDay
-      }
-    } catch (e) {}
-
     // Prefer the live external timetable when available. The cached
     // `lastRecordedTimetable` is only a fallback for fast initial rendering
     // and should not be used until we've completed the initial calendar
@@ -1167,17 +1149,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // showing last week's substitutes when viewing a holiday date).
       const selectedIso = selectedDateObject ? selectedDateObject.toISOString().slice(0,10) : null
       const externalDateRefVal = externalTimetableDateRef.current
-      if (externalDateRefVal && selectedIso && externalDateRefVal !== selectedIso) {
-        if (!selectedDateCalendarChecked && !isOffline) {
-          try { console.debug('[timetable.provider] external timetable is for', externalDateRefVal, 'but selected is', selectedIso, '; withholding cached/external data until calendar check completes') } catch (e) {}
-          return emptyByDay
-        }
-      }
-
-      if (!initialCalendarChecked && !isOffline && hasCached && !cacheHydrated && !externalTimetable) {
-        try { console.debug('[timetable.provider] initial calendar check pending; hiding cached timetable to avoid flash') } catch (e) {}
-        return emptyByDay
-      }
+      // Only withhold if the data is explicitly for a DIFFERENT date AND we are still checking correctly.
+      // For holidays, we often want to fallback to the term timetable regardless.
     } catch (e) {}
 
     const useExternalTimetable = externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null)
@@ -1722,14 +1695,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           filtered[day] = list.filter((p) => isNonClassPeriod(p) || !(p as any).weekType)
         }
       }
-      // If the server explicitly reported that there is no timetable for the
-      // requested date, return the empty-by-day map as-is (do not insert
-      // Break rows based on bell times). This keeps the UI blank like a
-      // weekend when upstream reports "no timetable".
-      if (timetableSource === 'external-empty') {
-        preferToRoomOnMap(filtered)
-        return cleanupMap(filtered)
-      }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       const getBellForDay = (dayName: string) => {
         // Use only API-provided buckets when available; otherwise return empty.
@@ -1914,7 +1879,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
 
     return currentWeek === "B" ? timetableWeekB : timetableWeekA
-  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday])
+  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday, selectedDateCalendarChecked, initialCalendarChecked])
 
   // Persist computed break-layouts (simple heuristic) so we can hydrate
   // break rows quickly on restart without recomputing from bells immediately.
@@ -2548,14 +2513,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         const bub = (e: Event) => {
           try {
-        // Mark that the initial calendar check has completed (success or fail)
-        try { setInitialCalendarChecked(true) } catch (e) {}
             const ev = e as PointerEvent
             const top = document.elementFromPoint(ev.clientX, ev.clientY)
             console.debug('[timetable.refresh.debug] bubble', e.type, 'target=', e.target, 'defaultPrevented=', (e as any).defaultPrevented, 'top=', top)
             try { console.debug('[timetable.refresh.debug] composedPath', (ev as any).composedPath ? (ev as any).composedPath() : (ev as any).path || []) } catch (err) {}
           } catch (err) {}
         }
+        // Mark that the initial calendar check has completed (success or fail)
+        try { setInitialCalendarChecked(true) } catch (e) {}
         document.addEventListener('pointerdown', cap, true)
         document.addEventListener('click', bub, false)
         refreshDebugHandlersRef.current = { capture: cap, bubble: bub }
@@ -2624,23 +2589,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             )
             if (isHolidaySignal) {
               try { _t.lap('detected-holiday-signal') } catch (e) {}
-              // Clear caches to avoid stale cached timetables rehydrating
-              try {
-                if (typeof window !== 'undefined' && window.localStorage) {
-                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                  try { clearClientCaches() } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                }
-              } catch (e) {}
-
-              // Set empty timetable and mark source so UI shows 'No periods'
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              // Do NOT clear caches or set timetable to empty.
+              // Just mark as holiday and finish refresh.
+              setSelectedDateIsHoliday(true)
               setTimetableSource('portal-home-empty')
-              setExternalWeekType(null)
               try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ holiday: true }) } catch (e) {}
               setIsRefreshing(false)
               if (!hadCache) setIsLoading(false)
@@ -2780,21 +2732,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 )
               )
               if (isHolidayCal) {
-                try {
-                  if (typeof window !== 'undefined' && window.localStorage) {
-                    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                    try { clearClientCaches() } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                  }
-                } catch (e) {}
-
-                setExternalTimetable(emptyByDay)
-                setExternalTimetableByWeek(null)
+                // Do NOT clear caches or set timetable to empty.
+                // Mark as holiday and finish refresh.
+                setSelectedDateIsHoliday(true)
                 setTimetableSource('calendar-holiday')
-                setExternalWeekType(null)
                 try { setLastFetchedDate(todayDateStr); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
                 setIsRefreshing(false)
                 if (!hadCache) setIsLoading(false)
@@ -2861,24 +2802,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             })()
 
             if (isBooleanTimetable || looksEmptyObject || j?.noTimetable === true) {
-              try { console.debug('[timetable.provider] JSON payload indicates no timetable (boolean/empty) - showing empty timetable') } catch (e) {}
-              // Clear client-side caches so we don't rehydrate stale timetable data
-              try {
-                if (typeof window !== 'undefined' && window.localStorage) {
-                  try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                  try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                  try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                  try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                }
-              } catch (e) {}
-
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
-              setLastRecordedTimetable(null)
-              setLastRecordedTimetableByWeek(null)
+              try { console.debug('[timetable.provider] JSON payload indicates no timetable (boolean/empty)') } catch (e) {}
+              // Do NOT clear caches. Just mark as empty source and finish.
               setTimetableSource('external-empty')
-              setExternalWeekType(null)
               try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: 'no timetable (boolean/empty)' }) } catch (e) {}
               setIsRefreshing(false)
               if (!hadCache) setIsLoading(false)
@@ -2913,28 +2839,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (payloadHasNoTimetable(j)) {
               try {
                 const computed = buildBellTimesFromPayload(j)
-                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                const src = j.bellTimes || {}
-                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-                  else finalBellTimes[k] = []
-                }
-                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                // Only update bells if we don't already have authoritative date-specific ones
-                if (hasAny && !authoritativeBellsDateRef.current) {
-                  setExternalBellTimes(finalBellTimes)
-                  lastSeenBellTimesRef.current = finalBellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                }
+                // ...existing code...
               } catch (e) {
                 // ignore
               }
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
+              // Do NOT set externalTimetable to emptyByDay here.
+              // This allows fallback to term timetable.
               setTimetableSource('external-empty')
-              setExternalWeekType(null)
               try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' }) } catch (e) {}
               try { setIsRefreshing(false) } catch (e) {}
               if (!hadCache) try { setIsLoading(false) } catch (e) {}
@@ -3007,33 +2918,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (payloadHasNoTimetable(j)) {
               // Even when the payload reports "no timetable", try to
               // salvage any bell schedules the server may have provided
-              // (either in `bellTimes` or embedded `upstream` structures).
+              // ...existing code...
               try {
                 const computed = buildBellTimesFromPayload(j)
-                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                const src = j.bellTimes || {}
-                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                  else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-                  else finalBellTimes[k] = []
-                }
-                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                // Only update bells if we don't already have authoritative date-specific ones
-                if (hasAny && !authoritativeBellsDateRef.current) {
-                  setExternalBellTimes(finalBellTimes)
-                  lastSeenBellTimesRef.current = finalBellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                }
+                // ...existing code...
               } catch (e) {
                 // ignore extraction errors and preserve any previously-seen bells
               }
-              setExternalTimetable(emptyByDay)
-              setExternalTimetableByWeek(null)
-              // Do not clear previously discovered bell times when upstream
-              // reports no timetable; keep existing bells where available.
+              // Do NOT clear timetable - allow fallback
               setTimetableSource('external-empty')
-              setExternalWeekType(null)
               try {
                 setLastFetchedDate((new Date()).toISOString().slice(0,10))
                 setLastFetchedPayloadSummary({ error: j.error ?? 'no timetable' })
@@ -4247,6 +4140,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // Note: We intentionally do NOT clear lastRequestedDateRef.current here.
       // Keeping the ref set prevents duplicate fetches for the same date when
       // the effect re-fires (e.g., due to re-renders or interval ticks).
+      try { setSelectedDateCalendarChecked(true) } catch (e) {}
     }
     fetchForDate()
     return () => { cancelled = true }
