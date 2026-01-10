@@ -233,13 +233,16 @@ export const findFirstNonBreakPeriodOnDate = (
   return null
 }
 
-// Format a duration (ms) into "Xh Ym Zs" style (hours/mins/secs), used for countdowns
+// Format a duration (ms) into "Xd Yh Zm" style, used for long-range countdowns
 export const formatDurationShort = (ms: number): string => {
   if (!Number.isFinite(ms) || ms <= 0) return '0s'
   const totalSeconds = Math.max(0, Math.floor(ms / 1000))
-  const hours = Math.floor(totalSeconds / 3600)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
+  
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`
   if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
   if (minutes > 0) return `${minutes}m ${seconds}s`
   return `${seconds}s`

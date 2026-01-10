@@ -1138,17 +1138,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
 
-    // If calendar indicates the selected date is a holiday, force an
-    // empty timetable so the UI does not show any class data. This is a
-    // final guard that prevents other refreshes from briefly showing
-    // periods on holiday dates.
-    try {
-      if (selectedDateIsHoliday || holidayDateRef.current) {
-        try { console.debug('[timetable.provider] holiday guard active - returning empty timetable') } catch (e) {}
-        return emptyByDay
-      }
-    } catch (e) {}
-
     // If the per-selected-date calendar check has not completed and the
     // client is online, withhold any timetable data to avoid briefly
     // showing cached or fetched classes on dates that may be holidays.
@@ -2586,16 +2575,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       lastRefreshTsRef.current = now
     } catch (e) {}
     setError(null)
-    // If the selected date is known to be a holiday, abort early to avoid
-    // fetching timetable data that should not exist for this date.
-    try {
-      if (selectedDateIsHoliday || (holidayDateRef && holidayDateRef.current)) {
-        try { console.debug('[timetable.provider] selected date is holiday; aborting refresh') } catch (e) {}
-        setIsRefreshing(false)
-        if (!hadCache) setIsLoading(false)
-        return
-      }
-    } catch (e) {}
+
     // First try the server-scraped homepage endpoint as a quick probe.
     try { _t.lap('start-homepage-probe') } catch (e) {}
     // Note: We intentionally do NOT set any timetable state or return early
