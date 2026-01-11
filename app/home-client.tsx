@@ -88,7 +88,7 @@ export default function HomeClient() {
   
   // Lightweight day timetable state - fetch only today's periods from API
   const [dayTimetablePeriods, setDayTimetablePeriods] = useState<any[]>([])
-  const [dayTimetableLoading, setDayTimetableLoading] = useState<boolean>(true)
+  const [dayTimetableLoading, setDayTimetableLoading] = useState<boolean>(false)
   const [dayTimetableBells, setDayTimetableBells] = useState<any[]>([])
 
   useEffect(() => {
@@ -292,8 +292,13 @@ export default function HomeClient() {
             }
           }
           
-          setDayTimetablePeriods(periods)
-          setDayTimetableBells(Array.isArray(bells) ? bells : [])
+          // Only update if we got data to avoid clearing the fallback
+          if (periods.length > 0) {
+            setDayTimetablePeriods(periods)
+          }
+          if (Array.isArray(bells) && bells.length > 0) {
+            setDayTimetableBells(bells)
+          }
           
           console.debug('[home-client] day timetable loaded', { periods: periods.length, bells: Array.isArray(bells) ? bells.length : 0 })
         } else {
@@ -312,8 +317,10 @@ export default function HomeClient() {
   // Use the displayDate's weekday to pick today's timetable for the home page.
   const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
   
-  // Use lightweight day timetable if available, fallback to context data
-  const todaysPeriodsRaw = dayTimetablePeriods.length > 0 ? dayTimetablePeriods : (timetableData[dayName] || []);
+  // IMPORTANT: Show context data immediately, then upgrade to API data when available
+  // This prevents the 10-second delay while API loads
+  const contextPeriods = timetableData[dayName] || []
+  const todaysPeriodsRaw = dayTimetablePeriods.length > 0 ? dayTimetablePeriods : contextPeriods;
 
   if (error) {
     return (
