@@ -241,7 +241,21 @@ export default function HomeClient() {
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
 
-  
+  // Determine the date to display for the HOME page. The home page should
+  // not be influenced by a manual date selection on the timetable page, so
+  // do not use `selectedDateObject` from the provider here. Instead use the
+  // local clock and auto-advance after school hours/weekends.
+  const displayDate = (() => {
+    const now = currentDate
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6
+    if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
+    return now
+  })()
+  const displayDateIso = displayDate.toISOString().slice(0,10)
+
+  // Use the displayDate's weekday to pick today's timetable for the home page.
+  const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
+  const todaysPeriodsRaw = timetableData[dayName] || [];
 
   if (error) {
     return (
@@ -264,22 +278,6 @@ export default function HomeClient() {
   const canShowTimetable = Boolean(initialCalendarChecked && (todaysPeriodsRaw.length > 0 || (homeCalendarChecked && selectedDateCalendarChecked)))
   const effectiveMoment = canShowTimetable ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
-  
-  // Determine the date to display for the HOME page. The home page should
-  // not be influenced by a manual date selection on the timetable page, so
-  // do not use `selectedDateObject` from the provider here. Instead use the
-  // local clock and auto-advance after school hours/weekends.
-  const displayDate = (() => {
-    const now = currentDate
-    const isWeekend = now.getDay() === 0 || now.getDay() === 6
-    if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
-    return now
-  })()
-  const displayDateIso = displayDate.toISOString().slice(0,10)
-
-  // Use the displayDate's weekday to pick today's timetable for the home page.
-  const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
-  const todaysPeriodsRaw = timetableData[dayName] || [];
 
   // Run a quick calendar check for the home display date so we can avoid
   // rendering cached/external timetable rows for holiday dates while the
