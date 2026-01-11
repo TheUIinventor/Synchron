@@ -699,6 +699,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const lastRefreshTsRef = useRef<number | null>(null)
   const lastFocusTsRef = useRef<number | null>(null)
   const holidayDateRef = useRef<boolean>(false)
+  // Track whether substitutions have been applied - declared here before first usage
+  const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
 
   // Aggressive background refresh tuning
   // NOTE: reduced intervals to make visible-refresh more responsive.
@@ -1916,8 +1918,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
   }, [externalTimetable, selectedDateObject])
 
-  // Track whether substitutions have been applied to the current external timetable
-  const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
+  // subsAppliedRef is declared earlier in the component (before first usage)
   // Track the last time we attempted to fetch substitutions so we can retry
   // periodically instead of permanently skipping when no subs were present.
   const lastSubsAttemptRef = useRef<number | null>(null)
