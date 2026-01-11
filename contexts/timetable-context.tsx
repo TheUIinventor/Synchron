@@ -1809,7 +1809,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     // Default to empty if no data is available
     return emptyByDay
-  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday, selectedDateCalendarChecked, initialCalendarChecked])
+  }, [currentWeek, externalTimetable, externalTimetableByWeek, externalBellTimes, lastRecordedTimetable, lastRecordedTimetableByWeek, isLoading, reauthRequired, selectedDateObject, selectedDateIsHoliday, selectedDateCalendarChecked, initialCalendarChecked, cacheHydrated])
 
   // Persist computed break-layouts (simple heuristic) so we can hydrate
   // break rows quickly on restart without recomputing from bells immediately.
