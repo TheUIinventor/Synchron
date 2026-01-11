@@ -85,6 +85,11 @@ export default function HomeClient() {
   // Home-specific calendar check to avoid flashing cached timetable
   const [homeCalendarChecked, setHomeCalendarChecked] = useState<boolean>(false)
   const [homeIsHoliday, setHomeIsHoliday] = useState<boolean>(false)
+  
+  // Lightweight day timetable state - fetch only today's periods from API
+  const [dayTimetablePeriods, setDayTimetablePeriods] = useState<any[]>([])
+  const [dayTimetableLoading, setDayTimetableLoading] = useState<boolean>(true)
+  const [dayTimetableBells, setDayTimetableBells] = useState<any[]>([])
 
   useEffect(() => {
     // keep clock updated every second so countdowns refresh on mobile pill
@@ -253,9 +258,62 @@ export default function HomeClient() {
   })()
   const displayDateIso = displayDate.toISOString().slice(0,10)
 
+  // Fetch lightweight day timetable directly from API (like competing app)
+  // This avoids heavy client-side processing and uses server-side week detection
+  useEffect(() => {
+    let cancelled = false
+    setDayTimetableLoading(true)
+    
+    void (async () => {
+      try {
+        const res = await fetch(`/api/timetable?date=${encodeURIComponent(displayDateIso)}`, { 
+          credentials: 'include' 
+        })
+        
+        if (res.ok) {
+          const data = await res.json()
+          if (cancelled) return
+          
+          // Extract periods for today from the response
+          const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate)
+          const periods = data?.byDay?.[dayName] || data?.periods || []
+          
+          // Extract bell times - handle multiple possible structures
+          let bells = data?.bellTimes || data?.bells || []
+          
+          // If bells is an object with day-specific buckets, extract the right day
+          if (bells && typeof bells === 'object' && !Array.isArray(bells)) {
+            if (dayName === 'Friday') {
+              bells = bells.Fri || bells.Friday || []
+            } else if (dayName === 'Wednesday' || dayName === 'Thursday') {
+              bells = bells['Wed/Thurs'] || bells.Wednesday || bells.Thursday || []
+            } else {
+              bells = bells['Mon/Tues'] || bells.Monday || bells.Tuesday || []
+            }
+          }
+          
+          setDayTimetablePeriods(periods)
+          setDayTimetableBells(Array.isArray(bells) ? bells : [])
+          
+          console.debug('[home-client] day timetable loaded', { periods: periods.length, bells: Array.isArray(bells) ? bells.length : 0 })
+        } else {
+          console.debug('[home-client] day timetable fetch failed with status', res.status)
+        }
+      } catch (e) {
+        console.debug('[home-client] day timetable fetch error', e)
+      } finally {
+        if (!cancelled) setDayTimetableLoading(false)
+      }
+    })()
+    
+    return () => { cancelled = true }
+  }, [displayDateIso])
+
   // Use the displayDate's weekday to pick today's timetable for the home page.
   const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
-  const todaysPeriodsRaw = timetableData[dayName] || [];
+  
+  // Use lightweight day timetable if available, fallback to context data
+  const todaysPeriodsRaw = dayTimetablePeriods.length > 0 ? dayTimetablePeriods : (timetableData[dayName] || []);
 
   if (error) {
     return (
@@ -328,7 +386,14 @@ export default function HomeClient() {
   }, [displayDateIso])
 
   // Map provider bell buckets into the day-specific bucket keys used elsewhere.
+  // Prefer day-specific bells from API if available
   const bellsForDay = (() => {
+    // Use bells from day timetable API if available
+    if (dayTimetableBells && dayTimetableBells.length > 0) {
+      return dayTimetableBells
+    }
+    
+    // Fallback to context bells
     if (!bellTimes) return []
     if (dayName === 'Friday') return (bellTimes as any).Fri || []
     if (dayName === 'Wednesday' || dayName === 'Thursday') return (bellTimes as any)['Wed/Thurs'] || []
@@ -504,7 +569,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-3">
             {/* Sync indicator placed left of the settings icon. Spinner while loading, cloud+check when synced. */}
             <div className="flex items-center">
-              {(isLoading || isRefreshing) ? (
+              {(isLoading || isRefreshing || dayTimetableLoading) ? (
                 <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
               ) : (timetableSource && timetableSource !== 'cache') ? (
                 <div className="relative w-5 h-5" title="Synced to cloud">

@@ -1177,49 +1177,49 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (currentWeek === 'A' || currentWeek === 'B') {
           list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
         } else {
-          // Try to infer which week (A or B) the grouped timetable should use
-          // by comparing available per-day entries in any provided external
-          // timetable with the A/B grouped entries. This helps when the
-          // server returned `timetableByWeek` but did not provide an explicit
-          // `weekType` value for the current selection; prefer the group that
-          // best matches the live/day timetable data.
+          // When currentWeek is unknown, prefer showing ALL periods from both weeks
+          // rather than trying to guess. This prevents classes from disappearing.
+          // Combine A + B + unknown, with A taking priority if there are duplicates.
           try {
-            const reference = useExternalTimetable || lastRecordedTimetable || {}
-            const refPeriods = Array.isArray((reference as any)[day]) ? (reference as any)[day] as Period[] : []
-            const score = { A: 0, B: 0 }
-
-            const norm = (s?: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
-
-            if (refPeriods && refPeriods.length) {
-              for (const rp of refPeriods) {
-                const rsub = norm(rp.subject)
-                const rper = norm(rp.period)
-                if (groups && Array.isArray(groups.A)) {
-                  for (const a of groups.A) {
-                    if (norm(a.subject) === rsub && norm(a.period) === rper) { score.A += 2 }
-                    else if (norm(a.period) === rper) { score.A += 1 }
-                  }
-                }
-                if (groups && Array.isArray(groups.B)) {
-                  for (const b of groups.B) {
-                    if (norm(b.subject) === rsub && norm(b.period) === rper) { score.B += 2 }
-                    else if (norm(b.period) === rper) { score.B += 1 }
-                  }
+            const combined: Period[] = []
+            const seen = new Set<string>()
+            
+            // Add Week A periods first
+            if (Array.isArray(groups.A)) {
+              for (const p of groups.A) {
+                const key = `${p.period}-${p.subject}`
+                if (!seen.has(key)) {
+                  combined.push({ ...p })
+                  seen.add(key)
                 }
               }
             }
-
-            if (score.A > score.B) list = Array.isArray(groups.A) ? groups.A.slice() : []
-            else if (score.B > score.A) list = Array.isArray(groups.B) ? groups.B.slice() : []
-            else {
-              // No clear match: prefer the non-empty group (A then B), or
-              // fall back to unknown if both are empty.
-              if (groups.A && groups.A.length) list = groups.A.slice()
-              else if (groups.B && groups.B.length) list = groups.B.slice()
-              else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
+            
+            // Add Week B periods (skip duplicates)
+            if (Array.isArray(groups.B)) {
+              for (const p of groups.B) {
+                const key = `${p.period}-${p.subject}`
+                if (!seen.has(key)) {
+                  combined.push({ ...p })
+                  seen.add(key)
+                }
+              }
             }
+            
+            // Add unknown periods
+            if (Array.isArray(groups.unknown)) {
+              for (const p of groups.unknown) {
+                const key = `${p.period}-${p.subject}`
+                if (!seen.has(key)) {
+                  combined.push({ ...p })
+                  seen.add(key)
+                }
+              }
+            }
+            
+            list = combined.length > 0 ? combined : []
           } catch (e) {
-            // On error, fall back to original behaviour: prefer A if present
+            // On error, fall back to showing A or B or unknown
             if (groups.A && groups.A.length) list = groups.A.slice()
             else if (groups.B && groups.B.length) list = groups.B.slice()
             else list = Array.isArray(groups.unknown) ? groups.unknown.slice() : []
