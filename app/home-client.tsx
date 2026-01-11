@@ -322,6 +322,19 @@ export default function HomeClient() {
   const contextPeriods = timetableData[dayName] || []
   const todaysPeriodsRaw = dayTimetablePeriods.length > 0 ? dayTimetablePeriods : contextPeriods;
 
+  // Debug logging to diagnose missing classes
+  useEffect(() => {
+    console.debug('[home-client] Display state:', {
+      dayName,
+      contextPeriodsCount: contextPeriods.length,
+      dayTimetablePeriodsCount: dayTimetablePeriods.length,
+      todaysPeriodsRawCount: todaysPeriodsRaw.length,
+      initialCalendarChecked,
+      homeCalendarChecked,
+      cacheHydrated
+    })
+  }, [dayName, contextPeriods.length, dayTimetablePeriods.length, todaysPeriodsRaw.length, initialCalendarChecked, homeCalendarChecked, cacheHydrated])
+
   if (error) {
     return (
       <div className="p-4 flex flex-col items-center justify-center h-[50vh] text-center space-y-4">
@@ -340,7 +353,7 @@ export default function HomeClient() {
     );
   }
 
-  const canShowTimetable = Boolean(initialCalendarChecked && (todaysPeriodsRaw.length > 0 || (homeCalendarChecked && selectedDateCalendarChecked)))
+  const canShowTimetable = Boolean(todaysPeriodsRaw.length > 0 || (initialCalendarChecked && homeCalendarChecked && selectedDateCalendarChecked))
   const effectiveMoment = canShowTimetable ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
 
@@ -822,7 +835,7 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
-                  {canShowTimetable && todaysPeriods.length > 0 ? (
+                  {todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
