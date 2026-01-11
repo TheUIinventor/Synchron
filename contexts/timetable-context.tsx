@@ -1605,10 +1605,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (currentWeek === 'A' || currentWeek === 'B') {
           filtered[day] = list.filter((p) => isNonClassPeriod(p) || !(p as any).weekType || (p as any).weekType === currentWeek)
         } else {
-          // If we don't yet know the current week, show untagged entries
-          // (commonly Break rows) rather than returning an empty list.
-          // Always include non-class periods (Period 0, Roll Call, End of Day).
-          filtered[day] = list.filter((p) => isNonClassPeriod(p) || !(p as any).weekType)
+          // If we don't yet know the current week, show ALL periods (don't filter by weekType)
+          // This prevents classes from disappearing while we're waiting for week detection
+          filtered[day] = list
         }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
