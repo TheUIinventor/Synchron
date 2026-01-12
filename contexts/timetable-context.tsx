@@ -1927,9 +1927,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // selectedDateObject (the date the user is viewing) because they can differ during date switches.
   useEffect(() => {
     try {
-      if (!externalTimetable) return
+      if (!externalTimetable && !externalTimetableByWeek) return
       try {
-        // Debug: log basic info about the incoming externalTimetable
+        // Debug: log basic info about the incoming data
         const days = Object.keys(externalTimetable || {})
         let periodCount = 0
         let varCount = 0
@@ -1947,28 +1947,74 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       
       if (!timetableDateIso) return
       
-      // Check if externalTimetable has any variations
+      // Check if EITHER structure has any variations
+      // This handles the case where variations are in grouped structure but not flat
       let hasVariations = false
       const varData: Record<string, any[]> = {}
       
-      for (const day of Object.keys(externalTimetable)) {
-        const periods = (externalTimetable as any)[day] || []
-        const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
-          period: p.period,
-          isSubstitute: p.isSubstitute,
-          isRoomChange: p.isRoomChange,
-          displayRoom: p.displayRoom,
-          displayTeacher: p.displayTeacher,
-          casualSurname: p.casualSurname,
-          originalTeacher: p.originalTeacher,
-          originalRoom: p.originalRoom,
-        }))
-        if (variations.length > 0) {
-          hasVariations = true
-          varData[day] = variations
-        } else {
-          varData[day] = []
+      // Check flat structure first
+      if (externalTimetable) {
+        for (const day of Object.keys(externalTimetable)) {
+          const periods = (externalTimetable as any)[day] || []
+          const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
+            period: p.period,
+            isSubstitute: p.isSubstitute,
+            isRoomChange: p.isRoomChange,
+            displayRoom: p.displayRoom,
+            displayTeacher: p.displayTeacher,
+            casualSurname: p.casualSurname,
+            originalTeacher: p.originalTeacher,
+            originalRoom: p.originalRoom,
+          }))
+          if (variations.length > 0) {
+            hasVariations = true
+            varData[day] = variations
+          } else {
+            varData[day] = []
+          }
         }
+      }
+      
+      // CRITICAL: Also check grouped structure for variations
+      // After my fix, variations might be in finalByWeek but not in flat structure
+      if (externalTimetableByWeek && currentWeek) {
+        try {
+          for (const day of Object.keys(externalTimetableByWeek)) {
+            const groups = (externalTimetableByWeek as any)[day]
+            const weekPeriods = groups?.[currentWeek] || []
+            const variations = weekPeriods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
+              period: p.period,
+              isSubstitute: p.isSubstitute,
+              isRoomChange: p.isRoomChange,
+              displayRoom: p.displayRoom,
+              displayTeacher: p.displayTeacher,
+              casualSurname: p.casualSurname,
+              originalTeacher: p.originalTeacher,
+              originalRoom: p.originalRoom,
+            }))
+            if (variations.length > 0) {
+              hasVariations = true
+              // Merge with existing data for this day
+              if (!varData[day]) varData[day] = []
+              for (const v of variations) {
+                // Only add if not already present
+                const exists = varData[day].some((existing: any) => 
+                  existing.period === v.period && 
+                  existing.isSubstitute === v.isSubstitute &&
+                  existing.isRoomChange === v.isRoomChange
+                )
+                if (!exists) varData[day].push(v)
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[timetable.provider] Error checking grouped structure for variations:', e)
+        }
+      }
+      
+      // Ensure all days have an entry
+      for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
+        if (!varData[day]) varData[day] = []
       }
       
       // CRITICAL: Only update if we have variations OR if we don't have any stored yet
@@ -1992,8 +2038,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       
       // Only update if new data has MORE variations, or if we have no existing data
       if (newCount > 0 || !existingVars) {
-        if (newCount < existingCount) {
-          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has fewer variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
+        // CRITICAL: Never overwrite existing variations with data that has fewer OR equal variations
+        // This prevents losing substitutions when a subsequent render provides the same timetable
+        // but without variation flags (e.g., when data flows through different processing paths)
+        if (existingVars && newCount <= existingCount) {
+          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has same or fewer variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
           return
         }
         
@@ -2020,7 +2069,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (e) {}
-  }, [externalTimetable, selectedDateObject])
+  }, [externalTimetable, externalTimetableByWeek, selectedDateObject, currentWeek])
 
   // subsAppliedRef is declared earlier in the component (before first usage)
   // Track the last time we attempted to fetch substitutions so we can retry
