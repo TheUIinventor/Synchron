@@ -1072,7 +1072,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
     const isDataForWrongDate = Boolean(selectedIsoString && externalTimetableDateRef.current && selectedIsoString !== externalTimetableDateRef.current)
 
-    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetable ?? (cacheHydrated ? lastRecordedTimetable : null))
+    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetable ?? lastRecordedTimetable)
     const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
