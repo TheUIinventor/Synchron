@@ -1928,6 +1928,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       if (!externalTimetable) return
+      try {
+        // Debug: log basic info about the incoming externalTimetable
+        const days = Object.keys(externalTimetable || {})
+        let periodCount = 0
+        let varCount = 0
+        for (const d of days) {
+          const arr = (externalTimetable as any)[d] || []
+          periodCount += arr.length
+          for (const p of arr) if (p && (p.isSubstitute || p.isRoomChange)) varCount++
+        }
+        console.debug('[timetable.provider] externalTimetable arrived for refDate=', externalTimetableDateRef.current, 'selected=', selectedDateObject?.toISOString().slice(0,10), 'days=', days.join(','), 'periods=', periodCount, 'vars=', varCount)
+      } catch (e) {}
       
       // Use the date the timetable is actually FOR, falling back to selected date
       const timetableDateIso = externalTimetableDateRef.current || 
