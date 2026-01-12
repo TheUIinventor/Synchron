@@ -757,10 +757,12 @@ export default function HomeClient() {
                       try {
                         if (!startTime && bellTimes) {
                           const bucket = (dayName === 'Friday' ? bellTimes.Fri : (dayName === 'Wednesday' || dayName === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues']))
-                          startTime = startTime || findBellTimeForPeriod(period, bucket, i)
+                          startTime = findBellTimeForPeriod(period, bucket, i)
                         }
-                        const { start } = parseTimeRange(startTime || '')
-                        startTime = formatTo12Hour(start)
+                        if (startTime) {
+                          const { start } = parseTimeRange(startTime)
+                          startTime = formatTo12Hour(start)
+                        }
                       } catch (e) {}
                       
                       // Treat Period 0, Roll Call, End of Day, and Break as non-class periods
