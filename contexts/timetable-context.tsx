@@ -1709,14 +1709,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
         const authVars = selectedIso ? authoritativeVariationsRef.current.get(selectedIso) : null
+        
+        console.debug('[timetable.provider] Simple timetable path - checking authVars for', selectedIso, '- found:', !!authVars, '- mapSize:', authoritativeVariationsRef.current.size)
+        
         if (authVars) {
           for (const day of Object.keys(filtered)) {
             const varData = authVars[day]
-            if (Array.isArray(varData)) {
+            if (Array.isArray(varData) && varData.length > 0) {
+              console.debug('[timetable.provider] Applying', varData.length, 'authVars to', day, 'periods:', filtered[day].length)
               for (const p of filtered[day]) {
                 const normP = String(p.period).trim().toLowerCase()
                 const v = varData.find(item => String(item.period).trim().toLowerCase() === normP)
                 if (v) {
+                  console.debug('[timetable.provider] Matched variation for period', p.period, '- isSubstitute:', v.isSubstitute, '- isRoomChange:', v.isRoomChange)
                   if (v.isSubstitute) {
                     (p as any).isSubstitute = true
                     if (v.casualSurname) (p as any).casualSurname = v.casualSurname
@@ -1737,7 +1742,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('[timetable.provider] Error applying simple timetable authVars:', e)
+      }
 
       preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
