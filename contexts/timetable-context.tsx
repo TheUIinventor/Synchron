@@ -3222,14 +3222,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try { console.debug('[timetable.provider] withholding fetched timetable (processed payload) until per-date calendar check completes', { computedDate, selIso }) } catch (e) {}
                   setIsRefreshing(false)
                 } else {
+                  // CRITICAL: Set the date ref BEFORE startTransition so it's available to useEffect immediately
+                  externalTimetableDateRef.current = computedDate
+                  
                   startTransition(() => {
                     if (j.weekType === 'A' || j.weekType === 'B') {
                       setExternalWeekType(j.weekType)
                       setCurrentWeek(j.weekType)
                     }
                     if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
-                    // Track which date this timetable is FOR
-                    externalTimetableDateRef.current = computedDate
                     setExternalTimetable(finalTimetable)
                     setTimetableSource(computedSource)
                     setLastFetchedDate(computedDate)
@@ -3629,9 +3630,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try { console.debug('[timetable.provider] withholding fetched timetable (retry path) until per-date calendar check completes', { retryDate, selIso }) } catch (e) {}
                 setIsRefreshing(false)
               } else {
+                // CRITICAL: Set the date ref BEFORE startTransition
+                if (retryDate) externalTimetableDateRef.current = retryDate
+                
                 startTransition(() => {
-                  // Track which date this timetable is FOR
-                  if (retryDate) externalTimetableDateRef.current = retryDate
                   setExternalTimetable(finalTimetable)
                   setTimetableSource(j.source ?? 'external')
                   if (j.weekType === 'A' || j.weekType === 'B') {
@@ -3645,8 +3647,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 })
               }
             } catch (e) {
+              // CRITICAL: Set the date ref BEFORE startTransition
+              if (retryDate) externalTimetableDateRef.current = retryDate
+              
               startTransition(() => {
-                if (retryDate) externalTimetableDateRef.current = retryDate
                 setExternalTimetable(finalTimetable)
                 setTimetableSource(j.source ?? 'external')
                 if (j.weekType === 'A' || j.weekType === 'B') {
@@ -3693,10 +3697,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore substitution extraction errors
             }
             
+            // CRITICAL: Set the date ref BEFORE startTransition
+            externalTimetableDateRef.current = todayDateStr2
+            
             // Use startTransition to batch updates and prevent flash
             startTransition(() => {
-              // Track which date this timetable is FOR - use the date we fetched for
-              externalTimetableDateRef.current = todayDateStr2
               setExternalTimetable(finalTimetable)
               setTimetableSource(j.source ?? 'external')
               if (j.weekType === 'A' || j.weekType === 'B') {
