@@ -1055,10 +1055,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const isDateMismatch = Boolean(selectedIso && externalDateRefVal && selectedIso !== externalDateRefVal)
       const isLoadingNewDate = Boolean(!selectedDateCalendarChecked && !isOffline)
       
-      // CRITICAL: We only withhold if we are NOT on a holiday, because on holidays
+      // CRITICAL: We only withhold if we are NOT on a holiday AND not offline, because on holidays
       // we usually WANT to see the base cycle/term timetable even if the
-      // server only returned an empty "daily" response.
-      if (isDateMismatch && isLoadingNewDate && !selectedDateIsHoliday) {
+      // server only returned an empty "daily" response. Also always show
+      // cached data when offline regardless of date mismatches.
+      if (isDateMismatch && isLoadingNewDate && !selectedDateIsHoliday && !isOffline) {
         try { console.debug('[timetable.provider] withholding stale timetable for different date:', externalDateRefVal, 'vs selected:', selectedIso) } catch (e) {}
         // By returning early with empty data, we force the UI to show its
         // loading state instead of old variations.
@@ -1072,8 +1073,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
     const isDataForWrongDate = Boolean(selectedIsoString && externalTimetableDateRef.current && selectedIsoString !== externalTimetableDateRef.current)
 
-    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetable ?? lastRecordedTimetable)
-    const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
+    // CRITICAL: During holidays/weekends, ALWAYS show cached data regardless of date mismatches
+    // because the API returns empty/old data, but users still want to see their cycle timetable
+    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday && !isOffline) ? null : (externalTimetable ?? lastRecordedTimetable)
+    const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday && !isOffline) ? null : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
