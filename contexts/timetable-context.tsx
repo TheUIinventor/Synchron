@@ -1250,8 +1250,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
         // This ensures variations are NEVER lost, even when a background fetch returns data without them.
         try {
-          // Use the selected date, not just today, so variations work for past/future dates
+          // CRITICAL FIX: Try multiple date keys to find variations
+          // 1. Selected date (what user is viewing)
+          // 2. externalTimetableDateRef (what the data is FOR)
+          // 3. Today's date (fallback)
           const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+          const candidateDates = [
+            selectedIso,
+            externalTimetableDateRef.current,
+            new Date().toISOString().slice(0, 10)
+          ].filter(Boolean)
           
           // Try multiple sources for base periods: grouped week data, flat day data, and cached data
           let daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
@@ -1261,11 +1269,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             daySource = (lastRecordedTimetable as any)[day] as Period[]
           }
           
-          // Check if we have authoritative variations for the selected date
+          // Check if we have authoritative variations - try multiple date keys
           const authVarsMap = authoritativeVariationsRef.current
-          const authVarsForDate = authVarsMap.get(selectedIso)
+          let authVarsForDate = null
+          let matchedDate = null
+          for (const dateKey of candidateDates) {
+            authVarsForDate = authVarsMap.get(dateKey!)
+            if (authVarsForDate) {
+              matchedDate = dateKey
+              break
+            }
+          }
           
-          try { console.debug('[timetable.provider] variation lookup for', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
+          try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
 
           // If the server/client has captured authoritative variations for
           // this date but the live `filtered[day]` is empty (e.g., a
