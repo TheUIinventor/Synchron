@@ -3555,17 +3555,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       } else if (isAuthenticated) {
         startTransition(() => {
-          setExternalTimetable(null)
-          setTimetableSource(null)
-          setError("Could not refresh timetable.")
+          // Don't clear externalTimetable if we have no new data - keep showing cached data
+          if (!lastRecordedTimetable) {
+            setExternalTimetable(null)
+          }
+          setTimetableSource('cache')
+          setError(null)
           setIsRefreshing(false)
         })
       } else {
-        // No cached data and auth unknown/false: keep whatever we have and surface an error
+        // No cached data and auth unknown/false: keep showing cached data
         startTransition(() => {
-          setExternalTimetable(null)
-          setTimetableSource(null)
-          setError("Could not refresh timetable.")
+          if (!lastRecordedTimetable) {
+            setExternalTimetable(null)
+          }
+          setTimetableSource('cache')
+          setError(null)
           setIsRefreshing(false)
         })
       }
@@ -3584,16 +3589,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       } else if (isAuthenticated) {
         startTransition(() => {
-          setExternalTimetable(null)
-          setTimetableSource(null)
-          setError("An error occurred while refreshing timetable.")
+          // Don't clear externalTimetable during errors - preserve cached data
+          if (!lastRecordedTimetable) {
+            setExternalTimetable(null)
+          }
+          setTimetableSource('cache')
+          setError(null)
           setIsRefreshing(false)
         })
       } else {
         startTransition(() => {
-          setExternalTimetable(null)
-          setTimetableSource(null)
-          setError("An error occurred while refreshing timetable.")
+          // Don't clear externalTimetable during errors - preserve cached data
+          if (!lastRecordedTimetable) {
+            setExternalTimetable(null)
+          }
+          setTimetableSource('cache')
+          setError(null)
           setIsRefreshing(false)
         })
       }
