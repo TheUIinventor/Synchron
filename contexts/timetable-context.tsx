@@ -1072,8 +1072,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
     const isDataForWrongDate = Boolean(selectedIsoString && externalTimetableDateRef.current && selectedIsoString !== externalTimetableDateRef.current)
 
-    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetable ?? lastRecordedTimetable)
-    const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? null : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
+    // CRITICAL: During holidays, don't withhold cached timetable data even if dates don't match
+    // The API returns empty for holidays, so we should show the last known good timetable
+    // Also, always allow lastRecordedTimetable as fallback regardless of date
+    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetable || null) : (externalTimetable ?? lastRecordedTimetable)
+    const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetableByWeek || null) : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
