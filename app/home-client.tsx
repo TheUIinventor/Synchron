@@ -82,10 +82,6 @@ export default function HomeClient() {
   const lastProfileFetchRef = useRef<number | null>(null)
   const mountedRef = useRef(true)
 
-  // Home-specific calendar check to avoid flashing cached timetable
-  const [homeCalendarChecked, setHomeCalendarChecked] = useState<boolean>(false)
-  const [homeIsHoliday, setHomeIsHoliday] = useState<boolean>(false)
-
   useEffect(() => {
     // keep clock updated every second so countdowns refresh on mobile pill
     const t = setInterval(() => setCurrentDate(new Date()), 1000);
@@ -241,11 +237,15 @@ export default function HomeClient() {
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
 
-  // Determine the date to display for the HOME page. The home page should
-  // not be influenced by a manual date selection on the timetable page, so
-  // do not use `selectedDateObject` from the provider here. Instead use the
-  // local clock and auto-advance after school hours/weekends.
+  // Determine the date to display for the HOME page. During holidays or when
+  // no live data is available, use the timetable page's selected date so users
+  // can view past timetable data. Otherwise, use the current date with auto-advance.
   const displayDate = (() => {
+    // If user has selected a date on the timetable page, use that during holidays
+    if (selectedDateObject && (timetableSource === 'cache' || timetableSource === 'calendar-holiday')) {
+      return selectedDateObject
+    }
+    
     const now = currentDate
     const isWeekend = now.getDay() === 0 || now.getDay() === 6
     if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
@@ -256,6 +256,22 @@ export default function HomeClient() {
   // Use the displayDate's weekday to pick today's timetable for the home page.
   const dayName = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(displayDate);
   const todaysPeriodsRaw = timetableData[dayName] || [];
+  
+  // Debug: Log timetable data to diagnose Monday/Wed/Fri issues
+  console.log('[HomeClient] Debug:', {
+    displayDate: displayDate.toISOString().slice(0, 10),
+    dayName,
+    selectedDateObject: selectedDateObject?.toISOString().slice(0, 10),
+    timetableSource,
+    currentWeek,
+    periodsCount: todaysPeriodsRaw.length,
+    periods: todaysPeriodsRaw.map((p: any) => ({
+      period: p.period,
+      subject: p.subject,
+      time: p.time,
+      weekType: p.weekType
+    }))
+  })
 
   if (error) {
     return (
@@ -278,54 +294,6 @@ export default function HomeClient() {
   const canShowTimetable = Boolean(todaysPeriodsRaw.length > 0)
   const effectiveMoment = canShowTimetable ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
-
-  // Run a quick calendar check for the home display date so we can avoid
-  // rendering cached/external timetable rows for holiday dates while the
-  // provider is still performing its background refresh. This prevents a
-  // visible flash of stale timetable rows on initial load.
-  useEffect(() => {
-    let cancelled = false
-    // Only re-run when the display date (ISO) changes — avoid running
-    // every second due to the local clock ticking which caused visual
-    // thrash. Use the stable ISO date string as the dependency.
-    setHomeCalendarChecked(false)
-    setHomeIsHoliday(false)
-    void (async () => {
-      try {
-        const ds = displayDateIso
-        const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
-        const ctype = res.headers.get('content-type') || ''
-        if (res.ok && ctype.includes('application/json')) {
-          const calJson = await res.json()
-          let dayInfo: any = null
-          if (Array.isArray(calJson) && calJson.length) dayInfo = calJson[0]
-          else if (calJson && typeof calJson === 'object' && calJson[ds]) dayInfo = calJson[ds]
-          else if (calJson && typeof calJson === 'object') {
-            for (const k of Object.keys(calJson)) {
-              const v = calJson[k]
-              if (v && (v.date === ds || String(k) === ds)) { dayInfo = v; break }
-            }
-          }
-          const isHoliday = Boolean(
-            dayInfo && (
-              dayInfo.isHoliday === true ||
-              dayInfo.holiday === true ||
-              String(dayInfo.is_school_day).toLowerCase() === 'false' ||
-              String(dayInfo.status || '').toLowerCase().includes('holiday') ||
-              String(dayInfo.type || '').toLowerCase().includes('holiday') ||
-              String(dayInfo.dayType || '').toLowerCase().includes('holiday')
-            )
-          )
-          if (!cancelled) setHomeIsHoliday(Boolean(isHoliday))
-        }
-      } catch (e) {
-        // ignore - we'll just allow rendering after this
-      } finally {
-        if (!cancelled) setHomeCalendarChecked(true)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [displayDateIso])
 
   // Map provider bell buckets into the day-specific bucket keys used elsewhere.
   const bellsForDay = (() => {
