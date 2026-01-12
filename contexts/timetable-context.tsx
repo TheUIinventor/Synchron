@@ -1708,9 +1708,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // Apply authoritative variations even when using simple day-by-day external data
       try {
         const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
-        const authVars = selectedIso ? authoritativeVariationsRef.current.get(selectedIso) : null
         
-        console.debug('[timetable.provider] Simple timetable path - checking authVars for', selectedIso, '- found:', !!authVars, '- mapSize:', authoritativeVariationsRef.current.size)
+        // CRITICAL FIX: Try multiple date keys to find variations
+        // 1. Selected date (what user is viewing)
+        // 2. externalTimetableDateRef (what the data is FOR)
+        // 3. Today's date (fallback)
+        const candidateDates = [
+          selectedIso,
+          externalTimetableDateRef.current,
+          new Date().toISOString().slice(0, 10)
+        ].filter(Boolean)
+        
+        let authVars = null
+        let matchedDate = null
+        for (const dateKey of candidateDates) {
+          authVars = authoritativeVariationsRef.current.get(dateKey!)
+          if (authVars) {
+            matchedDate = dateKey
+            break
+          }
+        }
+        
+        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'found:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
         
         if (authVars) {
           for (const day of Object.keys(filtered)) {
