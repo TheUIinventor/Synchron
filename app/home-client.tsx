@@ -241,16 +241,11 @@ export default function HomeClient() {
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
 
-  // Determine the date to display for the HOME page. If the user has manually
-  // selected a date on the timetable page, use that for consistency. Otherwise
-  // use the local clock and auto-advance after school hours/weekends.
+  // Determine the date to display for the HOME page. The home page should
+  // not be influenced by a manual date selection on the timetable page, so
+  // do not use `selectedDateObject` from the provider here. Instead use the
+  // local clock and auto-advance after school hours/weekends.
   const displayDate = (() => {
-    // If user has manually selected a date (e.g., viewing past term data during holidays),
-    // use that date instead of auto-advancing
-    if (selectedDateObject) {
-      return selectedDateObject
-    }
-    
     const now = currentDate
     const isWeekend = now.getDay() === 0 || now.getDay() === 6
     if (isWeekend || isSchoolDayOver()) return getNextSchoolDay(now)
@@ -283,9 +278,6 @@ export default function HomeClient() {
   const canShowTimetable = Boolean(todaysPeriodsRaw.length > 0)
   const effectiveMoment = canShowTimetable ? currentMomentPeriodInfo : { currentPeriod: null, nextPeriod: null, timeUntil: '', isCurrentlyInClass: false }
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = effectiveMoment as any;
-
-  // Show loading state if we haven't checked calendar yet and have no cached data
-  const isLoading = !homeCalendarChecked && todaysPeriodsRaw.length === 0
 
   // Run a quick calendar check for the home display date so we can avoid
   // rendering cached/external timetable rows for holiday dates while the
@@ -356,33 +348,8 @@ export default function HomeClient() {
 
   // Helper: normalize period label for comparison
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
-  
-  // Sort periods by their embedded time to ensure correct display order
-  // (especially for Wed/Thu/Fri which have varying lunch/break times)
-  const todaysPeriods = useMemo(() => {
-    if (!todaysPeriodsRaw || todaysPeriodsRaw.length === 0) return []
-    
-    // Helper to parse time string "HH:MM" or "HH:MM - HH:MM" into minutes since midnight
-    const parseTimeToMinutes = (timeStr: string | undefined): number => {
-      if (!timeStr) return 999999 // Put items without time at end
-      const match = String(timeStr).match(/(\d{1,2}):(\d{2})/)
-      if (!match) return 999999
-      return parseInt(match[1]) * 60 + parseInt(match[2])
-    }
-    
-    // Sort by embedded time, fallback to period number
-    return [...todaysPeriodsRaw].sort((a, b) => {
-      const timeA = parseTimeToMinutes(a.time)
-      const timeB = parseTimeToMinutes(b.time)
-      
-      if (timeA !== timeB) return timeA - timeB
-      
-      // Fallback: sort by period number if times are equal
-      const periodA = parseInt(String(a.period || '99')) || 99
-      const periodB = parseInt(String(b.period || '99')) || 99
-      return periodA - periodB
-    })
-  }, [todaysPeriodsRaw])
+  // Keep roll call and period 0 visible — show all entries
+  const todaysPeriods = todaysPeriodsRaw
 
   // Helper: find a bell time for a given period by label matching, falling
   // back to index-based lookup when a direct label match isn't found.
