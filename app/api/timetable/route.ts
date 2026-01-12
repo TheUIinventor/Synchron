@@ -422,9 +422,15 @@ export async function GET(req: NextRequest) {
           if (Array.isArray(bells) && bells.length > 0) {
             const date = dj.date || dateParam
             
+            // Debug: Log the bells array structure
+            console.log(`[API] Bells array for ${dow}:`, JSON.stringify(bells.map(b => ({ bell: b.bell || b.period, start: b.startTime || b.start, end: b.endTime || b.end }))))
+            
             byDay[dow] = bells.map((bell: any) => {
               const bellKey = bell.bell || bell.period || ''
               const periodData = periodsObj[bellKey] || {}
+              
+              // Debug: Log period data lookup
+              console.log(`[API] Bell ${bellKey}: periodData exists=${!!Object.keys(periodData).length}, bell times=${bell.startTime || bell.start} - ${bell.endTime || bell.end}`)
               
               // Build subject lookup key (year + title)
               // SBHS subjects are keyed like "9ENG A" (no space between year and shortTitle)
@@ -481,6 +487,11 @@ export async function GET(req: NextRequest) {
               const start = bell.startTime || bell.start || ''
               const end = bell.endTime || bell.end || ''
               const time = [start, end].filter(Boolean).join(' - ')
+              
+              // Debug: Log time assignment for class periods
+              if (bellKey >= '1' && bellKey <= '5') {
+                console.log(`[API] ⏰ Period ${bellKey} time assignment: "${time}" (from bell: start="${start}", end="${end}")`)
+              }
               
               // Extract colour from subject data (hex without # prefix)
               const subjectColour = subjectData.colour || undefined

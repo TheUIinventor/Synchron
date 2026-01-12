@@ -752,6 +752,16 @@ export default function HomeClient() {
                 <div className="space-y-3 flex-1 pr-2">
                   {canShowTimetable && todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
+                      // Debug: log what times we're actually getting
+                      if (i === 0) {
+                        console.debug('[home-client] First period time data:', {
+                          dayName,
+                          periodTime: period.time,
+                          period: period.period,
+                          subject: period.subject
+                        })
+                      }
+                      
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
                       try {
