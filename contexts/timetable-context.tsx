@@ -3002,7 +3002,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // calendar date (daily view), not both Week A and Week B.
                   const genericSubs = subs.filter((s: any) => !s || !s.date)
 
-                  if (j.timetableByWeek && genericSubs.length) {
+                  if (j.timetableByWeek) {
                       try {
                       const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
                       const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
@@ -3021,9 +3021,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         for (const d of Object.keys(transformed)) {
                           weekMap[d] = transformed[d][weekKey] || []
                         }
-                        const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
-                        for (const d of Object.keys(transformed)) {
-                          transformed[d][weekKey] = applied[d] || []
+                        if (genericSubs.length > 0) {
+                          const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
+                          for (const d of Object.keys(transformed)) {
+                            transformed[d][weekKey] = applied[d] || []
+                          }
                         }
                       }
 
@@ -3031,6 +3033,46 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       applyToWeek('A')
                       applyToWeek('B')
                       applyToWeek('unknown')
+                      
+                      // CRITICAL FIX: Also copy date-specific variations directly from finalTimetable
+                      // Since finalTimetable already has variations applied (including date-specific ones),
+                      // we need to preserve those flags in the grouped structure.
+                      // Check each period in finalTimetable and if it has variation flags, copy them to the
+                      // corresponding period in the grouped structure.
+                      try {
+                        const weekType = j.weekType as ('A' | 'B' | null)
+                        if (weekType === 'A' || weekType === 'B') {
+                          for (const day of Object.keys(finalTimetable)) {
+                            const flatPeriods = finalTimetable[day] || []
+                            const groupedPeriods = transformed[day]?.[weekType] || []
+                            
+                            for (const flatP of flatPeriods) {
+                              // Find matching period in grouped structure
+                              const match = groupedPeriods.find((gp: any) => 
+                                String(gp.period).trim().toLowerCase() === String(flatP.period).trim().toLowerCase() &&
+                                String(gp.subject || '').trim().toLowerCase() === String(flatP.subject || '').trim().toLowerCase()
+                              )
+                              
+                              if (match) {
+                                // Copy variation flags from flat to grouped
+                                if ((flatP as any).isSubstitute) {
+                                  (match as any).isSubstitute = true
+                                  if ((flatP as any).casualSurname) (match as any).casualSurname = (flatP as any).casualSurname
+                                  if ((flatP as any).displayTeacher) (match as any).displayTeacher = (flatP as any).displayTeacher
+                                  if ((flatP as any).originalTeacher) (match as any).originalTeacher = (flatP as any).originalTeacher
+                                }
+                                if ((flatP as any).isRoomChange) {
+                                  (match as any).isRoomChange = true
+                                  if ((flatP as any).displayRoom) (match as any).displayRoom = (flatP as any).displayRoom
+                                  if ((flatP as any).originalRoom) (match as any).originalRoom = (flatP as any).originalRoom
+                                }
+                              }
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        console.error('[timetable.provider] Error copying variations to grouped structure:', e)
+                      }
 
                       finalByWeek = transformed
                     } catch (e) {
