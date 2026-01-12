@@ -1987,24 +1987,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         
         if (hasVariations || newCount > 0) {
           map.set(timetableDateIso, varData)
-        // Limit map size to prevent unbounded growth. Keep a longer history
-        // so substitutions from far-past dates remain available. Timetabl-app
-        // preserves query cache in localStorage (react-query persister) and
-        // thus can show substitutions from months ago. To match that behavior
-        // for authoritative variations we retain up to 365 days by default.
-        const MAX_VAR_DAYS = 365
-        if (map.size > MAX_VAR_DAYS) {
-          const oldest = Array.from(map.keys()).sort()[0]
-          map.delete(oldest)
+          // Limit map size to prevent unbounded growth. Keep a longer history
+          // so substitutions from far-past dates remain available. Timetabl-app
+          // preserves query cache in localStorage (react-query persister) and
+          // thus can show substitutions from months ago. To match that behavior
+          // for authoritative variations we retain up to 365 days by default.
+          const MAX_VAR_DAYS = 365
+          if (map.size > MAX_VAR_DAYS) {
+            const oldest = Array.from(map.keys()).sort()[0]
+            map.delete(oldest)
+          }
+          try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
+          
+          // Immediately persist to localStorage
+          try {
+            const obj: Record<string, any> = {}
+            map.forEach((value, key) => { obj[key] = value })
+            localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
+          } catch (e) {}
         }
-        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
-        
-        // Immediately persist to localStorage
-        try {
-          const obj: Record<string, any> = {}
-          map.forEach((value, key) => { obj[key] = value })
-          localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
-        } catch (e) {}
       }
     } catch (e) {}
   }, [externalTimetable, selectedDateObject])
