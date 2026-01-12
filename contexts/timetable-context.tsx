@@ -1232,6 +1232,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // Deep copy periods to prevent mutation of original timetableByWeek objects
         filtered[day] = list.map(p => ({ ...p }))
         
+        // CRITICAL FIX: If filtered[day] is empty but useExternalTimetable (flat structure) has data with variations,
+        // use that instead. This handles the case where timetableByWeek was built without variations
+        // but the flat timetable structure has them (from date-specific API responses).
+        if (filtered[day].length === 0 && useExternalTimetable && Array.isArray((useExternalTimetable as any)[day])) {
+          const flatDayData = (useExternalTimetable as any)[day] as Period[]
+          if (flatDayData.length > 0) {
+            // Check if any period has variations
+            const hasVariations = flatDayData.some((p: any) => p.isSubstitute || p.isRoomChange)
+            if (hasVariations) {
+              console.debug('[timetable.provider] Using flat timetable for', day, 'because it has variations')
+              filtered[day] = flatDayData.map(p => ({ ...p }))
+            }
+          }
+        }
+        
         // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
         // This ensures variations are NEVER lost, even when a background fetch returns data without them.
         try {
