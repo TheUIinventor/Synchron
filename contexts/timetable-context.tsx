@@ -1959,9 +1959,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      if (hasVariations) {
-        const map = authoritativeVariationsRef.current
-        map.set(timetableDateIso, varData)
+      // CRITICAL: Only update if we have variations OR if we don't have any stored yet
+      // This prevents overwriting good cached variations with empty data from refetches
+      const map = authoritativeVariationsRef.current
+      const existingVars = map.get(timetableDateIso)
+      
+      // Count existing variations
+      let existingCount = 0
+      if (existingVars) {
+        for (const day of Object.keys(existingVars)) {
+          existingCount += (existingVars[day] || []).length
+        }
+      }
+      
+      // Count new variations
+      let newCount = 0
+      for (const day of Object.keys(varData)) {
+        newCount += (varData[day] || []).length
+      }
+      
+      // Only update if new data has MORE variations, or if we have no existing data
+      if (newCount > 0 || !existingVars) {
+        if (newCount < existingCount) {
+          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has fewer variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
+          return
+        }
+        
+        if (hasVariations || newCount > 0) {
+          map.set(timetableDateIso, varData)
         // Limit map size to prevent unbounded growth. Keep a longer history
         // so substitutions from far-past dates remain available. Timetabl-app
         // preserves query cache in localStorage (react-query persister) and
