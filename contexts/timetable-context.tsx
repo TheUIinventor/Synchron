@@ -1237,7 +1237,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try {
           // Use the selected date, not just today, so variations work for past/future dates
           const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-          const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+          
+          // Try multiple sources for base periods: grouped week data, flat day data, and cached data
+          let daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+          
+          // If daySource is empty but we have lastRecordedTimetable, use that as fallback
+          if (daySource.length === 0 && lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day])) {
+            daySource = (lastRecordedTimetable as any)[day] as Period[]
+          }
           
           // Check if we have authoritative variations for the selected date
           const authVarsMap = authoritativeVariationsRef.current
