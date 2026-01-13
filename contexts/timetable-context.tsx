@@ -1072,52 +1072,68 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
     const isDataForWrongDate = Boolean(selectedIsoString && externalTimetableDateRef.current && selectedIsoString !== externalTimetableDateRef.current)
 
-    // CRITICAL: During holidays, don't withhold cached timetable data even if dates don't match
-    // The API returns empty for holidays, so we should show the last known good timetable
-    // Also, always allow lastRecordedTimetable as fallback regardless of date
-    // BUT: When using cached data for a wrong date, strip variation flags to prevent showing
-    // stale substitutes that cause flashing
-    let useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetable || null) : (externalTimetable ?? lastRecordedTimetable)
-    let useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetableByWeek || null) : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
+    // CRITICAL FIX: When viewing a different date than what externalTimetable is for,
+    // we have two scenarios:
+    // 1. externalTimetable IS for the selected date (data just arrived) → USE IT with variations
+    // 2. externalTimetable is for a DIFFERENT date → use lastRecordedTimetable WITHOUT variations
     
-    // CRITICAL FIX: Strip variation flags from cached data when it's for a different date
-    // This prevents Dec 16 variations from flashing when viewing Dec 17
-    if (isDataForWrongDate && useExternalTimetable) {
-      const stripped: Record<string, Period[]> = {}
-      for (const [day, periods] of Object.entries(useExternalTimetable as Record<string, Period[]>)) {
-        stripped[day] = (periods || []).map(p => {
-          const clean = { ...p }
-          delete (clean as any).isSubstitute
-          delete (clean as any).isRoomChange
-          delete (clean as any).casualSurname
-          delete (clean as any).displayRoom
-          delete (clean as any).displayTeacher
-          delete (clean as any).originalTeacher
-          delete (clean as any).originalRoom
-          return clean
-        })
-      }
-      useExternalTimetable = stripped
-    }
-    if (isDataForWrongDate && useExternalTimetableByWeek) {
-      const stripped: Record<string, any> = {}
-      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, any>)) {
-        stripped[day] = {}
-        for (const [weekType, periods] of Object.entries(groups)) {
-          stripped[day][weekType] = (periods as Period[] || []).map(p => {
-            const clean = { ...p }
-            delete (clean as any).isSubstitute
-            delete (clean as any).isRoomChange
-            delete (clean as any).casualSurname
-            delete (clean as any).displayRoom
-            delete (clean as any).displayTeacher
-            delete (clean as any).originalTeacher
-            delete (clean as any).originalRoom
-            return clean
-          })
+    // Check if externalTimetable is actually for the selected date (regardless of what ref says)
+    const externalIsForSelectedDate = selectedIsoString && externalTimetableDateRef.current === selectedIsoString
+    
+    let useExternalTimetable: Record<string, Period[]> | null = null
+    let useExternalTimetableByWeek: Record<string, any> | null = null
+    
+    if (externalIsForSelectedDate || !isDataForWrongDate) {
+      // Use external data as-is (it's for the correct date or ref matches)
+      useExternalTimetable = externalTimetable ?? lastRecordedTimetable
+      useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
+    } else {
+      // Date mismatch: use cached data but STRIP variations to avoid showing stale subs
+      if (!selectedDateIsHoliday) {
+        // Strip variations from cached fallback data
+        if (lastRecordedTimetable) {
+          const stripped: Record<string, Period[]> = {}
+          for (const [day, periods] of Object.entries(lastRecordedTimetable)) {
+            stripped[day] = (periods || []).map(p => {
+              const clean = { ...p }
+              delete (clean as any).isSubstitute
+              delete (clean as any).isRoomChange
+              delete (clean as any).casualSurname
+              delete (clean as any).displayRoom
+              delete (clean as any).displayTeacher
+              delete (clean as any).originalTeacher
+              delete (clean as any).originalRoom
+              return clean
+            })
+          }
+          useExternalTimetable = stripped
         }
+        
+        if (lastRecordedTimetableByWeek) {
+          const stripped: Record<string, any> = {}
+          for (const [day, groups] of Object.entries(lastRecordedTimetableByWeek)) {
+            stripped[day] = {}
+            for (const [weekType, periods] of Object.entries(groups)) {
+              stripped[day][weekType] = (periods as Period[] || []).map((p: Period) => {
+                const clean = { ...p }
+                delete (clean as any).isSubstitute
+                delete (clean as any).isRoomChange
+                delete (clean as any).casualSurname
+                delete (clean as any).displayRoom
+                delete (clean as any).displayTeacher
+                delete (clean as any).originalTeacher
+                delete (clean as any).originalRoom
+                return clean
+              })
+            }
+          }
+          useExternalTimetableByWeek = stripped
+        }
+      } else {
+        // Holiday: show cached data even with variations (no fresh data expected)
+        useExternalTimetable = lastRecordedTimetable
+        useExternalTimetableByWeek = lastRecordedTimetableByWeek
       }
-      useExternalTimetableByWeek = stripped
     }
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
