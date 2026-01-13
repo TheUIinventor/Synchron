@@ -1067,65 +1067,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
 
     // Prefer the live external timetable when available. Fall back to cached.
-    // Simple approach: Just use the API data as-is. Variations are already applied by the API.
-    // CRITICAL FIX: Only strip variations when using FALLBACK cached data during date mismatch
-    // If we have fresh externalTimetable data, use it even during mismatch (it might be the correct date)
-    const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
-    const externalDateString = externalTimetableDateRef.current
-    const isDateMismatch = selectedIsoString && externalDateString && selectedIsoString !== externalDateString
-    
-    let useExternalTimetable: Record<string, Period[]> | null = null
-    let useExternalTimetableByWeek: Record<string, any> | null = null
-    
-    // Always prefer fresh external data if available (might be the correct date)
-    if (externalTimetable || externalTimetableByWeek) {
-      useExternalTimetable = externalTimetable
-      useExternalTimetableByWeek = externalTimetableByWeek
-    } else if (!isDateMismatch || selectedDateIsHoliday) {
-      // No external data: use cached as-is
-      useExternalTimetable = lastRecordedTimetable
-      useExternalTimetableByWeek = lastRecordedTimetableByWeek
-    } else {
-      // No external data AND date mismatch: strip variations from cached fallback
-      if (lastRecordedTimetable) {
-        const stripped: Record<string, Period[]> = {}
-        for (const [day, periods] of Object.entries(lastRecordedTimetable)) {
-          stripped[day] = (periods || []).map(p => {
-            const clean = { ...p }
-            delete (clean as any).isSubstitute
-            delete (clean as any).casualSurname
-            delete (clean as any).displayTeacher
-            delete (clean as any).isRoomChange
-            delete (clean as any).displayRoom
-            delete (clean as any).originalTeacher
-            delete (clean as any).originalRoom
-            return clean
-          })
-        }
-        useExternalTimetable = stripped
-      }
-      
-      if (lastRecordedTimetableByWeek) {
-        const stripped: Record<string, any> = {}
-        for (const [day, groups] of Object.entries(lastRecordedTimetableByWeek)) {
-          stripped[day] = {}
-          for (const [weekType, periods] of Object.entries(groups)) {
-            stripped[day][weekType] = (periods as Period[] || []).map(p => {
-              const clean = { ...p }
-              delete (clean as any).isSubstitute
-              delete (clean as any).casualSurname
-              delete (clean as any).displayTeacher
-              delete (clean as any).isRoomChange
-              delete (clean as any).displayRoom
-              delete (clean as any).originalTeacher
-              delete (clean as any).originalRoom
-              return clean
-            })
-          }
-        }
-        useExternalTimetableByWeek = stripped
-      }
-    }
+    // Simple approach: Always use data immediately for instant display
+    // The API already applies variations correctly, so just use whatever we have
+    const useExternalTimetable = externalTimetable ?? lastRecordedTimetable
+    const useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
