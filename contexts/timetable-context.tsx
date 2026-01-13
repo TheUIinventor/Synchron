@@ -3280,6 +3280,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // CRITICAL: Set the date ref BEFORE startTransition so it's available to useEffect immediately
                   externalTimetableDateRef.current = computedDate
                   
+                  // Mark subs as applied since we've already applied cached variations
+                  subsAppliedRef.current = Date.now()
+                  
                   startTransition(() => {
                     if (j.weekType === 'A' || j.weekType === 'B') {
                       setExternalWeekType(j.weekType)
@@ -3451,6 +3454,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try { console.debug('[timetable.provider] withholding fetched timetable (array path) until per-date calendar check completes', { payloadDate, selIso }) } catch (e) {}
                   setIsRefreshing(false)
                 } else {
+                  // Mark subs as applied since we've already applied cached variations
+                  subsAppliedRef.current = Date.now()
+                  
                   startTransition(() => {
                     setExternalTimetable(byDay)
                     setTimetableSource(computedSourceArr)
@@ -3840,6 +3846,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // CRITICAL: Set the date ref BEFORE startTransition
             externalTimetableDateRef.current = todayDateStr2
+            
+            // Mark subs as applied since we've already applied cached variations
+            subsAppliedRef.current = Date.now()
             
             // Use startTransition to batch updates and prevent flash
             startTransition(() => {
