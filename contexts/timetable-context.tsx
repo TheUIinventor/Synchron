@@ -1233,27 +1233,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
         // Deep copy periods to prevent mutation of original timetableByWeek objects
         filtered[day] = list.map(p => ({ ...p }))
-      }
-      
-      // IMPORTANT: Do NOT apply date-specific variations to timetableByWeek data.
-      // The cycle view shows the template schedule for all days of the week, but
-      // variations are date-specific (e.g., only valid for Dec 16, not for all days).
-      // The API has already correctly stripped date-specific flags from timetableByWeek.
-      // Variations should ONLY be applied in the daily view using the flat timetable structure.
-      
-      // Return the grouped week data as-is, without variation reapplication
-      return filtered
-    }
-    
-    // FLAT TIMETABLE PATH - Only used for daily view with date-specific variations
-    if (useExternalTimetable) {
-      const filtered: Record<string, Period[]> = {}
-      for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
-        const list = Array.isArray((useExternalTimetable as any)[day]) ? ((useExternalTimetable as any)[day] as Period[]) : []
-        filtered[day] = list.map(p => ({ ...p }))
         
-        // Apply variations from authoritative cache for date-specific daily view.
-        // This ensures variations are preserved even when background fetches return data without them.
+        // CRITICAL FIX: If filtered[day] is empty but useExternalTimetable (flat structure) has data with variations,
+        // use that instead. This handles the case where timetableByWeek was built without variations
+        // but the flat timetable structure has them (from date-specific API responses).
+        if (filtered[day].length === 0 && useExternalTimetable && Array.isArray((useExternalTimetable as any)[day])) {
+          const flatDayData = (useExternalTimetable as any)[day] as Period[]
+          if (flatDayData.length > 0) {
+            // Check if any period has variations
+            const hasVariations = flatDayData.some((p: any) => p.isSubstitute || p.isRoomChange)
+            if (hasVariations) {
+              console.debug('[timetable.provider] Using flat timetable for', day, 'because it has variations')
+              filtered[day] = flatDayData.map(p => ({ ...p }))
+            }
+          }
+        }
+        
+        // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
+        // This ensures variations are NEVER lost, even when a background fetch returns data without them.
         try {
           // CRITICAL FIX: Try multiple date keys to find variations
           // Priority order:
