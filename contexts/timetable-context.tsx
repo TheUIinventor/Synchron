@@ -1073,6 +1073,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const externalDateString = externalTimetableDateRef.current
     const isDateMismatch = selectedIsoString && externalDateString && selectedIsoString !== externalDateString
     
+    // Store this flag so variation application logic can check it
+    const shouldSuppressVariations = isDateMismatch && !selectedDateIsHoliday
+    
     let useExternalTimetable: Record<string, Period[]> | null = null
     let useExternalTimetableByWeek: Record<string, any> | null = null
     
@@ -1330,7 +1333,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
           
           // Apply variations if they match the data we're displaying
-          if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+          // CRITICAL: Skip ALL variation application during date mismatch to prevent flash
+          if (shouldSuppressVariations) {
+            authVarsForDate = null
+          } else if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
             try { 
               console.debug('[timetable.provider] SKIPPING variation application - date mismatch', {
                 variationsFor: matchedDate,
@@ -1807,7 +1813,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         
         // Apply variations if they match the data we're displaying
-        if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+        // CRITICAL: Skip ALL variation application during date mismatch to prevent flash
+        if (shouldSuppressVariations) {
+          authVars = null
+        } else if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
           try { 
             console.debug('[timetable.provider] SKIPPING simple path variation - date mismatch', {
               variationsFor: matchedDate,
