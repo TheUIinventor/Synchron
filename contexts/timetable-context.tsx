@@ -1282,19 +1282,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
           
-          // CRITICAL: Only apply variations if they match the data we're actually displaying
-          // If externalTimetableDateRef exists and doesn't match the found variations, skip them
-          // This prevents showing Dec 16th's subs when viewing Jan 13th's cached timetable
-          if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
-            try { 
-              console.debug('[timetable.provider] SKIPPING variation application - date mismatch', {
-                variationsFor: matchedDate,
-                timetableFor: externalTimetableDateRef.current,
-                viewing: selectedIso
-              })
-            } catch (e) {}
-            authVarsForDate = null
-          }
+          // CRITICAL FIX: API already applies variations correctly
+          // Skip all variation reapplication since periods already have isSubstitute/isRoomChange flags
+          // This prevents double-application and the flashing bug
+          authVarsForDate = null
+          
+          // OLD LOGIC (now disabled):
+          // if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+          //   try { 
+          //     console.debug('[timetable.provider] SKIPPING variation application - date mismatch', {
+          //       variationsFor: matchedDate,
+          //       timetableFor: externalTimetableDateRef.current,
+          //       viewing: selectedIso
+          //     })
+          //   } catch (e) {}
+          //   authVarsForDate = null
+          // }
           
           try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
 
@@ -1761,17 +1764,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // CRITICAL: Only apply variations if they match the data we're actually displaying
-        if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
-          try { 
-            console.debug('[timetable.provider] SKIPPING simple path variation - date mismatch', {
-              variationsFor: matchedDate,
-              timetableFor: externalTimetableDateRef.current,
-              viewing: selectedIso
-            })
-          } catch (e) {}
-          authVars = null
-        }
+        // CRITICAL FIX: API already applies variations correctly
+        // Skip variation reapplication since periods already have isSubstitute/isRoomChange flags
+        authVars = null
+        
+        // OLD LOGIC (now disabled):
+        // if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+        //   try { 
+        //     console.debug('[timetable.provider] SKIPPING simple path variation - date mismatch', {
+        //       variationsFor: matchedDate,
+        //       timetableFor: externalTimetableDateRef.current,
+        //       viewing: selectedIso
+        //     })
+        //   } catch (e) {}
+        //   authVars = null
+        // }
         
         console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'found:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
         
