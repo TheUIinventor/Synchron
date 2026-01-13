@@ -1067,74 +1067,26 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
 
     // Prefer the live external timetable when available. Fall back to cached.
-    // If we determined it was a mismatch above, we should ideally exclude 
-    // the mismatching externalTimetable here.
+    // Simple approach: Just use the API data as-is. Variations are already applied by the API.
+    // Don't try to be clever with caching or reapplication - that causes all the issues.
+    
+    // CRITICAL FIX: Prevent showing stale data during date transitions
+    // If the user selected a different date but we haven't fetched that date's data yet,
+    // show empty timetable instead of flashing old data
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
-    const isDataForWrongDate = Boolean(selectedIsoString && externalTimetableDateRef.current && selectedIsoString !== externalTimetableDateRef.current)
-
-    // CRITICAL FIX: When viewing a different date than what externalTimetable is for,
-    // we have two scenarios:
-    // 1. externalTimetable IS for the selected date (data just arrived) → USE IT with variations
-    // 2. externalTimetable is for a DIFFERENT date → use lastRecordedTimetable WITHOUT variations
+    const externalDateString = externalTimetableDateRef.current
+    const isWaitingForNewDate = selectedIsoString && externalDateString && selectedIsoString !== externalDateString
     
-    // Check if externalTimetable is actually for the selected date (regardless of what ref says)
-    const externalIsForSelectedDate = selectedIsoString && externalTimetableDateRef.current === selectedIsoString
+    // Exception: During holidays, show cached data even if dates don't match (API returns empty for holidays)
+    const shouldShowStaleData = selectedDateIsHoliday || !isWaitingForNewDate
     
-    let useExternalTimetable: Record<string, Period[]> | null = null
-    let useExternalTimetableByWeek: Record<string, any> | null = null
-    
-    if (externalIsForSelectedDate || !isDataForWrongDate) {
-      // Use external data as-is (it's for the correct date or ref matches)
-      useExternalTimetable = externalTimetable ?? lastRecordedTimetable
-      useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
-    } else {
-      // Date mismatch: use cached data but STRIP variations to avoid showing stale subs
-      if (!selectedDateIsHoliday) {
-        // Strip variations from cached fallback data
-        if (lastRecordedTimetable) {
-          const stripped: Record<string, Period[]> = {}
-          for (const [day, periods] of Object.entries(lastRecordedTimetable)) {
-            stripped[day] = (periods || []).map(p => {
-              const clean = { ...p }
-              delete (clean as any).isSubstitute
-              delete (clean as any).isRoomChange
-              delete (clean as any).casualSurname
-              delete (clean as any).displayRoom
-              delete (clean as any).displayTeacher
-              delete (clean as any).originalTeacher
-              delete (clean as any).originalRoom
-              return clean
-            })
-          }
-          useExternalTimetable = stripped
-        }
-        
-        if (lastRecordedTimetableByWeek) {
-          const stripped: Record<string, any> = {}
-          for (const [day, groups] of Object.entries(lastRecordedTimetableByWeek)) {
-            stripped[day] = {}
-            for (const [weekType, periods] of Object.entries(groups)) {
-              stripped[day][weekType] = (periods as Period[] || []).map((p: Period) => {
-                const clean = { ...p }
-                delete (clean as any).isSubstitute
-                delete (clean as any).isRoomChange
-                delete (clean as any).casualSurname
-                delete (clean as any).displayRoom
-                delete (clean as any).displayTeacher
-                delete (clean as any).originalTeacher
-                delete (clean as any).originalRoom
-                return clean
-              })
-            }
-          }
-          useExternalTimetableByWeek = stripped
-        }
-      } else {
-        // Holiday: show cached data even with variations (no fresh data expected)
-        useExternalTimetable = lastRecordedTimetable
-        useExternalTimetableByWeek = lastRecordedTimetableByWeek
-      }
-    }
+    const useExternalTimetable = shouldShowStaleData 
+      ? (externalTimetable ?? lastRecordedTimetable)
+      : null // Show nothing while waiting for correct date's data
+      
+    const useExternalTimetableByWeek = shouldShowStaleData
+      ? (externalTimetableByWeek ?? lastRecordedTimetableByWeek) 
+      : null
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
@@ -1340,22 +1292,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
           
-          // CRITICAL FIX: API already applies variations correctly
-          // Skip all variation reapplication since periods already have isSubstitute/isRoomChange flags
-          // This prevents double-application and the flashing bug
-          authVarsForDate = null
-          
-          // OLD LOGIC (now disabled):
-          // if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
-          //   try { 
-          //     console.debug('[timetable.provider] SKIPPING variation application - date mismatch', {
-          //       variationsFor: matchedDate,
-          //       timetableFor: externalTimetableDateRef.current,
-          //       viewing: selectedIso
-          //     })
-          //   } catch (e) {}
-          //   authVarsForDate = null
-          // }
+          // Apply variations if they match the data we're displaying
+          if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+            try { 
+              console.debug('[timetable.provider] SKIPPING variation application - date mismatch', {
+                variationsFor: matchedDate,
+                timetableFor: externalTimetableDateRef.current,
+                viewing: selectedIso
+              })
+            } catch (e) {}
+            authVarsForDate = null
+          }
           
           try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
 
@@ -1439,16 +1386,44 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             }
             
-            // DISABLED: API already provides periods with correct variation flags
-            // No need to re-check or re-apply - this was causing the flashing bug
-            // OLD LOGIC:
-            // if (Array.isArray(daySource) && daySource.length) {
-            //   const normSubject = String(p.subject || '').trim().toLowerCase()
-            //   const match = daySource.find((src) => { ... })
-            //   if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
-            //     ... apply variations ...
-            //   }
-            // }
+            // Also check daySource for FRESH variations that might be newer than cached
+            // (This handles the case where a new variation was just added)
+            if (Array.isArray(daySource) && daySource.length) {
+              const normSubject = String(p.subject || '').trim().toLowerCase()
+              const match = daySource.find((src) => {
+                const srcPeriod = String(src.period).trim().toLowerCase()
+                const srcSubject = String(src.subject || '').trim().toLowerCase()
+                if (srcPeriod !== normPeriod) return false
+                if (srcSubject === normSubject) return true
+                if (srcSubject.includes(normSubject) || normSubject.includes(srcSubject)) return true
+                const srcCode = srcSubject.replace(/[^a-z0-9]/g, '')
+                const pCode = normSubject.replace(/[^a-z0-9]/g, '')
+                if (srcCode && pCode && (srcCode.includes(pCode) || pCode.includes(srcCode))) return true
+                return false
+              })
+              
+              // If match has variations, use them (they might be more recent than cached)
+              if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
+                if ((match as any).isSubstitute) {
+                  (p as any).isSubstitute = true
+                  if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
+                  if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
+                  if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
+                  if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
+                  if (match.teacher) p.teacher = match.teacher
+                }
+                
+                if ((match as any).isRoomChange && (match as any).displayRoom) {
+                  const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                  const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
+                  if (variationRoom && variationRoom !== scheduledRoom) {
+                    (p as any).isRoomChange = true
+                    (p as any).displayRoom = (match as any).displayRoom
+                    (p as any).originalRoom = p.room
+                  }
+                }
+              }
+            }
           }
         } catch (e) {
           // Ignore merge errors - display will still work without variations
@@ -1794,21 +1769,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // CRITICAL FIX: API already applies variations correctly
-        // Skip variation reapplication since periods already have isSubstitute/isRoomChange flags
-        authVars = null
-        
-        // OLD LOGIC (now disabled):
-        // if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
-        //   try { 
-        //     console.debug('[timetable.provider] SKIPPING simple path variation - date mismatch', {
-        //       variationsFor: matchedDate,
-        //       timetableFor: externalTimetableDateRef.current,
-        //       viewing: selectedIso
-        //     })
-        //   } catch (e) {}
-        //   authVars = null
-        // }
+        // Apply variations if they match the data we're displaying
+        if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+          try { 
+            console.debug('[timetable.provider] SKIPPING simple path variation - date mismatch', {
+              variationsFor: matchedDate,
+              timetableFor: externalTimetableDateRef.current,
+              viewing: selectedIso
+            })
+          } catch (e) {}
+          authVars = null
+        }
         
         console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'found:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
         
