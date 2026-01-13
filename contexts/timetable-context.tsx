@@ -1068,25 +1068,62 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     // Prefer the live external timetable when available. Fall back to cached.
     // Simple approach: Just use the API data as-is. Variations are already applied by the API.
-    // Don't try to be clever with caching or reapplication - that causes all the issues.
-    
-    // CRITICAL FIX: Prevent showing stale data during date transitions
-    // If the user selected a different date but we haven't fetched that date's data yet,
-    // show empty timetable instead of flashing old data
+    // CRITICAL FIX: When date doesn't match, show cached data but strip variations to prevent flash
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
     const externalDateString = externalTimetableDateRef.current
-    const isWaitingForNewDate = selectedIsoString && externalDateString && selectedIsoString !== externalDateString
+    const isDateMismatch = selectedIsoString && externalDateString && selectedIsoString !== externalDateString
     
-    // Exception: During holidays, show cached data even if dates don't match (API returns empty for holidays)
-    const shouldShowStaleData = selectedDateIsHoliday || !isWaitingForNewDate
+    let useExternalTimetable: Record<string, Period[]> | null = null
+    let useExternalTimetableByWeek: Record<string, any> | null = null
     
-    const useExternalTimetable = shouldShowStaleData 
-      ? (externalTimetable ?? lastRecordedTimetable)
-      : null // Show nothing while waiting for correct date's data
+    // If dates match or no mismatch, use data as-is
+    if (!isDateMismatch || selectedDateIsHoliday) {
+      useExternalTimetable = externalTimetable ?? lastRecordedTimetable
+      useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
+    } else {
+      // Date mismatch: show cached structure instantly but without variation flags
+      // This gives instant feedback while preventing stale substitute flash
+      const cached = externalTimetable ?? lastRecordedTimetable
+      if (cached) {
+        const stripped: Record<string, Period[]> = {}
+        for (const [day, periods] of Object.entries(cached)) {
+          stripped[day] = (periods || []).map(p => {
+            const clean = { ...p }
+            delete (clean as any).isSubstitute
+            delete (clean as any).casualSurname
+            delete (clean as any).displayTeacher
+            delete (clean as any).isRoomChange
+            delete (clean as any).displayRoom
+            delete (clean as any).originalTeacher
+            delete (clean as any).originalRoom
+            return clean
+          })
+        }
+        useExternalTimetable = stripped
+      }
       
-    const useExternalTimetableByWeek = shouldShowStaleData
-      ? (externalTimetableByWeek ?? lastRecordedTimetableByWeek) 
-      : null
+      const cachedByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
+      if (cachedByWeek) {
+        const stripped: Record<string, any> = {}
+        for (const [day, groups] of Object.entries(cachedByWeek)) {
+          stripped[day] = {}
+          for (const [weekType, periods] of Object.entries(groups)) {
+            stripped[day][weekType] = (periods as Period[] || []).map(p => {
+              const clean = { ...p }
+              delete (clean as any).isSubstitute
+              delete (clean as any).casualSurname
+              delete (clean as any).displayTeacher
+              delete (clean as any).isRoomChange
+              delete (clean as any).displayRoom
+              delete (clean as any).originalTeacher
+              delete (clean as any).originalRoom
+              return clean
+            })
+          }
+        }
+        useExternalTimetableByWeek = stripped
+      }
+    }
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
