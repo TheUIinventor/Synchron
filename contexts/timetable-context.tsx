@@ -3408,6 +3408,41 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try { console.debug('[timetable.provider] withholding fetched timetable (array path) until per-date calendar check completes', { payloadDate, selIso }) } catch (e) {}
                   setIsRefreshing(false)
                 } else {
+                  // Merge authoritative variations for the target date BEFORE updating state
+                  try {
+                    const authMap = authoritativeVariationsRef.current
+                    const dateKeyForCache = payloadDate || todayDateStr
+                    const authForDate = authMap && authMap.get(dateKeyForCache)
+                    if (authForDate && typeof authForDate === 'object') {
+                      for (const dayKey of Object.keys(authForDate)) {
+                        const dayVars = authForDate[dayKey] || []
+                        const dayPeriods = byDay[dayKey] || []
+                        for (const v of dayVars) {
+                          try {
+                            if (!v || !v.period) continue
+                            const norm = String(v.period).trim().toLowerCase()
+                            const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                            if (idx >= 0) {
+                              const period = dayPeriods[idx]
+                              if (v.isSubstitute) {
+                                (period as any).isSubstitute = true
+                                if (v.casualSurname) (period as any).casualSurname = v.casualSurname
+                                if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
+                                if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+                              }
+                              if (v.isRoomChange) {
+                                (period as any).isRoomChange = true
+                                if (v.displayRoom) (period as any).displayRoom = v.displayRoom
+                                if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+                              }
+                            }
+                          } catch (e) {}
+                        }
+                      }
+                      try { console.debug('[timetable.provider] merged authoritative variations (array path) for', dateKeyForCache) } catch (e) {}
+                    }
+                  } catch (e) {}
+
                   startTransition(() => {
                     setExternalTimetable(byDay)
                     setTimetableSource(computedSourceArr)
@@ -3776,6 +3811,40 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const hasData = Object.values(parsed).some((arr) => arr.length > 0)
           if (hasData) {
             // Batch state updates for scraped HTML after retry
+            // Merge authoritative variations for todayDateStr2 BEFORE updating state
+            try {
+              const authMap = authoritativeVariationsRef.current
+              const authForDate = authMap && authMap.get(todayDateStr2)
+              if (authForDate && typeof authForDate === 'object') {
+                for (const dayKey of Object.keys(authForDate)) {
+                  const dayVars = authForDate[dayKey] || []
+                  const dayPeriods = parsed[dayKey] || []
+                  for (const v of dayVars) {
+                    try {
+                      if (!v || !v.period) continue
+                      const norm = String(v.period).trim().toLowerCase()
+                      const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                      if (idx >= 0) {
+                        const period = dayPeriods[idx]
+                        if (v.isSubstitute) {
+                          (period as any).isSubstitute = true
+                          if (v.casualSurname) (period as any).casualSurname = v.casualSurname
+                          if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
+                          if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+                        }
+                        if (v.isRoomChange) {
+                          (period as any).isRoomChange = true
+                          if (v.displayRoom) (period as any).displayRoom = v.displayRoom
+                          if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+                        }
+                      }
+                    } catch (e) {}
+                  }
+                }
+                try { console.debug('[timetable.provider] merged authoritative variations (scraped retry) for', todayDateStr2) } catch (e) {}
+              }
+            } catch (e) {}
+
             startTransition(() => {
               setExternalTimetable(parsed)
               setTimetableSource('external-scraped')
