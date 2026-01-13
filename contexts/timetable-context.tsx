@@ -431,6 +431,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     selectedDateObjectRef.current = selectedDateObject
   }, [selectedDateObject])
   
+  // Clear substitution state when date changes so we re-fetch for the new date
+  useEffect(() => {
+    subsAppliedRef.current = null
+    lastSubsAttemptRef.current = null
+  }, [selectedDateObject])
+  
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
@@ -3220,52 +3226,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
               
-              // CRITICAL: Apply cached variations to finalTimetable BEFORE setting state
-              // This prevents flashing by ensuring variations are in the data when UI renders
-              try {
-                const varMap = authoritativeVariationsRef.current
-                const cachedVars = varMap.get(todayDateStr)
-                if (cachedVars && typeof cachedVars === 'object') {
-                  try {
-                    // Directly apply cached variations which are already organized by day
-                    // No need to go through applySubstitutionsToTimetable since we have exact day mapping
-                    for (const day of Object.keys(cachedVars)) {
-                      const dayVars = cachedVars[day] || []
-                      const dayPeriods = finalTimetable[day] || []
-                      
-                      for (const varPeriod of dayVars) {
-                        if (!varPeriod || !varPeriod.period) continue
-                        
-                        // Find matching period in the timetable
-                        const normVarPeriod = String(varPeriod.period).trim().toLowerCase()
-                        const matchIdx = dayPeriods.findIndex((p: any) => 
-                          String(p.period).trim().toLowerCase() === normVarPeriod
-                        )
-                        
-                        if (matchIdx >= 0) {
-                          // Apply variation flags to the matched period
-                          const period = dayPeriods[matchIdx]
-                          if (varPeriod.isSubstitute) {
-                            (period as any).isSubstitute = true
-                            if (varPeriod.casualSurname) (period as any).casualSurname = varPeriod.casualSurname
-                            if (varPeriod.displayTeacher) (period as any).displayTeacher = varPeriod.displayTeacher
-                            if (varPeriod.originalTeacher) (period as any).originalTeacher = varPeriod.originalTeacher
-                          }
-                          if (varPeriod.isRoomChange) {
-                            (period as any).isRoomChange = true
-                            if (varPeriod.displayRoom) (period as any).displayRoom = varPeriod.displayRoom
-                            if (varPeriod.originalRoom) (period as any).originalRoom = varPeriod.originalRoom
-                          }
-                        }
-                      }
-                    }
-                    try { console.debug('[timetable.provider] applied cached variations to fetched timetable for', todayDateStr) } catch (e) {}
-                  } catch (e) {
-                    try { console.debug('[timetable.provider] error applying cached variations:', e) } catch (err) {}
-                  }
-                }
-              } catch (e) {}
-              
               const computedSource = j.source ?? 'external'
               // Use the actual date we fetched for, not the current date
               const computedDate = todayDateStr
@@ -3279,9 +3239,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 } else {
                   // CRITICAL: Set the date ref BEFORE startTransition so it's available to useEffect immediately
                   externalTimetableDateRef.current = computedDate
-                  
-                  // Mark subs as applied since we've already applied cached variations
-                  subsAppliedRef.current = Date.now()
                   
                   startTransition(() => {
                     if (j.weekType === 'A' || j.weekType === 'B') {
@@ -3404,49 +3361,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
                 const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
                 
-                // CRITICAL: Apply cached variations to byDay BEFORE setting state
-                try {
-                  const varMap = authoritativeVariationsRef.current
-                  const dateKeyForCache = payloadDate || todayDateStr
-                  const cachedVars = varMap.get(dateKeyForCache)
-                  if (cachedVars && typeof cachedVars === 'object') {
-                    try {
-                      // Directly apply cached variations which are already organized by day
-                      for (const day of Object.keys(cachedVars)) {
-                        const dayVars = cachedVars[day] || []
-                        const dayPeriods = byDay[day] || []
-                        
-                        for (const varPeriod of dayVars) {
-                          if (!varPeriod || !varPeriod.period) continue
-                          
-                          const normVarPeriod = String(varPeriod.period).trim().toLowerCase()
-                          const matchIdx = dayPeriods.findIndex((p: any) => 
-                            String(p.period).trim().toLowerCase() === normVarPeriod
-                          )
-                          
-                          if (matchIdx >= 0) {
-                            const period = dayPeriods[matchIdx]
-                            if (varPeriod.isSubstitute) {
-                              (period as any).isSubstitute = true
-                              if (varPeriod.casualSurname) (period as any).casualSurname = varPeriod.casualSurname
-                              if (varPeriod.displayTeacher) (period as any).displayTeacher = varPeriod.displayTeacher
-                              if (varPeriod.originalTeacher) (period as any).originalTeacher = varPeriod.originalTeacher
-                            }
-                            if (varPeriod.isRoomChange) {
-                              (period as any).isRoomChange = true
-                              if (varPeriod.displayRoom) (period as any).displayRoom = varPeriod.displayRoom
-                              if (varPeriod.originalRoom) (period as any).originalRoom = varPeriod.originalRoom
-                            }
-                          }
-                        }
-                      }
-                      try { console.debug('[timetable.provider] applied cached variations to fetched timetable (array) for', dateKeyForCache) } catch (e) {}
-                    } catch (e) {
-                      try { console.debug('[timetable.provider] error applying cached variations (array):', e) } catch (err) {}
-                    }
-                  }
-                } catch (e) {}
-                
                 // CRITICAL FIX: Do NOT withhold data if we have a valid payload, even if calendar check is pending.
                 // The withholding logic was causing valid backfilled data for past dates to be ignored
                 // because selectedDateCalendarChecked was false (since we don't check calendar for past dates in the same way).
@@ -3454,9 +3368,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try { console.debug('[timetable.provider] withholding fetched timetable (array path) until per-date calendar check completes', { payloadDate, selIso }) } catch (e) {}
                   setIsRefreshing(false)
                 } else {
-                  // Mark subs as applied since we've already applied cached variations
-                  subsAppliedRef.current = Date.now()
-                  
                   startTransition(() => {
                     setExternalTimetable(byDay)
                     setTimetableSource(computedSourceArr)
@@ -3802,53 +3713,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore substitution extraction errors
             }
             
-            // CRITICAL: Apply cached variations to finalTimetable BEFORE setting state
-            try {
-              const varMap = authoritativeVariationsRef.current
-              const cachedVars = varMap.get(todayDateStr2)
-              if (cachedVars && typeof cachedVars === 'object') {
-                try {
-                  // Directly apply cached variations which are already organized by day
-                  for (const day of Object.keys(cachedVars)) {
-                    const dayVars = cachedVars[day] || []
-                    const dayPeriods = finalTimetable[day] || []
-                    
-                    for (const varPeriod of dayVars) {
-                      if (!varPeriod || !varPeriod.period) continue
-                      
-                      const normVarPeriod = String(varPeriod.period).trim().toLowerCase()
-                      const matchIdx = dayPeriods.findIndex((p: any) => 
-                        String(p.period).trim().toLowerCase() === normVarPeriod
-                      )
-                      
-                      if (matchIdx >= 0) {
-                        const period = dayPeriods[matchIdx]
-                        if (varPeriod.isSubstitute) {
-                          (period as any).isSubstitute = true
-                          if (varPeriod.casualSurname) (period as any).casualSurname = varPeriod.casualSurname
-                          if (varPeriod.displayTeacher) (period as any).displayTeacher = varPeriod.displayTeacher
-                          if (varPeriod.originalTeacher) (period as any).originalTeacher = varPeriod.originalTeacher
-                        }
-                        if (varPeriod.isRoomChange) {
-                          (period as any).isRoomChange = true
-                          if (varPeriod.displayRoom) (period as any).displayRoom = varPeriod.displayRoom
-                          if (varPeriod.originalRoom) (period as any).originalRoom = varPeriod.originalRoom
-                        }
-                      }
-                    }
-                  }
-                  try { console.debug('[timetable.provider] applied cached variations to retry timetable for', todayDateStr2) } catch (e) {}
-                } catch (e) {
-                  try { console.debug('[timetable.provider] error applying cached variations (retry):', e) } catch (err) {}
-                }
-              }
-            } catch (e) {}
-            
             // CRITICAL: Set the date ref BEFORE startTransition
             externalTimetableDateRef.current = todayDateStr2
-            
-            // Mark subs as applied since we've already applied cached variations
-            subsAppliedRef.current = Date.now()
             
             // Use startTransition to batch updates and prevent flash
             startTransition(() => {
