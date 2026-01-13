@@ -2183,7 +2183,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           // Try to extract variations from known fields in the AI payload first
           const fromUpstream = PortalScraper.extractVariationsFromJson(j)
           try { console.debug('[timetable.provider] extracted variations from /api/timetable payload', Array.isArray(fromUpstream) ? fromUpstream.length : 0, fromUpstream && fromUpstream[0] || null) } catch (e) {}
-          if (Array.isArray(fromUpstream) && fromUpstream.length) return fromUpstream
+          if (Array.isArray(fromUpstream) && fromUpstream.length) {
+            // Ensure each substitution has a date set so applySubstitutionsToTimetable uses the correct day
+            return fromUpstream.map((v: any) => ({ ...v, date: v.date || dateParam }))
+          }
           // Some timetable JSON shapes embed substitute/casual fields directly
           // on period items rather than exposing a separate `variations` array.
           // Scan common payload locations for inline substitution markers and
@@ -2209,7 +2212,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try { console.debug('[timetable.provider] found inline substitution-like items in /api/timetable payload', inlineFound.length, inlineFound[0]) } catch (e) {}
               // Normalize inline items to variation objects similar to portal-scraper.normalizeVariation
               const normalizedInline = inlineFound.map((it: any) => ({
-                date: it.date || it.day || undefined,
+                date: it.date || it.day || dateParam,
                 period: it.period || it.p || it.block || undefined,
                 subject: it.subject || it.class || undefined,
                 originalTeacher: it.teacher || it.originalTeacher || undefined,
@@ -2228,8 +2231,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try { console.debug('[timetable.provider] inline scan failed', e) } catch (err) {}
           }
           // fall back to commonly named keys
-          if (Array.isArray(j.substitutions)) return j.substitutions
-          if (Array.isArray(j.variations)) return j.variations
+          if (Array.isArray(j.substitutions)) return j.substitutions.map((v: any) => ({ ...v, date: v.date || dateParam }))
+          if (Array.isArray(j.variations)) return j.variations.map((v: any) => ({ ...v, date: v.date || dateParam }))
         }
         // If AI endpoint returned HTML, attempt to scrape it
         if (res.ok && ct.includes('text/html')) {
@@ -2237,7 +2240,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           try {
             const extracted = PortalScraper.extractVariationsFromHtml(text)
             try { console.debug('[timetable.provider] ai timetable extracted from HTML', extracted.length) } catch (e) {}
-            return extracted || []
+            return (extracted || []).map((v: any) => ({ ...v, date: v.date || dateParam }))
           } catch (e) {}
         }
       } catch (e) {
@@ -2251,7 +2254,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (res2.ok && ctype.includes('application/json')) {
           const j = await res2.json()
           try { console.debug('[timetable.provider] portal subs fallback', Array.isArray(j.substitutions) ? j.substitutions.length : 0) } catch (e) {}
-          return j.substitutions || []
+          return (j.substitutions || []).map((v: any) => ({ ...v, date: v.date || dateParam }))
         }
         if (res2.ok && ctype.includes('text/html')) {
           const text = await res2.text()
@@ -3239,7 +3242,44 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 } else {
                   // CRITICAL: Set the date ref BEFORE startTransition so it's available to useEffect immediately
                   externalTimetableDateRef.current = computedDate
-                  
+
+                  // If we have authoritative variations captured for this date (or the selected date),
+                  // merge them into the finalTimetable to avoid flashes where a subsequent
+                  // render would otherwise overwrite substitutions with raw data.
+                  try {
+                    const authMap = authoritativeVariationsRef.current
+                    const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                    const authForDate = (authMap && (authMap.get(computedDate) || (selIso && authMap.get(selIso)))) || null
+                    if (authForDate && typeof authForDate === 'object') {
+                      for (const dayKey of Object.keys(authForDate)) {
+                        const dayVars = authForDate[dayKey] || []
+                        const dayPeriods = (finalTimetable as any)[dayKey] || []
+                        for (const v of dayVars) {
+                          try {
+                            if (!v || !v.period) continue
+                            const norm = String(v.period).trim().toLowerCase()
+                            const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                            if (idx >= 0) {
+                              const period = dayPeriods[idx]
+                              if (v.isSubstitute) {
+                                (period as any).isSubstitute = true
+                                if (v.casualSurname) (period as any).casualSurname = v.casualSurname
+                                if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
+                                if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+                              }
+                              if (v.isRoomChange) {
+                                (period as any).isRoomChange = true
+                                if (v.displayRoom) (period as any).displayRoom = v.displayRoom
+                                if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+                              }
+                            }
+                          } catch (e) {}
+                        }
+                      }
+                      try { console.debug('[timetable.provider] merged authoritative variations into fetched processed payload for', computedDate) } catch (e) {}
+                    }
+                  } catch (e) {}
+
                   startTransition(() => {
                     if (j.weekType === 'A' || j.weekType === 'B') {
                       setExternalWeekType(j.weekType)
@@ -4211,6 +4251,40 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               // CRITICAL: Track which date this timetable data is FOR before setting it
+              // Merge any authoritative variations we previously captured for this date
+              try {
+                const authMap = authoritativeVariationsRef.current
+                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                const authForDate = (authMap && (authMap.get(ds) || (selIso && authMap.get(selIso)))) || null
+                if (authForDate && typeof authForDate === 'object') {
+                  for (const dayKey of Object.keys(authForDate)) {
+                    const dayVars = authForDate[dayKey] || []
+                    const dayPeriods = (finalTimetable as any)[dayKey] || []
+                    for (const v of dayVars) {
+                      try {
+                        if (!v || !v.period) continue
+                        const norm = String(v.period).trim().toLowerCase()
+                        const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                        if (idx >= 0) {
+                          const period = dayPeriods[idx]
+                          if (v.isSubstitute) {
+                            (period as any).isSubstitute = true
+                            if (v.casualSurname) (period as any).casualSurname = v.casualSurname
+                            if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
+                            if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+                          }
+                          if (v.isRoomChange) {
+                            (period as any).isRoomChange = true
+                            if (v.displayRoom) (period as any).displayRoom = v.displayRoom
+                            if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+                          }
+                        }
+                      } catch (e) {}
+                    }
+                  }
+                  try { console.debug('[timetable.provider] merged authoritative variations into fetched date payload for', ds) } catch (e) {}
+                }
+              } catch (e) {}
               externalTimetableDateRef.current = ds
               setExternalTimetable(finalTimetable)
             setTimetableSource(j.source ?? 'external')
