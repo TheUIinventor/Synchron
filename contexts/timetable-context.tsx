@@ -3249,7 +3249,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try {
                     const authMap = authoritativeVariationsRef.current
                     const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
-                    const authForDate = (authMap && (authMap.get(computedDate) || (selIso && authMap.get(selIso)))) || null
+                    const candidateDates = [computedDate, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
+                    let authForDate: any = null
+                    for (const dk of candidateDates) { authForDate = authMap.get(dk); if (authForDate) break }
                     if (authForDate && typeof authForDate === 'object') {
                       for (const dayKey of Object.keys(authForDate)) {
                         const dayVars = authForDate[dayKey] || []
@@ -3412,7 +3414,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try {
                     const authMap = authoritativeVariationsRef.current
                     const dateKeyForCache = payloadDate || todayDateStr
-                    const authForDate = authMap && authMap.get(dateKeyForCache)
+                    const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                    const candidateDates = [dateKeyForCache, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
+                    let authForDate: any = null
+                    for (const dk of candidateDates) { authForDate = authMap.get(dk); if (authForDate) break }
                     if (authForDate && typeof authForDate === 'object') {
                       for (const dayKey of Object.keys(authForDate)) {
                         const dayVars = authForDate[dayKey] || []
@@ -3814,7 +3819,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // Merge authoritative variations for todayDateStr2 BEFORE updating state
             try {
               const authMap = authoritativeVariationsRef.current
-              const authForDate = authMap && authMap.get(todayDateStr2)
+              const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+              const candidateDates = [todayDateStr2, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
+              let authForDate: any = null
+              for (const dk of candidateDates) { authForDate = authMap.get(dk); if (authForDate) break }
               if (authForDate && typeof authForDate === 'object') {
                 for (const dayKey of Object.keys(authForDate)) {
                   const dayVars = authForDate[dayKey] || []
@@ -4324,7 +4332,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const authMap = authoritativeVariationsRef.current
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
-                const authForDate = (authMap && (authMap.get(ds) || (selIso && authMap.get(selIso)))) || null
+                const candidateDates = [ds, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
+                let authForDate: any = null
+                for (const dk of candidateDates) { authForDate = authMap.get(dk); if (authForDate) break }
                 if (authForDate && typeof authForDate === 'object') {
                   for (const dayKey of Object.keys(authForDate)) {
                     const dayVars = authForDate[dayKey] || []
@@ -4346,6 +4356,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             (period as any).isRoomChange = true
                             if (v.displayRoom) (period as any).displayRoom = v.displayRoom
                             if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+                          }
+                        }
+                      } catch (e) {}
+                    }
+                    // Also merge into grouped by-week structure if present
+                    if (finalByWeek && (finalByWeek as any)[dayKey]) {
+                      try {
+                        const groups = (finalByWeek as any)[dayKey]
+                        for (const wk of ['A','B','unknown']) {
+                          const arr = Array.isArray(groups[wk]) ? groups[wk] : []
+                          for (const v of dayVars) {
+                            if (!v || !v.period) continue
+                            const norm = String(v.period).trim().toLowerCase()
+                            const idx = arr.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                            if (idx >= 0) {
+                              const period = arr[idx]
+                              if (v.isSubstitute) {
+                                (period as any).isSubstitute = true
+                                if (v.casualSurname) (period as any).casualSurname = v.casualSurname
+                                if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
+                                if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+                              }
+                              if (v.isRoomChange) {
+                                (period as any).isRoomChange = true
+                                if (v.displayRoom) (period as any).displayRoom = v.displayRoom
+                                if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+                              }
+                            }
                           }
                         }
                       } catch (e) {}
