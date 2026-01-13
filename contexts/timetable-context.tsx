@@ -1072,11 +1072,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
     const isDataForWrongDate = Boolean(selectedIsoString && externalTimetableDateRef.current && selectedIsoString !== externalTimetableDateRef.current)
 
-    // CRITICAL: During holidays OR when actively refreshing, allow showing cached data even if dates don't match
-    // But during normal navigation (not refreshing), hide mismatched data to prevent showing wrong-day subs
-    const allowMismatchedData = selectedDateIsHoliday || isRefreshing
-    const useExternalTimetable = (isDataForWrongDate && !allowMismatchedData) ? null : (externalTimetable ?? lastRecordedTimetable)
-    const useExternalTimetableByWeek = (isDataForWrongDate && !allowMismatchedData) ? null : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
+    // CRITICAL: During holidays, don't withhold cached timetable data even if dates don't match
+    // The API returns empty for holidays, so we should show the last known good timetable
+    // Also, always allow lastRecordedTimetable as fallback regardless of date
+    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetable || null) : (externalTimetable ?? lastRecordedTimetable)
+    const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetableByWeek || null) : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
@@ -1251,13 +1251,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // This ensures variations are NEVER lost, even when a background fetch returns data without them.
         try {
           // CRITICAL FIX: Try multiple date keys to find variations
-          // IMPORTANT: Check externalTimetableDateRef FIRST because that's what the data is actually FOR
-          // selectedDateObject is what the USER is viewing, which can be different during navigation
+          // Priority order:
+          // 1. externalTimetableDateRef (what the data is FOR) - MOST AUTHORITATIVE
+          // 2. Selected date (what user is viewing)
+          // 3. Today's date (fallback)
           const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
           const candidateDates = [
-            externalTimetableDateRef.current,  // What the cached data is FOR (highest priority)
-            selectedIso,                       // What the user is currently viewing
-            new Date().toISOString().slice(0, 10)  // Today (fallback)
+            externalTimetableDateRef.current, // Try data's actual date FIRST
+            selectedIso,
+            new Date().toISOString().slice(0, 10)
           ].filter(Boolean)
           
           // Try multiple sources for base periods: grouped week data, flat day data, and cached data
@@ -1278,6 +1280,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               matchedDate = dateKey
               break
             }
+          }
+          
+          // CRITICAL: Only apply variations if they match the data we're actually displaying
+          // If externalTimetableDateRef exists and doesn't match the found variations, skip them
+          // This prevents showing Dec 16th's subs when viewing Jan 13th's cached timetable
+          if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+            try { 
+              console.debug('[timetable.provider] SKIPPING variation application - date mismatch', {
+                variationsFor: matchedDate,
+                timetableFor: externalTimetableDateRef.current,
+                viewing: selectedIso
+              })
+            } catch (e) {}
+            authVarsForDate = null
           }
           
           try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
@@ -1725,11 +1741,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
         
         // CRITICAL FIX: Try multiple date keys to find variations
-        // IMPORTANT: Check externalTimetableDateRef FIRST because that's what the data is actually FOR
+        // Priority order:
+        // 1. externalTimetableDateRef (what the data is FOR) - MOST AUTHORITATIVE
+        // 2. Selected date (what user is viewing)
+        // 3. Today's date (fallback)
         const candidateDates = [
-          externalTimetableDateRef.current,  // What the cached data is FOR (highest priority)
-          selectedIso,                       // What the user is currently viewing
-          new Date().toISOString().slice(0, 10)  // Today (fallback)
+          externalTimetableDateRef.current, // Try data's actual date FIRST
+          selectedIso,
+          new Date().toISOString().slice(0, 10)
         ].filter(Boolean)
         
         let authVars = null
@@ -1740,6 +1759,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             matchedDate = dateKey
             break
           }
+        }
+        
+        // CRITICAL: Only apply variations if they match the data we're actually displaying
+        if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+          try { 
+            console.debug('[timetable.provider] SKIPPING simple path variation - date mismatch', {
+              variationsFor: matchedDate,
+              timetableFor: externalTimetableDateRef.current,
+              viewing: selectedIso
+            })
+          } catch (e) {}
+          authVars = null
         }
         
         console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'found:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
