@@ -431,12 +431,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     selectedDateObjectRef.current = selectedDateObject
   }, [selectedDateObject])
   
-  // Clear substitution state when date changes so we re-fetch for the new date
-  useEffect(() => {
-    subsAppliedRef.current = null
-    lastSubsAttemptRef.current = null
-  }, [selectedDateObject])
-  
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
@@ -3225,6 +3219,46 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     : null,
                 }
               } catch (e) {}
+              
+              // CRITICAL: Apply cached variations to finalTimetable BEFORE setting state
+              // This prevents flashing by ensuring variations are in the data when UI renders
+              try {
+                const varMap = authoritativeVariationsRef.current
+                const cachedVars = varMap.get(todayDateStr)
+                if (cachedVars && typeof cachedVars === 'object') {
+                  try {
+                    // Build a variations array from cached data and apply it
+                    const varArray: any[] = []
+                    for (const day of Object.keys(cachedVars)) {
+                      const dayVars = cachedVars[day] || []
+                      for (const v of dayVars) {
+                        if (v && v.period) {
+                          varArray.push({
+                            date: todayDateStr,
+                            period: v.period,
+                            isSubstitute: v.isSubstitute,
+                            casualSurname: v.casualSurname,
+                            displayTeacher: v.displayTeacher,
+                            originalTeacher: v.originalTeacher,
+                            isRoomChange: v.isRoomChange,
+                            displayRoom: v.displayRoom,
+                            originalRoom: v.originalRoom,
+                          })
+                        }
+                      }
+                    }
+                    if (varArray.length > 0) {
+                      // Apply cached variations to finalTimetable
+                      const withVars = applySubstitutionsToTimetable(finalTimetable, varArray, { debug: false })
+                      finalTimetable = withVars
+                      try { console.debug('[timetable.provider] applied', varArray.length, 'cached variations to fetched timetable for', todayDateStr) } catch (e) {}
+                    }
+                  } catch (e) {
+                    try { console.debug('[timetable.provider] error applying cached variations:', e) } catch (err) {}
+                  }
+                }
+              } catch (e) {}
+              
               const computedSource = j.source ?? 'external'
               // Use the actual date we fetched for, not the current date
               const computedDate = todayDateStr
@@ -3359,6 +3393,44 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const payloadDate = extractDateFromPayload(j.upstream || j) || null
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
                 const isOfflineNow = (typeof navigator !== 'undefined') ? (navigator.onLine === false) : false
+                
+                // CRITICAL: Apply cached variations to byDay BEFORE setting state
+                try {
+                  const varMap = authoritativeVariationsRef.current
+                  const dateKeyForCache = payloadDate || todayDateStr
+                  const cachedVars = varMap.get(dateKeyForCache)
+                  if (cachedVars && typeof cachedVars === 'object') {
+                    try {
+                      const varArray: any[] = []
+                      for (const day of Object.keys(cachedVars)) {
+                        const dayVars = cachedVars[day] || []
+                        for (const v of dayVars) {
+                          if (v && v.period) {
+                            varArray.push({
+                              date: dateKeyForCache,
+                              period: v.period,
+                              isSubstitute: v.isSubstitute,
+                              casualSurname: v.casualSurname,
+                              displayTeacher: v.displayTeacher,
+                              originalTeacher: v.originalTeacher,
+                              isRoomChange: v.isRoomChange,
+                              displayRoom: v.displayRoom,
+                              originalRoom: v.originalRoom,
+                            })
+                          }
+                        }
+                      }
+                      if (varArray.length > 0) {
+                        const withVars = applySubstitutionsToTimetable(byDay, varArray, { debug: false })
+                        byDay = withVars
+                        try { console.debug('[timetable.provider] applied', varArray.length, 'cached variations to fetched timetable (array) for', dateKeyForCache) } catch (e) {}
+                      }
+                    } catch (e) {
+                      try { console.debug('[timetable.provider] error applying cached variations (array):', e) } catch (err) {}
+                    }
+                  }
+                } catch (e) {}
+                
                 // CRITICAL FIX: Do NOT withhold data if we have a valid payload, even if calendar check is pending.
                 // The withholding logic was causing valid backfilled data for past dates to be ignored
                 // because selectedDateCalendarChecked was false (since we don't check calendar for past dates in the same way).
@@ -3710,6 +3782,42 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             } catch (e) {
               // ignore substitution extraction errors
             }
+            
+            // CRITICAL: Apply cached variations to finalTimetable BEFORE setting state
+            try {
+              const varMap = authoritativeVariationsRef.current
+              const cachedVars = varMap.get(todayDateStr2)
+              if (cachedVars && typeof cachedVars === 'object') {
+                try {
+                  const varArray: any[] = []
+                  for (const day of Object.keys(cachedVars)) {
+                    const dayVars = cachedVars[day] || []
+                    for (const v of dayVars) {
+                      if (v && v.period) {
+                        varArray.push({
+                          date: todayDateStr2,
+                          period: v.period,
+                          isSubstitute: v.isSubstitute,
+                          casualSurname: v.casualSurname,
+                          displayTeacher: v.displayTeacher,
+                          originalTeacher: v.originalTeacher,
+                          isRoomChange: v.isRoomChange,
+                          displayRoom: v.displayRoom,
+                          originalRoom: v.originalRoom,
+                        })
+                      }
+                    }
+                  }
+                  if (varArray.length > 0) {
+                    const withVars = applySubstitutionsToTimetable(finalTimetable, varArray, { debug: false })
+                    finalTimetable = withVars
+                    try { console.debug('[timetable.provider] applied', varArray.length, 'cached variations to retry timetable for', todayDateStr2) } catch (e) {}
+                  }
+                } catch (e) {
+                  try { console.debug('[timetable.provider] error applying cached variations (retry):', e) } catch (err) {}
+                }
+              }
+            } catch (e) {}
             
             // CRITICAL: Set the date ref BEFORE startTransition
             externalTimetableDateRef.current = todayDateStr2
