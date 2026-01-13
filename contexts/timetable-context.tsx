@@ -1075,8 +1075,50 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // CRITICAL: During holidays, don't withhold cached timetable data even if dates don't match
     // The API returns empty for holidays, so we should show the last known good timetable
     // Also, always allow lastRecordedTimetable as fallback regardless of date
-    const useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetable || null) : (externalTimetable ?? lastRecordedTimetable)
-    const useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetableByWeek || null) : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
+    // BUT: When using cached data for a wrong date, strip variation flags to prevent showing
+    // stale substitutes that cause flashing
+    let useExternalTimetable = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetable || null) : (externalTimetable ?? lastRecordedTimetable)
+    let useExternalTimetableByWeek = (isDataForWrongDate && !selectedDateIsHoliday) ? (lastRecordedTimetableByWeek || null) : (externalTimetableByWeek ?? lastRecordedTimetableByWeek)
+    
+    // CRITICAL FIX: Strip variation flags from cached data when it's for a different date
+    // This prevents Dec 16 variations from flashing when viewing Dec 17
+    if (isDataForWrongDate && useExternalTimetable) {
+      const stripped: Record<string, Period[]> = {}
+      for (const [day, periods] of Object.entries(useExternalTimetable as Record<string, Period[]>)) {
+        stripped[day] = (periods || []).map(p => {
+          const clean = { ...p }
+          delete (clean as any).isSubstitute
+          delete (clean as any).isRoomChange
+          delete (clean as any).casualSurname
+          delete (clean as any).displayRoom
+          delete (clean as any).displayTeacher
+          delete (clean as any).originalTeacher
+          delete (clean as any).originalRoom
+          return clean
+        })
+      }
+      useExternalTimetable = stripped
+    }
+    if (isDataForWrongDate && useExternalTimetableByWeek) {
+      const stripped: Record<string, any> = {}
+      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, any>)) {
+        stripped[day] = {}
+        for (const [weekType, periods] of Object.entries(groups)) {
+          stripped[day][weekType] = (periods as Period[] || []).map(p => {
+            const clean = { ...p }
+            delete (clean as any).isSubstitute
+            delete (clean as any).isRoomChange
+            delete (clean as any).casualSurname
+            delete (clean as any).displayRoom
+            delete (clean as any).displayTeacher
+            delete (clean as any).originalTeacher
+            delete (clean as any).originalRoom
+            return clean
+          })
+        }
+      }
+      useExternalTimetableByWeek = stripped
+    }
     
     // Simpler bell-times fallback: prefer API-provided `externalBellTimes`,
     // otherwise fall back to the last-seen cached bell times.
@@ -1381,44 +1423,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             }
             
-            // Also check daySource for FRESH variations that might be newer than cached
-            // (This handles the case where a new variation was just added)
-            if (Array.isArray(daySource) && daySource.length) {
-              const normSubject = String(p.subject || '').trim().toLowerCase()
-              const match = daySource.find((src) => {
-                const srcPeriod = String(src.period).trim().toLowerCase()
-                const srcSubject = String(src.subject || '').trim().toLowerCase()
-                if (srcPeriod !== normPeriod) return false
-                if (srcSubject === normSubject) return true
-                if (srcSubject.includes(normSubject) || normSubject.includes(srcSubject)) return true
-                const srcCode = srcSubject.replace(/[^a-z0-9]/g, '')
-                const pCode = normSubject.replace(/[^a-z0-9]/g, '')
-                if (srcCode && pCode && (srcCode.includes(pCode) || pCode.includes(srcCode))) return true
-                return false
-              })
-              
-              // If match has variations, use them (they might be more recent than cached)
-              if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
-                if ((match as any).isSubstitute) {
-                  (p as any).isSubstitute = true
-                  if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
-                  if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
-                  if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
-                  if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
-                  if (match.teacher) p.teacher = match.teacher
-                }
-                
-                if ((match as any).isRoomChange && (match as any).displayRoom) {
-                  const scheduledRoom = String(p.room || '').trim().toLowerCase()
-                  const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
-                  if (variationRoom && variationRoom !== scheduledRoom) {
-                    (p as any).isRoomChange = true
-                    (p as any).displayRoom = (match as any).displayRoom
-                    (p as any).originalRoom = p.room
-                  }
-                }
-              }
-            }
+            // DISABLED: API already provides periods with correct variation flags
+            // No need to re-check or re-apply - this was causing the flashing bug
+            // OLD LOGIC:
+            // if (Array.isArray(daySource) && daySource.length) {
+            //   const normSubject = String(p.subject || '').trim().toLowerCase()
+            //   const match = daySource.find((src) => { ... })
+            //   if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
+            //     ... apply variations ...
+            //   }
+            // }
           }
         } catch (e) {
           // Ignore merge errors - display will still work without variations
