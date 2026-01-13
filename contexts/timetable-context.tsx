@@ -426,23 +426,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // Track the currently selected date as a ref so interval callbacks can access the latest value
   // without stale closure issues - MUST be declared before first useEffect that references it
   const selectedDateObjectRef = useRef<Date | null>(null)
-  const previousSelectedDateRef = useRef<string | null>(null)
   // Keep selectedDateObjectRef in sync with state so interval callbacks can access the latest value
   useEffect(() => {
     selectedDateObjectRef.current = selectedDateObject
   }, [selectedDateObject])
   
-  // Clear external timetable data when the DATE (not time) changes to force fresh fetch
-  // This prevents stale data from previous dates being displayed with wrong variations
+  // Clear substitution state when date changes so we re-fetch for the new date
   useEffect(() => {
-    const currentDateStr = selectedDateObject.toISOString().slice(0, 10)
-    if (previousSelectedDateRef.current !== null && previousSelectedDateRef.current !== currentDateStr) {
-      // Date actually changed, clear the data
-      setExternalTimetable(null)
-      setExternalTimetableByWeek(null)
-      externalTimetableDateRef.current = null
-    }
-    previousSelectedDateRef.current = currentDateStr
+    subsAppliedRef.current = null
+    lastSubsAttemptRef.current = null
   }, [selectedDateObject])
   
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
@@ -2493,7 +2485,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     })()
 
     return () => { cancelled = true }
-  }, [externalTimetable, timetableSource])
+  }, [externalTimetable, timetableSource, selectedDateObject])
 
   // Remember last known-good external timetable data so we can continue
   // showing it while a reload is in progress or when a refresh falls back.
