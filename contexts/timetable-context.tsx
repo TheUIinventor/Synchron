@@ -431,6 +431,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     selectedDateObjectRef.current = selectedDateObject
   }, [selectedDateObject])
   
+  // Clear external timetable data when date changes to force fresh fetch
+  // This prevents stale data from previous dates being displayed with wrong variations
+  useEffect(() => {
+    setExternalTimetable(null)
+    setExternalTimetableByWeek(null)
+    externalTimetableDateRef.current = null
+  }, [selectedDateObject])
+  
   const [isShowingNextDay, setIsShowingNextDay] = useState(false) // For main timetable
   // Track when the user manually selected a date so we don't auto-override it
   const lastUserSelectedRef = useRef<number | null>(null)
