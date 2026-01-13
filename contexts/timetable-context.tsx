@@ -1068,28 +1068,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     // Prefer the live external timetable when available. Fall back to cached.
     // Simple approach: Just use the API data as-is. Variations are already applied by the API.
-    // CRITICAL FIX: When date doesn't match, show cached data but strip variations to prevent flash
+    // CRITICAL FIX: Only strip variations when using FALLBACK cached data during date mismatch
+    // If we have fresh externalTimetable data, use it even during mismatch (it might be the correct date)
     const selectedIsoString = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
     const externalDateString = externalTimetableDateRef.current
     const isDateMismatch = selectedIsoString && externalDateString && selectedIsoString !== externalDateString
     
-    // Store this flag so variation application logic can check it
-    const shouldSuppressVariations = isDateMismatch && !selectedDateIsHoliday
-    
     let useExternalTimetable: Record<string, Period[]> | null = null
     let useExternalTimetableByWeek: Record<string, any> | null = null
     
-    // If dates match or no mismatch, use data as-is
-    if (!isDateMismatch || selectedDateIsHoliday) {
-      useExternalTimetable = externalTimetable ?? lastRecordedTimetable
-      useExternalTimetableByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
+    // Always prefer fresh external data if available (might be the correct date)
+    if (externalTimetable || externalTimetableByWeek) {
+      useExternalTimetable = externalTimetable
+      useExternalTimetableByWeek = externalTimetableByWeek
+    } else if (!isDateMismatch || selectedDateIsHoliday) {
+      // No external data: use cached as-is
+      useExternalTimetable = lastRecordedTimetable
+      useExternalTimetableByWeek = lastRecordedTimetableByWeek
     } else {
-      // Date mismatch: show cached structure instantly but without variation flags
-      // This gives instant feedback while preventing stale substitute flash
-      const cached = externalTimetable ?? lastRecordedTimetable
-      if (cached) {
+      // No external data AND date mismatch: strip variations from cached fallback
+      if (lastRecordedTimetable) {
         const stripped: Record<string, Period[]> = {}
-        for (const [day, periods] of Object.entries(cached)) {
+        for (const [day, periods] of Object.entries(lastRecordedTimetable)) {
           stripped[day] = (periods || []).map(p => {
             const clean = { ...p }
             delete (clean as any).isSubstitute
@@ -1105,10 +1105,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         useExternalTimetable = stripped
       }
       
-      const cachedByWeek = externalTimetableByWeek ?? lastRecordedTimetableByWeek
-      if (cachedByWeek) {
+      if (lastRecordedTimetableByWeek) {
         const stripped: Record<string, any> = {}
-        for (const [day, groups] of Object.entries(cachedByWeek)) {
+        for (const [day, groups] of Object.entries(lastRecordedTimetableByWeek)) {
           stripped[day] = {}
           for (const [weekType, periods] of Object.entries(groups)) {
             stripped[day][weekType] = (periods as Period[] || []).map(p => {
@@ -1333,10 +1332,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
           
           // Apply variations if they match the data we're displaying
-          // CRITICAL: Skip ALL variation application during date mismatch to prevent flash
-          if (shouldSuppressVariations) {
-            authVarsForDate = null
-          } else if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+          if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
             try { 
               console.debug('[timetable.provider] SKIPPING variation application - date mismatch', {
                 variationsFor: matchedDate,
@@ -1813,10 +1809,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         
         // Apply variations if they match the data we're displaying
-        // CRITICAL: Skip ALL variation application during date mismatch to prevent flash
-        if (shouldSuppressVariations) {
-          authVars = null
-        } else if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+        if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
           try { 
             console.debug('[timetable.provider] SKIPPING simple path variation - date mismatch', {
               variationsFor: matchedDate,
