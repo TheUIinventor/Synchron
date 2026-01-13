@@ -3227,32 +3227,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const cachedVars = varMap.get(todayDateStr)
                 if (cachedVars && typeof cachedVars === 'object') {
                   try {
-                    // Build a variations array from cached data and apply it
-                    const varArray: any[] = []
+                    // Directly apply cached variations which are already organized by day
+                    // No need to go through applySubstitutionsToTimetable since we have exact day mapping
                     for (const day of Object.keys(cachedVars)) {
                       const dayVars = cachedVars[day] || []
-                      for (const v of dayVars) {
-                        if (v && v.period) {
-                          varArray.push({
-                            date: todayDateStr,
-                            period: v.period,
-                            isSubstitute: v.isSubstitute,
-                            casualSurname: v.casualSurname,
-                            displayTeacher: v.displayTeacher,
-                            originalTeacher: v.originalTeacher,
-                            isRoomChange: v.isRoomChange,
-                            displayRoom: v.displayRoom,
-                            originalRoom: v.originalRoom,
-                          })
+                      const dayPeriods = finalTimetable[day] || []
+                      
+                      for (const varPeriod of dayVars) {
+                        if (!varPeriod || !varPeriod.period) continue
+                        
+                        // Find matching period in the timetable
+                        const normVarPeriod = String(varPeriod.period).trim().toLowerCase()
+                        const matchIdx = dayPeriods.findIndex((p: any) => 
+                          String(p.period).trim().toLowerCase() === normVarPeriod
+                        )
+                        
+                        if (matchIdx >= 0) {
+                          // Apply variation flags to the matched period
+                          const period = dayPeriods[matchIdx]
+                          if (varPeriod.isSubstitute) {
+                            (period as any).isSubstitute = true
+                            if (varPeriod.casualSurname) (period as any).casualSurname = varPeriod.casualSurname
+                            if (varPeriod.displayTeacher) (period as any).displayTeacher = varPeriod.displayTeacher
+                            if (varPeriod.originalTeacher) (period as any).originalTeacher = varPeriod.originalTeacher
+                          }
+                          if (varPeriod.isRoomChange) {
+                            (period as any).isRoomChange = true
+                            if (varPeriod.displayRoom) (period as any).displayRoom = varPeriod.displayRoom
+                            if (varPeriod.originalRoom) (period as any).originalRoom = varPeriod.originalRoom
+                          }
                         }
                       }
                     }
-                    if (varArray.length > 0) {
-                      // Apply cached variations to finalTimetable
-                      const withVars = applySubstitutionsToTimetable(finalTimetable, varArray, { debug: false })
-                      finalTimetable = withVars
-                      try { console.debug('[timetable.provider] applied', varArray.length, 'cached variations to fetched timetable for', todayDateStr) } catch (e) {}
-                    }
+                    try { console.debug('[timetable.provider] applied cached variations to fetched timetable for', todayDateStr) } catch (e) {}
                   } catch (e) {
                     try { console.debug('[timetable.provider] error applying cached variations:', e) } catch (err) {}
                   }
@@ -3401,30 +3408,36 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   const cachedVars = varMap.get(dateKeyForCache)
                   if (cachedVars && typeof cachedVars === 'object') {
                     try {
-                      const varArray: any[] = []
+                      // Directly apply cached variations which are already organized by day
                       for (const day of Object.keys(cachedVars)) {
                         const dayVars = cachedVars[day] || []
-                        for (const v of dayVars) {
-                          if (v && v.period) {
-                            varArray.push({
-                              date: dateKeyForCache,
-                              period: v.period,
-                              isSubstitute: v.isSubstitute,
-                              casualSurname: v.casualSurname,
-                              displayTeacher: v.displayTeacher,
-                              originalTeacher: v.originalTeacher,
-                              isRoomChange: v.isRoomChange,
-                              displayRoom: v.displayRoom,
-                              originalRoom: v.originalRoom,
-                            })
+                        const dayPeriods = byDay[day] || []
+                        
+                        for (const varPeriod of dayVars) {
+                          if (!varPeriod || !varPeriod.period) continue
+                          
+                          const normVarPeriod = String(varPeriod.period).trim().toLowerCase()
+                          const matchIdx = dayPeriods.findIndex((p: any) => 
+                            String(p.period).trim().toLowerCase() === normVarPeriod
+                          )
+                          
+                          if (matchIdx >= 0) {
+                            const period = dayPeriods[matchIdx]
+                            if (varPeriod.isSubstitute) {
+                              (period as any).isSubstitute = true
+                              if (varPeriod.casualSurname) (period as any).casualSurname = varPeriod.casualSurname
+                              if (varPeriod.displayTeacher) (period as any).displayTeacher = varPeriod.displayTeacher
+                              if (varPeriod.originalTeacher) (period as any).originalTeacher = varPeriod.originalTeacher
+                            }
+                            if (varPeriod.isRoomChange) {
+                              (period as any).isRoomChange = true
+                              if (varPeriod.displayRoom) (period as any).displayRoom = varPeriod.displayRoom
+                              if (varPeriod.originalRoom) (period as any).originalRoom = varPeriod.originalRoom
+                            }
                           }
                         }
                       }
-                      if (varArray.length > 0) {
-                        const withVars = applySubstitutionsToTimetable(byDay, varArray, { debug: false })
-                        byDay = withVars
-                        try { console.debug('[timetable.provider] applied', varArray.length, 'cached variations to fetched timetable (array) for', dateKeyForCache) } catch (e) {}
-                      }
+                      try { console.debug('[timetable.provider] applied cached variations to fetched timetable (array) for', dateKeyForCache) } catch (e) {}
                     } catch (e) {
                       try { console.debug('[timetable.provider] error applying cached variations (array):', e) } catch (err) {}
                     }
@@ -3789,30 +3802,36 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               const cachedVars = varMap.get(todayDateStr2)
               if (cachedVars && typeof cachedVars === 'object') {
                 try {
-                  const varArray: any[] = []
+                  // Directly apply cached variations which are already organized by day
                   for (const day of Object.keys(cachedVars)) {
                     const dayVars = cachedVars[day] || []
-                    for (const v of dayVars) {
-                      if (v && v.period) {
-                        varArray.push({
-                          date: todayDateStr2,
-                          period: v.period,
-                          isSubstitute: v.isSubstitute,
-                          casualSurname: v.casualSurname,
-                          displayTeacher: v.displayTeacher,
-                          originalTeacher: v.originalTeacher,
-                          isRoomChange: v.isRoomChange,
-                          displayRoom: v.displayRoom,
-                          originalRoom: v.originalRoom,
-                        })
+                    const dayPeriods = finalTimetable[day] || []
+                    
+                    for (const varPeriod of dayVars) {
+                      if (!varPeriod || !varPeriod.period) continue
+                      
+                      const normVarPeriod = String(varPeriod.period).trim().toLowerCase()
+                      const matchIdx = dayPeriods.findIndex((p: any) => 
+                        String(p.period).trim().toLowerCase() === normVarPeriod
+                      )
+                      
+                      if (matchIdx >= 0) {
+                        const period = dayPeriods[matchIdx]
+                        if (varPeriod.isSubstitute) {
+                          (period as any).isSubstitute = true
+                          if (varPeriod.casualSurname) (period as any).casualSurname = varPeriod.casualSurname
+                          if (varPeriod.displayTeacher) (period as any).displayTeacher = varPeriod.displayTeacher
+                          if (varPeriod.originalTeacher) (period as any).originalTeacher = varPeriod.originalTeacher
+                        }
+                        if (varPeriod.isRoomChange) {
+                          (period as any).isRoomChange = true
+                          if (varPeriod.displayRoom) (period as any).displayRoom = varPeriod.displayRoom
+                          if (varPeriod.originalRoom) (period as any).originalRoom = varPeriod.originalRoom
+                        }
                       }
                     }
                   }
-                  if (varArray.length > 0) {
-                    const withVars = applySubstitutionsToTimetable(finalTimetable, varArray, { debug: false })
-                    finalTimetable = withVars
-                    try { console.debug('[timetable.provider] applied', varArray.length, 'cached variations to retry timetable for', todayDateStr2) } catch (e) {}
-                  }
+                  try { console.debug('[timetable.provider] applied cached variations to retry timetable for', todayDateStr2) } catch (e) {}
                 } catch (e) {
                   try { console.debug('[timetable.provider] error applying cached variations (retry):', e) } catch (err) {}
                 }
