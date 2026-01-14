@@ -1659,16 +1659,32 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         if (storedVariations) break
       }
       
-      // Helper to check if a period has a stored variation
-      const hasStoredVariation = (dayName: string, periodIdentifier: string) => {
+      // Helper to check if a period has a stored variation for the CURRENT WEEK
+      // CRITICAL: Must check weekType to prevent variations from wrong week bypassing filter
+      const hasStoredVariation = (dayName: string, periodIdentifier: string, periodWeekType?: string) => {
         if (!storedVariations) return false
         const dayVars = storedVariations[dayName]
         if (!Array.isArray(dayVars)) return false
         const normPeriod = String(periodIdentifier).trim().toLowerCase()
-        return dayVars.some((v: any) => 
-          String(v.period).trim().toLowerCase() === normPeriod &&
-          (v.isSubstitute || v.isRoomChange)
-        )
+        return dayVars.some((v: any) => {
+          const periodMatches = String(v.period).trim().toLowerCase() === normPeriod
+          const hasVariation = v.isSubstitute || v.isRoomChange
+          
+          // CRITICAL: Check if variation's weekType matches the period's weekType
+          // If variation has a weekType, it must match the period's weekType (or currentWeek)
+          // This prevents Week A substitutes from appearing on Week B
+          const variationWeekType = v.weekType
+          if (!periodMatches || !hasVariation) return false
+          
+          // If variation has no weekType (legacy data), allow it
+          if (!variationWeekType) return true
+          
+          // If period has explicit weekType, check against that
+          if (periodWeekType) return variationWeekType === periodWeekType
+          
+          // Otherwise check against current week
+          return !currentWeek || variationWeekType === currentWeek
+        })
       }
       
       for (const [day, periods] of Object.entries(useExternalTimetable)) {
@@ -1689,7 +1705,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             (p as any).weekType === currentWeek ||
             (p as any).isSubstitute ||
             (p as any).isRoomChange ||
-            hasStoredVariation(day, p.period)
+            hasStoredVariation(day, p.period, (p as any).weekType)
           )
         } else {
           // If we don't yet know the current week, show ALL periods (don't filter by weekType)
