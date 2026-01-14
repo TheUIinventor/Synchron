@@ -2000,6 +2000,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       
       if (!timetableDateIso) return
       
+      // CRITICAL: Create composite key with date + week type to prevent variations from
+      // carrying over between different weeks (e.g., Week A substitute showing on Week B)
+      const storageKey = currentWeek ? `${timetableDateIso}:${currentWeek}` : timetableDateIso
+      
       // Check if EITHER structure has any variations
       // This handles the case where variations are in grouped structure but not flat
       let hasVariations = false
@@ -2082,7 +2086,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // CRITICAL: Only update if we have variations OR if we don't have any stored yet
       // This prevents overwriting good cached variations with empty data from refetches
       const map = authoritativeVariationsRef.current
-      const existingVars = map.get(timetableDateIso)
+      const existingVars = map.get(storageKey)
       
       // Count existing variations
       let existingCount = 0
@@ -2102,7 +2106,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // NEVER overwrite the existing data. This prevents losing substitutions when
       // navigating between days causes a re-fetch with incomplete data.
       if (existingVars && newCount === 0 && existingCount > 0) {
-        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', timetableDateIso, '- Days in existing:', Object.keys(existingVars).filter(d => existingVars[d]?.length).join(','), '- Days in new:', Object.keys(varData).filter(d => varData[d]?.length).join(',')) } catch (e) {}
+        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', storageKey, '- Days in existing:', Object.keys(existingVars).filter(d => existingVars[d]?.length).join(','), '- Days in new:', Object.keys(varData).filter(d => varData[d]?.length).join(',')) } catch (e) {}
         return
       }
       
@@ -2112,12 +2116,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // This prevents losing substitutions when a subsequent render provides the same timetable
         // but without variation flags (e.g., when data flows through different processing paths)
         if (existingVars && newCount <= existingCount) {
-          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has same or fewer variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
+          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has same or fewer variations', { storageKey, existing: existingCount, new: newCount }) } catch (e) {}
           return
         }
         
         if (hasVariations || newCount > 0) {
-          map.set(timetableDateIso, varData)
+          map.set(storageKey, varData)
           // Limit map size to prevent unbounded growth. Keep a longer history
           // so substitutions from far-past dates remain available. Timetabl-app
           // preserves query cache in localStorage (react-query persister) and
@@ -2128,7 +2132,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const oldest = Array.from(map.keys()).sort()[0]
             map.delete(oldest)
           }
-          try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
+          try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', storageKey, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), 'week:', currentWeek, ')', varData) } catch (e) {}
           
           // Immediately persist to localStorage
           try {
@@ -4392,7 +4396,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const candidateDates = [ds, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
                 let authForDate: any = null
                 let matchedKey: string | null = null
-                for (const dk of candidateDates) { 
+                // CRITICAL: Try composite keys first (date:weekType), then fall back to date-only keys
+                // This prevents variations from Week A appearing on Week B
+                for (const dk of candidateDates) {
+                  // Try with week type first if available
+                  if (currentWeek) {
+                    const compositeKey = `${dk}:${currentWeek}`
+                    authForDate = authMap.get(compositeKey)
+                    if (authForDate) {
+                      matchedKey = compositeKey
+                      break
+                    }
+                  }
+                  // Fall back to date-only key for backwards compatibility
                   authForDate = authMap.get(dk)
                   if (authForDate) {
                     matchedKey = dk
