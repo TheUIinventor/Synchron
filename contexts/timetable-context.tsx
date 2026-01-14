@@ -1230,25 +1230,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
 
         // Deep copy periods to prevent mutation of original timetableByWeek objects
-        // CRITICAL: Strip out variations (isSubstitute, isRoomChange) when copying
-        // These variations may be from a different date's data - we'll re-apply
-        // the correct variations based on the selected date later
-        const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-        const dataIsForCurrentDate = externalTimetableDateRef.current === selectedIso
-        filtered[day] = list.map(p => {
-          const copy = { ...p }
-          // Only strip variations if the data is NOT for the current selected date
-          if (!dataIsForCurrentDate) {
-            delete (copy as any).isSubstitute
-            delete (copy as any).isRoomChange
-            delete (copy as any).casualSurname
-            delete (copy as any).displayTeacher
-            delete (copy as any).originalTeacher
-            delete (copy as any).displayRoom
-            delete (copy as any).originalRoom
-          }
-          return copy
-        })
+        filtered[day] = list.map(p => ({ ...p }))
         
         // CRITICAL FIX: If filtered[day] is empty but useExternalTimetable (flat structure) has data with variations,
         // use that instead. This handles the case where timetableByWeek was built without variations
@@ -1268,10 +1250,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
         // This ensures variations are NEVER lost, even when a background fetch returns data without them.
         try {
-          // CRITICAL FIX: ONLY use the selected date for variations
-          // Previously we tried multiple candidate dates which caused variations
-          // from one date to appear on different dates
+          // CRITICAL FIX: Try multiple date keys to find variations
+          // Priority order:
+          // 1. externalTimetableDateRef (what the data is FOR) - MOST AUTHORITATIVE
+          // 2. Selected date (what user is viewing)
+          // 3. Today's date (fallback)
           const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+          const candidateDates = [
+            externalTimetableDateRef.current, // Try data's actual date FIRST
+            selectedIso,
+            new Date().toISOString().slice(0, 10)
+          ].filter(Boolean)
           
           // Try multiple sources for base periods: grouped week data, flat day data, and cached data
           let daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
@@ -1281,12 +1270,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             daySource = (lastRecordedTimetable as any)[day] as Period[]
           }
           
-          // CRITICAL: Only get variations for the EXACT date being displayed
+          // Check if we have authoritative variations - try multiple date keys
           const authVarsMap = authoritativeVariationsRef.current
-          const authVarsForDate = authVarsMap.get(selectedIso)
-          const matchedDate = selectedIso
+          let authVarsForDate = null
+          let matchedDate = null
+          for (const dateKey of candidateDates) {
+            authVarsForDate = authVarsMap.get(dateKey!)
+            if (authVarsForDate) {
+              matchedDate = dateKey
+              break
+            }
+          }
           
-          try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
+          // Don't check date mismatch - API data already has correct variations for its date
+          // The old logic was causing substitutes to disappear
+          // if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+          //   authVarsForDate = null
+          // }
+          
+          try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
 
           // If the server/client has captured authoritative variations for
           // this date but the live `filtered[day]` is empty (e.g., a
@@ -1369,10 +1371,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
             
             // Also check daySource for FRESH variations that might be newer than cached
-            // CRITICAL: Only use daySource variations if the data is actually for the selected date
-            // This prevents substitutes from a different date's fetch leaking into the current view
-            const dataIsForSelectedDate = externalTimetableDateRef.current === selectedIso
-            if (dataIsForSelectedDate && Array.isArray(daySource) && daySource.length) {
+            // (This handles the case where a new variation was just added)
+            if (Array.isArray(daySource) && daySource.length) {
               const normSubject = String(p.subject || '').trim().toLowerCase()
               const match = daySource.find((src) => {
                 const srcPeriod = String(src.period).trim().toLowerCase()
@@ -1584,9 +1584,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                 }
                 // Also overlay fresh day-source variations if present
-                // CRITICAL: Only use if data is for the selected date
-                const dataIsForSelectedDate = externalTimetableDateRef.current === selectedIso
-                if (dataIsForSelectedDate && daySource.length) {
+                if (daySource.length) {
                   const normSubject = String(p.subject || '').trim().toLowerCase()
                   const match = daySource.find((src) => {
                     const srcPeriod = String(src.period).trim().toLowerCase()
@@ -1646,11 +1644,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
       
       // CRITICAL: Pre-fetch authoritative variations to check during filtering
-      // Only use variations for the EXACT selected date, not fallback dates
+      // This prevents filtering out periods that have stored variations
       const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+      const candidateDateKeys = [
+        externalTimetableDateRef.current,
+        selectedIso,
+        new Date().toISOString().slice(0, 10)
+      ].filter(Boolean)
       
+      let storedVariations: Record<string, any[]> | null = null
       const authVarsMap = authoritativeVariationsRef.current
-      const storedVariations = authVarsMap.get(selectedIso) || null
+      for (const dateKey of candidateDateKeys) {
+        storedVariations = authVarsMap.get(dateKey!)
+        if (storedVariations) break
+      }
       
       // Helper to check if a period has a stored variation
       const hasStoredVariation = (dayName: string, periodIdentifier: string) => {
@@ -1675,50 +1682,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // because variations are date-specific and override the cycle week logic.
         // ALSO check if there are STORED variations for this period (authoritativeVariationsRef)
         // to prevent filtering out periods before their variations can be applied.
-        // CRITICAL: Check if data is for the correct date before using its variations
-        const dataIsForCurrentDate = externalTimetableDateRef.current === selectedIso
         if (currentWeek === 'A' || currentWeek === 'B') {
           filtered[day] = list.filter((p) => 
             isNonClassPeriod(p) || 
             !(p as any).weekType || 
             (p as any).weekType === currentWeek ||
-            // Only trust isSubstitute/isRoomChange flags if data is for current date
-            (dataIsForCurrentDate && ((p as any).isSubstitute || (p as any).isRoomChange)) ||
+            (p as any).isSubstitute ||
+            (p as any).isRoomChange ||
             hasStoredVariation(day, p.period)
-          ).map(p => {
-            // Strip variations from periods if data is NOT for current date
-            // They will be re-applied from authoritative storage if appropriate
-            if (!dataIsForCurrentDate) {
-              const copy = { ...p }
-              delete (copy as any).isSubstitute
-              delete (copy as any).isRoomChange
-              delete (copy as any).casualSurname
-              delete (copy as any).displayTeacher
-              delete (copy as any).originalTeacher
-              delete (copy as any).displayRoom
-              delete (copy as any).originalRoom
-              return copy
-            }
-            return { ...p }
-          })
+          )
         } else {
           // If we don't yet know the current week, show ALL periods (don't filter by weekType)
           // This prevents classes from disappearing while we're waiting for week detection
-          filtered[day] = list.map(p => {
-            // Strip variations from periods if data is NOT for current date
-            if (!dataIsForCurrentDate) {
-              const copy = { ...p }
-              delete (copy as any).isSubstitute
-              delete (copy as any).isRoomChange
-              delete (copy as any).casualSurname
-              delete (copy as any).displayTeacher
-              delete (copy as any).originalTeacher
-              delete (copy as any).displayRoom
-              delete (copy as any).originalRoom
-              return copy
-            }
-            return { ...p }
-          })
+          filtered[day] = list
         }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
@@ -4465,22 +4441,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // MUST happen BEFORE setExternalTimetable to ensure variations are never lost
               try {
                 const authMap = authoritativeVariationsRef.current
+                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                const candidateDates = [ds, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
                 
-                // CRITICAL FIX: ONLY use the requested date (ds), NOT other dates
-                // Previously we tried multiple candidate dates which caused variations
-                // from one date to appear on different dates
-                const authForDate = authMap.get(ds)
-                const matchedKey = ds
-                
-                // AGGRESSIVE DEBUG: Show what we're looking for
+                // AGGRESSIVE DEBUG: Show all candidate dates
                 try {
-                  console.warn('🔍 [RETRIEVAL] Looking for variations ONLY for date:', ds)
+                  console.warn('🔍 [RETRIEVAL] Fetching data for date:', ds, 'Candidate dates:', candidateDates.join(', '))
                   console.warn('🔍 [RETRIEVAL] Available stored dates in map:', Array.from(authMap.keys()).join(', '))
-                  console.warn('🔍 [RETRIEVAL] Found variations for', ds, ':', authForDate ? 'YES' : 'NO')
                 } catch (e) {}
                 
+                let authForDate: any = null
+                let matchedKey: string | null = null
+                for (const dk of candidateDates) { 
+                  authForDate = authMap.get(dk)
+                  if (authForDate) {
+                    matchedKey = dk
+                    try {
+                      console.warn('🔍 [RETRIEVAL] Found variations for key:', dk)
+                      for (const day of Object.keys(authForDate)) {
+                        if (authForDate[day]?.length > 0) {
+                          console.warn('🔍 [RETRIEVAL]   -', day, ':', authForDate[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+                        }
+                      }
+                    } catch (e) {}
+                    break
+                  }
+                }
+                
                 if (authForDate && typeof authForDate === 'object') {
-                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
+                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable for requested date:', ds, '- Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
+                  // CRITICAL: Verify we're not applying the wrong date's variations
+                  if (matchedKey !== ds) {
+                    try { console.error('[timetable.provider] ⚠️ WARNING: Applying variations from', matchedKey, 'to timetable requested for', ds, '- This may cause substitutes to appear on wrong dates!') } catch (e) {}
+                  }
                   
                   // Extra logging for Friday
                   try {
