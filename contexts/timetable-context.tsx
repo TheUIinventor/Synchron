@@ -4368,16 +4368,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
               // CRITICAL: Track which date this timetable data is FOR before setting it
               // Merge any authoritative variations we previously captured for this date
+              // MUST happen BEFORE setExternalTimetable to ensure variations are never lost
               try {
                 const authMap = authoritativeVariationsRef.current
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
                 const candidateDates = [ds, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
                 let authForDate: any = null
-                for (const dk of candidateDates) { authForDate = authMap.get(dk); if (authForDate) break }
+                let matchedKey: string | null = null
+                for (const dk of candidateDates) { 
+                  authForDate = authMap.get(dk)
+                  if (authForDate) {
+                    matchedKey = dk
+                    break
+                  }
+                }
+                
                 if (authForDate && typeof authForDate === 'object') {
+                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(',')) } catch (e) {}
+                  
                   for (const dayKey of Object.keys(authForDate)) {
                     const dayVars = authForDate[dayKey] || []
                     const dayPeriods = (finalTimetable as any)[dayKey] || []
+                    
                     for (const v of dayVars) {
                       try {
                         if (!v || !v.period) continue
@@ -4385,16 +4397,81 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
                         if (idx >= 0) {
                           const period = dayPeriods[idx]
+                          let applied = false
                           if (v.isSubstitute) {
                             (period as any).isSubstitute = true
                             if (v.casualSurname) (period as any).casualSurname = v.casualSurname
                             if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
                             if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+                            applied = true
                           }
                           if (v.isRoomChange) {
                             (period as any).isRoomChange = true
                             if (v.displayRoom) (period as any).displayRoom = v.displayRoom
                             if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+                            applied = true
+                          }
+                          if (applied) {
+                            try { console.warn('[timetable.provider] ✅ Applied stored variation:', dayKey, 'P' + v.period, v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
+                          }
+                        } else {
+                          // CRITICAL: If period doesn't exist in the fetched timetable but we have a stored variation for it,
+                          // we need to reconstruct the period. This handles cases where:
+                          // 1. API returns incomplete data (only Week B when substitute was on Week A)
+                          // 2. Data is being reused/repeated and doesn't include the historical period
+                          try { console.warn('[timetable.provider] ⚠️ Could not find period', v.period, 'in', dayKey, 'to apply variation. Attempting to reconstruct. Available periods:', dayPeriods.map((p: any) => p.period).join(',')) } catch (e) {}
+                          
+                          // Try to find this period in finalByWeek (grouped structure) as a template
+                          let template: any = null
+                          if (finalByWeek && (finalByWeek as any)[dayKey]) {
+                            const groups = (finalByWeek as any)[dayKey]
+                            for (const wk of ['A', 'B', 'unknown']) {
+                              const arr = Array.isArray(groups[wk]) ? groups[wk] : []
+                              template = arr.find((p: any) => String(p.period).trim().toLowerCase() === norm)
+                              if (template) break
+                            }
+                          }
+                          
+                          // If we found a template, reconstruct the period with the variation applied
+                          if (template) {
+                            const reconstructed: any = { ...template }
+                            if (v.isSubstitute) {
+                              reconstructed.isSubstitute = true
+                              if (v.casualSurname) reconstructed.casualSurname = v.casualSurname
+                              if (v.displayTeacher) reconstructed.displayTeacher = v.displayTeacher
+                              if (v.originalTeacher) reconstructed.originalTeacher = v.originalTeacher
+                            }
+                            if (v.isRoomChange) {
+                              reconstructed.isRoomChange = true
+                              if (v.displayRoom) reconstructed.displayRoom = v.displayRoom
+                              if (v.originalRoom) reconstructed.originalRoom = v.originalRoom
+                            }
+                            // Add the reconstructed period to the timetable
+                            dayPeriods.push(reconstructed)
+                            try { console.warn('[timetable.provider] ✅ Reconstructed period', dayKey, 'P' + v.period, 'from grouped structure with stored variation') } catch (e) {}
+                          } else {
+                            // No template available - create a minimal period with the variation
+                            // This ensures the substitute is visible even if we can't find the base period
+                            const minimal: any = {
+                              period: v.period,
+                              time: '',
+                              subject: v.isSubstitute ? 'Class' : '',
+                              teacher: v.isSubstitute && v.originalTeacher ? v.originalTeacher : '',
+                              room: v.isRoomChange && v.originalRoom ? v.originalRoom : ''
+                            }
+                            if (v.isSubstitute) {
+                              minimal.isSubstitute = true
+                              if (v.casualSurname) minimal.casualSurname = v.casualSurname
+                              if (v.displayTeacher) minimal.displayTeacher = v.displayTeacher
+                              if (v.originalTeacher) minimal.originalTeacher = v.originalTeacher
+                            }
+                            if (v.isRoomChange) {
+                              minimal.isRoomChange = true
+                              if (v.displayRoom) minimal.displayRoom = v.displayRoom
+                              if (v.originalRoom) minimal.originalRoom = v.originalRoom
+                            }
+                            dayPeriods.push(minimal)
+                            try { console.warn('[timetable.provider] ✅ Created minimal period', dayKey, 'P' + v.period, 'with stored variation (no template found)') } catch (e) {}
                           }
                         }
                       } catch (e) {}
