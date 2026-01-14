@@ -4192,58 +4192,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const cached = qc.getQueryData(['timetable', ds]) as any | undefined
                 if (cached && cached.timetable) {
-                  // CRITICAL: Merge stored variations into cached timetable BEFORE setting state
-                  // This prevents flash when cache has no variations but we have stored variations
-                  let finalTimetable = cached.timetable
-                  const authMap = authoritativeVariationsRef.current
-                  const authForDate = authMap.get(ds)
-                  
-                  if (authForDate && typeof authForDate === 'object') {
-                    try { console.warn('[timetable.provider] Merging stored variations into CACHED timetable for date', ds) } catch (e) {}
-                    // Clone the timetable to avoid mutating cache
-                    finalTimetable = JSON.parse(JSON.stringify(cached.timetable))
-                    
-                    for (const dayKey of Object.keys(authForDate)) {
-                      const dayVars = authForDate[dayKey] || []
-                      if (!dayVars.length) continue
-                      
-                      // Match day key case-insensitively
-                      const normalizedKey = String(dayKey).toLowerCase()
-                      const timetableDayKey = Object.keys(finalTimetable).find(k => String(k).toLowerCase() === normalizedKey) || dayKey
-                      let dayPeriods = (finalTimetable as any)[timetableDayKey] || []
-                      
-                      let modified = false
-                      for (const v of dayVars) {
-                        if (!v || !v.period) continue
-                        const norm = String(v.period).trim().toLowerCase()
-                        const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
-                        if (idx >= 0) {
-                          const period = dayPeriods[idx]
-                          if (v.isSubstitute) {
-                            period.isSubstitute = true
-                            if (v.casualSurname) period.casualSurname = v.casualSurname
-                            if (v.displayTeacher) period.displayTeacher = v.displayTeacher
-                            if (v.originalTeacher) period.originalTeacher = v.originalTeacher
-                            modified = true
-                          }
-                          if (v.isRoomChange) {
-                            period.isRoomChange = true
-                            if (v.displayRoom) period.displayRoom = v.displayRoom
-                            if (v.originalRoom) period.originalRoom = v.originalRoom
-                            modified = true
-                          }
-                        }
-                      }
-                      
-                      if (modified) {
-                        (finalTimetable as any)[timetableDayKey] = dayPeriods
-                      }
-                    }
-                  }
-                  
-                  // Use the merged timetable (with variations applied)
+                  // Use the cached processed timetable immediately and skip fetch
                   externalTimetableDateRef.current = ds
-                  setExternalTimetable(finalTimetable)
+                  setExternalTimetable(cached.timetable)
                   setExternalTimetableByWeek(cached.timetableByWeek || null)
                   if (cached.bellTimes && !authoritativeBellsDateRef.current) {
                     setExternalBellTimes(cached.bellTimes)
