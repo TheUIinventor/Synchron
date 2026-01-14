@@ -1982,15 +1982,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       if (!externalTimetable && !externalTimetableByWeek) return
       
-      // Use the date the timetable is actually FOR, falling back to selected date
-      const timetableDateIso = externalTimetableDateRef.current || 
-        (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
+      // CRITICAL: Use ONLY selectedDateObject for storage key, NOT externalTimetableDateRef
+      // The ref can point to cached/stale data from a previous date, causing variations
+      // to be stored under the wrong date key and appearing on wrong days.
+      const timetableDateIso = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
       
       if (!timetableDateIso) return
       
       // AGGRESSIVE DEBUG: Log what we're about to capture
       try {
-        console.warn('🔍 [CAPTURE START] Processing timetable for date:', timetableDateIso, 'currentWeek:', currentWeek, 'selectedDate:', selectedDateObject?.toISOString().slice(0,10))
+        console.warn('🔍 [CAPTURE START] Processing timetable for selectedDate:', timetableDateIso, 'currentWeek:', currentWeek, 'externalTimetableDateRef (IGNORED):', externalTimetableDateRef.current)
       } catch (e) {}
       
       try {
