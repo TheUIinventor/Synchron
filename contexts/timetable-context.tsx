@@ -2022,9 +2022,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (variations.length > 0) {
             hasVariations = true
             varData[day] = variations
-            // Extra logging for Friday
+            // Extra logging for Friday and Thursday
             if (day.toLowerCase().includes('fri')) {
               try { console.warn('[timetable.provider] 📅 FRIDAY variations captured:', variations.length, 'variations:', variations.map(v => `P${v.period} ${v.isSubstitute ? 'SUB' : ''}${v.isRoomChange ? 'ROOM' : ''}`).join(', ')) } catch (e) {}
+            }
+            if (day.toLowerCase().includes('thu')) {
+              try { console.warn('[timetable.provider] 📅 THURSDAY variations captured:', variations.length, 'variations:', variations.map(v => `P${v.period} ${v.isSubstitute ? 'SUB' : ''}${v.isRoomChange ? 'ROOM' : ''}`).join(', '), 'Day key:', day) } catch (e) {}
             }
           } else {
             varData[day] = []
@@ -4406,6 +4409,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       const fridayInTimetable = Object.keys(finalTimetable).find(k => k.toLowerCase().includes('fri'))
                       console.warn('[timetable.provider] 📅 FRIDAY in timetable as:', fridayInTimetable, 'with', ((finalTimetable as any)[fridayInTimetable || 'Friday'] || []).length, 'periods')
                     }
+                    const thursdayKey = Object.keys(authForDate).find(k => k.toLowerCase().includes('thu'))
+                    if (thursdayKey && authForDate[thursdayKey]?.length) {
+                      console.warn('[timetable.provider] 📅 THURSDAY stored variations found:', authForDate[thursdayKey].length, 'variations for key:', thursdayKey)
+                      const thursdayInTimetable = Object.keys(finalTimetable).find(k => k.toLowerCase().includes('thu'))
+                      console.warn('[timetable.provider] 📅 THURSDAY in timetable as:', thursdayInTimetable, 'with', ((finalTimetable as any)[thursdayInTimetable || 'Thursday'] || []).length, 'periods')
+                    }
                   } catch (e) {}
                   
                   for (const dayKey of Object.keys(authForDate)) {
@@ -4459,6 +4468,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                           }
                           if (applied) {
                             try { console.warn('[timetable.provider] ✅ Applied stored variation:', timetableDayKey, 'P' + v.period, v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
+                            // Extra logging for Thursday
+                            if (String(timetableDayKey).toLowerCase().includes('thu')) {
+                              try { console.warn('[timetable.provider] 📅 THURSDAY variation applied to period', v.period) } catch (e) {}
+                            }
                           }
                         } else {
                           // CRITICAL: If period doesn't exist in the fetched timetable but we have a stored variation for it,
