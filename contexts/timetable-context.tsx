@@ -4449,15 +4449,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       try {
                         if (!v || !v.period) continue
                         const norm = String(v.period).trim().toLowerCase()
-                        const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                        
+                        // CRITICAL: Match by BOTH period number AND week type
+                        // This prevents substitutes from Week A being applied to Week B periods
+                        const idx = dayPeriods.findIndex((p: any) => {
+                          const periodMatch = String(p.period).trim().toLowerCase() === norm
+                          // If variation has weekType, ensure period matches or has no weekType
+                          const weekMatch = !v.weekType || !p.weekType || p.weekType === v.weekType
+                          return periodMatch && weekMatch
+                        })
+                        
                         if (idx >= 0) {
                           const period = dayPeriods[idx]
-                          
-                          // CRITICAL: Check if weekType matches before applying variation
-                          // This prevents substitutes from Week A appearing on Week B and vice versa
                           const periodWeekType = (period as any).weekType
                           const variationWeekType = v.weekType
                           
+                          // Double-check week type matches (should already match from findIndex)
                           // Only apply if:
                           // 1. Variation has no weekType (legacy data), OR
                           // 2. Period has no weekType (shouldn't happen but be safe), OR
@@ -4465,7 +4472,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                           const weekTypeMatches = !variationWeekType || !periodWeekType || variationWeekType === periodWeekType
                           
                           if (!weekTypeMatches) {
-                            try { console.warn('[timetable.provider] ⏭️ SKIPPING variation - week type mismatch. Period:', timetableDayKey, 'P' + v.period, 'has weekType:', periodWeekType, 'but variation has:', variationWeekType) } catch (e) {}
+                            try { console.warn('[timetable.provider] ⏭️ SKIPPING variation - week type mismatch after match. Period:', timetableDayKey, 'P' + v.period, 'has weekType:', periodWeekType, 'but variation has:', variationWeekType) } catch (e) {}
                             continue
                           }
                           
