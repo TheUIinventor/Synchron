@@ -2011,6 +2011,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const periods = (externalTimetable as any)[day] || []
           const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
             period: p.period,
+            weekType: p.weekType, // CRITICAL: Include week type so variations don't carry over to wrong weeks
             isSubstitute: p.isSubstitute,
             isRoomChange: p.isRoomChange,
             displayRoom: p.displayRoom,
@@ -2044,6 +2045,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const weekPeriods = groups?.[currentWeek] || []
             const variations = weekPeriods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
               period: p.period,
+              weekType: p.weekType || currentWeek, // CRITICAL: Include week type so variations don't carry over to wrong weeks
               isSubstitute: p.isSubstitute,
               isRoomChange: p.isRoomChange,
               displayRoom: p.displayRoom,
@@ -4450,6 +4452,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
                         if (idx >= 0) {
                           const period = dayPeriods[idx]
+                          
+                          // CRITICAL: Check if weekType matches before applying variation
+                          // This prevents substitutes from Week A appearing on Week B and vice versa
+                          const periodWeekType = (period as any).weekType
+                          const variationWeekType = v.weekType
+                          
+                          // Only apply if:
+                          // 1. Variation has no weekType (legacy data), OR
+                          // 2. Period has no weekType (shouldn't happen but be safe), OR
+                          // 3. Week types match exactly
+                          const weekTypeMatches = !variationWeekType || !periodWeekType || variationWeekType === periodWeekType
+                          
+                          if (!weekTypeMatches) {
+                            try { console.warn('[timetable.provider] ⏭️ SKIPPING variation - week type mismatch. Period:', timetableDayKey, 'P' + v.period, 'has weekType:', periodWeekType, 'but variation has:', variationWeekType) } catch (e) {}
+                            continue
+                          }
+                          
                           let applied = false
                           if (v.isSubstitute) {
                             (period as any).isSubstitute = true
@@ -4467,7 +4486,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             modified = true
                           }
                           if (applied) {
-                            try { console.warn('[timetable.provider] ✅ Applied stored variation:', timetableDayKey, 'P' + v.period, v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
+                            try { console.warn('[timetable.provider] ✅ Applied stored variation:', timetableDayKey, 'P' + v.period, 'Week', variationWeekType || '?', v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
                             // Extra logging for Thursday
                             if (String(timetableDayKey).toLowerCase().includes('thu')) {
                               try { console.warn('[timetable.provider] 📅 THURSDAY variation applied to period', v.period) } catch (e) {}
@@ -4478,22 +4497,35 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                           // we need to reconstruct the period. This handles cases where:
                           // 1. API returns incomplete data (only Week B when substitute was on Week A)
                           // 2. Data is being reused/repeated and doesn't include the historical period
-                          try { console.warn('[timetable.provider] ⚠️ Could not find period', v.period, 'in', dayKey, 'to apply variation. Attempting to reconstruct. Available periods:', dayPeriods.map((p: any) => p.period).join(',')) } catch (e) {}
+                          try { console.warn('[timetable.provider] ⚠️ Could not find period', v.period, 'in', dayKey, 'to apply variation. Variation weekType:', v.weekType, 'Attempting to reconstruct. Available periods:', dayPeriods.map((p: any) => `P${p.period}(${p.weekType || '?'})`).join(',')) } catch (e) {}
                           
                           // Try to find this period in finalByWeek (grouped structure) as a template
+                          // CRITICAL: Only use a template that matches the variation's week type
                           let template: any = null
                           if (finalByWeek && (finalByWeek as any)[dayKey]) {
                             const groups = (finalByWeek as any)[dayKey]
-                            for (const wk of ['A', 'B', 'unknown']) {
+                            // If variation has a weekType, ONLY search that specific week
+                            const weeksToSearch = v.weekType ? [v.weekType] : ['A', 'B', 'unknown']
+                            for (const wk of weeksToSearch) {
                               const arr = Array.isArray(groups[wk]) ? groups[wk] : []
-                              template = arr.find((p: any) => String(p.period).trim().toLowerCase() === norm)
-                              if (template) break
+                              template = arr.find((p: any) => {
+                                const periodMatch = String(p.period).trim().toLowerCase() === norm
+                                // If variation has weekType, ensure template matches or has no weekType
+                                const weekMatch = !v.weekType || !p.weekType || p.weekType === v.weekType
+                                return periodMatch && weekMatch
+                              })
+                              if (template) {
+                                try { console.warn('[timetable.provider] Found template for period', v.period, 'in week', wk) } catch (e) {}
+                                break
+                              }
                             }
                           }
                           
                           // If we found a template, reconstruct the period with the variation applied
                           if (template) {
                             const reconstructed: any = { ...template }
+                            // CRITICAL: Set the weekType from the variation to ensure correct week association
+                            if (v.weekType) reconstructed.weekType = v.weekType
                             if (v.isSubstitute) {
                               reconstructed.isSubstitute = true
                               if (v.casualSurname) reconstructed.casualSurname = v.casualSurname
@@ -4508,7 +4540,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             // Add the reconstructed period to the timetable
                             dayPeriods.push(reconstructed)
                             modified = true
-                            try { console.warn('[timetable.provider] ✅ Reconstructed period', timetableDayKey, 'P' + v.period, 'from grouped structure with stored variation') } catch (e) {}
+                            try { console.warn('[timetable.provider] ✅ Reconstructed period', timetableDayKey, 'P' + v.period, 'Week', v.weekType || '?', 'from grouped structure with stored variation') } catch (e) {}
                           } else {
                             // No template available - create a minimal period with the variation
                             // This ensures the substitute is visible even if we can't find the base period
