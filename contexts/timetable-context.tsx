@@ -2100,7 +2100,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // NEVER overwrite the existing data. This prevents losing substitutions when
       // navigating between days causes a re-fetch with incomplete data.
       if (existingVars && newCount === 0 && existingCount > 0) {
-        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', timetableDateIso) } catch (e) {}
+        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', timetableDateIso, '- Days in existing:', Object.keys(existingVars).filter(d => existingVars[d]?.length).join(','), '- Days in new:', Object.keys(varData).filter(d => varData[d]?.length).join(',')) } catch (e) {}
         return
       }
       
@@ -4544,9 +4544,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       try { console.warn('[timetable.provider] ✅ Updated finalTimetable for', timetableDayKey, 'with', dayPeriods.length, 'periods') } catch (e) {}
                     }
                     // Also merge into grouped by-week structure if present
-                    if (finalByWeek && (finalByWeek as any)[dayKey]) {
+                    if (finalByWeek && (finalByWeek as any)[timetableDayKey]) {
                       try {
-                        const groups = (finalByWeek as any)[dayKey]
+                        const groups = (finalByWeek as any)[timetableDayKey]
                         for (const wk of ['A','B','unknown']) {
                           const arr = Array.isArray(groups[wk]) ? groups[wk] : []
                           for (const v of dayVars) {
