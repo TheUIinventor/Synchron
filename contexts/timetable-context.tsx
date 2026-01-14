@@ -1975,9 +1975,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }, [timetableData]) // Re-persist whenever timetable data changes (which triggers variation updates)
 
   // CRITICAL: Capture variations from externalTimetable IMMEDIATELY when they appear
-  // This ensures we never lose substitutions/room changes even if timetable is later overwritten
-  // NOTE: We use externalTimetableDateRef (the date the timetable data is FOR) rather than
-  // selectedDateObject (the date the user is viewing) because they can differ during date switches.
+  // DISABLED: This useEffect was capturing variations at the wrong time with wrong dates
+  // Variations are now captured immediately when data arrives from API/cache with correct date
+  // Keeping this commented out for reference
+  /*
   useEffect(() => {
     try {
       if (!externalTimetable && !externalTimetableByWeek) return
@@ -2158,6 +2159,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {}
   }, [externalTimetable, externalTimetableByWeek, selectedDateObject, currentWeek])
+  */
 
   // subsAppliedRef is declared earlier in the component (before first usage)
   // Track the last time we attempted to fetch substitutions so we can retry
@@ -4219,6 +4221,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const cached = qc.getQueryData(['timetable', ds]) as any | undefined
                 if (cached && cached.timetable) {
+                  // CRITICAL: Capture variations from cached data RIGHT NOW with correct date
+                  // before setting state, to prevent wrong date being used
+                  try {
+                    const varData: Record<string, any[]> = {}
+                    for (const day of Object.keys(cached.timetable)) {
+                      const periods = (cached.timetable as any)[day] || []
+                      const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
+                        period: p.period,
+                        isSubstitute: p.isSubstitute,
+                        isRoomChange: p.isRoomChange,
+                        displayRoom: p.displayRoom,
+                        displayTeacher: p.displayTeacher,
+                        casualSurname: p.casualSurname,
+                        originalTeacher: p.originalTeacher,
+                        originalRoom: p.originalRoom,
+                      }))
+                      if (variations.length > 0) {
+                        varData[day] = variations
+                        console.warn('🔍 [CACHE-CAPTURE] Date:', ds, 'Day:', day, 'Variations:', variations.map(v => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+                      }
+                    }
+                    const totalVars = Object.values(varData).flat().length
+                    if (totalVars > 0) {
+                      const existing = authoritativeVariationsRef.current.get(ds)
+                      if (!existing || Object.values(existing).flat().length < totalVars) {
+                        authoritativeVariationsRef.current.set(ds, varData)
+                        console.warn('🔍 [CACHE-STORAGE] Stored', totalVars, 'variations for date:', ds)
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Error capturing variations from cache:', e)
+                  }
+                  
                   // Use the cached processed timetable immediately and skip fetch
                   externalTimetableDateRef.current = ds
                   setExternalTimetable(cached.timetable)
@@ -4621,6 +4656,47 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   try { console.debug('[timetable.provider] merged authoritative variations into fetched date payload for', ds) } catch (e) {}
                 }
               } catch (e) {}
+              
+              // CRITICAL: Capture variations from finalTimetable RIGHT NOW before setting state
+              // This ensures the correct date (ds) is used for storage
+              try {
+                const varData: Record<string, any[]> = {}
+                for (const day of Object.keys(finalTimetable)) {
+                  const periods = (finalTimetable as any)[day] || []
+                  const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
+                    period: p.period,
+                    isSubstitute: p.isSubstitute,
+                    isRoomChange: p.isRoomChange,
+                    displayRoom: p.displayRoom,
+                    displayTeacher: p.displayTeacher,
+                    casualSurname: p.casualSurname,
+                    originalTeacher: p.originalTeacher,
+                    originalRoom: p.originalRoom,
+                  }))
+                  if (variations.length > 0) {
+                    varData[day] = variations
+                    console.warn('🔍 [API-CAPTURE] Date:', ds, 'Day:', day, 'Variations:', variations.map(v => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+                  }
+                }
+                const totalVars = Object.values(varData).flat().length
+                if (totalVars > 0) {
+                  const existing = authoritativeVariationsRef.current.get(ds)
+                  const existingCount = existing ? Object.values(existing).flat().length : 0
+                  if (!existing || existingCount < totalVars) {
+                    authoritativeVariationsRef.current.set(ds, varData)
+                    console.warn('🔍 [API-STORAGE] Stored', totalVars, 'variations for date:', ds)
+                    // Persist to localStorage
+                    try {
+                      const obj: Record<string, any> = {}
+                      authoritativeVariationsRef.current.forEach((value, key) => { obj[key] = value })
+                      localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
+                    } catch (e) {}
+                  }
+                }
+              } catch (e) {
+                console.error('Error capturing variations from API:', e)
+              }
+              
               externalTimetableDateRef.current = ds
               setExternalTimetable(finalTimetable)
             setTimetableSource(j.source ?? 'external')
