@@ -1643,6 +1643,34 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         return false
       }
       
+      // CRITICAL: Pre-fetch authoritative variations to check during filtering
+      // This prevents filtering out periods that have stored variations
+      const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+      const candidateDateKeys = [
+        externalTimetableDateRef.current,
+        selectedIso,
+        new Date().toISOString().slice(0, 10)
+      ].filter(Boolean)
+      
+      let storedVariations: Record<string, any[]> | null = null
+      const authVarsMap = authoritativeVariationsRef.current
+      for (const dateKey of candidateDateKeys) {
+        storedVariations = authVarsMap.get(dateKey!)
+        if (storedVariations) break
+      }
+      
+      // Helper to check if a period has a stored variation
+      const hasStoredVariation = (dayName: string, periodIdentifier: string) => {
+        if (!storedVariations) return false
+        const dayVars = storedVariations[dayName]
+        if (!Array.isArray(dayVars)) return false
+        const normPeriod = String(periodIdentifier).trim().toLowerCase()
+        return dayVars.some((v: any) => 
+          String(v.period).trim().toLowerCase() === normPeriod &&
+          (v.isSubstitute || v.isRoomChange)
+        )
+      }
+      
       for (const [day, periods] of Object.entries(useExternalTimetable)) {
         const list = Array.isArray(periods) ? periods : []
         // When the server provides week-tagged entries (A/B), prefer entries
@@ -1652,13 +1680,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // Also always preserve Period 0, Roll Call, and End of Day.
         // CRITICAL: Always preserve periods with variations (isSubstitute or isRoomChange)
         // because variations are date-specific and override the cycle week logic.
+        // ALSO check if there are STORED variations for this period (authoritativeVariationsRef)
+        // to prevent filtering out periods before their variations can be applied.
         if (currentWeek === 'A' || currentWeek === 'B') {
           filtered[day] = list.filter((p) => 
             isNonClassPeriod(p) || 
             !(p as any).weekType || 
             (p as any).weekType === currentWeek ||
             (p as any).isSubstitute ||
-            (p as any).isRoomChange
+            (p as any).isRoomChange ||
+            hasStoredVariation(day, p.period)
           )
         } else {
           // If we don't yet know the current week, show ALL periods (don't filter by weekType)
