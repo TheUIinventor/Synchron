@@ -1981,6 +1981,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       if (!externalTimetable && !externalTimetableByWeek) return
+      
+      // Use the date the timetable is actually FOR, falling back to selected date
+      const timetableDateIso = externalTimetableDateRef.current || 
+        (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
+      
+      if (!timetableDateIso) return
+      
+      // AGGRESSIVE DEBUG: Log what we're about to capture
+      try {
+        console.warn('🔍 [CAPTURE START] Processing timetable for date:', timetableDateIso, 'currentWeek:', currentWeek, 'selectedDate:', selectedDateObject?.toISOString().slice(0,10))
+      } catch (e) {}
+      
       try {
         // Debug: log basic info about the incoming data
         const days = Object.keys(externalTimetable || {})
@@ -1993,12 +2005,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         console.debug('[timetable.provider] externalTimetable arrived for refDate=', externalTimetableDateRef.current, 'selected=', selectedDateObject?.toISOString().slice(0,10), 'days=', days.join(','), 'periods=', periodCount, 'vars=', varCount)
       } catch (e) {}
-      
-      // Use the date the timetable is actually FOR, falling back to selected date
-      const timetableDateIso = externalTimetableDateRef.current || 
-        (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
-      
-      if (!timetableDateIso) return
       
       // Check if EITHER structure has any variations
       // This handles the case where variations are in grouped structure but not flat
@@ -2022,6 +2028,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (variations.length > 0) {
             hasVariations = true
             varData[day] = variations
+            // AGGRESSIVE DEBUG: Log every variation captured with the date
+            try {
+              console.warn('🔍 [CAPTURE] Date:', timetableDateIso, 'Day:', day, 'Variations:', variations.map(v => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+            } catch (e) {}
             // Extra logging for Friday and Thursday
             if (day.toLowerCase().includes('fri')) {
               try { console.warn('[timetable.provider] 📅 FRIDAY variations captured:', variations.length, 'variations:', variations.map(v => `P${v.period} ${v.isSubstitute ? 'SUB' : ''}${v.isRoomChange ? 'ROOM' : ''}`).join(', ')) } catch (e) {}
@@ -2116,6 +2126,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         
         if (hasVariations || newCount > 0) {
           map.set(timetableDateIso, varData)
+          // AGGRESSIVE DEBUG: Log storage action
+          try {
+            console.warn('🔍 [STORAGE] Storing variations for date:', timetableDateIso, 'Total variations:', newCount)
+            for (const day of Object.keys(varData)) {
+              if (varData[day]?.length > 0) {
+                console.warn('🔍 [STORAGE]   -', day, ':', varData[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+              }
+            }
+          } catch (e) {}
           // Limit map size to prevent unbounded growth. Keep a longer history
           // so substitutions from far-past dates remain available. Timetabl-app
           // preserves query cache in localStorage (react-query persister) and
@@ -4388,12 +4407,27 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const authMap = authoritativeVariationsRef.current
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
                 const candidateDates = [ds, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
+                
+                // AGGRESSIVE DEBUG: Show all candidate dates
+                try {
+                  console.warn('🔍 [RETRIEVAL] Fetching data for date:', ds, 'Candidate dates:', candidateDates.join(', '))
+                  console.warn('🔍 [RETRIEVAL] Available stored dates in map:', Array.from(authMap.keys()).join(', '))
+                } catch (e) {}
+                
                 let authForDate: any = null
                 let matchedKey: string | null = null
                 for (const dk of candidateDates) { 
                   authForDate = authMap.get(dk)
                   if (authForDate) {
                     matchedKey = dk
+                    try {
+                      console.warn('🔍 [RETRIEVAL] Found variations for key:', dk)
+                      for (const day of Object.keys(authForDate)) {
+                        if (authForDate[day]?.length > 0) {
+                          console.warn('🔍 [RETRIEVAL]   -', day, ':', authForDate[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+                        }
+                      }
+                    } catch (e) {}
                     break
                   }
                 }
@@ -4452,6 +4486,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         if (!v || !v.period) continue
                         const norm = String(v.period).trim().toLowerCase()
                         const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                        
+                        // AGGRESSIVE DEBUG: Log each variation application attempt
+                        try {
+                          console.warn('🔍 [APPLY] Attempting to apply variation to', timetableDayKey, 'P' + v.period, '- Found at index:', idx, '- Variation:', v.casualSurname || v.displayRoom)
+                        } catch (e) {}
+                        
                         if (idx >= 0) {
                           const period = dayPeriods[idx]
                           
