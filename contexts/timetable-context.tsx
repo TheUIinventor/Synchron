@@ -4399,7 +4399,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
                 
                 if (authForDate && typeof authForDate === 'object') {
-                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
+                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable for requested date:', ds, '- Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
+                  // CRITICAL: Verify we're not applying the wrong date's variations
+                  if (matchedKey !== ds) {
+                    try { console.error('[timetable.provider] ⚠️ WARNING: Applying variations from', matchedKey, 'to timetable requested for', ds, '- This may cause substitutes to appear on wrong dates!') } catch (e) {}
+                  }
                   
                   // Extra logging for Friday
                   try {
