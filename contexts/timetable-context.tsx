@@ -4408,9 +4408,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 
                 if (authForDate && typeof authForDate === 'object') {
                   try { console.warn('[timetable.provider] ✅ MERGING authoritative variations for EXACT date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
-                } else {
-                  try { console.warn('[timetable.provider] ⚪ No variations found for date', ds) } catch (e) {}
-                }
                   
                   // Extra logging for Friday
                   try {
@@ -4427,7 +4424,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       console.warn('[timetable.provider] 📅 THURSDAY in timetable as:', thursdayInTimetable, 'with', ((finalTimetable as any)[thursdayInTimetable || 'Thursday'] || []).length, 'periods')
                     }
                   } catch (e) {}
-                  
+
                   for (const dayKey of Object.keys(authForDate)) {
                     const dayVars = authForDate[dayKey] || []
                     // CRITICAL: Try to match day key case-insensitively
