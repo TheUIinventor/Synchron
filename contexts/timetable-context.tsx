@@ -2096,14 +2096,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         return
       }
       
-      // CRITICAL: Never overwrite existing variations with data that has fewer variations
-      // This prevents losing substitutions when a subsequent render provides incomplete data
-      if (existingVars && newCount > 0 && newCount < existingCount) {
-        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has FEWER variations', { storageKey, existing: existingCount, new: newCount }) } catch (e) {}
-        return
-      }
-      
-      // Capture if we have variations (more or equal to existing)
+      // Always capture if we have variations - allow equal or greater counts
+      // This handles cases where variations arrive through different render paths
       if (newCount > 0) {
         map.set(storageKey, varData)
         // Limit map size to prevent unbounded growth. Keep a longer history
