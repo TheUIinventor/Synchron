@@ -4384,11 +4384,33 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
                 
                 if (authForDate && typeof authForDate === 'object') {
-                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(',')) } catch (e) {}
+                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
                   
                   for (const dayKey of Object.keys(authForDate)) {
                     const dayVars = authForDate[dayKey] || []
-                    const dayPeriods = (finalTimetable as any)[dayKey] || []
+                    // CRITICAL: Try to match day key case-insensitively
+                    // API might return "Wednesday" but stored variations might be under "wednesday"
+                    let timetableDayKey = dayKey
+                    let dayPeriods = (finalTimetable as any)[dayKey]
+                    if (!dayPeriods || !Array.isArray(dayPeriods)) {
+                      // Try case-insensitive match
+                      const normalizedKey = String(dayKey).toLowerCase()
+                      const matchedKey = Object.keys(finalTimetable).find(k => String(k).toLowerCase() === normalizedKey)
+                      if (matchedKey) {
+                        timetableDayKey = matchedKey
+                        dayPeriods = (finalTimetable as any)[matchedKey]
+                        try { console.warn('[timetable.provider] Matched day key case-insensitively:', dayKey, '->', matchedKey) } catch (e) {}
+                      } else {
+                        // Day doesn't exist in timetable at all - create it
+                        dayPeriods = []
+                        timetableDayKey = dayKey
+                        try { console.warn('[timetable.provider] Creating new day entry for:', dayKey) } catch (e) {}
+                      }
+                    }
+                    dayPeriods = dayPeriods || []
+                    
+                    // Track if we made any changes so we know to update finalTimetable
+                    let modified = false
                     
                     for (const v of dayVars) {
                       try {
@@ -4404,15 +4426,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
                             if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
                             applied = true
+                            modified = true
                           }
                           if (v.isRoomChange) {
                             (period as any).isRoomChange = true
                             if (v.displayRoom) (period as any).displayRoom = v.displayRoom
                             if (v.originalRoom) (period as any).originalRoom = v.originalRoom
                             applied = true
+                            modified = true
                           }
                           if (applied) {
-                            try { console.warn('[timetable.provider] ✅ Applied stored variation:', dayKey, 'P' + v.period, v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
+                            try { console.warn('[timetable.provider] ✅ Applied stored variation:', timetableDayKey, 'P' + v.period, v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
                           }
                         } else {
                           // CRITICAL: If period doesn't exist in the fetched timetable but we have a stored variation for it,
@@ -4448,7 +4472,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             }
                             // Add the reconstructed period to the timetable
                             dayPeriods.push(reconstructed)
-                            try { console.warn('[timetable.provider] ✅ Reconstructed period', dayKey, 'P' + v.period, 'from grouped structure with stored variation') } catch (e) {}
+                            modified = true
+                            try { console.warn('[timetable.provider] ✅ Reconstructed period', timetableDayKey, 'P' + v.period, 'from grouped structure with stored variation') } catch (e) {}
                           } else {
                             // No template available - create a minimal period with the variation
                             // This ensures the substitute is visible even if we can't find the base period
@@ -4471,10 +4496,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                               if (v.originalRoom) minimal.originalRoom = v.originalRoom
                             }
                             dayPeriods.push(minimal)
-                            try { console.warn('[timetable.provider] ✅ Created minimal period', dayKey, 'P' + v.period, 'with stored variation (no template found)') } catch (e) {}
+                            modified = true
+                            try { console.warn('[timetable.provider] ✅ Created minimal period', timetableDayKey, 'P' + v.period, 'with stored variation (no template found)') } catch (e) {}
                           }
                         }
                       } catch (e) {}
+                    }
+                    
+                    // Write the modified day periods back to finalTimetable
+                    if (modified) {
+                      (finalTimetable as any)[timetableDayKey] = dayPeriods
+                      try { console.warn('[timetable.provider] ✅ Updated finalTimetable for', timetableDayKey, 'with', dayPeriods.length, 'periods') } catch (e) {}
                     }
                     // Also merge into grouped by-week structure if present
                     if (finalByWeek && (finalByWeek as any)[dayKey]) {
