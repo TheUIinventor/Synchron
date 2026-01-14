@@ -1643,21 +1643,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         return false
       }
       
-      // CRITICAL: Pre-fetch authoritative variations to check during filtering
-      // This prevents filtering out periods that have stored variations
+      // CRITICAL: Only check stored variations for the EXACT selected date
+      // Do not check other dates to prevent variations from wrong dates being preserved
       const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-      const candidateDateKeys = [
-        externalTimetableDateRef.current,
-        selectedIso,
-        new Date().toISOString().slice(0, 10)
-      ].filter(Boolean)
-      
-      let storedVariations: Record<string, any[]> | null = null
-      const authVarsMap = authoritativeVariationsRef.current
-      for (const dateKey of candidateDateKeys) {
-        storedVariations = authVarsMap.get(dateKey!)
-        if (storedVariations) break
-      }
+      const storedVariations: Record<string, any[]> | null = authoritativeVariationsRef.current.get(selectedIso) || null
       
       // Helper to check if a period has a stored variation
       // Variations are DATE-SPECIFIC and only checked when viewing that exact date
@@ -1688,8 +1677,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             isNonClassPeriod(p) || 
             !(p as any).weekType || 
             (p as any).weekType === currentWeek ||
-            (p as any).isSubstitute ||
-            (p as any).isRoomChange ||
             hasStoredVariation(day, p.period)
           )
         } else {
@@ -2105,9 +2092,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         return
       }
       
-      // ALWAYS capture if we have new variations, even if count is equal or less
-      // This handles cases where variations arrive through different render paths
-      // We trust that if variations are present in the data, they should be stored
+      // CRITICAL: Never overwrite existing variations with data that has fewer variations
+      // This prevents losing substitutions when a subsequent render provides incomplete data
+      if (existingVars && newCount > 0 && newCount < existingCount) {
+        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has FEWER variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
+        return
+      }
+      
+      // Capture if we have variations (more or equal to existing)
       if (newCount > 0) {
         map.set(timetableDateIso, varData)
         // Limit map size to prevent unbounded growth. Keep a longer history
