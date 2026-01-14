@@ -1643,14 +1643,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         return false
       }
       
-      // CRITICAL: Only check stored variations for the EXACT selected date AND week
-      // Do not check other dates/weeks to prevent variations from wrong dates being preserved
+      // CRITICAL: Pre-fetch authoritative variations to check during filtering
+      // This prevents filtering out periods that have stored variations
       const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-      const storageKeyForFilter = currentWeek ? `${selectedIso}:${currentWeek}` : selectedIso
-      const storedVariations: Record<string, any[]> | null = authoritativeVariationsRef.current.get(storageKeyForFilter) || null
+      const candidateDateKeys = [
+        externalTimetableDateRef.current,
+        selectedIso,
+        new Date().toISOString().slice(0, 10)
+      ].filter(Boolean)
+      
+      let storedVariations: Record<string, any[]> | null = null
+      const authVarsMap = authoritativeVariationsRef.current
+      for (const dateKey of candidateDateKeys) {
+        storedVariations = authVarsMap.get(dateKey!)
+        if (storedVariations) break
+      }
       
       // Helper to check if a period has a stored variation
-      // Variations are DATE-SPECIFIC and only checked when viewing that exact date
       const hasStoredVariation = (dayName: string, periodIdentifier: string) => {
         if (!storedVariations) return false
         const dayVars = storedVariations[dayName]
@@ -1678,6 +1687,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             isNonClassPeriod(p) || 
             !(p as any).weekType || 
             (p as any).weekType === currentWeek ||
+            (p as any).isSubstitute ||
+            (p as any).isRoomChange ||
             hasStoredVariation(day, p.period)
           )
         } else {
@@ -1989,9 +2000,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       
       if (!timetableDateIso) return
       
-      // CRITICAL: Include week type in storage key so Week A subs don't appear on Week B
-      const storageKey = currentWeek ? `${timetableDateIso}:${currentWeek}` : timetableDateIso
-      
       // Check if EITHER structure has any variations
       // This handles the case where variations are in grouped structure but not flat
       let hasVariations = false
@@ -2003,6 +2011,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const periods = (externalTimetable as any)[day] || []
           const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
             period: p.period,
+            weekType: p.weekType, // CRITICAL: Include week type so variations don't carry over to wrong weeks
             isSubstitute: p.isSubstitute,
             isRoomChange: p.isRoomChange,
             displayRoom: p.displayRoom,
@@ -2036,6 +2045,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const weekPeriods = groups?.[currentWeek] || []
             const variations = weekPeriods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
               period: p.period,
+              weekType: p.weekType || currentWeek, // CRITICAL: Include week type so variations don't carry over to wrong weeks
               isSubstitute: p.isSubstitute,
               isRoomChange: p.isRoomChange,
               displayRoom: p.displayRoom,
@@ -2072,7 +2082,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // CRITICAL: Only update if we have variations OR if we don't have any stored yet
       // This prevents overwriting good cached variations with empty data from refetches
       const map = authoritativeVariationsRef.current
-      const existingVars = map.get(storageKey)
+      const existingVars = map.get(timetableDateIso)
       
       // Count existing variations
       let existingCount = 0
@@ -2092,32 +2102,41 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // NEVER overwrite the existing data. This prevents losing substitutions when
       // navigating between days causes a re-fetch with incomplete data.
       if (existingVars && newCount === 0 && existingCount > 0) {
-        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', storageKey, '- Days in existing:', Object.keys(existingVars).filter(d => existingVars[d]?.length).join(','), '- Days in new:', Object.keys(varData).filter(d => varData[d]?.length).join(',')) } catch (e) {}
+        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', timetableDateIso, '- Days in existing:', Object.keys(existingVars).filter(d => existingVars[d]?.length).join(','), '- Days in new:', Object.keys(varData).filter(d => varData[d]?.length).join(',')) } catch (e) {}
         return
       }
       
-      // Always capture if we have variations - allow equal or greater counts
-      // This handles cases where variations arrive through different render paths
-      if (newCount > 0) {
-        map.set(storageKey, varData)
-        // Limit map size to prevent unbounded growth. Keep a longer history
-        // so substitutions from far-past dates remain available. Timetabl-app
-        // preserves query cache in localStorage (react-query persister) and
-        // thus can show substitutions from months ago. To match that behavior
-        // for authoritative variations we retain up to 365 days by default.
-        const MAX_VAR_DAYS = 365
-        if (map.size > MAX_VAR_DAYS) {
-          const oldest = Array.from(map.keys()).sort()[0]
-          map.delete(oldest)
+      // Only update if new data has MORE variations, or if we have no existing data
+      if (newCount > 0 || !existingVars) {
+        // CRITICAL: Never overwrite existing variations with data that has fewer OR equal variations
+        // This prevents losing substitutions when a subsequent render provides the same timetable
+        // but without variation flags (e.g., when data flows through different processing paths)
+        if (existingVars && newCount <= existingCount) {
+          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has same or fewer variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
+          return
         }
-        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', storageKey, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), 'week:', currentWeek, ')', varData) } catch (e) {}
+        
+        if (hasVariations || newCount > 0) {
+          map.set(timetableDateIso, varData)
+          // Limit map size to prevent unbounded growth. Keep a longer history
+          // so substitutions from far-past dates remain available. Timetabl-app
+          // preserves query cache in localStorage (react-query persister) and
+          // thus can show substitutions from months ago. To match that behavior
+          // for authoritative variations we retain up to 365 days by default.
+          const MAX_VAR_DAYS = 365
+          if (map.size > MAX_VAR_DAYS) {
+            const oldest = Array.from(map.keys()).sort()[0]
+            map.delete(oldest)
+          }
+          try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
           
-        // Immediately persist to localStorage
-        try {
-          const obj: Record<string, any> = {}
-          map.forEach((value, key) => { obj[key] = value })
-          localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
-        } catch (e) {}
+          // Immediately persist to localStorage
+          try {
+            const obj: Record<string, any> = {}
+            map.forEach((value, key) => { obj[key] = value })
+            localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
+          } catch (e) {}
+        }
       }
     } catch (e) {}
   }, [externalTimetable, externalTimetableByWeek, selectedDateObject, currentWeek])
@@ -4368,30 +4387,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // Merge any authoritative variations we previously captured for this date
               // MUST happen BEFORE setExternalTimetable to ensure variations are never lost
               try {
-                // CRITICAL: Variations are DATE+WEEK-SPECIFIC
-                // Only apply variations if they match the EXACT date AND week being viewed
                 const authMap = authoritativeVariationsRef.current
-                
-                // Use the date AND week we're fetching for
+                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
+                const candidateDates = [ds, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
                 let authForDate: any = null
                 let matchedKey: string | null = null
-                if (ds) {
-                  // Try with week type first, then fall back to date-only for legacy data
-                  const weekStorageKey = currentWeek ? `${ds}:${currentWeek}` : ds
-                  authForDate = authMap.get(weekStorageKey)
+                for (const dk of candidateDates) { 
+                  authForDate = authMap.get(dk)
                   if (authForDate) {
-                    matchedKey = weekStorageKey
-                    try { console.warn('[timetable.provider] Found stored variations for', weekStorageKey) } catch (e) {}
-                  } else if (currentWeek) {
-                    // Try date-only key as fallback for legacy data
-                    authForDate = authMap.get(ds)
-                    if (authForDate) {
-                      matchedKey = ds
-                      try { console.warn('[timetable.provider] Found legacy stored variations for date', ds, '(no week type)') } catch (e) {}
-                    }
-                  }
-                  if (!authForDate) {
-                    try { console.debug('[timetable.provider] No stored variations found for', weekStorageKey, 'Map has', authMap.size, 'keys:', Array.from(authMap.keys()).join(',')) } catch (e) {}
+                    matchedKey = dk
+                    break
                   }
                 }
                 
@@ -4447,6 +4452,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                         const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
                         if (idx >= 0) {
                           const period = dayPeriods[idx]
+                          
+                          // CRITICAL: Check if weekType matches before applying variation
+                          // This prevents substitutes from Week A appearing on Week B and vice versa
+                          const periodWeekType = (period as any).weekType
+                          const variationWeekType = v.weekType
+                          
+                          // Only apply if:
+                          // 1. Variation has no weekType (legacy data), OR
+                          // 2. Period has no weekType (shouldn't happen but be safe), OR
+                          // 3. Week types match exactly
+                          const weekTypeMatches = !variationWeekType || !periodWeekType || variationWeekType === periodWeekType
+                          
+                          if (!weekTypeMatches) {
+                            try { console.warn('[timetable.provider] ⏭️ SKIPPING variation - week type mismatch. Period:', timetableDayKey, 'P' + v.period, 'has weekType:', periodWeekType, 'but variation has:', variationWeekType) } catch (e) {}
+                            continue
+                          }
+                          
                           let applied = false
                           if (v.isSubstitute) {
                             (period as any).isSubstitute = true
@@ -4464,23 +4486,46 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             modified = true
                           }
                           if (applied) {
-                            try { console.warn('[timetable.provider] ✅ Applied stored variation:', timetableDayKey, 'P' + v.period, v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
+                            try { console.warn('[timetable.provider] ✅ Applied stored variation:', timetableDayKey, 'P' + v.period, 'Week', variationWeekType || '?', v.isSubstitute ? 'SUB:' + v.casualSurname : '', v.isRoomChange ? 'ROOM:' + v.displayRoom : '') } catch (e) {}
+                            // Extra logging for Thursday
+                            if (String(timetableDayKey).toLowerCase().includes('thu')) {
+                              try { console.warn('[timetable.provider] 📅 THURSDAY variation applied to period', v.period) } catch (e) {}
+                            }
                           }
                         } else {
                           // CRITICAL: If period doesn't exist in the fetched timetable but we have a stored variation for it,
                           // we need to reconstruct the period. This handles cases where:
                           // 1. API returns incomplete data (only Week B when substitute was on Week A)
                           // 2. Data is being reused/repeated and doesn't include the historical period
-                          try { console.warn('[timetable.provider] ⚠️ Could not find period', v.period, 'in', dayKey, 'to apply variation. Attempting to reconstruct. Available periods:', dayPeriods.map((p: any) => p.period).join(',')) } catch (e) {}
+                          try { console.warn('[timetable.provider] ⚠️ Could not find period', v.period, 'in', dayKey, 'to apply variation. Variation weekType:', v.weekType, 'Attempting to reconstruct. Available periods:', dayPeriods.map((p: any) => `P${p.period}(${p.weekType || '?'})`).join(',')) } catch (e) {}
                           
-                          // DISABLE period reconstruction - variations should only apply to periods that exist
-                          // If the period doesn't exist in the fetched timetable, skip this variation
-                          // This prevents creating phantom periods that carry over to wrong dates
+                          // Try to find this period in finalByWeek (grouped structure) as a template
+                          // CRITICAL: Only use a template that matches the variation's week type
                           let template: any = null
+                          if (finalByWeek && (finalByWeek as any)[dayKey]) {
+                            const groups = (finalByWeek as any)[dayKey]
+                            // If variation has a weekType, ONLY search that specific week
+                            const weeksToSearch = v.weekType ? [v.weekType] : ['A', 'B', 'unknown']
+                            for (const wk of weeksToSearch) {
+                              const arr = Array.isArray(groups[wk]) ? groups[wk] : []
+                              template = arr.find((p: any) => {
+                                const periodMatch = String(p.period).trim().toLowerCase() === norm
+                                // If variation has weekType, ensure template matches or has no weekType
+                                const weekMatch = !v.weekType || !p.weekType || p.weekType === v.weekType
+                                return periodMatch && weekMatch
+                              })
+                              if (template) {
+                                try { console.warn('[timetable.provider] Found template for period', v.period, 'in week', wk) } catch (e) {}
+                                break
+                              }
+                            }
+                          }
                           
                           // If we found a template, reconstruct the period with the variation applied
                           if (template) {
                             const reconstructed: any = { ...template }
+                            // CRITICAL: Set the weekType from the variation to ensure correct week association
+                            if (v.weekType) reconstructed.weekType = v.weekType
                             if (v.isSubstitute) {
                               reconstructed.isSubstitute = true
                               if (v.casualSurname) reconstructed.casualSurname = v.casualSurname
@@ -4495,7 +4540,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             // Add the reconstructed period to the timetable
                             dayPeriods.push(reconstructed)
                             modified = true
-                            try { console.warn('[timetable.provider] ✅ Reconstructed period', timetableDayKey, 'P' + v.period, 'from grouped structure with stored variation') } catch (e) {}
+                            try { console.warn('[timetable.provider] ✅ Reconstructed period', timetableDayKey, 'P' + v.period, 'Week', v.weekType || '?', 'from grouped structure with stored variation') } catch (e) {}
                           } else {
                             // No template available - create a minimal period with the variation
                             // This ensures the substitute is visible even if we can't find the base period
