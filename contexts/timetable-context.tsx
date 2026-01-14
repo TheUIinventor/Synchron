@@ -4389,13 +4389,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               try {
                 const authMap = authoritativeVariationsRef.current
                 const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
-                
-                // CRITICAL: Only use the EXACT date we're fetching for (ds)
-                // Do NOT fall back to other dates - this was causing variations from other weeks to bleed through
-                const candidateDates = [ds].filter(Boolean) as string[]
-                
-                try { console.warn('[timetable.provider] 🔍 Looking for variations for EXACT date:', ds, '- All stored dates in cache:', Array.from(authMap.keys()).join(', ')) } catch (e) {}
-                
+                const candidateDates = [ds, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
                 let authForDate: any = null
                 let matchedKey: string | null = null
                 for (const dk of candidateDates) { 
@@ -4407,7 +4401,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
                 
                 if (authForDate && typeof authForDate === 'object') {
-                  try { console.warn('[timetable.provider] ✅ MERGING authoritative variations for EXACT date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
+                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
                   
                   // Extra logging for Friday
                   try {
@@ -4424,7 +4418,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       console.warn('[timetable.provider] 📅 THURSDAY in timetable as:', thursdayInTimetable, 'with', ((finalTimetable as any)[thursdayInTimetable || 'Thursday'] || []).length, 'periods')
                     }
                   } catch (e) {}
-
+                  
                   for (const dayKey of Object.keys(authForDate)) {
                     const dayVars = authForDate[dayKey] || []
                     // CRITICAL: Try to match day key case-insensitively
