@@ -1172,6 +1172,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
     if (useExternalTimetableByWeek) {
+      // CRITICAL: Pre-fetch authoritative variations BEFORE building filtered periods
+      // This prevents the flash where periods are created without variations, then variations are applied in a second pass
+      const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+      const candidateDates = [
+        externalTimetableDateRef.current,
+        selectedIso,
+        new Date().toISOString().slice(0, 10)
+      ].filter(Boolean)
+      
+      const authVarsMap = authoritativeVariationsRef.current
+      let authVarsForDate = null
+      let matchedDate = null
+      for (const dateKey of candidateDates) {
+        authVarsForDate = authVarsMap.get(dateKey!)
+        if (authVarsForDate) {
+          matchedDate = dateKey
+          break
+        }
+      }
+      
+      try { console.debug('[timetable.provider] PRE-FETCHING variations before building periods - matched:', matchedDate, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none') } catch (e) {}
+      
       const filtered: Record<string, Period[]> = {}
       for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
         let list: Period[] = []
@@ -1229,8 +1251,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Deep copy periods to prevent mutation of original timetableByWeek objects
-        filtered[day] = list.map(p => ({ ...p }))
+        // CRITICAL: Apply variations DURING the map, not after
+        // This ensures each period object is created with variations already present
+        filtered[day] = list.map(p => {
+          const period = { ...p }
+          
+          // Apply authoritative variations immediately if available
+          if (authVarsForDate && Array.isArray(authVarsForDate[day])) {
+            const normPeriod = String(period.period).trim().toLowerCase()
+            const authVariation = authVarsForDate[day].find((v: any) => 
+              String(v.period).trim().toLowerCase() === normPeriod
+            )
+            
+            if (authVariation) {
+              if (authVariation.isSubstitute) {
+                (period as any).isSubstitute = true
+                if (authVariation.casualSurname) (period as any).casualSurname = authVariation.casualSurname
+                if (authVariation.displayTeacher) (period as any).displayTeacher = authVariation.displayTeacher
+                if (authVariation.originalTeacher) (period as any).originalTeacher = authVariation.originalTeacher
+              }
+              if (authVariation.isRoomChange && authVariation.displayRoom) {
+                const scheduledRoom = String(period.room || '').trim().toLowerCase()
+                const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
+                if (variationRoom && variationRoom !== scheduledRoom) {
+                  (period as any).isRoomChange = true
+                  (period as any).displayRoom = authVariation.displayRoom
+                  (period as any).originalRoom = period.room
+                }
+              }
+            }
+          }
+          
+          return period
+        })
         
         // CRITICAL FIX: If filtered[day] is empty but useExternalTimetable (flat structure) has data with variations,
         // use that instead. This handles the case where timetableByWeek was built without variations
@@ -1247,132 +1300,46 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
-        // This ensures variations are NEVER lost, even when a background fetch returns data without them.
+        // NOTE: Variations are now applied during the initial map above (before periods are added to filtered[day])
+        // This prevents the flash where periods briefly exist without variations
+        
+        // CRITICAL FIX: If filtered[day] is empty after initial processing but we have authoritative 
+        // variations and a flat timetable source, reconstruct the periods with variations
         try {
-          // CRITICAL FIX: Try multiple date keys to find variations
-          // Priority order:
-          // 1. externalTimetableDateRef (what the data is FOR) - MOST AUTHORITATIVE
-          // 2. Selected date (what user is viewing)
-          // 3. Today's date (fallback)
-          const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-          const candidateDates = [
-            externalTimetableDateRef.current, // Try data's actual date FIRST
-            selectedIso,
-            new Date().toISOString().slice(0, 10)
-          ].filter(Boolean)
-          
-          // Try multiple sources for base periods: grouped week data, flat day data, and cached data
-          let daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
-          
-          // If daySource is empty but we have lastRecordedTimetable, use that as fallback
-          if (daySource.length === 0 && lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day])) {
-            daySource = (lastRecordedTimetable as any)[day] as Period[]
-          }
-          
-          // Check if we have authoritative variations - try multiple date keys
-          const authVarsMap = authoritativeVariationsRef.current
-          let authVarsForDate = null
-          let matchedDate = null
-          for (const dateKey of candidateDates) {
-            authVarsForDate = authVarsMap.get(dateKey!)
-            if (authVarsForDate) {
-              matchedDate = dateKey
-              break
-            }
-          }
-          
-          // Don't check date mismatch - API data already has correct variations for its date
-          // The old logic was causing substitutes to disappear
-          // if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
-          //   authVarsForDate = null
-          // }
-          
-          try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
-
-          // If the server/client has captured authoritative variations for
-          // this date but the live `filtered[day]` is empty (e.g., a
-          // background refresh briefly cleared the timetable), attempt to
-          // reconstruct minimal period rows from either the live day source
-          // or the last recorded timetable so substitutes/room-changes can
-          // remain visible instead of flashing then disappearing.
-          try {
-            if (Array.isArray(filtered[day]) && filtered[day].length === 0 && authVarsForDate && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
-              const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
-              const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
-              const reconstructed: Period[] = []
-              for (const v of authVarsForDate[day]) {
-                try {
-                  let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
-                  if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
-                  const base: any = src ? { ...src } : { period: v.period || '', time: '', subject: '', teacher: '' }
-                  if (v.isSubstitute) {
-                    base.isSubstitute = true
-                    if (v.casualSurname) base.casualSurname = v.casualSurname
-                    if (v.displayTeacher) base.displayTeacher = v.displayTeacher
-                    if (v.originalTeacher) base.originalTeacher = v.originalTeacher
-                  }
-                  if (v.isRoomChange && v.displayRoom) {
-                    base.isRoomChange = true
-                    base.displayRoom = v.displayRoom
-                    base.originalRoom = base.room || ''
-                  }
-                  reconstructed.push(base)
-                } catch (e) {
-                  // ignore single-item reconstruction errors
+          if (Array.isArray(filtered[day]) && filtered[day].length === 0 && authVarsForDate && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
+            const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+            const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
+            const reconstructed: Period[] = []
+            for (const v of authVarsForDate[day]) {
+              try {
+                let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
+                const base: any = src ? { ...src } : { period: v.period || '', time: '', subject: '', teacher: '' }
+                if (v.isSubstitute) {
+                  base.isSubstitute = true
+                  if (v.casualSurname) base.casualSurname = v.casualSurname
+                  if (v.displayTeacher) base.displayTeacher = v.displayTeacher
+                  if (v.originalTeacher) base.originalTeacher = v.originalTeacher
                 }
-              }
-              if (reconstructed.length) filtered[day] = reconstructed
-            }
-          } catch (e) {
-            // ignore reconstruction errors
-          }
-
-          // Apply variations to all periods in this day
-          // STRATEGY: Always apply authoritative variations if they exist for this date.
-          // Also overlay fresh match data if it has variations (to update the display with newest data).
-          // NOTE: Variation SAVING is handled by a separate useEffect that watches externalTimetable
-          for (const p of filtered[day]) {
-            const normPeriod = String(p.period).trim().toLowerCase()
-            
-            // Get authoritative variation for this period (if exists)
-            let authVariation: any = null
-            try {
-              const candidate = authVarsForDate && Array.isArray(authVarsForDate[day]) ? authVarsForDate[day] : []
-              if (Array.isArray(candidate)) {
-                authVariation = candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod)
-              } else {
-                try { console.debug('[timetable.provider] unexpected candidate type for authVarsForDate[day]', typeof authVarsForDate?.[day], authVarsForDate?.[day]) } catch (e) {}
-                authVariation = null
-              }
-            } catch (e) {
-              try { console.warn('[timetable.provider] unexpected authVarsForDate[day] type', typeof authVarsForDate, typeof authVarsForDate?.[day]) } catch (e2) {}
-              authVariation = null
-            }
-            
-            // ALWAYS apply authoritative variation if we have one - this is the source of truth
-            if (authVariation) {
-              try { console.debug('[timetable.provider] APPLYING auth variation for period', normPeriod, authVariation) } catch (e) {}
-              if (authVariation.isSubstitute) {
-                (p as any).isSubstitute = true
-                if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
-                if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
-                if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
-              }
-              if (authVariation.isRoomChange && authVariation.displayRoom) {
-                const scheduledRoom = String(p.room || '').trim().toLowerCase()
-                const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
-                if (variationRoom && variationRoom !== scheduledRoom) {
-                  (p as any).isRoomChange = true
-                  (p as any).displayRoom = authVariation.displayRoom
-                  (p as any).originalRoom = p.room
+                if (v.isRoomChange && v.displayRoom) {
+                  base.isRoomChange = true
+                  base.displayRoom = v.displayRoom
+                  base.originalRoom = base.room || ''
                 }
+                reconstructed.push(base)
+              } catch (e) {
+                // ignore single-item reconstruction errors
               }
             }
-            
-            // Also check daySource for FRESH variations that might be newer than cached
-            // (This handles the case where a new variation was just added)
-            if (Array.isArray(daySource) && daySource.length) {
+            if (reconstructed.length) filtered[day] = reconstructed
+          }
+          
+          // Also overlay FRESH variations from daySource (flat timetable) if they're newer
+          // This handles the case where a new variation was just added
+          const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+          if (Array.isArray(daySource) && daySource.length && Array.isArray(filtered[day])) {
+            for (const p of filtered[day]) {
+              const normPeriod = String(p.period).trim().toLowerCase()
               const normSubject = String(p.subject || '').trim().toLowerCase()
               const match = daySource.find((src) => {
                 const srcPeriod = String(src.period).trim().toLowerCase()
@@ -1386,7 +1353,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 return false
               })
               
-              // If match has variations, use them (they might be more recent than cached)
+              // If match has variations, overlay them (they might be more recent than cached)
               if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
                 if ((match as any).isSubstitute) {
                   (p as any).isSubstitute = true
@@ -1410,8 +1377,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch (e) {
-          // Ignore merge errors - display will still work without variations
-          try { console.error('[timetable.provider] variation merge error', e) } catch (e2) {}
+          // Ignore variation overlay errors
+          try { console.error('[timetable.provider] variation overlay error', e) } catch (e2) {}
         }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
