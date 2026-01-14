@@ -2105,29 +2105,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         return
       }
       
-      // Only update if new data has MORE variations, or if we have no existing data
-      if (newCount > 0 || !existingVars) {
-        // CRITICAL: Never overwrite existing variations with data that has fewer OR equal variations
-        // This prevents losing substitutions when a subsequent render provides the same timetable
-        // but without variation flags (e.g., when data flows through different processing paths)
-        if (existingVars && newCount <= existingCount) {
-          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has same or fewer variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
-          return
+      // ALWAYS capture if we have new variations, even if count is equal or less
+      // This handles cases where variations arrive through different render paths
+      // We trust that if variations are present in the data, they should be stored
+      if (newCount > 0) {
+        map.set(timetableDateIso, varData)
+        // Limit map size to prevent unbounded growth. Keep a longer history
+        // so substitutions from far-past dates remain available. Timetabl-app
+        // preserves query cache in localStorage (react-query persister) and
+        // thus can show substitutions from months ago. To match that behavior
+        // for authoritative variations we retain up to 365 days by default.
+        const MAX_VAR_DAYS = 365
+        if (map.size > MAX_VAR_DAYS) {
+          const oldest = Array.from(map.keys()).sort()[0]
+          map.delete(oldest)
         }
-        
-        if (hasVariations || newCount > 0) {
-          map.set(timetableDateIso, varData)
-          // Limit map size to prevent unbounded growth. Keep a longer history
-          // so substitutions from far-past dates remain available. Timetabl-app
-          // preserves query cache in localStorage (react-query persister) and
-          // thus can show substitutions from months ago. To match that behavior
-          // for authoritative variations we retain up to 365 days by default.
-          const MAX_VAR_DAYS = 365
-          if (map.size > MAX_VAR_DAYS) {
-            const oldest = Array.from(map.keys()).sort()[0]
-            map.delete(oldest)
-          }
-          try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
+        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
           
           // Immediately persist to localStorage
           try {
@@ -4387,18 +4380,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // MUST happen BEFORE setExternalTimetable to ensure variations are never lost
               try {
                 // CRITICAL: Variations are DATE-SPECIFIC, not cycle-specific
-                // Only apply variations if they match the EXACT date being viewed
+                // Only apply variations if they match the EXACT date being viewed (ds)
                 // Do NOT apply variations from other dates even if they're in the same week cycle
                 const authMap = authoritativeVariationsRef.current
-                const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
                 
-                // ONLY use the selected date - do not fall back to other dates
+                // Use the date we're fetching for (ds) - this is the selected date
                 let authForDate: any = null
                 let matchedKey: string | null = null
-                if (selIso) {
-                  authForDate = authMap.get(selIso)
+                if (ds) {
+                  authForDate = authMap.get(ds)
                   if (authForDate) {
-                    matchedKey = selIso
+                    matchedKey = ds
+                    try { console.warn('[timetable.provider] Found stored variations for date', ds) } catch (e) {}
+                  } else {
+                    try { console.debug('[timetable.provider] No stored variations found for date', ds, 'Map has', authMap.size, 'dates:', Array.from(authMap.keys()).join(',')) } catch (e) {}
                   }
                 }
                 
