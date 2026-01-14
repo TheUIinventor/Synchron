@@ -1329,7 +1329,13 @@ export async function GET(req: NextRequest) {
       byDay[dayName] = byDay[dayName].filter(p => {
         // If we have a detected week type (e.g. from calendar), filter out mismatched weeks
         // This is critical when falling back to full timetable which contains both A and B weeks
+        // CRITICAL: Always preserve periods with variations (isSubstitute or isRoomChange)
+        // because variations are date-specific and override the cycle week logic
         if (detectedWeekType && p.weekType && p.weekType !== detectedWeekType) {
+           // Don't filter out periods with substitutes or room changes
+           if (p.isSubstitute || p.isRoomChange) {
+             return true
+           }
            return false
         }
         return true

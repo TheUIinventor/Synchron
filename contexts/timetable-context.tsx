@@ -1650,8 +1650,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // include UI-only items like Recess/Lunch without a `weekType` — treat
         // those as applicable to either week so they aren't dropped.
         // Also always preserve Period 0, Roll Call, and End of Day.
+        // CRITICAL: Always preserve periods with variations (isSubstitute or isRoomChange)
+        // because variations are date-specific and override the cycle week logic.
         if (currentWeek === 'A' || currentWeek === 'B') {
-          filtered[day] = list.filter((p) => isNonClassPeriod(p) || !(p as any).weekType || (p as any).weekType === currentWeek)
+          filtered[day] = list.filter((p) => 
+            isNonClassPeriod(p) || 
+            !(p as any).weekType || 
+            (p as any).weekType === currentWeek ||
+            (p as any).isSubstitute ||
+            (p as any).isRoomChange
+          )
         } else {
           // If we don't yet know the current week, show ALL periods (don't filter by weekType)
           // This prevents classes from disappearing while we're waiting for week detection
