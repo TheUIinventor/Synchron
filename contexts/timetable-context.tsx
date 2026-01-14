@@ -2022,6 +2022,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           if (variations.length > 0) {
             hasVariations = true
             varData[day] = variations
+            // Extra logging for Friday
+            if (day.toLowerCase().includes('fri')) {
+              try { console.warn('[timetable.provider] 📅 FRIDAY variations captured:', variations.length, 'variations:', variations.map(v => `P${v.period} ${v.isSubstitute ? 'SUB' : ''}${v.isRoomChange ? 'ROOM' : ''}`).join(', ')) } catch (e) {}
+            }
           } else {
             varData[day] = []
           }
@@ -4385,6 +4389,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 
                 if (authForDate && typeof authForDate === 'object') {
                   try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable. Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
+                  
+                  // Extra logging for Friday
+                  try {
+                    const fridayKey = Object.keys(authForDate).find(k => k.toLowerCase().includes('fri'))
+                    if (fridayKey && authForDate[fridayKey]?.length) {
+                      console.warn('[timetable.provider] 📅 FRIDAY stored variations found:', authForDate[fridayKey].length, 'variations for key:', fridayKey)
+                      const fridayInTimetable = Object.keys(finalTimetable).find(k => k.toLowerCase().includes('fri'))
+                      console.warn('[timetable.provider] 📅 FRIDAY in timetable as:', fridayInTimetable, 'with', ((finalTimetable as any)[fridayInTimetable || 'Friday'] || []).length, 'periods')
+                    }
+                  } catch (e) {}
                   
                   for (const dayKey of Object.keys(authForDate)) {
                     const dayVars = authForDate[dayKey] || []
