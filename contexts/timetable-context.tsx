@@ -2093,6 +2093,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         newCount += (varData[day] || []).length
       }
       
+      // CRITICAL: If new data has ZERO variations but we have existing variations stored,
+      // NEVER overwrite the existing data. This prevents losing substitutions when
+      // navigating between days causes a re-fetch with incomplete data.
+      if (existingVars && newCount === 0 && existingCount > 0) {
+        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', timetableDateIso) } catch (e) {}
+        return
+      }
+      
       // Only update if new data has MORE variations, or if we have no existing data
       if (newCount > 0 || !existingVars) {
         // CRITICAL: Never overwrite existing variations with data that has fewer OR equal variations
