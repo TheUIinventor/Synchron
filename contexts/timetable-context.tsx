@@ -1173,12 +1173,75 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     
     if (useExternalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
+      
+      // CRITICAL: Pre-fetch authoritative variations to check during filtering
+      // This prevents filtering out periods that have stored variations
+      const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+      const candidateDateKeys = [
+        externalTimetableDateRef.current,
+        selectedIso,
+        new Date().toISOString().slice(0, 10)
+      ].filter(Boolean)
+      
+      let storedVariations: Record<string, any[]> | null = null
+      const authVarsMap = authoritativeVariationsRef.current
+      for (const dateKey of candidateDateKeys) {
+        storedVariations = authVarsMap.get(dateKey!)
+        if (storedVariations) break
+      }
+      
+      // Helper to check if a period has a stored variation
+      const hasStoredVariation = (dayName: string, periodIdentifier: string) => {
+        if (!storedVariations) return false
+        const dayVars = storedVariations[dayName]
+        if (!Array.isArray(dayVars)) return false
+        const normPeriod = String(periodIdentifier).trim().toLowerCase()
+        return dayVars.some((v: any) => 
+          String(v.period).trim().toLowerCase() === normPeriod &&
+          (v.isSubstitute || v.isRoomChange)
+        )
+      }
+      
+      // Helper to identify non-class periods that should always be shown
+      const isNonClassPeriod = (p: Period) => {
+        const period = String(p.period || '').trim().toLowerCase()
+        const subject = String(p.subject || '').trim().toLowerCase()
+        if (period === '0' || period === 'rc' || period === 'eod') return true
+        if (subject.includes('period 0') || subject.includes('roll call') || subject.includes('end of day')) return true
+        if (subject === 'break' || /(recess|lunch)/i.test(subject) || /(recess|lunch)/i.test(period)) return true
+        return false
+      }
+      
       for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
         let list: Period[] = []
 
         // If an explicit current week is known, use it.
+        // BUT also preserve periods with variations or that are non-class periods
         if (currentWeek === 'A' || currentWeek === 'B') {
-          list = Array.isArray(groups[currentWeek]) ? (groups[currentWeek] as Period[]) : []
+          const targetWeek = groups[currentWeek]
+          const allPeriods = [...(groups.A || []), ...(groups.B || []), ...(groups.unknown || [])]
+          
+          // Start with periods from the target week
+          const targetPeriods = Array.isArray(targetWeek) ? targetWeek.slice() : []
+          
+          // Add periods from other weeks if they have variations or are non-class
+          for (const p of allPeriods) {
+            const alreadyIncluded = targetPeriods.some(tp => 
+              String(tp.period).trim().toLowerCase() === String(p.period).trim().toLowerCase() &&
+              String(tp.subject || '').trim().toLowerCase() === String(p.subject || '').trim().toLowerCase()
+            )
+            
+            if (!alreadyIncluded && (
+              isNonClassPeriod(p) ||
+              (p as any).isSubstitute ||
+              (p as any).isRoomChange ||
+              hasStoredVariation(day, p.period)
+            )) {
+              targetPeriods.push(p)
+            }
+          }
+          
+          list = targetPeriods
         } else {
           // When currentWeek is unknown, prefer showing ALL periods from both weeks
           // rather than trying to guess. This prevents classes from disappearing.
