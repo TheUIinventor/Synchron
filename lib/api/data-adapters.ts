@@ -95,7 +95,7 @@ export function applySubstitutionsToTimetable(
     reason?: string
     room?: string
   }>,
-  options?: { debug?: boolean }
+  options?: { debug?: boolean; selectedDate?: Date | string }
 ): Record<string, Period[]> {
   // Create shallow copy of timetable structure
   const result: Record<string, Period[]> = {}
@@ -108,6 +108,16 @@ export function applySubstitutionsToTimetable(
     try { console.debug('[adapters] applySubstitutionsToTimetable subs=', substitutions ? substitutions.length : 0, substitutions && substitutions[0] ? substitutions[0] : null) } catch (e) {}
   }
 
+  // Determine the target date for filtering substitutions
+  const targetDateObj = options?.selectedDate 
+    ? (options.selectedDate instanceof Date ? options.selectedDate : new Date(options.selectedDate))
+    : new Date()
+  const targetDateStr = targetDateObj.toISOString().split('T')[0] // YYYY-MM-DD
+  
+  if (options?.debug) {
+    console.debug('[adapters] Applying substitutions for target date:', targetDateStr)
+  }
+
   const subsArray = Array.isArray(substitutions) ? substitutions : (substitutions && typeof substitutions === 'object' && Array.isArray((substitutions as any).substitutions) ? (substitutions as any).substitutions : [])
   subsArray.forEach((sub) => {
     if (!sub) return
@@ -116,6 +126,33 @@ export function applySubstitutionsToTimetable(
     // causing displayRoom to be applied to unrelated periods. Require at
     // least one identifying field so we don't accidentally overwrite rooms.
     if (!sub.period && !sub.subject) return
+    
+    // CRITICAL: Skip substitutions that don't match the target date
+    // This prevents substitutions from carrying over to other dates
+    if (sub.date) {
+      const subDateStr = new Date(sub.date).toISOString().split('T')[0]
+      if (subDateStr !== targetDateStr) {
+        if (options?.debug) {
+          console.debug('[adapters] Skipping substitution for different date:', {
+            subDate: subDateStr,
+            targetDate: targetDateStr,
+            period: sub.period,
+            subject: sub.subject
+          })
+        }
+        return
+      }
+    } else {
+      // Substitutions without a date are dangerous - skip them entirely
+      // to prevent them from being mis-applied to wrong dates
+      if (options?.debug) {
+        console.debug('[adapters] Skipping substitution without date:', {
+          period: sub.period,
+          subject: sub.subject
+        })
+      }
+      return
+    }
     
     // For room-only changes (toRoom provided but no substitute teacher),
     // REQUIRE a date. Room changes without a date are extremely likely to be
@@ -133,8 +170,7 @@ export function applySubstitutionsToTimetable(
       return
     }
     
-    // If date is present, try to map to day name; otherwise apply across all days
-    // (but only for teacher substitutions, not room changes - handled above)
+    // If date is present, try to map to day name
     const candidateDays = (() => {
       if (sub.date) {
         try {
@@ -145,20 +181,14 @@ export function applySubstitutionsToTimetable(
             return [name]
           }
         } catch (e) {
-          // ignore parse errors and fall back to all days
+          // ignore parse errors
         }
         // try to match textual day names
         const dayNames = Object.keys(result)
         const found = dayNames.filter((dn) => sub.date && dn.toLowerCase().includes(sub.date.toLowerCase()))
         if (found.length > 0) return found
       }
-      // No date - for teacher-only subs, apply to today's day only (safer than all days)
-      // Get today's day name
-      const today = new Date()
-      const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-      const todayName = names[today.getDay()]
-      // Only return today if it exists in the result, otherwise skip entirely
-      if (result[todayName]) return [todayName]
+      // No valid date - already filtered out above, but double-check
       return []
     })()
 
