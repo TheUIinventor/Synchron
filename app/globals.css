@@ -112,56 +112,6 @@
   transform-origin: left;
   animation: loader-progress 1.4s ease-in-out infinite;
 }
-
-/* Material 3 Expressive: Loading indicators and spinners */
-@keyframes m3-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.m3-spinner {
-  animation: m3-spin 1s linear infinite;
-}
-
-/* Material 3 emphasized easing for interactions */
-@keyframes m3-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes m3-scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes m3-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.m3-fade-in {
-  animation: m3-fade-in 300ms cubic-bezier(0.2, 0, 0, 1) forwards;
-}
-
-.m3-scale-in {
-  animation: m3-scale-in 300ms cubic-bezier(0.2, 0, 0, 1) forwards;
-}
-
-.m3-slide-up {
-  animation: m3-slide-up 400ms cubic-bezier(0.2, 0, 0, 1) forwards;
-}
  
 @layer base {
   * {
@@ -175,7 +125,7 @@
 @layer utilities {
   .glass-card {
     background-color: hsl(var(--card) / 1) !important;
-    transition: background-color 220ms cubic-bezier(0.2, 0, 0, 1);
+    transition: background-color 220ms ease;
   }
   .glass-card:hover {
   }
@@ -185,7 +135,7 @@
 
   /* Buttons and small controls */
   .glass-button {
-    transition: all 200ms cubic-bezier(0.2, 0, 0, 1);
+    transition: box-shadow 160ms ease;
   }
   .glass-button:hover {
   }
@@ -197,23 +147,6 @@
   .dark .bg-popover {
     background-color: hsl(var(--popover) / 1) !important;
     color: hsl(var(--popover-foreground)) !important;
-  }
-
-  /* M3 Loading indicator styling */
-  .m3-spinner {
-    animation: m3-spin 1s linear infinite;
-  }
-
-  /* M3 Interaction feedback */
-  .active\:scale-95:active {
-    transform: scale(0.95);
-    transition: transform 200ms cubic-bezier(0.2, 0, 0, 1);
-  }
-
-  /* M3 disabled state */
-  .disabled\:opacity-50:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
   /* Ensure Radix/popover content using absolute/bg-popover also inherits translucency */
   .radix-popover-content, [data-radix-popover-content] {
