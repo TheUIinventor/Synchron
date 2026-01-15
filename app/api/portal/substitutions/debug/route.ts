@@ -61,11 +61,12 @@ export async function GET(req: Request) {
     if (rawCookie) baseHeaders['Cookie'] = rawCookie
     if (accessTokenPresent) baseHeaders['Authorization'] = `Bearer ${accessTokenValue}`
 
+    const todayDate = new Date().toISOString().split('T')[0]
     const endpoints = ['/timetable/timetable.json', '/timetable/daytimetable.json', '/timetable']
     // Probe portal endpoints in parallel for faster diagnostics
     const results: any[] = []
     try {
-      const promises = endpoints.map(ep => probeEndpoint(ep, { ...baseHeaders }))
+      const promises = endpoints.map(ep => probeEndpoint(`${ep}?date=${todayDate}`, { ...baseHeaders }))
       const settled = await Promise.allSettled(promises)
       for (let i = 0; i < settled.length; i++) {
         const s = settled[i]
@@ -75,7 +76,7 @@ export async function GET(req: Request) {
     } catch (e) {
       // fallback to sequential probe if something unexpected fails
       for (const ep of endpoints) {
-        results.push(await probeEndpoint(ep, { ...baseHeaders }))
+        results.push(await probeEndpoint(`${ep}?date=${todayDate}`, { ...baseHeaders }))
       }
     }
 
@@ -84,7 +85,7 @@ export async function GET(req: Request) {
     // Probe API host endpoints in parallel as well
     const apiResults: any[] = []
     try {
-      const apiPromises = apiEndpoints.map(ep => probeEndpoint(`${API_BASE}${ep}`, { ...baseHeaders }))
+      const apiPromises = apiEndpoints.map(ep => probeEndpoint(`${API_BASE}${ep}?date=${todayDate}`, { ...baseHeaders }))
       const settledApi = await Promise.allSettled(apiPromises)
       for (let i = 0; i < settledApi.length; i++) {
         const s = settledApi[i]

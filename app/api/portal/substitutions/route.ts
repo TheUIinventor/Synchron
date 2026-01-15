@@ -29,11 +29,12 @@ export async function GET(req: Request) {
 
     // Try API host first when we have a bearer token or the caller requested the API explicitly.
     // (Some environments may accept unauthenticated API reads; requesters can force API via ?source=api.)
+    const todayDate = new Date().toISOString().split('T')[0]
     const jsonPaths = ['/api/timetable/timetable.json', '/api/timetable/daytimetable.json']
     if (accessToken || forceApi) {
       try {
         // Fire both API JSON endpoint requests in parallel and pick the first valid JSON response.
-        const reqs = jsonPaths.map(p => fetch(`${API_BASE}${p}`, { headers, redirect: 'follow' }))
+        const reqs = jsonPaths.map(p => fetch(`${API_BASE}${p}?date=${todayDate}`, { headers, redirect: 'follow' }))
         const settled = await Promise.allSettled(reqs)
         for (let i = 0; i < settled.length; i++) {
           const s = settled[i]
@@ -71,10 +72,10 @@ export async function GET(req: Request) {
 
       const promises = endpoints.map(ep => {
         if (useCache) {
-          const key = `portal:json:${ep}`
+          const key = `portal:json:${ep}:${todayDate}`
           return getStatic<any>(key, ttl, async () => {
             try {
-              const r = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
+              const r = await fetch(`${PORTAL_BASE}${ep}?date=${todayDate}`, { headers, redirect: 'follow' })
               const ct = r.headers.get('content-type') || ''
               if (!r.ok || !ct.includes('application/json')) return null
               return await r.json().catch(() => null)
@@ -84,7 +85,7 @@ export async function GET(req: Request) {
         // No cache for authenticated callers - probe live
         return (async () => {
           try {
-            const r = await fetch(`${PORTAL_BASE}${ep}`, { headers, redirect: 'follow' })
+            const r = await fetch(`${PORTAL_BASE}${ep}?date=${todayDate}`, { headers, redirect: 'follow' })
             const ct = r.headers.get('content-type') || ''
             if (!r.ok || !ct.includes('application/json')) return null
             return await r.json().catch(() => null)

@@ -134,12 +134,13 @@ export async function GET(req: NextRequest) {
         try {
           const headersForApi: Record<string, string> = { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
           if (incomingCookie) headersForApi['Cookie'] = incomingCookie
+          const todayDate = new Date().toISOString().split('T')[0]
           const hosts = ['https://student.sbhs.net.au', 'https://api.sbhs.net.au']
           for (const host of hosts) {
             try {
               // Fetch both possible JSON endpoints in parallel for this host and use the first valid JSON
-              const p1 = fetch(`${host}/api/timetable/daytimetable.json`, { headers: headersForApi })
-              const p2 = fetch(`${host}/api/timetable/timetable.json`, { headers: headersForApi })
+              const p1 = fetch(`${host}/api/timetable/daytimetable.json?date=${todayDate}`, { headers: headersForApi })
+              const p2 = fetch(`${host}/api/timetable/timetable.json?date=${todayDate}`, { headers: headersForApi })
               const settled = await Promise.allSettled([p1, p2])
               let candidate: any = null
               for (const s of settled) {

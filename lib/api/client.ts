@@ -338,7 +338,8 @@ class SBHSPortalClient {
         }
       }
 
-      const secondary = await this.makePortalRequest<any>(`/timetable/daytimetable.json`)
+      const todayDate = new Date().toISOString().split('T')[0]
+      const secondary = await this.makePortalRequest<any>(`/timetable/daytimetable.json?date=${todayDate}`)
       if (secondary.success && secondary.data) {
         const subs = PortalScraper.extractVariationsFromJson(secondary.data)
         if (subs && subs.length > 0) {
