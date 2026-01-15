@@ -4,97 +4,101 @@
 
 @layer base {
   :root {
-    /* M3 Expressive: Amethyst (Primary) & Citrine (Tertiary) Theme - Light Mode */
-    --background: 290 52% 99%; /* even lighter surface */
-    --foreground: 290 8% 12%; /* slight softening */
+    /* M3 Expressive: Soft Pastel Theme - Light Mode */
+    --background: 280 40% 98%; /* soft lavender background */
+    --foreground: 280 12% 25%; /* softer dark text */
 
-    /* Light mode: favor very light surfaces and subtle contrast */
-    --surface-container: 280 30% 98%;
-    --surface-container-high: 280 30% 95%;
-    --surface-variant: 280 18% 94%;
+    /* Light mode: soft pastel surfaces */
+    --surface-container: 270 35% 96%;
+    --surface-container-high: 270 30% 94%;
+    --surface-variant: 270 25% 92%;
 
-    --card: 280 30% 98%;
-    --card-foreground: 290 8% 12%;
+    --card: 270 35% 97%;
+    --card-foreground: 280 12% 25%;
  
-    --popover: 290 50% 98%;
-    --popover-foreground: 290 8% 12%;
+    --popover: 280 40% 97%;
+    --popover-foreground: 280 12% 25%;
 
-    /* Make primary and supporting tones a bit lighter to avoid heavy saturation */
-    --primary: 265 46% 58%; /* lighter purple */
-    --primary-foreground: 0 0% 100%;
-    --primary-container: 265 70% 94%;
-    --primary-container-foreground: 265 60% 22%;
+    /* Pastel primary: soft lavender/periwinkle */
+    --primary: 260 45% 72%; /* pastel lavender */
+    --primary-foreground: 260 30% 20%;
+    --primary-container: 260 50% 90%;
+    --primary-container-foreground: 260 45% 30%;
 
-    --secondary: 290 18% 46%;
-    --secondary-foreground: 0 0% 100%;
-    --secondary-container: 290 36% 92%;
-    --secondary-container-foreground: 290 32% 18%;
+    /* Pastel secondary: soft mauve */
+    --secondary: 290 30% 70%;
+    --secondary-foreground: 290 25% 20%;
+    --secondary-container: 290 40% 88%;
+    --secondary-container-foreground: 290 35% 28%;
 
-    --tertiary: 45 88% 50%; /* slightly brighter citrine */
-    --tertiary-foreground: 45 18% 12%;
-    --tertiary-container: 45 78% 94%;
-    --tertiary-container-foreground: 45 40% 18%;
+    /* Pastel tertiary: soft peach/coral */
+    --tertiary: 30 60% 75%; /* pastel peach */
+    --tertiary-foreground: 30 35% 25%;
+    --tertiary-container: 30 65% 90%;
+    --tertiary-container-foreground: 30 50% 30%;
 
-    --muted: 280 10% 94%;
-    --muted-foreground: 280 6% 44%;
+    --muted: 270 20% 92%;
+    --muted-foreground: 270 15% 50%;
 
-    --accent: 265 76% 94%;
-    --accent-foreground: 265 60% 22%;
+    --accent: 260 50% 88%;
+    --accent-foreground: 260 40% 30%;
  
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 55% 72%; /* pastel red */
+    --destructive-foreground: 0 30% 20%;
 
-    --border: 280 10% 85%;
-    --input: 280 10% 85%;
-    --ring: 265 50% 50%;
+    --border: 270 20% 88%;
+    --input: 270 20% 88%;
+    --ring: 260 45% 70%;
  
     --radius: 0.5rem; /* Standard radius, overridden by specific components for M3 */
   }
  
   .dark {
-    /* Dark mode: darker surfaces and light foreground for readability */
-    --background: 220 12% 8%;
-    --foreground: 0 0% 96%;
+    /* Dark mode: soft dark surfaces with pastel accents */
+    --background: 250 18% 12%;
+    --foreground: 0 0% 94%;
 
-    /* Surfaces: subtle separation from the very dark background */
-    --surface-container: 220 10% 12%;
-    --surface-container-high: 220 12% 15%;
-    --surface-variant: 220 14% 18%;
+    /* Surfaces: subtle separation with soft undertones */
+    --surface-container: 250 15% 16%;
+    --surface-container-high: 250 15% 19%;
+    --surface-variant: 250 12% 22%;
 
-    --card: 220 12% 14%;
-    --card-foreground: 0 0% 96%;
+    --card: 250 16% 17%;
+    --card-foreground: 0 0% 94%;
 
-    --popover: 220 12% 16%;
-    --popover-foreground: 0 0% 96%;
+    --popover: 250 16% 18%;
+    --popover-foreground: 0 0% 94%;
 
-    /* Keep primary hue expressive but readable on dark backgrounds */
-    --primary: 220 80% 60%;
-    --primary-foreground: 0 0% 96%;
-    --primary-container: 220 70% 18%;
-    --primary-container-foreground: 220 60% 96%;
+    /* Pastel primary for dark mode: soft blue-purple */
+    --primary: 250 55% 70%;
+    --primary-foreground: 250 20% 15%;
+    --primary-container: 250 45% 25%;
+    --primary-container-foreground: 250 50% 88%;
 
-    --secondary: 260 18% 46%;
-    --secondary-foreground: 0 0% 96%;
-    --secondary-container: 260 18% 22%;
-    --secondary-container-foreground: 260 32% 88%;
+    /* Pastel secondary: soft purple */
+    --secondary: 270 35% 65%;
+    --secondary-foreground: 270 15% 15%;
+    --secondary-container: 270 30% 28%;
+    --secondary-container-foreground: 270 35% 85%;
 
-    --tertiary: 40 80% 50%;
-    --tertiary-foreground: 0 0% 96%;
-    --tertiary-container: 40 80% 24%;
-    --tertiary-container-foreground: 40 40% 92%;
+    /* Pastel tertiary: soft coral */
+    --tertiary: 25 60% 70%;
+    --tertiary-foreground: 25 20% 15%;
+    --tertiary-container: 25 50% 28%;
+    --tertiary-container-foreground: 25 55% 88%;
 
-    --muted: 220 8% 18%;
-    --muted-foreground: 220 6% 72%;
+    --muted: 250 10% 22%;
+    --muted-foreground: 250 8% 70%;
 
-    --accent: 220 76% 56%;
-    --accent-foreground: 0 0% 96%;
+    --accent: 250 60% 65%;
+    --accent-foreground: 250 15% 15%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 50% 68%; /* pastel red for dark mode */
+    --destructive-foreground: 0 15% 15%;
 
-    --border: 220 8% 14%;
-    --input: 220 8% 14%;
-    --ring: 220 60% 60%;
+    --border: 250 10% 20%;
+    --input: 250 10% 20%;
+    --ring: 250 50% 68%;
   }
 }
 
@@ -115,38 +119,25 @@
   }
   body {
     @apply bg-background text-foreground font-sans overflow-x-hidden;
-    background-image: 
-      radial-gradient(at 0% 0%, hsla(var(--primary) / 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(var(--tertiary) / 0.12) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(var(--secondary) / 0.12) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, hsla(var(--accent) / 0.12) 0px, transparent 50%),
-      linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.03), hsla(var(--surface-gradient-end) / 0.03));
-    background-attachment: fixed;
   }
 }
 
 @layer utilities {
   .glass-card {
-    @apply backdrop-blur-md;
-    /* Solid card backing (no translucency): use opaque HSL or a soft gradient */
     background-color: hsl(var(--card) / 1) !important;
-    background-image: linear-gradient(180deg, hsl(var(--surface-gradient-start) / 1), hsl(var(--surface-gradient-end) / 1));
-    transition: background-image 220ms ease, transform 160ms ease;
+    transition: background-color 220ms ease;
   }
   .glass-card:hover {
-    background-image: linear-gradient(180deg, hsl(var(--surface-gradient-start) / 1), hsl(var(--surface-gradient-end) / 0.96));
-    transform: translateY(-2px);
   }
   .glass-border {
-    @apply border border-white/20 dark:border-white/10;
+    @apply border border-border;
   }
 
-  /* Buttons and small controls get a subtle primary gradient on hover/focus */
+  /* Buttons and small controls */
   .glass-button {
-    transition: background-image 220ms ease, box-shadow 160ms ease;
+    transition: box-shadow 160ms ease;
   }
   .glass-button:hover {
-    background-image: linear-gradient(180deg, hsla(var(--primary-gradient-start) / 0.06), hsla(var(--primary-gradient-end) / 0.04));
   }
   /* Make popovers translucent in light mode; darker in dark mode still uses slightly stronger tint */
   .bg-popover {
@@ -161,12 +152,10 @@
   .radix-popover-content, [data-radix-popover-content] {
     background-color: hsl(var(--popover) / 1) !important;
     color: hsl(var(--popover-foreground)) !important;
-    box-shadow: 0 6px 24px rgba(2,6,23,0.06);
   }
   .dark .radix-popover-content, .dark [data-radix-popover-content] {
     background-color: hsl(var(--popover) / 1) !important;
     color: hsl(var(--popover-foreground)) !important;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
   }
 
   /* Ensure `bg-card` utility does not force full opacity; make it translucent */
@@ -190,33 +179,25 @@
     border-color: hsl(var(--primary) / 0.12) !important;
   }
 
-  /* Dark-mode adjustments for better layering and contrast */
+  /* Dark-mode adjustments */
   .dark .glass-card {
     background-color: hsl(var(--card) / 0.94) !important;
-    background-image: linear-gradient(180deg, hsla(var(--surface-gradient-start) / 0.04), hsla(var(--surface-gradient-end) / 0.03));
-    box-shadow: 0 6px 24px rgba(0,0,0,0.45);
   }
 
   .dark .glass-button:hover {
-    background-image: linear-gradient(180deg, hsla(var(--primary-gradient-start) / 0.08), hsla(var(--primary-gradient-end) / 0.06));
   }
 
   .dark .now-card {
-    /* Make Now card sit a bit lighter than surrounding surfaces for emphasis */
     background-color: hsl(var(--now-card) / 0.98) !important;
     color: hsl(var(--card-foreground)) !important;
-    border: 1px solid hsla(var(--primary) / 0.06) !important;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.55) inset, 0 6px 20px rgba(0,0,0,0.36);
   }
 
   .dark .radix-popover-content, .dark [data-radix-popover-content] {
-    border: 1px solid rgba(255,255,255,0.03);
   }
 
   .dark .bg-popover {
     background-color: hsl(var(--popover) / 0.96) !important;
     color: hsl(var(--popover-foreground)) !important;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.48);
   }
 
   .dark .sidebar-current {
