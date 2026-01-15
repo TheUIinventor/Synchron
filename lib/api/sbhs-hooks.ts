@@ -88,8 +88,12 @@ async function fetchDayTimetable(date?: string): Promise<DayTimetableResponse> {
   return response.json()
 }
 
-async function fetchFullTimetable(): Promise<FullTimetableResponse> {
-  const response = await fetch("/api/timetable", {
+async function fetchFullTimetable(date?: string): Promise<FullTimetableResponse> {
+  const url = date 
+    ? `/api/timetable?date=${encodeURIComponent(date)}`
+    : `/api/timetable?date=${new Date().toISOString().split('T')[0]}`
+  
+  const response = await fetch(url, {
     credentials: "include",
     headers: {
       "Accept": "application/json",
@@ -180,11 +184,13 @@ useDtt.getQueryKey = dayTimetableKey
  * Hook for fetching the full 10-day cycle timetable (no subs)
  * This returns the clean cycle timetable organized by day and week.
  * Use this for viewing the full schedule, not for current-day display.
+ * 
+ * @param date - Optional YYYY-MM-DD date string for fetching specific date's data
  */
-export function useTimetable() {
+export function useTimetable(date?: string) {
   return useQuery({
-    queryKey: fullTimetableKey(),
-    queryFn: fetchFullTimetable,
+    queryKey: fullTimetableKey(date ? { date } : undefined),
+    queryFn: () => fetchFullTimetable(date),
     // Caching configuration - cycle timetable changes less often
     staleTime: 30 * 60 * 1000, // Data is fresh for 30 minutes
     gcTime: Infinity, // Keep in cache forever
@@ -208,7 +214,7 @@ useTimetable.getQueryKey = fullTimetableKey
  */
 export function useCombinedTimetable(date?: string) {
   const dttQuery = useDtt(date)
-  const fullQuery = useTimetable()
+  const fullQuery = useTimetable(date)
   
   // Use day timetable if available, otherwise fall back to full
   const data = dttQuery.data || fullQuery.data
