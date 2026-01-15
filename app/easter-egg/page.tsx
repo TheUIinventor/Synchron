@@ -71,7 +71,7 @@ export default function EasterEggPage() {
           <div className="w-6 hidden md:block"></div>
         </div>
 
-        <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 text-center p-6">
+        <Card className="bg-surface-container rounded-m3-xl border-none text-center p-6">
           <CardContent className="p-0">
             <div className="flex flex-col items-center justify-center mb-6">
               <div className="w-20 h-20 bg-tertiary-container rounded-full flex items-center justify-center mb-4">

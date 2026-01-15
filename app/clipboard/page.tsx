@@ -145,7 +145,7 @@ export default function ClipboardPage() {
   return (
     <>
       {showAuthHelper && (
-        <div className="fixed bottom-4 left-4 md:left-20 lg:left-24 z-50 bg-card border border-border rounded-lg shadow-lg p-4 max-w-sm text-center relative">
+        <div className="fixed bottom-4 left-4 md:left-20 lg:left-24 z-50 bg-card border border-border rounded-lg p-4 max-w-sm text-center relative">
           <button
             onClick={() => setShowAuthHelper(false)}
             className="absolute top-2 right-2 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"

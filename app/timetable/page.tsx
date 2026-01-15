@@ -368,7 +368,7 @@ export default function TimetablePage() {
         {/* When we're using empty data because live data couldn't be obtained, show a clear, non-technical call-to-action */}
         {(!timetableData || Object.values(timetableData).every(day => day.length === 0)) && (
           <div className="w-full mb-6">
-            <Card className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-4">
+            <Card className="w-full bg-surface-container rounded-m3-xl border-none p-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
                   <div className="font-medium text-on-surface">Can't load your live timetable</div>
@@ -410,7 +410,7 @@ export default function TimetablePage() {
             <button
               onClick={() => setViewMode("daily")}
               className={`px-4 py-2 text-sm rounded-full transition-all ${
-                viewMode === "daily" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
+                viewMode === "daily" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               Daily View
@@ -418,7 +418,7 @@ export default function TimetablePage() {
             <button
               onClick={() => setViewMode("cycle")}
               className={`px-4 py-2 text-sm rounded-full transition-all ${
-                viewMode === "cycle" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
+                viewMode === "cycle" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               Cycle View
@@ -552,7 +552,7 @@ export default function TimetablePage() {
             )}
 
             {/* Daily Schedule (wide format) */}
-            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-2 sm:p-4 mx-auto max-w-full">
+            <div className="w-full bg-surface-container rounded-m3-xl border-none p-2 sm:p-4 mx-auto max-w-full">
               <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
@@ -660,7 +660,7 @@ export default function TimetablePage() {
                         return displayRoom
                       })()
                       
-                      const cardClass = 'flex-1 w-full min-w-0 px-3 py-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
+                      const cardClass = 'flex-1 w-full min-w-0 px-3 py-2 rounded-xl border transition-all bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
 
                       return (
                         <div key={period.id ?? idx} className="flex gap-3 items-start group cursor-pointer w-full">
@@ -760,7 +760,7 @@ export default function TimetablePage() {
             {/* Full Cycle View (show both Week A and Week B) */}
 
             {/* Grid Timetable */}
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+            <Card className="bg-surface-container rounded-m3-xl border-none">
               <div className="p-6">
                 <div className="text-center mb-6">
                   <h2 className="text-xl font-semibold text-on-surface">Full Cycle Timetable</h2>

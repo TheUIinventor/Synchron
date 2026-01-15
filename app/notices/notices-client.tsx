@@ -131,7 +131,7 @@ export default function NoticesClient() {
                 onClick={() => setSelectedYear(year)}
                 className={cn(
                   "rounded-full px-6 transition-all",
-                  selectedYear === year ? "shadow-md" : "border-outline hover:bg-surface-variant"
+                  selectedYear === year ? "" : "border-outline hover:bg-surface-variant"
                 )}
               >
                 {year}
@@ -154,7 +154,7 @@ export default function NoticesClient() {
         ) : filteredNotices.length > 0 ? (
           <div className="space-y-4 px-2 md:px-0">
             {filteredNotices.map((notice, idx) => (
-              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low">
+              <Card key={idx} className="overflow-hidden border-none transition-all duration-300 bg-surface-container-low">
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start gap-4">
                     <CardTitle className="text-xl font-bold leading-tight">

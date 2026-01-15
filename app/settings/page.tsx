@@ -288,7 +288,7 @@ export default function SettingsPage() {
           {/* General tab removed - navigation settings moved into Appearance tab */}
 
           <TabsContent value="appearance" className="space-y-6 mt-0">
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+            <Card className="bg-surface-container rounded-m3-xl border-none">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Theme Mode</CardTitle>
                 <CardDescription className="text-on-surface-variant">Switch between Light and Dark</CardDescription>
@@ -301,7 +301,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+            <Card className="bg-surface-container rounded-m3-xl border-none">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
                 <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
@@ -319,7 +319,7 @@ export default function SettingsPage() {
 
             {/* Navigation Tabs control removed - navigation is fixed in this build */}
 
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+            <Card className="bg-surface-container rounded-m3-xl border-none">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Color Theme</CardTitle>
                 <CardDescription className="text-on-surface-variant">
@@ -356,7 +356,7 @@ export default function SettingsPage() {
 
             {/* Font Theme Section - Hidden until easter egg is discovered */}
             {showFontSelector && (
-              <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1 animate-in fade-in slide-in-from-bottom-4">
+              <Card className="bg-surface-container rounded-m3-xl border-none animate-in fade-in slide-in-from-bottom-4">
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <Type className="h-5 w-5 text-primary" />
@@ -402,7 +402,7 @@ export default function SettingsPage() {
 
             {/* Easter egg progress indicator */}
             {appearanceTabClicks >= 3 && appearanceTabClicks < 7 && !showFontSelector && (
-              <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <Card className="bg-surface-container rounded-m3-xl border-none">
                 <CardContent className="p-6 text-center">
                   <p className="text-sm text-primary animate-pulse mb-3 font-medium">
                     Keep clicking Appearance... {7 - appearanceTabClicks} more!
@@ -425,7 +425,7 @@ export default function SettingsPage() {
           
 
           <TabsContent value="feedback" className="space-y-6 mt-0">
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+            <Card className="bg-surface-container rounded-m3-xl border-none">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Send Feedback</CardTitle>
                 <CardDescription className="text-on-surface-variant">
@@ -451,7 +451,7 @@ export default function SettingsPage() {
           {/* Integrations content hidden on mobile */}
           {!isMobile && (
             <TabsContent value="integrations" className="space-y-4 mt-0">
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+            <Card className="bg-surface-container rounded-m3-xl border-none">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-on-surface">Canvas Links</CardTitle>
                 <CardDescription className="text-on-surface-variant">

@@ -267,7 +267,7 @@ export default function HomeClient() {
         <p className="text-muted-foreground max-w-xs">{error}</p>
         <button 
           onClick={() => refreshExternal && refreshExternal()} 
-          className="px-6 py-3 rounded-full bg-primary text-primary-foreground hover:shadow-lg transition-all active:scale-95"
+          className="px-6 py-3 rounded-full bg-primary text-primary-foreground transition-all active:scale-95"
         >
           Try Again
         </button>
@@ -534,7 +534,7 @@ export default function HomeClient() {
             {/* Mobile-only compact pill (shows countdown and next period) */}
             {!noClassesByBells && (
               <Link href="/timetable" className="block sm:hidden w-full">
-                <div className="mx-auto max-w-[680px] px-3 py-2 rounded-full bg-primary text-primary-foreground font-medium flex items-center justify-between shadow-sm">
+                <div className="mx-auto max-w-[680px] px-3 py-2 rounded-full bg-primary text-primary-foreground font-medium flex items-center justify-between">
                   <>
                     <span className="text-sm md:text-base truncate">
                       {formatMsHHMMSS(bellState.timeUntil)} to {bellState.isCurrentlyInPeriod ? (bellState.currentPeriod?.period || 'class') : (bellState.nextBell?.period || 'next bell')}
@@ -546,7 +546,7 @@ export default function HomeClient() {
             )}
 
             {/* Desktop / tablet expressive card (hidden on small screens) */}
-            <div className="hidden sm:block relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 shadow-elevation-1 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
+            <div className="hidden sm:block relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
               {/* Background Blob (hidden on small screens to avoid overflow) */}
               <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20 pointer-events-none" />
               
@@ -623,7 +623,7 @@ export default function HomeClient() {
                     href="https://mail.google.com/a/student.sbhs.nsw.edu.au"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full shadow-sm border border-transparent hover:border-primary/10 transition-all"
+                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full border border-transparent hover:border-primary/10 transition-all"
                   >
                     <Mail className="h-4 w-4" />
                     <span className="text-sm font-medium">Mail</span>
@@ -633,7 +633,7 @@ export default function HomeClient() {
                     href="https://student.sbhs.net.au/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full shadow-sm border border-transparent hover:border-primary/10 transition-all"
+                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full border border-transparent hover:border-primary/10 transition-all"
                   >
                     <Globe className="h-4 w-4" />
                     <span className="text-sm font-medium">Portal</span>
@@ -643,7 +643,7 @@ export default function HomeClient() {
                     href="https://sydneyboyshigh.instructure.com/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full shadow-sm border border-transparent hover:border-primary/10 transition-all"
+                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full border border-transparent hover:border-primary/10 transition-all"
                   >
                     <BookOpen className="h-4 w-4" />
                     <span className="text-sm font-medium">Canvas</span>
@@ -790,7 +790,7 @@ export default function HomeClient() {
                       
                       const link = canvasLinks[(period.subject ?? '').trim()]
                       const cardClass = cn(
-                        'flex-1 p-2 rounded-xl border transition-all shadow-sm',
+                        'flex-1 p-2 rounded-xl border transition-all',
                         period.subject === currentPeriod?.subject
                           ? 'sidebar-current border-primary/20'
                           : 'bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'

@@ -107,11 +107,6 @@ const config = {
         // M3 Expressive Motion (Overshoot)
         'expressive': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
         'standard': 'cubic-bezier(0.2, 0.0, 0, 1.0)',
-      },
-      boxShadow: {
-        'elevation-1': '0px 1px 2px rgba(0,0,0,0.3), 0px 1px 3px 1px rgba(0,0,0,0.15)',
-        'elevation-2': '0px 1px 2px rgba(0,0,0,0.3), 0px 2px 6px 2px rgba(0,0,0,0.15)',
-        'elevation-3': '0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px rgba(0,0,0,0.3)',
       }
     },
   },

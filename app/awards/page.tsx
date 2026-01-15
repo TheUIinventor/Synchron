@@ -285,7 +285,7 @@ export default function AwardsPage() {
         </div>
 
         {/* Overall Progress Card */}
-        <Card className="card-optimized-main mb-6 bg-surface-container shadow-elevation-1">
+        <Card className="card-optimized-main mb-6 bg-surface-container">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -352,7 +352,7 @@ export default function AwardsPage() {
               return (
                 <Card
                   key={category}
-                  className="rounded-m3-xl bg-surface-container-low shadow-sm p-4 border-none hover:shadow-md transition-all hover:scale-[1.02]"
+                  className="rounded-m3-xl bg-surface-container-low p-4 border-none transition-all hover:scale-[1.02]"
                 >
                   <div className="text-center mb-2">
                     <h4 className="font-semibold text-sm mb-1">{category}</h4>
@@ -395,7 +395,7 @@ export default function AwardsPage() {
                 <Card
                   key={level.name}
                   className={cn(
-                    "rounded-xl shadow-sm p-3 border transition-all duration-200 hover:scale-[1.01]",
+                    "rounded-xl p-3 border transition-all duration-200 hover:scale-[1.01]",
                     isAchieved
                       ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20"
                       : isCurrent
@@ -460,7 +460,7 @@ export default function AwardsPage() {
               <h3 className="text-lg font-medium mb-2">Participation Entries</h3>
               <div className="space-y-3">
                 {participationList.map((p) => (
-                  <Card key={p.id} className="rounded-xl p-3 border-none bg-surface-container-low shadow-sm">
+                  <Card key={p.id} className="rounded-xl p-3 border-none bg-surface-container-low">
                     <div className="flex justify-between items-center">
                       <div>
                         <div className="font-semibold">{p.activity}</div>
@@ -499,7 +499,7 @@ export default function AwardsPage() {
                       .map((point) => (
                         <Card
                           key={point.id}
-                          className="rounded-xl bg-surface-container-low shadow-sm p-3 border-none hover:shadow-md transition-all"
+                          className="rounded-xl bg-surface-container-low p-3 border-none transition-all"
                         >
                           <div className="flex justify-between items-start mb-1">
                             <div className="flex-1 pr-2">
@@ -539,7 +539,7 @@ export default function AwardsPage() {
             {/* Per-category summary grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
               {Object.entries(categoryData).map(([cat, stats]) => (
-                <Card key={cat} className="rounded-xl p-3 border-none bg-surface-container-low shadow-sm">
+                <Card key={cat} className="rounded-xl p-3 border-none bg-surface-container-low">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold">{cat}</p>
@@ -557,7 +557,7 @@ export default function AwardsPage() {
             <h3 className="text-lg font-medium mb-2">Individual Awards</h3>
             <div className="space-y-3">
               {awardPoints.data.awards.map((a: any, idx: number) => (
-                <Card key={a.id ?? idx} className="rounded-xl p-3 border-none bg-surface-container-low shadow-sm">
+                <Card key={a.id ?? idx} className="rounded-xl p-3 border-none bg-surface-container-low">
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1">
                       <div className="font-semibold">{a.title || a.activity || a.category}</div>
