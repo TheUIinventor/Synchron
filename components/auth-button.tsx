@@ -55,11 +55,11 @@ export function AuthButton() {
       variant={showReauth ? "default" : "outline"}
       size={(isAuthenticated || showReauth) ? "default" : "icon"}
       className={cn(
-        "glass-button border-0 transition-all duration-200",
+        "transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)]",
         showReauth
-          ? "rounded-full px-4 h-10 bg-[#e26222] text-white shadow-md hover:opacity-95"
-          : "bg-transparent hover:bg-white/30 dark:hover:bg-white/15",
-        (isAuthenticated || showReauth) ? "rounded-full px-3 h-10" : "rounded-full w-10 h-10"
+          ? "rounded-[24px] px-4 h-10 bg-error text-on-error shadow-none hover:bg-error/90"
+          : "bg-transparent hover:bg-surface-variant",
+        (isAuthenticated || showReauth) ? "rounded-[24px] px-3 h-10" : "rounded-[24px] w-10 h-10"
       )}
       onClick={handleAuth}
     >

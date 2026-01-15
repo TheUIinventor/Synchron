@@ -5,21 +5,23 @@ import SettingsMenu from "@/components/settings-menu";
 import ThemeToggle from "@/components/theme-toggle";
 import { usePathname } from "next/navigation";
 
-// Apple-style floating glass effect for each button
-const glass =
-  "backdrop-blur-xl bg-white/60 dark:bg-gray-900/60 shadow-lg border border-white/30 dark:border-gray-800/40";
-
 export default function FloatingActionIcons() {
   // Always show on every screen
   return (
-    <div className="fixed z-[9999] flex flex-col gap-6 right-4 bottom-8 items-end">
-      <div className={"transition-transform duration-300 hover:scale-105 rounded-full p-4 w-16 h-16 flex items-center justify-center glass-button backdrop-blur-xl bg-white/60 dark:bg-gray-900/60 shadow-lg border border-white/30 dark:border-gray-800/40"}>
+    <div className="fixed z-[9999] flex flex-col gap-4 right-4 bottom-8 items-end">
+      <div 
+        className="transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 rounded-[28px] p-4 w-16 h-16 flex items-center justify-center bg-secondary-container text-secondary-container-foreground"
+      >
         <AuthButton />
       </div>
-      <div className={"transition-transform duration-300 hover:scale-105 rounded-full p-4 w-16 h-16 flex items-center justify-center glass-button backdrop-blur-xl bg-white/60 dark:bg-gray-900/60 shadow-lg border border-white/30 dark:border-gray-800/40"}>
+      <div 
+        className="transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 rounded-[28px] p-4 w-16 h-16 flex items-center justify-center bg-tertiary-container text-tertiary-container-foreground"
+      >
         <SettingsMenu />
       </div>
-      <div className={"transition-transform duration-300 hover:scale-105 rounded-full p-4 w-16 h-16 flex items-center justify-center glass-button backdrop-blur-xl bg-white/60 dark:bg-gray-900/60 shadow-lg border border-white/30 dark:border-gray-800/40"}>
+      <div 
+        className="transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 rounded-[28px] p-4 w-16 h-16 flex items-center justify-center bg-primary-container text-primary-container-foreground"
+      >
         <ThemeToggle />
       </div>
     </div>

@@ -16,7 +16,7 @@ export function AppSidebar() {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 z-[9999] hidden md:flex flex-col items-center w-20 lg:w-24 py-8 bg-surface-container/80 backdrop-blur-md border-r border-border/50">
+    <aside className="fixed left-0 top-0 bottom-0 z-[9999] hidden md:flex flex-col items-center w-20 lg:w-24 py-8 bg-surface-container border-r border-outline-variant">
       <div className="flex-1 flex flex-col items-center gap-4 w-full">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
@@ -30,10 +30,11 @@ export function AppSidebar() {
             >
               <div
                 className={cn(
-                  "flex items-center justify-center w-14 h-8 rounded-full transition-all duration-300 ease-expressive",
+                  "flex items-center justify-center w-14 h-8 rounded-[16px] transition-all duration-500",
+                  "ease-[cubic-bezier(0.2,0,0,1)]",
                   isActive
                     ? "bg-secondary-container text-secondary-container-foreground"
-                    : "text-muted-foreground hover:bg-surface-variant/50 hover:text-foreground"
+                    : "text-on-surface-variant hover:bg-surface-variant hover:text-on-surface"
                 )}
               >
                 <Icon
@@ -47,7 +48,7 @@ export function AppSidebar() {
               <span
                 className={cn(
                   "text-[10px] font-medium tracking-wide transition-colors duration-300",
-                  isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  isActive ? "text-on-surface" : "text-on-surface-variant group-hover:text-on-surface"
                 )}
               >
                 {item.label}
@@ -56,7 +57,6 @@ export function AppSidebar() {
           );
         })}
       </div>
-      {/* bell times removed */}
     </aside>
   );
 }
