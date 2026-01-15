@@ -89,7 +89,8 @@ async function fetchDayTimetable(date?: string): Promise<DayTimetableResponse> {
 }
 
 async function fetchFullTimetable(): Promise<FullTimetableResponse> {
-  const response = await fetch("/api/timetable", {
+  const today = new Date().toISOString().split('T')[0]
+  const response = await fetch(`/api/timetable?date=${encodeURIComponent(today)}`, {
     credentials: "include",
     headers: {
       "Accept": "application/json",
