@@ -238,9 +238,7 @@ export async function GET(req: NextRequest) {
       const bellUrl = dateParam
         ? `${host}/api/timetable/bells.json?date=${dateParam}`
         : `${host}/api/timetable/bells.json`
-      const fullUrl = dateParam
-        ? `${host}/api/timetable/timetable.json?date=${dateParam}`
-        : `${host}/api/timetable/timetable.json`
+      const fullUrl = `${host}/api/timetable/timetable.json`
       
       // Fetch calendar data to determine week type reliably, especially when daytimetable fails
       const calendarUrl = dateParam
