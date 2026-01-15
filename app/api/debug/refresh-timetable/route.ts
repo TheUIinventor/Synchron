@@ -44,9 +44,10 @@ export async function GET(req: NextRequest) {
     }
 
     // 2) Call timetable with combined cookie header
+    const dateParam = req.nextUrl?.searchParams.get('date') || new Date().toISOString().split('T')[0]
     let timetableResult: any = { ok: false }
     try {
-      const rt = await fetch(`${origin}/api/timetable`, { headers: { Cookie: combinedCookie }, redirect: 'manual' })
+      const rt = await fetch(`${origin}/api/timetable?date=${encodeURIComponent(dateParam)}`, { headers: { Cookie: combinedCookie }, redirect: 'manual' })
       const ctype = rt.headers.get('content-type') || ''
       let body: any = null
       try {

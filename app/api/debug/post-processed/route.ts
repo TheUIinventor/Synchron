@@ -32,10 +32,11 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const origin = url.origin
+    const dateParam = url.searchParams.get('date') || new Date().toISOString().split('T')[0]
 
     // Fetch normalized timetable and substitutions in parallel to reduce latency
     const [ttSettled, subsSettled] = await Promise.allSettled([
-      fetch(`${origin}/api/timetable`, { headers: { accept: 'application/json' } }),
+      fetch(`${origin}/api/timetable?date=${encodeURIComponent(dateParam)}`, { headers: { accept: 'application/json' } }),
       fetch(`${origin}/api/portal/substitutions?debug=1`, { headers: { accept: 'application/json' } })
     ])
 

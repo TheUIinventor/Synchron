@@ -29,12 +29,13 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const origin = url.origin
+    const dateParam = url.searchParams.get('date') || new Date().toISOString().split('T')[0]
     const rawCookie = req.headers.get('cookie') || ''
     const headers: Record<string, string> = { accept: 'application/json' }
     if (rawCookie) headers['cookie'] = rawCookie
 
     // Fetch /api/timetable and substitutions in parallel.
-    const ttPromise = fetch(`${origin}/api/timetable`, { headers })
+    const ttPromise = fetch(`${origin}/api/timetable?date=${encodeURIComponent(dateParam)}`, { headers })
     const subsPromise = fetch(`${origin}/api/portal/substitutions?debug=1`, { headers })
     const [ttSettled, subsSettled] = await Promise.allSettled([ttPromise, subsPromise])
     let j: any = null

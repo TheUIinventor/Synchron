@@ -29,13 +29,14 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const origin = url.origin
+    const dateParam = url.searchParams.get('date') || new Date().toISOString().split('T')[0]
     // Forward the client's cookies when fetching internal endpoints so the
     // server-side fetch can act on behalf of an authenticated browser session.
     const rawCookie = req.headers.get('cookie') || ''
     const headers: Record<string, string> = { accept: 'application/json' }
     if (rawCookie) headers['cookie'] = rawCookie
 
-    let res = await fetch(`${origin}/api/timetable`, { headers })
+    let res = await fetch(`${origin}/api/timetable?date=${encodeURIComponent(dateParam)}`, { headers })
     let j: any
     // If /api/timetable requires auth, try the portal substitutions proxy as a fallback
     if (!res.ok && res.status === 401) {
