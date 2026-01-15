@@ -260,14 +260,14 @@ export default function HomeClient() {
   if (error) {
     return (
       <div className="p-4 flex flex-col items-center justify-center h-[50vh] text-center space-y-4">
-        <div className="w-24 h-24 rounded-3xl bg-destructive/10 flex items-center justify-center mb-4">
+        <div className="w-24 h-24 rounded-[28px] bg-destructive/10 flex items-center justify-center mb-4">
           <Loader2 className="h-10 w-10 text-destructive animate-spin" />
         </div>
         <h2 className="text-2xl font-sans font-semibold text-destructive">Connection Error</h2>
         <p className="text-muted-foreground max-w-xs">{error}</p>
         <button 
           onClick={() => refreshExternal && refreshExternal()} 
-          className="px-6 py-3 rounded-full bg-primary text-primary-foreground transition-all active:scale-95"
+          className="px-6 py-3 rounded-[28px] bg-primary text-primary-foreground transition-all active:scale-95"
         >
           Try Again
         </button>
@@ -546,9 +546,9 @@ export default function HomeClient() {
             )}
 
             {/* Desktop / tablet expressive card (hidden on small screens) */}
-            <div className="hidden sm:block relative overflow-hidden rounded-m3-2xl now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 transition-all duration-300 ease-expressive group w-full md:w-full md:max-w-none">
+            <div className="hidden sm:block relative overflow-hidden rounded-[28px] now-card text-primary-container-foreground p-4 sm:p-5 md:p-6 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] group w-full md:w-full md:max-w-none bg-primary-container">
               {/* Background Blob (hidden on small screens to avoid overflow) */}
-              <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-primary/20 pointer-events-none" />
+              <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-on-primary-container/5 rounded-full blur-3xl md:-mr-16 md:-mt-16 transition-all group-hover:bg-on-primary-container/10 pointer-events-none" />
               
               <div className="relative z-10 flex flex-col h-full justify-between min-h-[150px]">
                 <div className="flex justify-between items-start">
@@ -578,7 +578,7 @@ export default function HomeClient() {
                         {displayTeacher(currentPeriod) || "Self Study"}
                       </span>
                     ) : (
-                      <span className="bg-primary-foreground/20 px-3 py-1 rounded-md">
+                      <span className="bg-primary-foreground/20 px-3 py-1 rounded-[12px]">
                         {displayTeacher(currentPeriod) || "Self Study"}
                       </span>
                     )}
@@ -617,13 +617,13 @@ export default function HomeClient() {
 
             {/* Quick Links (replaces Up Next card) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 w-full md:w-full md:items-stretch">
-              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-container-highest transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
+              <div className="rounded-[24px] bg-surface-container-high p-4 hover:bg-surface-container-highest transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
                 <div className="flex flex-wrap items-center gap-3">
                   <a
                     href="https://mail.google.com/a/student.sbhs.nsw.edu.au"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full border border-transparent hover:border-primary/10 transition-all"
+                    className="inline-flex items-center gap-2 bg-on-surface/5 hover:bg-on-surface/10 px-4 py-2 rounded-[12px] border border-outline-variant hover:border-primary transition-all"
                   >
                     <Mail className="h-4 w-4" />
                     <span className="text-sm font-medium">Mail</span>
@@ -633,7 +633,7 @@ export default function HomeClient() {
                     href="https://student.sbhs.net.au/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full border border-transparent hover:border-primary/10 transition-all"
+                    className="inline-flex items-center gap-2 bg-on-surface/5 hover:bg-on-surface/10 px-4 py-2 rounded-[12px] border border-outline-variant hover:border-primary transition-all"
                   >
                     <Globe className="h-4 w-4" />
                     <span className="text-sm font-medium">Portal</span>
@@ -643,7 +643,7 @@ export default function HomeClient() {
                     href="https://sydneyboyshigh.instructure.com/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-muted/5 hover:bg-muted/10 px-4 py-2 rounded-full border border-transparent hover:border-primary/10 transition-all"
+                    className="inline-flex items-center gap-2 bg-on-surface/5 hover:bg-on-surface/10 px-4 py-2 rounded-[12px] border border-outline-variant hover:border-primary transition-all"
                   >
                     <BookOpen className="h-4 w-4" />
                     <span className="text-sm font-medium">Canvas</span>
@@ -701,7 +701,7 @@ export default function HomeClient() {
                               href={matched.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex-1 min-w-[6rem] px-4 py-3 rounded-md border border-outline-variant bg-surface-container-high hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-2"
+                              className="flex-1 min-w-[6rem] px-4 py-3 rounded-[12px] border border-outline-variant bg-surface-container-high hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-2"
                             >
                               <Globe className="h-4 w-4" />
                               <span className="font-medium">{matched.label}</span>
@@ -713,7 +713,7 @@ export default function HomeClient() {
                         return (
                           <div
                             key={i}
-                            className="flex-1 min-w-[6rem] h-10 rounded-md border border-outline-variant bg-transparent"
+                            className="flex-1 min-w-[6rem] h-10 rounded-[12px] border border-outline-variant bg-transparent"
                             aria-hidden
                           />
                         )
@@ -723,7 +723,7 @@ export default function HomeClient() {
                 </div>
               </div>
 
-               <Link href="/notices" className="hidden sm:flex rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex-col justify-between hover:brightness-95 transition-all cursor-pointer h-full">
+               <Link href="/notices" className="hidden sm:flex rounded-[24px] bg-tertiary-container text-tertiary-container-foreground p-4 flex-col justify-between hover:brightness-95 transition-all cursor-pointer h-full">
                   <div className="flex items-center gap-2 mb-4 opacity-80">
                     <Bell className="h-5 w-5" />
                     <span className="font-medium">Notices</span>
@@ -733,7 +733,7 @@ export default function HomeClient() {
                       <h3 className="text-3xl font-sans font-semibold">View</h3>
                       <p className="text-sm font-medium opacity-80">Daily Notices</p>
                     </div>
-                    <div className="h-10 w-10 rounded-full bg-tertiary/20 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-[16px] bg-on-tertiary-container/20 flex items-center justify-center">
                         <ArrowRight className="h-5 w-5" />
                     </div>
                   </div>
@@ -743,7 +743,7 @@ export default function HomeClient() {
 
         {/* SIDEBAR: Date & Quick Actions - 6 cols on desktop (approx. 50%) */}
         <div className="md:col-span-6 space-y-3">
-          <div className="rounded-m3-xl bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
+          <div className="rounded-[24px] bg-surface-container p-4 h-full min-h-[180px] flex flex-col">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
                   {new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(displayDate)}
@@ -790,7 +790,7 @@ export default function HomeClient() {
                       
                       const link = canvasLinks[(period.subject ?? '').trim()]
                       const cardClass = cn(
-                        'flex-1 p-2 rounded-xl border transition-all',
+                        'flex-1 p-2 rounded-[16px] border transition-all',
                         period.subject === currentPeriod?.subject
                           ? 'sidebar-current border-primary/20'
                           : 'bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
@@ -816,13 +816,13 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium ${getSubjectColor((period as any).title || period.subject)}`}>
+                                    <span className={`hidden md:inline-block px-2 py-0.5 rounded-[12px] text-xs font-medium ${getSubjectColor((period as any).title || period.subject)}`}>
                                       {(period as any)?.title || period.subject}
                                     </span>
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {(isSubstitutePeriod(period)) ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                      <span className="inline-block px-2 py-0.5 rounded-[12px] text-xs font-medium truncate max-w-[100px]"
                                         style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                       >
                                         {displayTeacher(period)}
@@ -836,14 +836,14 @@ export default function HomeClient() {
                                       // NOTE: Do NOT include `.to` - that field is commonly used for end times
                                       const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
                                       return (
-                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-[12px] font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
                                       )
                                     })()}
                                   </div>
                                 </div>
                                   <div className="md:hidden text-xs text-muted-foreground mt-1">
                                     {(isSubstitutePeriod(period)) ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium"
+                                      <span className="inline-block px-2 py-0.5 rounded-[12px] text-xs font-medium"
                                         style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                       >
                                         {displayTeacher(period)}
@@ -856,7 +856,7 @@ export default function HomeClient() {
                                       // NOTE: Do NOT include `.to` - that field is commonly used for end times
                                       const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
                                       return (
-                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-[12px] font-medium' : 'text-on-surface-variant'}`}
                                           style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
                                           {displayRoom}
                                         </span>
@@ -877,13 +877,13 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                      <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium ${getSubjectColor((period as any).title || period.subject)}`}>
+                                      <span className={`hidden md:inline-block px-2 py-0.5 rounded-[12px] text-xs font-medium ${getSubjectColor((period as any).title || period.subject)}`}>
                                         {(period as any)?.title || period.subject}
                                       </span>
                                   </div>
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {(isSubstitutePeriod(period)) ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
+                                      <span className="inline-block px-2 py-0.5 rounded-[12px] text-xs font-medium truncate max-w-[100px]"
                                         style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                       >
                                         {displayTeacher(period)}
@@ -896,7 +896,7 @@ export default function HomeClient() {
                                   </div>
                                 </div>
                                 <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  <span className={`text-sm truncate max-w-[100px] ${isSubstitutePeriod(period) ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
+                                  <span className={`text-sm truncate max-w-[100px] ${isSubstitutePeriod(period) ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-[12px]' : 'text-on-surface-variant'}`}>
                                     {displayTeacher(period)}
                                     </span>
                                     <span className="mx-2">•</span>
@@ -904,7 +904,7 @@ export default function HomeClient() {
                                       // NOTE: Do NOT include `.to` - that field is commonly used for end times
                                       const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
                                       return (
-                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : (isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}
+                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-[12px] font-medium' : (isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}
                                           style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
                                           {displayRoom}
                                         </span>
@@ -923,9 +923,9 @@ export default function HomeClient() {
                       <AuthButton />
                     </div>
                   ) : (
-                    <div className="py-8 text-center bg-surface-container-high/50 rounded-xl">
+                    <div className="py-8 text-center bg-surface-container-high/50 rounded-[24px]">
                       <div className="flex flex-col items-center gap-3">
-                        <div className="p-3 rounded-full bg-primary/10 text-primary">
+                        <div className="p-3 rounded-[16px] bg-primary/10 text-primary">
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
                           </svg>

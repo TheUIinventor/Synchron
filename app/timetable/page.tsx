@@ -406,19 +406,19 @@ export default function TimetablePage() {
 
         {/* View Mode Toggle */}
         <div className="flex justify-center mb-6">
-          <div className="bg-surface-container-high p-1 rounded-full">
+          <div className="bg-surface-container-high p-2 rounded-[28px] transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]">
             <button
               onClick={() => setViewMode("daily")}
-              className={`px-4 py-2 text-sm rounded-full transition-all ${
-                viewMode === "daily" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
+              className={`px-6 py-2 text-sm rounded-[24px] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
+                viewMode === "daily" ? "bg-primary text-on-primary active:scale-95" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant"
               }`}
             >
               Daily View
             </button>
             <button
               onClick={() => setViewMode("cycle")}
-              className={`px-4 py-2 text-sm rounded-full transition-all ${
-                viewMode === "cycle" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
+              className={`px-6 py-2 text-sm rounded-[24px] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
+                viewMode === "cycle" ? "bg-primary text-on-primary active:scale-95" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant"
               }`}
             >
               Cycle View
@@ -431,7 +431,7 @@ export default function TimetablePage() {
             {/* Date Navigation */}
             <div className="flex items-center justify-between mb-4 w-full max-w-full mx-auto">
               <button
-                className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
+                className="p-2 rounded-[16px] bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-surface-container-highest hover:text-on-surface active:scale-95"
                 onClick={goToPreviousDay}
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -452,7 +452,7 @@ export default function TimetablePage() {
                           <PopoverTrigger asChild>
                             <button
                               aria-label="Select date"
-                              className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest cursor-pointer"
+                              className="inline-flex items-center px-4 py-2 rounded-[12px] text-sm font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
                               type="button"
                             >
                               {headerShort}
@@ -483,7 +483,7 @@ export default function TimetablePage() {
                 </div>
 
               <button
-                className="p-2 rounded-full bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-in-out hover:bg-surface-container-highest hover:text-on-surface"
+                className="p-2 rounded-[16px] bg-surface-container-high text-on-surface-variant transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-surface-container-highest hover:text-on-surface active:scale-95"
                 onClick={goToNextDay}
               >
                 <ChevronLeft className="h-5 w-5 rotate-180" />
@@ -497,7 +497,7 @@ export default function TimetablePage() {
                   onClick={resetToCurrentOrNext}
                   variant="outline"
                   size="sm"
-                  className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
+                  className="rounded-[24px] border-outline text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
                 >
                   <CalendarIcon className="h-4 w-4 mr-2" />
                   Reset
@@ -528,7 +528,7 @@ export default function TimetablePage() {
                     setShowAuthVars(true)
                   }
                 }}
-                className="px-3 py-1 rounded-md text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+                className="px-3 py-2 rounded-[12px] text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
                 type="button"
               >
                 View stored variations
@@ -537,11 +537,11 @@ export default function TimetablePage() {
 
             {showAuthVars && (
               <div className="mb-4 max-w-3xl mx-auto">
-                <Card className="bg-surface-container-high p-3 border-none">
+                <Card className="bg-surface-container-high p-4 border-none rounded-[24px]">
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-medium text-on-surface">Persisted Authoritative Variations</div>
                     <div>
-                      <button className="px-2 py-1 text-xs rounded-full bg-surface-container-highest text-on-surface" onClick={() => { setShowAuthVars(false); setAuthVarsPreview(null) }}>
+                      <button className="px-3 py-1 text-xs rounded-[12px] bg-surface-container-highest text-on-surface transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]" onClick={() => { setShowAuthVars(false); setAuthVarsPreview(null) }}>
                         Close
                       </button>
                     </div>
