@@ -102,13 +102,13 @@ export default function NoticesClient() {
       <div className="w-full max-w-3xl space-y-6">
         
         {/* Header & Filters */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 px-4 rounded-[24px] m-2 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 px-2">
           <h1 className="text-3xl font-semibold hidden md:block">Notices</h1>
           
           {/* Mobile Filter */}
           <div className="w-full md:hidden">
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-full rounded-[24px] bg-surface-container-high border-none h-12 px-4 transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]">
+              <SelectTrigger className="w-full rounded-full bg-surface-container-high border-none h-12 px-4">
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 opacity-50" />
                   <SelectValue placeholder="Filter by Year" />
@@ -123,14 +123,14 @@ export default function NoticesClient() {
           </div>
 
           {/* Desktop Filter */}
-          <div className="hidden md:flex gap-3 overflow-x-auto pb-2 max-w-full no-scrollbar">
+          <div className="hidden md:flex gap-2 overflow-x-auto pb-2 max-w-full no-scrollbar">
             {fixedYears.map((year) => (
               <Button
                 key={year}
                 variant={selectedYear === year ? "default" : "outline"}
                 onClick={() => setSelectedYear(year)}
                 className={cn(
-                  "rounded-[24px] px-6 transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
+                  "rounded-full px-6 transition-all",
                   selectedYear === year ? "" : "border-outline hover:bg-surface-variant"
                 )}
               >
@@ -142,32 +142,32 @@ export default function NoticesClient() {
 
         {/* Content */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 animate-m3-fade-in">
-            <Loader2 className="h-10 w-10 animate-spin text-primary m3-spinner" />
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <p className="text-muted-foreground animate-pulse">Fetching notices...</p>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-destructive animate-m3-slide-up">
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-destructive">
             <AlertCircle className="h-10 w-10" />
             <p>Error: {error}</p>
           </div>
         ) : filteredNotices.length > 0 ? (
           <div className="space-y-4 px-2 md:px-0">
             {filteredNotices.map((notice, idx) => (
-              <Card key={idx} className="overflow-hidden border-none transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] bg-surface-container-low hover:bg-surface-container-high animate-m3-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
-                <CardHeader className="pb-3 pt-4 px-4">
+              <Card key={idx} className="overflow-hidden border-none transition-all duration-300 bg-surface-container-low">
+                <CardHeader className="pb-2">
                   <div className="flex justify-between items-start gap-4">
                     <CardTitle className="text-xl font-bold leading-tight">
                       {notice.title || notice.type}
                     </CardTitle>
                     {notice.displayYears && (
-                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20 rounded-[12px]">
+                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20">
                         {notice.displayYears}
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="px-4 pb-4">
+                <CardContent>
                   <div 
                     className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
                     dangerouslySetInnerHTML={{
@@ -181,7 +181,7 @@ export default function NoticesClient() {
                   
                   {notice.authorName && (
                     <div className="mt-4 flex items-center gap-3 pt-4 border-t border-outline-variant/50">
-                      <div className="h-8 w-8 rounded-[16px] bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
+                      <div className="h-8 w-8 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
                         {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
                       </div>
                       <span className="text-sm font-medium opacity-80">{notice.authorName}</span>

@@ -98,70 +98,16 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        // M3 Expressive animations
-        "m3-fade-in": {
-          from: { opacity: "0" },
-          to: { opacity: "1" },
-        },
-        "m3-scale-in": {
-          from: { opacity: "0", transform: "scale(0.95)" },
-          to: { opacity: "1", transform: "scale(1)" },
-        },
-        "m3-slide-up": {
-          from: { opacity: "0", transform: "translateY(8px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
-        },
-        "m3-slide-down": {
-          from: { opacity: "0", transform: "translateY(-8px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
-        },
-        "m3-pop": {
-          "0%": { opacity: "0", transform: "scale(0.9)" },
-          "50%": { transform: "scale(1.05)" },
-          "100%": { opacity: "1", transform: "scale(1)" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        // M3 Expressive animations with emphasized easing
-        "m3-fade-in": "m3-fade-in 300ms cubic-bezier(0.2, 0, 0, 1) forwards",
-        "m3-scale-in": "m3-scale-in 300ms cubic-bezier(0.2, 0, 0, 1) forwards",
-        "m3-slide-up": "m3-slide-up 400ms cubic-bezier(0.2, 0, 0, 1) forwards",
-        "m3-slide-down": "m3-slide-down 300ms cubic-bezier(0.2, 0, 0, 1) forwards",
-        "m3-pop": "m3-pop 500ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards",
       },
       transitionTimingFunction: {
         // M3 Expressive Motion (Overshoot)
         'expressive': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
         'standard': 'cubic-bezier(0.2, 0.0, 0, 1.0)',
-        // M3 Emphasized easing
-        'emphasized': 'cubic-bezier(0.2, 0, 0, 1)',
-        'emphasized-decelerate': 'cubic-bezier(0.05, 0.7, 0.1, 1)',
-        'emphasized-accelerate': 'cubic-bezier(0.3, 0, 0.8, 0.15)',
-      },
-      transitionDuration: {
-        // M3 Expressive motion durations
-        '50': '50ms',
-        '100': '100ms',
-        '150': '150ms',
-        '200': '200ms',
-        '300': '300ms',
-        '350': '350ms',
-        '400': '400ms',
-        '500': '500ms',
-      },
-      spacing: {
-        // M3 Expressive spacing scale
-        // xs: 4px, sm: 8px, md: 12px, lg: 16px, xl: 24px, 2xl: 32px, 3xl: 48px
-        'xs': '4px',
-        'sm': '8px',
-        'md': '12px',
-        'lg': '16px',
-        'xl': '24px',
-        '2xl': '32px',
-        '3xl': '48px',
-      },
+      }
     },
   },
   plugins: [require("tailwindcss-animate")],
