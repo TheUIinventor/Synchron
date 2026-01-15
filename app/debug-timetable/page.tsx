@@ -8,8 +8,7 @@ export default function DebugTimetablePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
-    fetch(`/api/timetable?date=${today}`, { credentials: 'include' })
+    fetch('/api/timetable', { credentials: 'include' })
       .then(async res => {
         const contentType = res.headers.get('content-type') || ''
         if (contentType.includes('application/json')) {
