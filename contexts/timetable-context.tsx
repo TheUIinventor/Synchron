@@ -1251,14 +1251,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
         // This ensures variations are NEVER lost, even when a background fetch returns data without them.
         try {
-          // CRITICAL FIX: Only use exact date matches to prevent carryover
+          // CRITICAL FIX: Try multiple date keys to find variations
           // Priority order:
           // 1. externalTimetableDateRef (what the data is FOR) - MOST AUTHORITATIVE
           // 2. Selected date (what user is viewing)
+          // 3. Today's date (fallback)
           const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
           const candidateDates = [
             externalTimetableDateRef.current, // Try data's actual date FIRST
-            selectedIso
+            selectedIso,
+            new Date().toISOString().slice(0, 10)
           ].filter(Boolean)
           
           // Try multiple sources for base periods: grouped week data, flat day data, and cached data
@@ -1281,15 +1283,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
           
-          // CRITICAL: Only apply variations if the matched date equals selectedIso OR externalTimetableDateRef
-          // This prevents variations from wrong dates being applied
-          if (authVarsForDate && matchedDate) {
-            const isValidMatch = (matchedDate === selectedIso) || (matchedDate === externalTimetableDateRef.current)
-            if (!isValidMatch) {
-              console.debug('[timetable.provider] Rejecting variations - date mismatch. matched:', matchedDate, 'selected:', selectedIso, 'external:', externalTimetableDateRef.current)
-              authVarsForDate = null
-            }
-          }
+          // Don't check date mismatch - API data already has correct variations for its date
+          // The old logic was causing substitutes to disappear
+          // if (authVarsForDate && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+          //   authVarsForDate = null
+          // }
           
           try { console.debug('[timetable.provider] variation lookup - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
 
@@ -1774,13 +1772,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
         
-        // CRITICAL FIX: Only use exact date matches to prevent carryover
+        // CRITICAL FIX: Try multiple date keys to find variations
         // Priority order:
         // 1. externalTimetableDateRef (what the data is FOR) - MOST AUTHORITATIVE
         // 2. Selected date (what user is viewing)
+        // 3. Today's date (fallback)
         const candidateDates = [
           externalTimetableDateRef.current, // Try data's actual date FIRST
-          selectedIso
+          selectedIso,
+          new Date().toISOString().slice(0, 10)
         ].filter(Boolean)
         
         let authVars = null
@@ -1793,15 +1793,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // CRITICAL: Only apply variations if the matched date equals selectedIso OR externalTimetableDateRef
-        // This prevents variations from wrong dates being applied
-        if (authVars && matchedDate) {
-          const isValidMatch = (matchedDate === selectedIso) || (matchedDate === externalTimetableDateRef.current)
-          if (!isValidMatch) {
-            console.debug('[timetable.provider] Simple path - Rejecting variations - date mismatch. matched:', matchedDate, 'selected:', selectedIso, 'external:', externalTimetableDateRef.current)
-            authVars = null
-          }
-        }
+        // Don't check date mismatch - API data already has correct variations for its date
+        // The old logic was causing substitutes to disappear
+        // if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
+        //   authVars = null
+        // }
         
         console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'found:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
         
