@@ -1798,69 +1798,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
         
-        // CRITICAL FIX: Try multiple date keys to find variations
-        // Priority order:
-        // 1. externalTimetableDateRef (what the data is FOR) - MOST AUTHORITATIVE
-        // 2. Selected date (what user is viewing)
-        // 3. Today's date (fallback)
-        const candidateDates = [
-          externalTimetableDateRef.current, // Try data's actual date FIRST
-          selectedIso,
-          new Date().toISOString().slice(0, 10)
-        ].filter(Boolean)
+        // DISABLED: Applying cached variations was causing substitutions from one date to appear on other dates
+        // The authoritativeVariationsRef cache was accumulating stale data and applying it irresponsibly
+        // Instead, rely ONLY on variations that come directly from the current timetable API response
+        // which are already embedded in the periods (isSubstitute, isRoomChange flags)
         
-        let authVars = null
-        let matchedDate = null
-        for (const dateKey of candidateDates) {
-          authVars = authoritativeVariationsRef.current.get(dateKey!)
-          if (authVars) {
-            matchedDate = dateKey
-            break
-          }
-        }
-        
-        // CRITICAL: Only apply variations if they're for the EXACT SAME DATE we're displaying
-        // This prevents Friday Week 10B's variations from showing on Friday Week 9A
-        const displayDateIso = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
-        if (authVars && matchedDate !== displayDateIso) {
-          console.debug('[timetable.provider] Blocking variation application - stored date:', matchedDate, 'display date:', displayDateIso)
-          authVars = null
-        }
-        
-        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'displayDate:', displayDateIso, 'willApply:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
-        
-        if (authVars) {
-          for (const day of Object.keys(filtered)) {
-            const varData = authVars[day]
-            if (Array.isArray(varData) && varData.length > 0) {
-              console.debug('[timetable.provider] Applying', varData.length, 'authVars to', day, 'periods:', filtered[day].length)
-              for (const p of filtered[day]) {
-                const normP = String(p.period).trim().toLowerCase()
-                const v = varData.find(item => String(item.period).trim().toLowerCase() === normP)
-                if (v) {
-                  console.debug('[timetable.provider] Matched variation for period', p.period, '- isSubstitute:', v.isSubstitute, '- isRoomChange:', v.isRoomChange)
-                  if (v.isSubstitute) {
-                    (p as any).isSubstitute = true
-                    if (v.casualSurname) (p as any).casualSurname = v.casualSurname
-                    if (v.displayTeacher) (p as any).displayTeacher = v.displayTeacher
-                    if (v.originalTeacher) (p as any).originalTeacher = v.originalTeacher
-                  }
-                  if (v.isRoomChange && v.displayRoom) {
-                    const scheduledRoom = String(p.room || '').trim().toLowerCase()
-                    const variationRoom = String(v.displayRoom || '').trim().toLowerCase()
-                    if (variationRoom && variationRoom !== scheduledRoom) {
-                      (p as any).isRoomChange = true
-                      (p as any).displayRoom = v.displayRoom
-                      (p as any).originalRoom = p.room
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+        console.debug('[timetable.provider] Simple timetable path - skipping cached authVars application to prevent stale data contamination - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'mapSize:', authoritativeVariationsRef.current.size)
       } catch (e) {
-        console.error('[timetable.provider] Error applying simple timetable authVars:', e)
+        console.error('[timetable.provider] Error in variation application block:', e)
       }
 
       preferToRoomOnMap(filtered)
