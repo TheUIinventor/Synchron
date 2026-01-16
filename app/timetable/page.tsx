@@ -426,6 +426,31 @@ export default function TimetablePage() {
           </div>
         </div>
 
+        {/* Debug Info Panel */}
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>
+              <span className="font-bold text-red-700 dark:text-red-300">Current Week:</span>
+              <span className="text-red-600 dark:text-red-400"> {currentWeek || 'unknown'}</span>
+            </div>
+            <div>
+              <span className="font-bold text-red-700 dark:text-red-300">External Week:</span>
+              <span className="text-red-600 dark:text-red-400"> {externalWeekType || 'unknown'}</span>
+            </div>
+            <div>
+              <span className="font-bold text-red-700 dark:text-red-300">Selected Date:</span>
+              <span className="text-red-600 dark:text-red-400"> {selectedDateObject?.toISOString().slice(0,10)}</span>
+            </div>
+            <div>
+              <span className="font-bold text-red-700 dark:text-red-300">View Mode:</span>
+              <span className="text-red-600 dark:text-red-400"> {viewMode}</span>
+            </div>
+          </div>
+          <div className="mt-2 text-red-600 dark:text-red-400">
+            <span className="font-bold">Legend:</span> 🔴SUB = Substitute Teacher | 🟠RM = Room Change
+          </div>
+        </div>
+
         {viewMode === "daily" && (
           <>
             {/* Date Navigation */}
@@ -666,6 +691,13 @@ export default function TimetablePage() {
                         <div key={period.id ?? idx} className="flex gap-3 items-start group cursor-pointer w-full">
                           <div className="flex flex-col items-center min-w-[2.5rem] sm:min-w-[3rem]">
                             <span className="text-xs font-bold text-muted-foreground">{startTime}</span>
+                            {(period.isSubstitute || period.isRoomChange) && (
+                              <div className="text-[0.6rem] text-red-600 font-bold mt-0.5">
+                                {period.isSubstitute && '🔴SUB'}
+                                {period.isRoomChange && period.isSubstitute ? ' ' : ''}
+                                {period.isRoomChange && '🟠RM'}
+                              </div>
+                            )}
                           </div>
 
                           {isBreak ? (

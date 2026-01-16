@@ -1241,10 +1241,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // Check if any period has variations
             const hasVariations = flatDayData.some((p: any) => p.isSubstitute || p.isRoomChange)
             if (hasVariations) {
-              console.debug('[timetable.provider] Using flat timetable for', day, 'because it has variations')
+              console.warn('🔴 [SUBS-DEBUG] Using flat timetable for', day, 'because it has variations. Flat data has:', flatDayData.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({ period: p.period, sub: p.casualSurname || p.displayTeacher })))
               filtered[day] = flatDayData.map(p => ({ ...p }))
             }
           }
+        }
+        
+        // Check for substitutions in filtered output
+        const varsInFiltered = filtered[day].filter((p: any) => p.isSubstitute || p.isRoomChange)
+        if (varsInFiltered.length > 0) {
+          console.warn(`🔴 [SUBS-DEBUG] After building filtered[${day}], found ${varsInFiltered.length} substitutions:`, varsInFiltered.map((p: any) => ({ period: p.period, subject: p.subject, sub: p.casualSurname || p.displayTeacher })))
         }
         
         // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
@@ -1354,12 +1360,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (authVariation) {
               try { console.debug('[timetable.provider] APPLYING auth variation for period', normPeriod, authVariation) } catch (e) {}
               if (authVariation.isSubstitute) {
+                console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: SUB ${authVariation.casualSurname || authVariation.displayTeacher}`)
                 (p as any).isSubstitute = true
                 if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
                 if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
                 if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
               }
               if (authVariation.isRoomChange && authVariation.displayRoom) {
+                console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: ROOM to ${authVariation.displayRoom}`)
                 const scheduledRoom = String(p.room || '').trim().toLowerCase()
                 const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
                 if (variationRoom && variationRoom !== scheduledRoom) {
@@ -1389,6 +1397,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // If match has variations, use them (they might be more recent than cached)
               if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
                 if ((match as any).isSubstitute) {
+                  console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: SUB ${(match as any).casualSurname || (match as any).displayTeacher}`)
                   (p as any).isSubstitute = true
                   if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
                   if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
@@ -1398,6 +1407,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
                 
                 if ((match as any).isRoomChange && (match as any).displayRoom) {
+                  console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: ROOM to ${(match as any).displayRoom}`)
                   const scheduledRoom = String(p.room || '').trim().toLowerCase()
                   const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
                   if (variationRoom && variationRoom !== scheduledRoom) {
@@ -2049,6 +2059,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // After my fix, variations might be in finalByWeek but not in flat structure
       if (externalTimetableByWeek && currentWeek) {
         try {
+          console.warn('🔴 [SUBS-DEBUG] Checking externalTimetableByWeek for variations. currentWeek:', currentWeek)
           for (const day of Object.keys(externalTimetableByWeek)) {
             const groups = (externalTimetableByWeek as any)[day]
             const weekPeriods = groups?.[currentWeek] || []
@@ -2063,6 +2074,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               originalRoom: p.originalRoom,
             }))
             if (variations.length > 0) {
+              console.warn(`🔴 [SUBS-DEBUG] Found ${variations.length} variations in externalTimetableByWeek[${day}][${currentWeek}]!`, variations.map(v => ({ period: v.period, sub: v.casualSurname || v.displayTeacher })))
               hasVariations = true
               // Merge with existing data for this day
               if (!varData[day]) varData[day] = []
@@ -3203,6 +3215,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // ignore substitution errors
               }
               
+              console.warn('🔴 [SUBS-DEBUG] refreshExternal: About to return from homepage payload. Checking finalByWeek...')
+              if (finalByWeek) {
+                for (const day of Object.keys(finalByWeek)) {
+                  const groups = (finalByWeek as any)[day]
+                  for (const weekKey of ['A', 'B', 'unknown']) {
+                    const periodVars = (groups[weekKey] || []).filter((p: any) => p.isSubstitute || p.isRoomChange)
+                    if (periodVars.length > 0) {
+                      console.warn(`🔴 [SUBS-DEBUG] refreshExternal: finalByWeek[${day}][${weekKey}] HAS ${periodVars.length} substitutions!`, periodVars.map((p: any) => ({ period: p.period, sub: p.casualSurname || p.displayTeacher })))
+                    }
+                  }
+                }
+              }
+              
               // Attach long subject titles when available in the upstream payload
               try {
                 const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
@@ -4333,12 +4358,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // CRITICAL: Substitutions are DATE-SPECIFIC only - they should NEVER be applied
                   // to timetableByWeek (the week-organized structure) to avoid carrying them over
                   // to the wrong week type.
+                  console.warn('🔴 [SUBS-DEBUG] fetchForDate: About to apply substitutions to finalTimetable')
+                  console.warn('🔴 [SUBS-DEBUG] fetchForDate: Number of substitutions:', subs.length)
+                  console.warn('🔴 [SUBS-DEBUG] fetchForDate: Subs sample:', subs.slice(0, 3).map((s: any) => ({ date: s.date, period: s.period, subject: s.subject, teacher: s.substituteTeacher || s.casualSurname })))
+                  console.warn('🔴 [SUBS-DEBUG] fetchForDate: finalTimetable before:', Object.keys(j.timetable).map((day: string) => ({ day, count: (j.timetable as any)[day]?.length || 0, hasVar: (j.timetable as any)[day]?.some((p: any) => p.isSubstitute || p.isRoomChange) })))
+                  
                   finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
+                  
                   // Count variations in the result
                   let varCount = 0
+                  const varsByDay: Record<string, any[]> = {}
                   for (const day of Object.keys(finalTimetable)) {
-                    varCount += ((finalTimetable as any)[day] || []).filter((p: any) => p.isSubstitute || p.isRoomChange).length
+                    const vars = ((finalTimetable as any)[day] || []).filter((p: any) => p.isSubstitute || p.isRoomChange)
+                    varCount += vars.length
+                    if (vars.length > 0) {
+                      varsByDay[day] = vars.map((v: any) => ({ period: v.period, subject: v.subject, sub: v.casualSurname || v.displayTeacher }))
+                    }
                   }
+                  console.warn('🔴 [SUBS-DEBUG] fetchForDate: After applying subs - total variations:', varCount, 'by day:', varsByDay)
                   try { console.debug('[timetable.provider] fetchForDate applied subs, variations in result:', varCount, 'for date', ds) } catch (e) {}
                 } catch (e) { /* ignore substitution apply errors */ }
               }
@@ -4346,7 +4383,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // ignore substitution extraction/apply errors
             }
 
-            if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+            console.warn('🔴 [SUBS-DEBUG] fetchForDate: About to set timetableByWeek. Has finalByWeek?', !!finalByWeek)
+            if (finalByWeek) {
+              console.warn('🔴 [SUBS-DEBUG] fetchForDate: Setting timetableByWeek - checking if it has subs...')
+              for (const day of Object.keys(finalByWeek)) {
+                const groups = (finalByWeek as any)[day]
+                for (const weekKey of ['A', 'B', 'unknown']) {
+                  const periodVars = (groups[weekKey] || []).filter((p: any) => p.isSubstitute || p.isRoomChange)
+                  if (periodVars.length > 0) {
+                    console.warn(`🔴 [SUBS-DEBUG] fetchForDate: timetableByWeek[${day}][${weekKey}] HAS ${periodVars.length} substitutions!`, periodVars.map((p: any) => ({ period: p.period, sub: p.casualSurname || p.displayTeacher })))
+                  }
+                }
+              }
+              setExternalTimetableByWeek(finalByWeek)
+            }
               // CRITICAL: Track which date this timetable data is FOR before setting it
               // Merge any authoritative variations we previously captured for this date
               // MUST happen BEFORE setExternalTimetable to ensure variations are never lost
