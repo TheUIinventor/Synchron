@@ -2038,20 +2038,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       let hasVariations = false
       const varData: Record<string, any[]> = {}
       
-      // Check flat structure first
-      if (externalTimetable) {
+      // Check flat structure first - ONLY use it if the timetable is for the current date
+      // This prevents substitutions from other dates showing up
+      if (externalTimetable && externalTimetableDateRef.current === timetableDateIso) {
         for (const day of Object.keys(externalTimetable)) {
           const periods = (externalTimetable as any)[day] || []
-          const variations = periods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
-            period: p.period,
-            isSubstitute: p.isSubstitute,
-            isRoomChange: p.isRoomChange,
-            displayRoom: p.displayRoom,
-            displayTeacher: p.displayTeacher,
-            casualSurname: p.casualSurname,
-            originalTeacher: p.originalTeacher,
-            originalRoom: p.originalRoom,
-          }))
+          // CRITICAL: Only extract variations from timetable data for THIS specific date
+          const variations = periods
+            .filter((p: any) => {
+              // Must be a variation
+              if (!p.isSubstitute && !p.isRoomChange) return false
+              return true
+            })
+            .map((p: any) => ({
+              period: p.period,
+              isSubstitute: p.isSubstitute,
+              isRoomChange: p.isRoomChange,
+              displayRoom: p.displayRoom,
+              displayTeacher: p.displayTeacher,
+              casualSurname: p.casualSurname,
+              originalTeacher: p.originalTeacher,
+              originalRoom: p.originalRoom,
+            }))
           if (variations.length > 0) {
             hasVariations = true
             varData[day] = variations
