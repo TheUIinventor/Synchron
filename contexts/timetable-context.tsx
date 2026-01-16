@@ -2139,11 +2139,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch (e) {}
-            if (varDataWithToken[day]?.length > 0) {
-              console.warn('🔍 [STORAGE]   -', day, ':', varDataWithToken[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
-            }
-          }
-        } catch (e) {}
         // Limit map size to prevent unbounded growth. Keep a longer history
         // so substitutions from far-past dates remain available. Timetabl-app
         // preserves query cache in localStorage (react-query persister) and
@@ -2177,8 +2172,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {}
   }, [externalTimetable, externalTimetableByWeek, selectedDateObject, currentWeek])
-
-  // subsAppliedRef is declared earlier in the component (before first usage)
   // Track the last time we attempted to fetch substitutions so we can retry
   // periodically instead of permanently skipping when no subs were present.
   const lastSubsAttemptRef = useRef<number | null>(null)
