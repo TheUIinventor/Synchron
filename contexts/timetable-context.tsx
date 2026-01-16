@@ -25,6 +25,9 @@ export type Period = {
   displayTeacher?: string
   // Subject colour (hex without # prefix, e.g., "448ae6")
   colour?: string
+  // CRITICAL: Date this substitution/variation is applicable for (YYYY-MM-DD format)
+  // Used to prevent substitutions from one date being applied to another date
+  dateApplicable?: string
 }
 
 // Define the bell time type
@@ -1821,6 +1824,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const normP = String(p.period).trim().toLowerCase()
                 const v = varData.find(item => String(item.period).trim().toLowerCase() === normP)
                 if (v) {
+                  // CRITICAL: Only apply variation if it's for the correct date
+                  if (v.dateApplicable && v.dateApplicable !== selectedIso) {
+                    console.debug('[timetable.provider] Skipping variation for period', p.period, '- dateApplicable:', v.dateApplicable, 'does not match selectedDate:', selectedIso)
+                    continue
+                  }
                   console.debug('[timetable.provider] Matched variation for period', p.period, '- isSubstitute:', v.isSubstitute, '- isRoomChange:', v.isRoomChange)
                   if (v.isSubstitute) {
                     (p as any).isSubstitute = true
@@ -2042,6 +2050,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               casualSurname: p.casualSurname,
               originalTeacher: p.originalTeacher,
               originalRoom: p.originalRoom,
+              // CRITICAL: Attach the date this variation is applicable for
+              dateApplicable: timetableDateIso,
             }))
           if (variations.length > 0) {
             hasVariations = true
