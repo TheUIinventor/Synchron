@@ -402,6 +402,32 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem('synchron-authoritative-variations')
       if (!raw) { try { console.debug('[timetable.provider] no authoritative variations in localStorage') } catch (e) {} return new Map() }
       const parsed = JSON.parse(raw)
+      
+      // CRITICAL: Check if cache has the new dateApplicable format
+      // If not, clear it to prevent old variations from being applied to wrong dates
+      let hasDateApplicableField = false
+      for (const [dateKey, dayVars] of Object.entries(parsed)) {
+        const dayVariations = dayVars as any
+        if (typeof dayVariations === 'object') {
+          for (const [dayName, vars] of Object.entries(dayVariations)) {
+            const varList = vars as any[]
+            if (Array.isArray(varList) && varList.length > 0) {
+              if (varList[0].dateApplicable) {
+                hasDateApplicableField = true
+                break
+              }
+            }
+          }
+        }
+        if (hasDateApplicableField) break
+      }
+      
+      if (!hasDateApplicableField) {
+        try { console.warn('[timetable.provider] 🔄 Clearing old variation cache - missing dateApplicable tokens. Will be regenerated.') } catch (e) {}
+        localStorage.removeItem('synchron-authoritative-variations')
+        return new Map()
+      }
+      
       // Convert from object to Map
       const map = new Map<string, Record<string, any[]>>()
       for (const [key, value] of Object.entries(parsed)) {
@@ -1378,22 +1404,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // ALWAYS apply authoritative variation if we have one - this is the source of truth
             if (authVariation) {
-              try { console.debug('[timetable.provider] APPLYING auth variation for period', normPeriod, authVariation) } catch (e) {}
-              if (authVariation.isSubstitute) {
-                try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: SUB ${authVariation.casualSurname || authVariation.displayTeacher}`) } catch (e) {}
-                (p as any).isSubstitute = true
-                if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
-                if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
-                if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
-              }
-              if (authVariation.isRoomChange && authVariation.displayRoom) {
-                try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: ROOM to ${authVariation.displayRoom}`) } catch (e) {}
-                const scheduledRoom = String(p.room || '').trim().toLowerCase()
-                const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
-                if (variationRoom && variationRoom !== scheduledRoom) {
-                  (p as any).isRoomChange = true
-                  (p as any).displayRoom = authVariation.displayRoom
-                  (p as any).originalRoom = p.room
+              // CRITICAL: Check dateApplicable token - only apply if it matches selectedDate
+              // (or if no dateApplicable token exists, apply for backward compatibility)
+              if (authVariation.dateApplicable && authVariation.dateApplicable !== selectedIso) {
+                try { console.debug('[timetable.provider] SKIPPING auth variation for period', normPeriod, '- dateApplicable:', authVariation.dateApplicable, '!== selectedDate:', selectedIso) } catch (e) {}
+              } else {
+                try { console.debug('[timetable.provider] APPLYING auth variation for period', normPeriod, authVariation) } catch (e) {}
+                if (authVariation.isSubstitute) {
+                  try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: SUB ${authVariation.casualSurname || authVariation.displayTeacher}`) } catch (e) {}
+                  (p as any).isSubstitute = true
+                  if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
+                  if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
+                  if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
+                }
+                if (authVariation.isRoomChange && authVariation.displayRoom) {
+                  try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: ROOM to ${authVariation.displayRoom}`) } catch (e) {}
+                  const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                  const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
+                  if (variationRoom && variationRoom !== scheduledRoom) {
+                    (p as any).isRoomChange = true
+                    (p as any).displayRoom = authVariation.displayRoom
+                    (p as any).originalRoom = p.room
+                  }
                 }
               }
             }
@@ -1801,19 +1833,33 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
         
-        // CRITICAL: Only apply variations if they came from the timetable data we just loaded
-        // Do NOT use fallback candidate dates - only use variations for the exact date we're displaying
-        // This prevents old variations from being applied to wrong dates
+        // CRITICAL: Try to find variations for this selected date from anywhere in the cache
+        // We can't rely on externalTimetableDateRef.current being set at the time useMemo runs
+        // Instead, trust the dateApplicable token on each variation to determine if it applies
         let authVars = null
-        let matchedDate = null
+        const authVarsMap = authoritativeVariationsRef.current
         
-        // Only look for variations if externalTimetable was set for this exact date
-        if (selectedIso && externalTimetableDateRef.current === selectedIso) {
-          authVars = authoritativeVariationsRef.current.get(selectedIso)
-          matchedDate = selectedIso
+        // First try exact match, then try any date if that fails
+        if (selectedIso) {
+          authVars = authVarsMap.get(selectedIso)
         }
         
-        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'willApply:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
+        // Fallback: look for variations that have dateApplicable tokens matching selectedIso
+        if (!authVars && selectedIso) {
+          for (const [dateKey, vars] of authVarsMap.entries()) {
+            // Check if any variation in this entry has our date as dateApplicable
+            const hasOurDate = Object.values(vars).some((dayVars: any) => {
+              if (!Array.isArray(dayVars)) return false
+              return dayVars.some((v: any) => v.dateApplicable === selectedIso)
+            })
+            if (hasOurDate) {
+              authVars = vars
+              break
+            }
+          }
+        }
+        
+        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'found:', !!authVars, 'mapSize:', authVarsMap.size)
         if (authVars) {
           try {
             console.warn('🔍 [APPLY-START] Applying variations for date:', selectedIso, 'Found variations for days:', Object.keys(authVars).filter(d => authVars[d]?.length))
@@ -1829,7 +1875,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const normP = String(p.period).trim().toLowerCase()
                 const v = varData.find(item => String(item.period).trim().toLowerCase() === normP)
                 if (v) {
-                  // CRITICAL: Only apply variation if it's for the correct date
+                  // CRITICAL: Only apply variation if its dateApplicable matches our selected date
+                  // (or if it has no dateApplicable, apply it anyway for backward compatibility)
                   if (v.dateApplicable && v.dateApplicable !== selectedIso) {
                     try { console.warn('🔍 [APPLY-BLOCK] Blocking variation for P' + p.period + ' on ' + day + ' - dateApplicable:', v.dateApplicable, '!== selectedDate:', selectedIso, '- Variation:', v.casualSurname || v.displayRoom) } catch (e) {}
                     continue
