@@ -1241,7 +1241,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // Check if any period has variations
             const hasVariations = flatDayData.some((p: any) => p.isSubstitute || p.isRoomChange)
             if (hasVariations) {
-              console.warn('🔴 [SUBS-DEBUG] Using flat timetable for', day, 'because it has variations. Flat data has:', flatDayData.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({ period: p.period, sub: p.casualSurname || p.displayTeacher })))
+                console.warn('🔴 [SUBS-DEBUG] Using flat timetable for', day, 'because it has variations. Flat data has:', flatDayData.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({ period: p.period, sub: p.casualSurname || p.displayTeacher })))
               filtered[day] = flatDayData.map(p => ({ ...p }))
             }
           }
@@ -1250,7 +1250,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // Check for substitutions in filtered output
         const varsInFiltered = filtered[day].filter((p: any) => p.isSubstitute || p.isRoomChange)
         if (varsInFiltered.length > 0) {
-          console.warn(`🔴 [SUBS-DEBUG] After building filtered[${day}], found ${varsInFiltered.length} substitutions:`, varsInFiltered.map((p: any) => ({ period: p.period, subject: p.subject, sub: p.casualSurname || p.displayTeacher })))
+          try { console.warn(`🔴 [SUBS-DEBUG] After building filtered[${day}], found ${varsInFiltered.length} substitutions:`, varsInFiltered.map((p: any) => ({ period: p.period, subject: p.subject, sub: p.casualSurname || p.displayTeacher }))) } catch (e) {}
         }
         
         // CRITICAL: Apply variations from authoritative cache FIRST, then overlay fresh data if available.
@@ -1360,14 +1360,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (authVariation) {
               try { console.debug('[timetable.provider] APPLYING auth variation for period', normPeriod, authVariation) } catch (e) {}
               if (authVariation.isSubstitute) {
-                console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: SUB ${authVariation.casualSurname || authVariation.displayTeacher}`)
+                try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: SUB ${authVariation.casualSurname || authVariation.displayTeacher}`) } catch (e) {}
                 (p as any).isSubstitute = true
                 if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
                 if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
                 if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
               }
               if (authVariation.isRoomChange && authVariation.displayRoom) {
-                console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: ROOM to ${authVariation.displayRoom}`)
+                try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: ROOM to ${authVariation.displayRoom}`) } catch (e) {}
                 const scheduledRoom = String(p.room || '').trim().toLowerCase()
                 const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
                 if (variationRoom && variationRoom !== scheduledRoom) {
@@ -1397,7 +1397,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // If match has variations, use them (they might be more recent than cached)
               if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
                 if ((match as any).isSubstitute) {
-                  console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: SUB ${(match as any).casualSurname || (match as any).displayTeacher}`)
+                  try { console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: SUB ${(match as any).casualSurname || (match as any).displayTeacher}`) } catch (e) {}
                   (p as any).isSubstitute = true
                   if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
                   if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
@@ -1407,7 +1407,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
                 
                 if ((match as any).isRoomChange && (match as any).displayRoom) {
-                  console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: ROOM to ${(match as any).displayRoom}`)
+                  try { console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: ROOM to ${(match as any).displayRoom}`) } catch (e) {}
                   const scheduledRoom = String(p.room || '').trim().toLowerCase()
                   const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
                   if (variationRoom && variationRoom !== scheduledRoom) {
@@ -3721,7 +3721,32 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalWeekType(j.weekType)
               setCurrentWeek(j.weekType)
             }
-            if (j.timetableByWeek) setExternalTimetableByWeek(j.timetableByWeek)
+            // CRITICAL FIX: Strip all variations from timetableByWeek before setting it
+            // The server includes substitutions/room changes in the grouped structure,
+            // but we only want date-specific variations in the flat timetable
+            if (j.timetableByWeek) {
+              const cleanedByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+              for (const day in j.timetableByWeek) {
+                cleanedByWeek[day] = {
+                  A: (j.timetableByWeek[day]?.A || []).map((p: any) => ({ 
+                    ...p, 
+                    isSubstitute: false, 
+                    isRoomChange: false 
+                  })),
+                  B: (j.timetableByWeek[day]?.B || []).map((p: any) => ({ 
+                    ...p, 
+                    isSubstitute: false, 
+                    isRoomChange: false 
+                  })),
+                  unknown: (j.timetableByWeek[day]?.unknown || []).map((p: any) => ({ 
+                    ...p, 
+                    isSubstitute: false, 
+                    isRoomChange: false 
+                  }))
+                }
+              }
+              setExternalTimetableByWeek(cleanedByWeek)
+            }
             if (j.bellTimes || j.upstream) {
               try {
                 const computed = buildBellTimesFromPayload(j)
