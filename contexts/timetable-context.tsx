@@ -4402,12 +4402,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 
                 if (authForDate && typeof authForDate === 'object') {
                   try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable for requested date:', ds, '- Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
-                  // CRITICAL: Only apply variations if the stored date EXACTLY matches the requested date
-                  // Do NOT apply variations from a different date, even if they're the only ones available
-                  if (matchedKey !== ds) {
-                    try { console.error('[timetable.provider] 🛑 BLOCKING: Variations from', matchedKey, 'do NOT match requested date', ds, '- NOT applying to prevent date contamination!') } catch (e) {}
-                    authForDate = null
-                  }
+                  // Note: We'll verify each variation's dateApplicable token below before applying
+                  // This allows us to apply correct variations even if they were stored under a different key
                   
                   // Extra logging for Friday
                   try {
@@ -4454,6 +4450,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     for (const v of dayVars) {
                       try {
                         if (!v || !v.period) continue
+                        
+                        // CRITICAL: Check if variation is for this date using the dateApplicable token
+                        if (v.dateApplicable && v.dateApplicable !== ds) {
+                          try {
+                            console.warn('🔍 [APPLY-BLOCK] Skipping variation - dateApplicable:', v.dateApplicable, 'does not match requested date:', ds, '- Variation: P' + v.period)
+                          } catch (e) {}
+                          continue
+                        }
+                        
                         const norm = String(v.period).trim().toLowerCase()
                         const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
                         
