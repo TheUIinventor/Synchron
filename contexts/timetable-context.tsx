@@ -2127,15 +2127,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const oldest = Array.from(map.keys()).sort()[0]
           map.delete(oldest)
         }
-          try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
-          
-          // Immediately persist to localStorage
-          try {
-            const obj: Record<string, any> = {}
-            map.forEach((value, key) => { obj[key] = value })
-            localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
-          } catch (e) {}
-        }
+        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
+        
+        // Immediately persist to localStorage
+        try {
+          const obj: Record<string, any> = {}
+          map.forEach((value, key) => { obj[key] = value })
+          localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
+        } catch (e) {}
       }
     } catch (e) {}
   }, [externalTimetable, externalTimetableByWeek, selectedDateObject, currentWeek])
