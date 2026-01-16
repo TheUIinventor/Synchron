@@ -1819,13 +1819,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // Don't check date mismatch - API data already has correct variations for its date
-        // The old logic was causing substitutes to disappear
-        // if (authVars && externalTimetableDateRef.current && matchedDate !== externalTimetableDateRef.current) {
-        //   authVars = null
-        // }
+        // CRITICAL: Only apply variations if they're for the EXACT SAME DATE we're displaying
+        // This prevents Friday Week 10B's variations from showing on Friday Week 9A
+        const displayDateIso = selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null
+        if (authVars && matchedDate !== displayDateIso) {
+          console.debug('[timetable.provider] Blocking variation application - stored date:', matchedDate, 'display date:', displayDateIso)
+          authVars = null
+        }
         
-        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'found:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
+        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'displayDate:', displayDateIso, 'willApply:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
         
         if (authVars) {
           for (const day of Object.keys(filtered)) {
