@@ -1906,6 +1906,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         console.error('[timetable.provider] Error applying simple timetable authVars:', e)
       }
+      
+      // CRITICAL: Also apply FRESH variations from the current useExternalTimetable
+      // This ensures variations are visible even before they're saved to the cache
+      // (handles the race condition where useMemo runs before capture useEffect)
+      try {
+        for (const day of Object.keys(filtered)) {
+          const freshPeriods = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) 
+            ? (useExternalTimetable as any)[day] as Period[] 
+            : []
+          
+          for (const p of filtered[day]) {
+            const normP = String(p.period).trim().toLowerCase()
+            const freshMatch = freshPeriods.find((fp: any) => String(fp.period).trim().toLowerCase() === normP)
+            
+            if (freshMatch && ((freshMatch as any).isSubstitute || (freshMatch as any).isRoomChange)) {
+              // Apply fresh variation data
+              if ((freshMatch as any).isSubstitute && !(p as any).isSubstitute) {
+                (p as any).isSubstitute = true
+                if ((freshMatch as any).casualSurname) (p as any).casualSurname = (freshMatch as any).casualSurname
+                if ((freshMatch as any).displayTeacher) (p as any).displayTeacher = (freshMatch as any).displayTeacher
+                if ((freshMatch as any).originalTeacher) (p as any).originalTeacher = (freshMatch as any).originalTeacher
+                try { console.debug('[timetable.provider] Applied FRESH inline sub for', day, 'P' + p.period) } catch (e) {}
+              }
+              if ((freshMatch as any).isRoomChange && (freshMatch as any).displayRoom && !(p as any).isRoomChange) {
+                const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                const variationRoom = String((freshMatch as any).displayRoom || '').trim().toLowerCase()
+                if (variationRoom && variationRoom !== scheduledRoom) {
+                  (p as any).isRoomChange = true
+                  (p as any).displayRoom = (freshMatch as any).displayRoom
+                  (p as any).originalRoom = p.room
+                  try { console.debug('[timetable.provider] Applied FRESH inline room change for', day, 'P' + p.period) } catch (e) {}
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[timetable.provider] Error applying fresh inline variations:', e)
+      }
 
       preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
