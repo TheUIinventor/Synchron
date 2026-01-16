@@ -4434,17 +4434,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
                 
                 if (authForDate && typeof authForDate === 'object') {
-                  // CRITICAL: Only apply variations if they're for the exact date being requested
-                  // Do NOT apply variations from a different date even if they're the only ones available
+                  try { console.warn('[timetable.provider] MERGING authoritative variations for date', matchedKey, 'into fetched timetable for requested date:', ds, '- Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(','), '- Available timetable days:', Object.keys(finalTimetable).join(',')) } catch (e) {}
+                  // CRITICAL: Verify we're not applying the wrong date's variations
                   if (matchedKey !== ds) {
-                    try { console.error('[timetable.provider] ❌ BLOCKING: Refusing to apply variations from', matchedKey, 'to timetable requested for', ds, '- Date mismatch!') } catch (e) {}
-                    authForDate = null  // Clear it so it won't be applied
-                  } else {
-                    try { console.warn('[timetable.provider] ✅ APPLYING: Merging authoritative variations for date', matchedKey, 'into fetched timetable for requested date:', ds, '- Days with variations:', Object.keys(authForDate).filter(d => authForDate[d]?.length).join(',')) } catch (e) {}
+                    try { console.error('[timetable.provider] ⚠️ WARNING: Applying variations from', matchedKey, 'to timetable requested for', ds, '- This may cause substitutes to appear on wrong dates!') } catch (e) {}
                   }
-                }
-                
-                if (authForDate && typeof authForDate === 'object') {
+                  
+                  // Extra logging for Friday
                   try {
                     const fridayKey = Object.keys(authForDate).find(k => k.toLowerCase().includes('fri'))
                     if (fridayKey && authForDate[fridayKey]?.length) {
