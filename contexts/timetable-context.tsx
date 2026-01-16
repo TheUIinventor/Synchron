@@ -562,6 +562,23 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // fallback paths from overwriting date-specific variations with stale data.
   // Key is ISO date string (YYYY-MM-DD), value is variations for that date.
   const authoritativeVariationsRef = useRef<Map<string, Record<string, { period: string; isSubstitute?: boolean; isRoomChange?: boolean; displayRoom?: string; displayTeacher?: string; casualSurname?: string; originalTeacher?: string; originalRoom?: string }[]>>>(__initialAuthoritativeVariations)
+  
+  // CRITICAL HELPER: Strip all variations from timetableByWeek before setting it
+  // The server includes substitutions in the grouped structure, but we only want
+  // date-specific variations in the flat timetable to prevent carry-over between weeks
+  const cleanTimetableByWeek = (data: any) => {
+    if (!data || typeof data !== 'object') return data
+    const cleaned: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+    for (const day in data) {
+      cleaned[day] = {
+        A: (data[day]?.A || []).map((p: any) => ({ ...p, isSubstitute: false, isRoomChange: false })),
+        B: (data[day]?.B || []).map((p: any) => ({ ...p, isSubstitute: false, isRoomChange: false })),
+        unknown: (data[day]?.unknown || []).map((p: any) => ({ ...p, isSubstitute: false, isRoomChange: false }))
+      }
+    }
+    return cleaned
+  }
+  
   // Debug: log authoritative variations presence on mount and when selected date changes
   useEffect(() => {
     try {
@@ -978,7 +995,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
                 setExternalTimetable(final)
                 try { setCacheHydrated(true) } catch (e) {}
-                setExternalTimetableByWeek(__initialExternalTimetableByWeek || null)
+                setExternalTimetableByWeek(cleanTimetableByWeek(__initialExternalTimetableByWeek) || null)
                 try { console.debug('[timetable.provider] hydrate: setExternalBellTimes (initial cache)', __initialExternalBellTimes) } catch (e) {}
                 setExternalBellTimes(__initialExternalBellTimes || null)
                 setTimetableSource(__initialTimetableSource || 'cache')
@@ -3066,7 +3083,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       }
                     } catch (e) {}
                     setExternalTimetable(parsedCache.timetable)
-                    setExternalTimetableByWeek(parsedCache.timetableByWeek || null)
+                    setExternalTimetableByWeek(cleanTimetableByWeek(parsedCache.timetableByWeek) || null)
                     // Only restore cached bell times if we don't already have authoritative
                     // date-specific bells from /api/timetable
                     if (parsedCache.bellTimes && !authoritativeBellsDateRef.current) {
@@ -3366,7 +3383,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       setExternalWeekType(j.weekType)
                       setCurrentWeek(j.weekType)
                     }
-                    if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                    if (finalByWeek) setExternalTimetableByWeek(cleanTimetableByWeek(finalByWeek))
                     setExternalTimetable(finalTimetable)
                     setTimetableSource(computedSource)
                     setLastFetchedDate(computedDate)
@@ -3382,7 +3399,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     setExternalWeekType(j.weekType)
                     setCurrentWeek(j.weekType)
                   }
-                  if (finalByWeek) setExternalTimetableByWeek(finalByWeek)
+                  if (finalByWeek) setExternalTimetableByWeek(cleanTimetableByWeek(finalByWeek))
                   externalTimetableDateRef.current = computedDate
                   setExternalTimetable(finalTimetable)
                   setTimetableSource(computedSource)
@@ -3722,30 +3739,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setCurrentWeek(j.weekType)
             }
             // CRITICAL FIX: Strip all variations from timetableByWeek before setting it
-            // The server includes substitutions/room changes in the grouped structure,
-            // but we only want date-specific variations in the flat timetable
             if (j.timetableByWeek) {
-              const cleanedByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
-              for (const day in j.timetableByWeek) {
-                cleanedByWeek[day] = {
-                  A: (j.timetableByWeek[day]?.A || []).map((p: any) => ({ 
-                    ...p, 
-                    isSubstitute: false, 
-                    isRoomChange: false 
-                  })),
-                  B: (j.timetableByWeek[day]?.B || []).map((p: any) => ({ 
-                    ...p, 
-                    isSubstitute: false, 
-                    isRoomChange: false 
-                  })),
-                  unknown: (j.timetableByWeek[day]?.unknown || []).map((p: any) => ({ 
-                    ...p, 
-                    isSubstitute: false, 
-                    isRoomChange: false 
-                  }))
-                }
-              }
-              setExternalTimetableByWeek(cleanedByWeek)
+              setExternalTimetableByWeek(cleanTimetableByWeek(j.timetableByWeek) || null)
             }
             if (j.bellTimes || j.upstream) {
               try {
@@ -4252,7 +4247,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // Use the cached processed timetable immediately and skip fetch
                   externalTimetableDateRef.current = ds
                   setExternalTimetable(cached.timetable)
-                  setExternalTimetableByWeek(cached.timetableByWeek || null)
+                  setExternalTimetableByWeek(cleanTimetableByWeek(cached.timetableByWeek) || null)
                   if (cached.bellTimes && !authoritativeBellsDateRef.current) {
                     setExternalBellTimes(cached.bellTimes)
                     lastSeenBellTimesRef.current = cached.bellTimes
@@ -4420,7 +4415,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                 }
               }
-              setExternalTimetableByWeek(finalByWeek)
+              setExternalTimetableByWeek(cleanTimetableByWeek(finalByWeek))
             }
               // CRITICAL: Track which date this timetable data is FOR before setting it
               // Merge any authoritative variations we previously captured for this date
