@@ -1810,22 +1810,33 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // CRITICAL: Validate that all variations have the correct date token
             // This prevents variations from other dates being applied
             let allValid = true
+            let invalidCount = 0
+            let invalidDates: string[] = []
+            
             for (const day of Object.keys(authVars)) {
               const variations = authVars[day] || []
               for (const v of variations) {
                 if (v.__prescribedDate !== selectedIso) {
                   allValid = false
-                  break
+                  invalidCount++
+                  if (!invalidDates.includes(v.__prescribedDate)) {
+                    invalidDates.push(v.__prescribedDate)
+                  }
                 }
               }
-              if (!allValid) break
             }
             
+            try { console.warn('[timetable.provider] 🔍 [TOKEN-DEBUG] Checking cached variations for', selectedIso, '- Found:', !!authVars, 'Valid:', allValid, 'InvalidCount:', invalidCount, 'InvalidDates:', invalidDates) } catch (e) {}
+            
             if (!allValid) {
-              console.warn('[timetable.provider] ❌ Rejecting cached variations - date token mismatch. Expected:', selectedIso, 'Found variations with different dates')
+              try { console.warn('[timetable.provider] ❌ Rejecting cached variations - date token mismatch. Expected:', selectedIso, 'But found variations from:', invalidDates.join(', ')) } catch (e) {}
               authVars = null
             }
+          } else {
+            try { console.debug('[timetable.provider] 🔍 [TOKEN-DEBUG] No cached variations found for', selectedIso) } catch (e) {}
           }
+        } else {
+          try { console.debug('[timetable.provider] 🔍 [TOKEN-DEBUG] No selectedIso available') } catch (e) {}
         }
         
         console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'matched:', matchedDate, 'willApply:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
@@ -2118,10 +2129,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         
         map.set(timetableDateIso, varDataWithToken)
-        // AGGRESSIVE DEBUG: Log storage action
+        // AGGRESSIVE DEBUG: Log storage action with token info
         try {
           console.warn('🔍 [STORAGE] Storing variations for date:', timetableDateIso, 'Total variations:', newCount)
           for (const day of Object.keys(varDataWithToken)) {
+            if (varDataWithToken[day]?.length > 0) {
+              const sampleVar = varDataWithToken[day][0]
+              console.warn('🔍 [STORAGE]   -', day, ':', varDataWithToken[day].length, 'variations, token:', sampleVar.__prescribedDate, '- samples:', varDataWithToken[day].slice(0, 2).map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+            }
+          }
+        } catch (e) {}
             if (varDataWithToken[day]?.length > 0) {
               console.warn('🔍 [STORAGE]   -', day, ':', varDataWithToken[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
             }
@@ -2137,13 +2154,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const oldest = Array.from(map.keys()).sort()[0]
           map.delete(oldest)
         }
-        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varDataWithToken) } catch (e) {}
+        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')') } catch (e) {}
         
         // Immediately persist to localStorage
         try {
           const obj: Record<string, any> = {}
-          map.forEach((value, key) => { obj[key] = value })
+          map.forEach((value, key) => { 
+            obj[key] = value
+            // Verify tokens in stored data
+            try {
+              const dayCount = Object.keys(value).length
+              const firstDayKey = Object.keys(value)[0]
+              const firstVar = value[firstDayKey]?.[0]
+              if (firstVar) {
+                console.debug('[timetable.provider] 🔍 [PERSIST] Date:', key, 'has token:', firstVar.__prescribedDate)
+              }
+            } catch (e) {}
+          })
           localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
+          try { console.debug('[timetable.provider] 🔍 [PERSIST] Persisted', map.size, 'dates to localStorage') } catch (e) {}
         } catch (e) {}
       }
     } catch (e) {}
