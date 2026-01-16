@@ -1798,14 +1798,70 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try {
         const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
         
-        // DISABLED: Applying cached variations was causing substitutions from one date to appear on other dates
-        // The authoritativeVariationsRef cache was accumulating stale data and applying it irresponsibly
-        // Instead, rely ONLY on variations that come directly from the current timetable API response
-        // which are already embedded in the periods (isSubstitute, isRoomChange flags)
+        // Look for cached variations for this date
+        let authVars = null
+        let matchedDate = null
         
-        console.debug('[timetable.provider] Simple timetable path - skipping cached authVars application to prevent stale data contamination - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'mapSize:', authoritativeVariationsRef.current.size)
+        if (selectedIso) {
+          authVars = authoritativeVariationsRef.current.get(selectedIso)
+          if (authVars) {
+            matchedDate = selectedIso
+            
+            // CRITICAL: Validate that all variations have the correct date token
+            // This prevents variations from other dates being applied
+            let allValid = true
+            for (const day of Object.keys(authVars)) {
+              const variations = authVars[day] || []
+              for (const v of variations) {
+                if (v.__prescribedDate !== selectedIso) {
+                  allValid = false
+                  break
+                }
+              }
+              if (!allValid) break
+            }
+            
+            if (!allValid) {
+              console.warn('[timetable.provider] ❌ Rejecting cached variations - date token mismatch. Expected:', selectedIso, 'Found variations with different dates')
+              authVars = null
+            }
+          }
+        }
+        
+        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'matched:', matchedDate, 'willApply:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
+        
+        if (authVars) {
+          for (const day of Object.keys(authVars)) {
+            const varData = authVars[day]
+            if (Array.isArray(varData) && varData.length > 0) {
+              console.debug('[timetable.provider] Applying', varData.length, 'authVars to', day, 'periods:', filtered[day].length)
+              for (const p of filtered[day]) {
+                const normP = String(p.period).trim().toLowerCase()
+                const v = varData.find((item: any) => String(item.period).trim().toLowerCase() === normP)
+                if (v) {
+                  console.debug('[timetable.provider] Matched variation for period', p.period, '- isSubstitute:', v.isSubstitute, '- isRoomChange:', v.isRoomChange)
+                  if (v.isSubstitute) {
+                    (p as any).isSubstitute = true
+                    if (v.casualSurname) (p as any).casualSurname = v.casualSurname
+                    if (v.displayTeacher) (p as any).displayTeacher = v.displayTeacher
+                    if (v.originalTeacher) (p as any).originalTeacher = v.originalTeacher
+                  }
+                  if (v.isRoomChange && v.displayRoom) {
+                    const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                    const variationRoom = String(v.displayRoom || '').trim().toLowerCase()
+                    if (variationRoom && variationRoom !== scheduledRoom) {
+                      (p as any).isRoomChange = true
+                      (p as any).displayRoom = v.displayRoom
+                      (p as any).originalRoom = p.room
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       } catch (e) {
-        console.error('[timetable.provider] Error in variation application block:', e)
+        console.error('[timetable.provider] Error applying cached variations:', e)
       }
 
       preferToRoomOnMap(filtered)
@@ -2052,13 +2108,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // CRITICAL: Only update variations if we have any in the current data
       // Always trust fresh data over cached data - if API returned 0 variations, that's correct for this date
       if (newCount > 0) {
-        map.set(timetableDateIso, varData)
+        // Add date token to each variation for cache validation
+        const varDataWithToken = { ...varData }
+        for (const day of Object.keys(varDataWithToken)) {
+          varDataWithToken[day] = (varDataWithToken[day] || []).map((v: any) => ({
+            ...v,
+            __prescribedDate: timetableDateIso  // Token to validate this variation belongs to this date
+          }))
+        }
+        
+        map.set(timetableDateIso, varDataWithToken)
         // AGGRESSIVE DEBUG: Log storage action
         try {
           console.warn('🔍 [STORAGE] Storing variations for date:', timetableDateIso, 'Total variations:', newCount)
-          for (const day of Object.keys(varData)) {
-            if (varData[day]?.length > 0) {
-              console.warn('🔍 [STORAGE]   -', day, ':', varData[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
+          for (const day of Object.keys(varDataWithToken)) {
+            if (varDataWithToken[day]?.length > 0) {
+              console.warn('🔍 [STORAGE]   -', day, ':', varDataWithToken[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
             }
           }
         } catch (e) {}
@@ -2072,7 +2137,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const oldest = Array.from(map.keys()).sort()[0]
           map.delete(oldest)
         }
-        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
+        try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varDataWithToken) } catch (e) {}
         
         // Immediately persist to localStorage
         try {
