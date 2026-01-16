@@ -2072,45 +2072,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // CRITICAL: Also check grouped structure for variations
-      // After my fix, variations might be in finalByWeek but not in flat structure
-      if (externalTimetableByWeek && currentWeek) {
-        try {
-          console.warn('🔴 [SUBS-DEBUG] Checking externalTimetableByWeek for variations. currentWeek:', currentWeek)
-          for (const day of Object.keys(externalTimetableByWeek)) {
-            const groups = (externalTimetableByWeek as any)[day]
-            const weekPeriods = groups?.[currentWeek] || []
-            const variations = weekPeriods.filter((p: any) => p.isSubstitute || p.isRoomChange).map((p: any) => ({
-              period: p.period,
-              isSubstitute: p.isSubstitute,
-              isRoomChange: p.isRoomChange,
-              displayRoom: p.displayRoom,
-              displayTeacher: p.displayTeacher,
-              casualSurname: p.casualSurname,
-              originalTeacher: p.originalTeacher,
-              originalRoom: p.originalRoom,
-            }))
-            if (variations.length > 0) {
-              console.warn(`🔴 [SUBS-DEBUG] Found ${variations.length} variations in externalTimetableByWeek[${day}][${currentWeek}]!`, variations.map(v => ({ period: v.period, sub: v.casualSurname || v.displayTeacher })))
-              hasVariations = true
-              // Merge with existing data for this day
-              if (!varData[day]) varData[day] = []
-              for (const v of variations) {
-                // Only add if not already present
-                const exists = varData[day].some((existing: any) => 
-                  existing.period === v.period && 
-                  existing.isSubstitute === v.isSubstitute &&
-                  existing.isRoomChange === v.isRoomChange
-                )
-                if (!exists) varData[day].push(v)
-              }
-            }
-          }
-        } catch (e) {
-          console.error('[timetable.provider] Error checking grouped structure for variations:', e)
-        }
-      }
-      
       // Ensure all days have an entry
       for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
         if (!varData[day]) varData[day] = []
