@@ -2002,7 +2002,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       try { console.debug('[timetable.provider] persisted authoritative variations for', map.size, 'dates') } catch (e) {}
     } catch (e) {}
   }, [timetableData]) // Re-persist whenever timetable data changes (which triggers variation updates)
-
   // CRITICAL: Capture variations from externalTimetable IMMEDIATELY when they appear
   // This ensures we never lose substitutions/room changes even if timetable is later overwritten
   // NOTE: We use externalTimetableDateRef (the date the timetable data is FOR) rather than
@@ -2011,9 +2010,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try {
       if (!externalTimetable && !externalTimetableByWeek) return
       
-      // Use the date the timetable is actually FOR, falling back to selected date
-      const timetableDateIso = externalTimetableDateRef.current || 
-        (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
+      // CRITICAL: Only capture variations if we KNOW what date the timetable is for
+      // Do NOT use selectedDateObject as a fallback - it can be a different date
+      const timetableDateIso = externalTimetableDateRef.current
       
       if (!timetableDateIso) return
       
@@ -2040,9 +2039,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       let hasVariations = false
       const varData: Record<string, any[]> = {}
       
-      // Check flat structure first - ONLY use it if the timetable is for the current date
-      // This prevents substitutions from other dates showing up
-      if (externalTimetable && externalTimetableDateRef.current === timetableDateIso) {
+      // Check flat structure - variations are only extracted if this timetable is definitely for timetableDateIso
+      if (externalTimetable) {
         for (const day of Object.keys(externalTimetable)) {
           const periods = (externalTimetable as any)[day] || []
           // CRITICAL: Only extract variations from timetable data for THIS specific date
@@ -2106,45 +2104,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         newCount += (varData[day] || []).length
       }
       
-      // CRITICAL: If new data has ZERO variations but we have existing variations stored,
-      // NEVER overwrite the existing data. This prevents losing substitutions when
-      // navigating between days causes a re-fetch with incomplete data.
-      if (existingVars && newCount === 0 && existingCount > 0) {
-        try { console.warn('[timetable.provider] 🛑 BLOCKING variation capture - new data has ZERO variations but we have', existingCount, 'existing variations for', timetableDateIso, '- Days in existing:', Object.keys(existingVars).filter(d => existingVars[d]?.length).join(','), '- Days in new:', Object.keys(varData).filter(d => varData[d]?.length).join(',')) } catch (e) {}
-        return
-      }
-      
-      // Only update if new data has MORE variations, or if we have no existing data
-      if (newCount > 0 || !existingVars) {
-        // CRITICAL: Never overwrite existing variations with data that has fewer OR equal variations
-        // This prevents losing substitutions when a subsequent render provides the same timetable
-        // but without variation flags (e.g., when data flows through different processing paths)
-        if (existingVars && newCount <= existingCount) {
-          try { console.debug('[timetable.provider] SKIPPING variation capture - new data has same or fewer variations', { timetableDateIso, existing: existingCount, new: newCount }) } catch (e) {}
-          return
-        }
-        
-        if (hasVariations || newCount > 0) {
-          map.set(timetableDateIso, varData)
-          // AGGRESSIVE DEBUG: Log storage action
-          try {
-            console.warn('🔍 [STORAGE] Storing variations for date:', timetableDateIso, 'Total variations:', newCount)
-            for (const day of Object.keys(varData)) {
-              if (varData[day]?.length > 0) {
-                console.warn('🔍 [STORAGE]   -', day, ':', varData[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
-              }
+      // CRITICAL: Only update variations if we have any in the current data
+      // Always trust fresh data over cached data - if API returned 0 variations, that's correct for this date
+      if (newCount > 0) {
+        map.set(timetableDateIso, varData)
+        // AGGRESSIVE DEBUG: Log storage action
+        try {
+          console.warn('🔍 [STORAGE] Storing variations for date:', timetableDateIso, 'Total variations:', newCount)
+          for (const day of Object.keys(varData)) {
+            if (varData[day]?.length > 0) {
+              console.warn('🔍 [STORAGE]   -', day, ':', varData[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}`).join(', '))
             }
-          } catch (e) {}
-          // Limit map size to prevent unbounded growth. Keep a longer history
-          // so substitutions from far-past dates remain available. Timetabl-app
-          // preserves query cache in localStorage (react-query persister) and
-          // thus can show substitutions from months ago. To match that behavior
-          // for authoritative variations we retain up to 365 days by default.
-          const MAX_VAR_DAYS = 365
-          if (map.size > MAX_VAR_DAYS) {
-            const oldest = Array.from(map.keys()).sort()[0]
-            map.delete(oldest)
           }
+        } catch (e) {}
+        // Limit map size to prevent unbounded growth. Keep a longer history
+        // so substitutions from far-past dates remain available. Timetabl-app
+        // preserves query cache in localStorage (react-query persister) and
+        // thus can show substitutions from months ago. To match that behavior
+        // for authoritative variations we retain up to 365 days by default.
+        const MAX_VAR_DAYS = 365
+        if (map.size > MAX_VAR_DAYS) {
+          const oldest = Array.from(map.keys()).sort()[0]
+          map.delete(oldest)
+        }
           try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
           
           // Immediately persist to localStorage
