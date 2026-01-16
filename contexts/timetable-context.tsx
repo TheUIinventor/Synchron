@@ -3135,93 +3135,74 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       try { console.debug('[timetable.provider] homepage substitutions applied, count=', appliedCount) } catch (e) {}
                     } catch (e) { try { console.debug('[timetable.provider] homepage substitution apply error', e) } catch (err) {} }
 
-                  // For the cycle/grouped view (timetableByWeek), only apply
-                  // substitutions that do NOT have a specific date attached.
-                  // Date-bound substitutions should only affect the single
-                  // calendar date (daily view), not both Week A and Week B.
-                  const genericSubs = subs.filter((s: any) => !s || !s.date)
-
-                  if (j.timetableByWeek) {
+                    // CRITICAL: Substitutions are DATE-SPECIFIC only - they should NEVER be applied
+                    // to timetableByWeek (the week-organized structure) to avoid carrying them over
+                    // to the wrong week type. The timetableByWeek structure should remain pristine
+                    // without any substitutions applied to it.
+                    
+                    if (j.timetableByWeek) {
                       try {
-                      const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-                      const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
-                      // Copy to avoid mutating original
-                      for (const d of Object.keys(byWeekSrc)) {
-                        transformed[d] = {
-                          A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
-                          B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
-                          unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
-                        }
-                      }
-
-                      // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
-                      const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
-                        const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                        for (const d of Object.keys(transformed)) {
-                          weekMap[d] = transformed[d][weekKey] || []
-                        }
-                        if (genericSubs.length > 0) {
-                          const applied = applySubstitutionsToTimetable(weekMap, genericSubs)
-                          for (const d of Object.keys(transformed)) {
-                            transformed[d][weekKey] = applied[d] || []
+                        const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+                        const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+                        // Copy to avoid mutating original
+                        for (const d of Object.keys(byWeekSrc)) {
+                          transformed[d] = {
+                            A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
+                            B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
+                            unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
                           }
                         }
-                      }
-
-                      // Apply generic substitutions to grouped week maps (debug enabled)
-                      applyToWeek('A')
-                      applyToWeek('B')
-                      applyToWeek('unknown')
-                      
-                      // CRITICAL FIX: Also copy date-specific variations directly from finalTimetable
-                      // Since finalTimetable already has variations applied (including date-specific ones),
-                      // we need to preserve those flags in the grouped structure.
-                      // Check each period in finalTimetable and if it has variation flags, copy them to the
-                      // corresponding period in the grouped structure.
-                      try {
-                        const weekType = j.weekType as ('A' | 'B' | null)
-                        if (weekType === 'A' || weekType === 'B') {
-                          for (const day of Object.keys(finalTimetable)) {
-                            const flatPeriods = finalTimetable[day] || []
-                            const groupedPeriods = transformed[day]?.[weekType] || []
-                            
-                            for (const flatP of flatPeriods) {
-                              // Find matching period in grouped structure
-                              const match = groupedPeriods.find((gp: any) => 
-                                String(gp.period).trim().toLowerCase() === String(flatP.period).trim().toLowerCase() &&
-                                String(gp.subject || '').trim().toLowerCase() === String(flatP.subject || '').trim().toLowerCase()
-                              )
+                        
+                        // CRITICAL FIX: Also copy date-specific variations directly from finalTimetable
+                        // Since finalTimetable already has variations applied (including date-specific ones),
+                        // we need to preserve those flags in the grouped structure.
+                        // Check each period in finalTimetable and if it has variation flags, copy them to the
+                        // corresponding period in the grouped structure.
+                        try {
+                          const weekType = j.weekType as ('A' | 'B' | null)
+                          if (weekType === 'A' || weekType === 'B') {
+                            for (const day of Object.keys(finalTimetable)) {
+                              const flatPeriods = finalTimetable[day] || []
+                              const groupedPeriods = transformed[day]?.[weekType] || []
                               
-                              if (match) {
-                                // Copy variation flags from flat to grouped
-                                if ((flatP as any).isSubstitute) {
-                                  (match as any).isSubstitute = true
-                                  if ((flatP as any).casualSurname) (match as any).casualSurname = (flatP as any).casualSurname
-                                  if ((flatP as any).displayTeacher) (match as any).displayTeacher = (flatP as any).displayTeacher
-                                  if ((flatP as any).originalTeacher) (match as any).originalTeacher = (flatP as any).originalTeacher
-                                }
-                                if ((flatP as any).isRoomChange) {
-                                  (match as any).isRoomChange = true
-                                  if ((flatP as any).displayRoom) (match as any).displayRoom = (flatP as any).displayRoom
-                                  if ((flatP as any).originalRoom) (match as any).originalRoom = (flatP as any).originalRoom
+                              for (const flatP of flatPeriods) {
+                                // Find matching period in grouped structure
+                                const match = groupedPeriods.find((gp: any) => 
+                                  String(gp.period).trim().toLowerCase() === String(flatP.period).trim().toLowerCase() &&
+                                  String(gp.subject || '').trim().toLowerCase() === String(flatP.subject || '').trim().toLowerCase()
+                                )
+                                
+                                if (match) {
+                                  // Copy variation flags from flat to grouped
+                                  if ((flatP as any).isSubstitute) {
+                                    (match as any).isSubstitute = true
+                                    if ((flatP as any).casualSurname) (match as any).casualSurname = (flatP as any).casualSurname
+                                    if ((flatP as any).displayTeacher) (match as any).displayTeacher = (flatP as any).displayTeacher
+                                    if ((flatP as any).originalTeacher) (match as any).originalTeacher = (flatP as any).originalTeacher
+                                  }
+                                  if ((flatP as any).isRoomChange) {
+                                    (match as any).isRoomChange = true
+                                    if ((flatP as any).displayRoom) (match as any).displayRoom = (flatP as any).displayRoom
+                                    if ((flatP as any).originalRoom) (match as any).originalRoom = (flatP as any).originalRoom
+                                  }
                                 }
                               }
                             }
                           }
+                        } catch (e) {
+                          console.error('[timetable.provider] Error copying variations to grouped structure:', e)
                         }
-                      } catch (e) {
-                        console.error('[timetable.provider] Error copying variations to grouped structure:', e)
-                      }
 
-                      finalByWeek = transformed
-                    } catch (e) {
-                      // ignore by-week substitution failures
+                        finalByWeek = transformed
+                      } catch (e) {
+                        // ignore by-week copying errors
+                      }
                     }
                   }
-                }
               } catch (e) {
-                // ignore substitution extraction errors
+                // ignore substitution errors
               }
+              
               // Attach long subject titles when available in the upstream payload
               try {
                 const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
@@ -4349,6 +4330,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (Array.isArray(subs) && subs.length) {
                 try {
                   // Apply all substitutions (date-specific + generic) to the per-day timetable
+                  // CRITICAL: Substitutions are DATE-SPECIFIC only - they should NEVER be applied
+                  // to timetableByWeek (the week-organized structure) to avoid carrying them over
+                  // to the wrong week type.
                   finalTimetable = applySubstitutionsToTimetable(j.timetable, subs, { debug: true })
                   // Count variations in the result
                   let varCount = 0
@@ -4357,43 +4341,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   }
                   try { console.debug('[timetable.provider] fetchForDate applied subs, variations in result:', varCount, 'for date', ds) } catch (e) {}
                 } catch (e) { /* ignore substitution apply errors */ }
-
-                const genericSubs = subs.filter((s: any) => !s || !s.date)
-
-                if (j.timetableByWeek && genericSubs.length) {
-                  try {
-                    const byWeekSrc = j.timetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
-                    const transformed: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
-                    // Copy to avoid mutating original
-                    for (const d of Object.keys(byWeekSrc)) {
-                      transformed[d] = {
-                        A: Array.isArray(byWeekSrc[d].A) ? byWeekSrc[d].A.map((p) => ({ ...p })) : [],
-                        B: Array.isArray(byWeekSrc[d].B) ? byWeekSrc[d].B.map((p) => ({ ...p })) : [],
-                        unknown: Array.isArray(byWeekSrc[d].unknown) ? byWeekSrc[d].unknown.map((p) => ({ ...p })) : [],
-                      }
-                    }
-
-                    // For each week (A/B/unknown) build a day->periods map and apply only generic substitutions
-                    const applyToWeek = (weekKey: 'A' | 'B' | 'unknown') => {
-                      const weekMap: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
-                      for (const d of Object.keys(transformed)) {
-                        weekMap[d] = transformed[d][weekKey] || []
-                      }
-                      const applied = applySubstitutionsToTimetable(weekMap, genericSubs, { debug: true })
-                      for (const d of Object.keys(transformed)) {
-                        transformed[d][weekKey] = applied[d] || []
-                      }
-                    }
-
-                    applyToWeek('A')
-                    applyToWeek('B')
-                    applyToWeek('unknown')
-
-                    finalByWeek = transformed
-                  } catch (e) {
-                    // ignore by-week substitution failures
-                  }
-                }
               }
             } catch (e) {
               // ignore substitution extraction/apply errors
