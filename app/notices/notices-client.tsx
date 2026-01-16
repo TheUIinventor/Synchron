@@ -196,8 +196,16 @@ export default function NoticesClient() {
             </div>
           </div>
         ) : (
-          <div className="text-center py-20 text-muted-foreground">
-            <p>No notices found for {selectedYear}</p>
+          <div className="py-8 text-center bg-surface-container-high/50 rounded-xl px-4">
+            <div className="flex flex-col items-center gap-3">
+              <div className="p-3 rounded-full bg-primary/10 text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 20v-6h4v6m7-10.236A8.002 8.002 0 003.555 9.636a8 8 0 0016.89 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-on-surface">No notices found</h3>
+              <p className="text-sm text-on-surface-variant max-w-md">There are no notices available for {selectedYear === 'All' ? 'your year' : selectedYear} at the moment — check back later.</p>
+            </div>
           </div>
         )}
       </div>
