@@ -3343,43 +3343,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   // CRITICAL: Set the date ref BEFORE startTransition so it's available to useEffect immediately
                   externalTimetableDateRef.current = computedDate
 
-                  // If we have authoritative variations captured for this date (or the selected date),
-                  // merge them into the finalTimetable to avoid flashes where a subsequent
-                  // render would otherwise overwrite substitutions with raw data.
+                  // Merge saved variations using the same helper that fetchForDate uses
+                  // This ensures date-applicable tokens are checked consistently
                   try {
-                    const authMap = authoritativeVariationsRef.current
-                    const selIso = selectedDateObjectRef.current ? selectedDateObjectRef.current.toISOString().slice(0,10) : null
-                    const candidateDates = [computedDate, externalTimetableDateRef.current, selIso, new Date().toISOString().slice(0,10)].filter(Boolean) as string[]
-                    let authForDate: any = null
-                    for (const dk of candidateDates) { authForDate = authMap.get(dk); if (authForDate) break }
-                    if (authForDate && typeof authForDate === 'object') {
-                      for (const dayKey of Object.keys(authForDate)) {
-                        const dayVars = authForDate[dayKey] || []
-                        const dayPeriods = (finalTimetable as any)[dayKey] || []
-                        for (const v of dayVars) {
-                          try {
-                            if (!v || !v.period) continue
-                            const norm = String(v.period).trim().toLowerCase()
-                            const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
-                            if (idx >= 0) {
-                              const period = dayPeriods[idx]
-                              if (v.isSubstitute) {
-                                (period as any).isSubstitute = true
-                                if (v.casualSurname) (period as any).casualSurname = v.casualSurname
-                                if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
-                                if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
-                              }
-                              if (v.isRoomChange) {
-                                (period as any).isRoomChange = true
-                                if (v.displayRoom) (period as any).displayRoom = v.displayRoom
-                                if (v.originalRoom) (period as any).originalRoom = v.originalRoom
-                              }
-                            }
-                          } catch (e) {}
-                        }
-                      }
-                      try { console.debug('[timetable.provider] merged authoritative variations into fetched processed payload for', computedDate) } catch (e) {}
-                    }
+                    finalTimetable = mergeSavedVariationsIntoTimetable(finalTimetable, computedDate)
+                    try { console.debug('[timetable.provider] merged authoritative variations into fetched processed payload for', computedDate) } catch (e) {}
                   } catch (e) {}
 
                   startTransition(() => {
