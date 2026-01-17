@@ -4452,6 +4452,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                     for (const v of dayVars) {
                       try {
                         if (!v || !v.period) continue
+                        
+                        // CRITICAL: Only apply variation if it's for the correct date
+                        if (v.dateApplicable && v.dateApplicable !== ds) {
+                          try { console.warn('🔍 [APPLY-BLOCK-FETCHFORDATE] Blocking variation for', timetableDayKey, 'P' + v.period, '- dateApplicable:', v.dateApplicable, '!== requestedDate:', ds) } catch (e) {}
+                          continue
+                        }
+                        
                         const norm = String(v.period).trim().toLowerCase()
                         const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
                         
