@@ -2103,19 +2103,29 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         newCount += (varData[day] || []).length
       }
       
-      // CRITICAL: Only update variations if we have any in the current data
-      // Always trust fresh data over cached data - if API returned 0 variations, that's correct for this date
-      if (newCount > 0) {
+      // CRITICAL: Always update the cache for this date, even if there are 0 variations
+      // This ensures old variations don't persist when fresh data has none
+      // Only skip if we have NO data at all (timetableDateIso is null)
+      if (timetableDateIso) {
+        // Store the variations (even if empty) to ensure we have fresh data for this date
         map.set(timetableDateIso, varData)
-        // AGGRESSIVE DEBUG: Log storage action
-        try {
-          console.warn('🔍 [STORAGE] Storing variations for date:', timetableDateIso, 'Total variations:', newCount)
-          for (const day of Object.keys(varData)) {
-            if (varData[day]?.length > 0) {
-              console.warn('🔍 [STORAGE]   -', day, ':', varData[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}(dateApplicable:${v.dateApplicable})`).join(', '))
+        
+        if (newCount > 0) {
+          // AGGRESSIVE DEBUG: Log storage action for variations
+          try {
+            console.warn('🔍 [STORAGE] Storing variations for date:', timetableDateIso, 'Total variations:', newCount)
+            for (const day of Object.keys(varData)) {
+              if (varData[day]?.length > 0) {
+                console.warn('🔍 [STORAGE]   -', day, ':', varData[day].map((v: any) => `P${v.period}:${v.casualSurname || v.displayRoom}(dateApplicable:${v.dateApplicable})`).join(', '))
+              }
             }
-          }
-        } catch (e) {}
+          } catch (e) {}
+        } else {
+          // Log when we store empty variations (to clear old ones)
+          try {
+            console.warn('🔍 [STORAGE-CLEAR] Clearing variations for date:', timetableDateIso, '(fresh data has 0 variations)')
+          } catch (e) {}
+        }
         // Limit map size to prevent unbounded growth. Keep a longer history
         // so substitutions from far-past dates remain available. Timetabl-app
         // preserves query cache in localStorage (react-query persister) and
