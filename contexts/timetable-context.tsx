@@ -582,6 +582,49 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return cleaned
   }
   
+  // CRITICAL HELPER: Merge authoritative variations back into timetable data before setting it
+  // This prevents substitutions from disappearing when stale/cached data overwrites fresh data
+  const mergeSavedVariationsIntoTimetable = (timetableData: any, dateIso: string | null) => {
+    if (!timetableData || !dateIso) return timetableData
+    
+    const savedVars = authoritativeVariationsRef.current.get(dateIso)
+    if (!savedVars) return timetableData
+    
+    const merged = { ...timetableData }
+    for (const day in savedVars) {
+      const dayVars = savedVars[day] || []
+      if (!Array.isArray(dayVars) || dayVars.length === 0) continue
+      
+      const dayPeriods = merged[day]
+      if (!Array.isArray(dayPeriods)) continue
+      
+      for (const v of dayVars) {
+        if (!v || !v.period) continue
+        if (v.dateApplicable && v.dateApplicable !== dateIso) continue // Only apply if date matches
+        
+        const norm = String(v.period).trim().toLowerCase()
+        const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+        if (idx >= 0) {
+          const period = dayPeriods[idx]
+          if (v.isSubstitute) {
+            (period as any).isSubstitute = true
+            if (v.casualSurname) (period as any).casualSurname = v.casualSurname
+            if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
+            if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+          }
+          if (v.isRoomChange) {
+            (period as any).isRoomChange = true
+            if (v.displayRoom) (period as any).displayRoom = v.displayRoom
+            if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+          }
+        }
+      }
+    }
+    
+    try { console.warn('🔍 [MERGE-SAVED] Merged saved variations into timetable for date:', dateIso) } catch (e) {}
+    return merged
+  }
+  
   // Debug: log authoritative variations presence on mount and when selected date changes
   useEffect(() => {
     try {
@@ -4474,14 +4517,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       try {
                         if (!v || !v.period) continue
                         
-                        // CRITICAL: Only apply variation if it's for the correct date
-                        if (v.dateApplicable && v.dateApplicable !== ds) {
-                          try { console.warn('🔍 [APPLY-BLOCK-FETCHFORDATE] Blocking variation for', timetableDayKey, 'P' + v.period, '- dateApplicable:', v.dateApplicable, '!== requestedDate:', ds) } catch (e) {}
-                          continue
-                        }
-                        
                         const norm = String(v.period).trim().toLowerCase()
                         const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+                        
+                        // Check if period already has the flag from fresh data
+                        let periodAlreadyHasSubstitute = false
+                        let periodAlreadyHasRoomChange = false
+                        if (idx >= 0) {
+                          const period = dayPeriods[idx]
+                          periodAlreadyHasSubstitute = !!(period as any).isSubstitute
+                          periodAlreadyHasRoomChange = !!(period as any).isRoomChange
+                        }
+                        
+                        // CRITICAL: Only apply variation if it's for the correct date
+                        // BUT: If the period already has the flag (from fresh data), preserve it
+                        if (v.dateApplicable && v.dateApplicable !== ds) {
+                          // Only block if we're trying to ADD a flag that doesn't exist
+                          if (!periodAlreadyHasSubstitute && !periodAlreadyHasRoomChange) {
+                            try { console.warn('🔍 [APPLY-BLOCK-FETCHFORDATE] Blocking variation for', timetableDayKey, 'P' + v.period, '- dateApplicable:', v.dateApplicable, '!== requestedDate:', ds) } catch (e) {}
+                            continue
+                          } else {
+                            try { console.warn('🔍 [APPLY-PRESERVE-FETCHFORDATE] Period P' + v.period + ' on', timetableDayKey, 'already has flag from fresh data, preserving despite dateApplicable mismatch') } catch (e) {}
+                            // Don't apply the cached variation, but don't block the existing flag either
+                            continue
+                          }
+                        }
                         
                         // AGGRESSIVE DEBUG: Log each variation application attempt
                         try {
@@ -4617,7 +4677,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 }
               } catch (e) {}
               externalTimetableDateRef.current = ds
-              setExternalTimetable(finalTimetable)
+              // CRITICAL: Merge saved variations back in before setting
+              const finalWithSavedVars = mergeSavedVariationsIntoTimetable(finalTimetable, ds)
+              setExternalTimetable(finalWithSavedVars)
             setTimetableSource(j.source ?? 'external')
             // record debug summary
             try {
