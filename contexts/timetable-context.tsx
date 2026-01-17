@@ -1830,9 +1830,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const v = varData.find(item => String(item.period).trim().toLowerCase() === normP)
                 if (v) {
                   // CRITICAL: Only apply variation if it's for the correct date
+                  // BUT: If the period already has the flag (from fresh data), don't block it
+                  const periodAlreadyHasSubstitute = (p as any).isSubstitute
+                  const periodAlreadyHasRoomChange = (p as any).isRoomChange
+                  
                   if (v.dateApplicable && v.dateApplicable !== selectedIso) {
-                    try { console.warn('🔍 [APPLY-BLOCK] Blocking variation for P' + p.period + ' on ' + day + ' - dateApplicable:', v.dateApplicable, '!== selectedDate:', selectedIso, '- Variation:', v.casualSurname || v.displayRoom) } catch (e) {}
-                    continue
+                    // Only block if we're trying to ADD a flag that doesn't exist
+                    if (!periodAlreadyHasSubstitute && !periodAlreadyHasRoomChange) {
+                      try { console.warn('🔍 [APPLY-BLOCK] Blocking variation for P' + p.period + ' on ' + day + ' - dateApplicable:', v.dateApplicable, '!== selectedDate:', selectedIso, '- Variation:', v.casualSurname || v.displayRoom) } catch (e) {}
+                      continue
+                    } else {
+                      try { console.warn('🔍 [APPLY-PRESERVE] Period P' + p.period + ' on ' + day + ' already has flag from fresh data, preserving despite dateApplicable mismatch') } catch (e) {}
+                      // Don't apply the cached variation, but don't block the existing flag either
+                      continue
+                    }
                   }
                   try { console.warn('🔍 [APPLY-ACCEPT] Applying variation for P' + p.period + ' on ' + day + ' - dateApplicable:', v.dateApplicable, '=== selectedDate:', selectedIso, '- Variation:', v.casualSurname || v.displayRoom) } catch (e) {}
                   console.debug('[timetable.provider] Matched variation for period', p.period, '- isSubstitute:', v.isSubstitute, '- isRoomChange:', v.isRoomChange)
