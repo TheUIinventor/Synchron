@@ -1400,10 +1400,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // ignore reconstruction errors
           }
 
-          // DISABLED: Variation application moved to happen BEFORE setExternalTimetable
-          // Applying variations here in the useMemo was causing re-render loops and errors
-          // The data should already have all variations applied when externalTimetable is set
-          /*
+          // Apply variations to all periods in this day
+          // STRATEGY: Always apply authoritative variations if they exist for this date.
+          // Also overlay fresh match data if it has variations (to update the display with newest data).
+          // NOTE: Variation SAVING is handled by a separate useEffect that watches externalTimetable
           for (const p of filtered[day]) {
             const normPeriod = String(p.period).trim().toLowerCase()
             
@@ -1422,6 +1422,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               authVariation = null
             }
             
+            // ALWAYS apply authoritative variation if we have one - this is the source of truth
             if (authVariation) {
               try { console.debug('[timetable.provider] APPLYING auth variation for period', normPeriod, authVariation) } catch (e) {}
               if (authVariation.isSubstitute) {
@@ -1443,6 +1444,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             }
             
+            // Also check daySource for FRESH variations that might be newer than cached
+            // (This handles the case where a new variation was just added)
             if (Array.isArray(daySource) && daySource.length) {
               const normSubject = String(p.subject || '').trim().toLowerCase()
               const match = daySource.find((src) => {
@@ -1457,6 +1460,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 return false
               })
               
+              // If match has variations, use them (they might be more recent than cached)
               if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
                 if ((match as any).isSubstitute) {
                   try { console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: SUB ${(match as any).casualSurname || (match as any).displayTeacher}`) } catch (e) {}
@@ -1481,7 +1485,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-          */
+        } catch (e) {
+          // Ignore merge errors - display will still work without variations
+          try { console.error('[timetable.provider] variation merge error', e) } catch (e2) {}
         }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
