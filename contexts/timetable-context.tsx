@@ -1461,11 +1461,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           // or the last recorded timetable so substitutes/room-changes can
           // remain visible instead of flashing then disappearing.
           try {
-            if (Array.isArray(filtered[day]) && filtered[day].length === 0 && authVarsForDate && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
+            const authVarsForDay = authVarsForDate?.[day]
+            if (Array.isArray(filtered[day]) && filtered[day].length === 0 && authVarsForDate && Array.isArray(authVarsForDay) && authVarsForDay.length) {
               const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
               const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
               const reconstructed: Period[] = []
-              for (const v of authVarsForDate[day]) {
+              for (const v of authVarsForDay) {
                 try {
                   let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
                   if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
@@ -1505,12 +1506,18 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               // CRITICAL: Validate that authVarsForDate[day] is actually an array
               // Sometimes corrupted data in localStorage can cause authVarsForDate[day] to be `true` or other non-array values
               const dayVars = authVarsForDate ? authVarsForDate[day] : null
-              const candidate = (dayVars && Array.isArray(dayVars)) ? dayVars : []
-              if (candidate.length > 0 && Array.isArray(candidate)) {
-                authVariation = candidate.find((v: any) => v && v.period && String(v.period).trim().toLowerCase() === normPeriod)
+              // Extra safety: ensure dayVars is an array and not a boolean or other type
+              if (Array.isArray(dayVars) && dayVars.length > 0) {
+                authVariation = dayVars.find((v: any) => {
+                  try {
+                    return v && v.period && String(v.period).trim().toLowerCase() === normPeriod
+                  } catch (e) {
+                    return false
+                  }
+                })
               }
             } catch (e) {
-              try { console.warn('[timetable.provider] error getting authVariation', e, 'authVarsForDate:', authVarsForDate, 'day:', day) } catch (e2) {}
+              try { console.warn('[timetable.provider] error getting authVariation', e, 'authVarsForDate type:', typeof authVarsForDate, 'day:', day, 'dayVars type:', typeof authVarsForDate?.[day]) } catch (e2) {}
               authVariation = null
             }
             
@@ -1697,10 +1704,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // variations for this day, attempt to reconstruct minimal rows
             // so substitutes/room-changes remain visible.
             try {
-              if (Array.isArray(filtered[day]) && filtered[day].length === 0 && Array.isArray(authVarsForDate[day]) && authVarsForDate[day].length) {
+              const authVarsForDay = authVarsForDate[day]
+              if (Array.isArray(filtered[day]) && filtered[day].length === 0 && Array.isArray(authVarsForDay) && authVarsForDay.length) {
                 const lastRecorded = lastRecordedTimetable && Array.isArray((lastRecordedTimetable as any)[day]) ? (lastRecordedTimetable as any)[day] as Period[] : []
                 const reconstructed: Period[] = []
-                for (const v of authVarsForDate[day]) {
+                for (const v of authVarsForDay) {
                   try {
                     let src = daySource.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
                     if (!src) src = lastRecorded.find((p: any) => String(p.period).trim().toLowerCase() === String(v.period).trim().toLowerCase())
