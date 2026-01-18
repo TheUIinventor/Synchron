@@ -402,10 +402,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem('synchron-authoritative-variations')
       if (!raw) { try { console.debug('[timetable.provider] no authoritative variations in localStorage') } catch (e) {} return new Map() }
       const parsed = JSON.parse(raw)
-      // Convert from object to Map
+      // Convert from object to Map with validation
       const map = new Map<string, Record<string, any[]>>()
       for (const [key, value] of Object.entries(parsed)) {
-        map.set(key, value as Record<string, any[]>)
+        // CRITICAL: Validate that value is an object with day arrays, not corrupted data
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const cleaned: Record<string, any[]> = {}
+          for (const [dayKey, dayValue] of Object.entries(value)) {
+            // Ensure each day's value is an array, not `true` or other corrupted data
+            if (Array.isArray(dayValue)) {
+              cleaned[dayKey] = dayValue
+            } else {
+              try { console.warn('[timetable.provider] CORRUPTED variation data for', key, dayKey, '- expected array, got:', typeof dayValue, dayValue) } catch (e) {}
+              cleaned[dayKey] = []
+            }
+          }
+          map.set(key, cleaned)
+        } else {
+          try { console.warn('[timetable.provider] CORRUPTED variation data for', key, '- expected object, got:', typeof value) } catch (e) {}
+        }
       }
       try { console.debug('[timetable.provider] hydrated authoritative variations from localStorage, dates:', Array.from(map.keys())) } catch (e) {}
       return map
