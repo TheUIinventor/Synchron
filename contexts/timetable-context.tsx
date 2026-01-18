@@ -1404,11 +1404,86 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           // Applying variations here in the useMemo was causing re-render loops and errors
           // The data should already have all variations applied when externalTimetable is set
           /*
-          // Apply variations to all periods in this day
-          // STRATEGY: Always apply authoritative variations if they exist for this date.
-          // Also overlay fresh match data if it has variations (to update the display with newest data).
-          // NOTE: Variation SAVING is handled by a separate useEffect that watches externalTimetable
           for (const p of filtered[day]) {
+            const normPeriod = String(p.period).trim().toLowerCase()
+            
+            // Get authoritative variation for this period (if exists)
+            let authVariation: any = null
+            try {
+              const candidate = authVarsForDate && Array.isArray(authVarsForDate[day]) ? authVarsForDate[day] : []
+              if (Array.isArray(candidate)) {
+                authVariation = candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod)
+              } else {
+                try { console.debug('[timetable.provider] unexpected candidate type for authVarsForDate[day]', typeof authVarsForDate?.[day], authVarsForDate?.[day]) } catch (e) {}
+                authVariation = null
+              }
+            } catch (e) {
+              try { console.warn('[timetable.provider] unexpected authVarsForDate[day] type', typeof authVarsForDate, typeof authVarsForDate?.[day]) } catch (e2) {}
+              authVariation = null
+            }
+            
+            if (authVariation) {
+              try { console.debug('[timetable.provider] APPLYING auth variation for period', normPeriod, authVariation) } catch (e) {}
+              if (authVariation.isSubstitute) {
+                try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: SUB ${authVariation.casualSurname || authVariation.displayTeacher}`) } catch (e) {}
+                (p as any).isSubstitute = true
+                if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
+                if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
+                if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
+              }
+              if (authVariation.isRoomChange && authVariation.displayRoom) {
+                try { console.warn(`🔴 [SUBS-DEBUG] Applying auth variation for ${day} Period ${normPeriod}: ROOM to ${authVariation.displayRoom}`) } catch (e) {}
+                const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                const variationRoom = String(authVariation.displayRoom || '').trim().toLowerCase()
+                if (variationRoom && variationRoom !== scheduledRoom) {
+                  (p as any).isRoomChange = true
+                  (p as any).displayRoom = authVariation.displayRoom
+                  (p as any).originalRoom = p.room
+                }
+              }
+            }
+            
+            if (Array.isArray(daySource) && daySource.length) {
+              const normSubject = String(p.subject || '').trim().toLowerCase()
+              const match = daySource.find((src) => {
+                const srcPeriod = String(src.period).trim().toLowerCase()
+                const srcSubject = String(src.subject || '').trim().toLowerCase()
+                if (srcPeriod !== normPeriod) return false
+                if (srcSubject === normSubject) return true
+                if (srcSubject.includes(normSubject) || normSubject.includes(srcSubject)) return true
+                const srcCode = srcSubject.replace(/[^a-z0-9]/g, '')
+                const pCode = normSubject.replace(/[^a-z0-9]/g, '')
+                if (srcCode && pCode && (srcCode.includes(pCode) || pCode.includes(srcCode))) return true
+                return false
+              })
+              
+              if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
+                if ((match as any).isSubstitute) {
+                  try { console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: SUB ${(match as any).casualSurname || (match as any).displayTeacher}`) } catch (e) {}
+                  (p as any).isSubstitute = true
+                  if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
+                  if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
+                  if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
+                  if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
+                  if (match.teacher) p.teacher = match.teacher
+                }
+                
+                if ((match as any).isRoomChange && (match as any).displayRoom) {
+                  try { console.warn(`🔴 [SUBS-DEBUG] Applying FRESH variation for ${day} Period ${normPeriod}: ROOM to ${(match as any).displayRoom}`) } catch (e) {}
+                  const scheduledRoom = String(p.room || '').trim().toLowerCase()
+                  const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
+                  if (variationRoom && variationRoom !== scheduledRoom) {
+                    (p as any).isRoomChange = true
+                    (p as any).displayRoom = (match as any).displayRoom
+                    (p as any).originalRoom = p.room
+                  }
+                }
+              }
+            }
+          }
+          */
+        }
+      }
             const normPeriod = String(p.period).trim().toLowerCase()
             
             // Get authoritative variation for this period (if exists)
@@ -1482,18 +1557,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   const variationRoom = String((match as any).displayRoom || '').trim().toLowerCase()
                   if (variationRoom && variationRoom !== scheduledRoom) {
                     (p as any).isRoomChange = true
-                    (p as any).displayRoom = (match as any).displayRoom
-                    (p as any).originalRoom = p.room
-                  }
-                }
-              }
-            }
-          }
-        } catch (e) {
-          // Ignore merge errors - display will still work without variations
-          try { console.error('[timetable.provider] variation merge error', e) } catch (e2) {}
+          */
         }
-        */
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       // Also fall back to cached break layouts for instant display during sector switches
