@@ -1843,68 +1843,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         filtered[day] = dayPeriods
       }
 
-      // Apply authoritative variations even when using simple day-by-day external data
-      try {
-        const selectedIso = (selectedDateObject ? selectedDateObject.toISOString().slice(0, 10) : null)
-        
-        // CRITICAL: Only apply variations if they came from the timetable data we just loaded
-        // Do NOT use fallback candidate dates - only use variations for the exact date we're displaying
-        // This prevents old variations from being applied to wrong dates
-        let authVars = null
-        let matchedDate = null
-        
-        // Only look for variations if externalTimetable was set for this exact date
-        if (selectedIso && externalTimetableDateRef.current === selectedIso) {
-          authVars = authoritativeVariationsRef.current.get(selectedIso)
-          matchedDate = selectedIso
-        }
-        
-        console.debug('[timetable.provider] Simple timetable path - checking authVars - selectedIso:', selectedIso, 'externalTimetableDateRef:', externalTimetableDateRef.current, 'matched:', matchedDate, 'willApply:', !!authVars, 'mapSize:', authoritativeVariationsRef.current.size)
-        if (authVars) {
-          try {
-            console.warn('🔍 [APPLY-START] Applying variations for date:', selectedIso, 'Found variations for days:', Object.keys(authVars).filter(d => authVars[d]?.length))
-          } catch (e) {}
-        }
-        
-        if (authVars) {
-          for (const day of Object.keys(filtered)) {
-            const varData = authVars[day]
-            if (Array.isArray(varData) && varData.length > 0) {
-              console.debug('[timetable.provider] Applying', varData.length, 'authVars to', day, 'periods:', filtered[day].length)
-              for (const p of filtered[day]) {
-                const normP = String(p.period).trim().toLowerCase()
-                const v = varData.find(item => String(item.period).trim().toLowerCase() === normP)
-                if (v) {
-                  // CRITICAL: Only apply variation if it's for the correct date
-                  if (v.dateApplicable && v.dateApplicable !== selectedIso) {
-                    try { console.warn('🔍 [APPLY-BLOCK] Blocking variation for P' + p.period + ' on ' + day + ' - dateApplicable:', v.dateApplicable, '!== selectedDate:', selectedIso, '- Variation:', v.casualSurname || v.displayRoom) } catch (e) {}
-                    continue
-                  }
-                  try { console.warn('🔍 [APPLY-ACCEPT] Applying variation for P' + p.period + ' on ' + day + ' - dateApplicable:', v.dateApplicable, '=== selectedDate:', selectedIso, '- Variation:', v.casualSurname || v.displayRoom) } catch (e) {}
-                  console.debug('[timetable.provider] Matched variation for period', p.period, '- isSubstitute:', v.isSubstitute, '- isRoomChange:', v.isRoomChange)
-                  if (v.isSubstitute) {
-                    (p as any).isSubstitute = true
-                    if (v.casualSurname) (p as any).casualSurname = v.casualSurname
-                    if (v.displayTeacher) (p as any).displayTeacher = v.displayTeacher
-                    if (v.originalTeacher) (p as any).originalTeacher = v.originalTeacher
-                  }
-                  if (v.isRoomChange && v.displayRoom) {
-                    const scheduledRoom = String(p.room || '').trim().toLowerCase()
-                    const variationRoom = String(v.displayRoom || '').trim().toLowerCase()
-                    if (variationRoom && variationRoom !== scheduledRoom) {
-                      (p as any).isRoomChange = true
-                      (p as any).displayRoom = v.displayRoom
-                      (p as any).originalRoom = p.room
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[timetable.provider] Error applying simple timetable authVars:', e)
-      }
+      // REMOVED: Variation application logic that was causing re-render loops and flashing
+      // Variations should already be present in externalTimetable before it's set
+      // They are merged in via mergeSavedVariationsIntoTimetable() when setExternalTimetable is called
 
       preferToRoomOnMap(filtered)
       return cleanupMap(filtered)
