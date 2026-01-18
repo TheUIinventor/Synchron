@@ -3310,14 +3310,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   setIsRefreshing(false)
                 } else {
                   // CRITICAL: Set the date ref BEFORE startTransition so it's available to useEffect immediately
+                  // The setExternalTimetable wrapper will merge saved variations automatically
                   externalTimetableDateRef.current = computedDate
-
-                  // Merge saved variations using the same helper that fetchForDate uses
-                  // This ensures date-applicable tokens are checked consistently
-                  try {
-                    finalTimetable = mergeSavedVariationsIntoTimetable(finalTimetable, computedDate)
-                    try { console.debug('[timetable.provider] merged authoritative variations into fetched processed payload for', computedDate) } catch (e) {}
-                  } catch (e) {}
 
                   startTransition(() => {
                     if (j.weekType === 'A' || j.weekType === 'B') {
@@ -4359,10 +4353,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               setExternalTimetableByWeek(cleanTimetableByWeek(finalByWeek))
             }
               // CRITICAL: Track which date this timetable data is FOR before setting it
-              // Merge saved variations using the helper that checks dateApplicable tokens
+              // The setExternalTimetable wrapper will merge saved variations automatically
               externalTimetableDateRef.current = ds
-              const finalWithSavedVars = mergeSavedVariationsIntoTimetable(finalTimetable, ds)
-              setExternalTimetable(finalWithSavedVars)
+              setExternalTimetable(finalTimetable)
             setTimetableSource(j.source ?? 'external')
             // record debug summary
             try {
