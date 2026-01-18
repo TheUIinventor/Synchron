@@ -498,16 +498,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   
   // Wrapper that ALWAYS merges saved variations before setting
   const setExternalTimetable = useCallback((data: Record<string, Period[]> | null) => {
-    try {
-      // AGGRESSIVE DEBUG: Log what data is being set
-      if (data) {
-        const varCount = Object.values(data).flat().filter((p: any) => p.isSubstitute || p.isRoomChange).length
-        console.warn('🔍 [SET-EXTERNAL] Called with data having', varCount, 'variations across', Object.keys(data).length, 'days for date:', externalTimetableDateRef.current)
-      } else {
-        console.warn('🔍 [SET-EXTERNAL] Called with NULL data')
-      }
-    } catch (e) {}
-    
     if (!data) {
       __setExternalTimetable(null)
       return
@@ -516,32 +506,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // Inline merge logic to ensure it always has access to current ref values
     const dateIso = externalTimetableDateRef.current
     if (!dateIso) {
-      console.warn('🔍 [SET-EXTERNAL] NO dateIso set, passing through data as-is')
       __setExternalTimetable(data)
       return
     }
     
     const savedVars = authoritativeVariationsRef.current.get(dateIso)
     if (!savedVars) {
-      try { console.warn('🔍 [MERGE-WRAPPER] NO saved variations for date:', dateIso, '- Map has:', authoritativeVariationsRef.current.size, 'dates') } catch (e) {}
+      try { console.warn('🔍 [MERGE-WRAPPER] NO saved variations for date:', dateIso) } catch (e) {}
       __setExternalTimetable(data)
       return
     }
     
-    // Count how many variations we're about to merge
-    let mergeCount = 0
-    for (const day in savedVars) {
-      mergeCount += (savedVars[day] || []).length
-    }
-    console.warn('🔍 [MERGE-WRAPPER] Merging', mergeCount, 'saved variations for date:', dateIso)
-    
-    // CRITICAL: Deep copy to avoid mutating the original data
-    const merged: Record<string, Period[]> = {}
-    for (const day in data) {
-      merged[day] = (data[day] || []).map((p: any) => ({ ...p }))
-    }
-    
-    // Merge variations into the deep copy
+    // Merge variations into data
+    const merged = { ...data }
     for (const day in savedVars) {
       const dayVars = savedVars[day] || []
       if (!Array.isArray(dayVars) || dayVars.length === 0) continue
@@ -572,8 +549,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    const finalVarCount = Object.values(merged).flat().filter((p: any) => p.isSubstitute || p.isRoomChange).length
-    try { console.warn('🔍 [MERGE-WRAPPER] Result has', finalVarCount, 'variations after merge') } catch (e) {}
+    try { console.warn('🔍 [MERGE-WRAPPER] Merged saved variations for date:', dateIso) } catch (e) {}
     __setExternalTimetable(merged)
   }, [])
   
@@ -4487,9 +4463,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   }, [externalWeekType, currentWeek])
 
-  // Preserve casualSurname AND variation flags from the last recorded timetable when a fresh
-  // externalTimetable arrives that lacks them. This handles the case where a background 
-  // refresh returns bare data and we want to keep the previously applied variations.
+  // Preserve casualSurname from the last recorded timetable when a fresh
+  // externalTimetable arrives that lacks casual markers. This handles the
+  // case where a background refresh returns a bare teacher code (e.g. "LIKZ")
+  // and we want to keep the human-friendly casual name previously applied.
   useEffect(() => {
     try {
       if (!externalTimetable) return
@@ -4510,35 +4487,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
               return false
             })
-            if (match) {
-              let needsCopy = false
+            if (match && !(p as any).casualSurname && (match as any).casualSurname) {
               const copy = { ...p } as any
-              
-              // Preserve casualSurname
-              if (!(p as any).casualSurname && (match as any).casualSurname) {
-                copy.casualSurname = (match as any).casualSurname
-                needsCopy = true
-              }
-              
-              // Preserve ALL variation flags to prevent flashing
-              if (!(p as any).isSubstitute && (match as any).isSubstitute) {
-                copy.isSubstitute = (match as any).isSubstitute
-                if ((match as any).displayTeacher) copy.displayTeacher = (match as any).displayTeacher
-                if ((match as any).originalTeacher) copy.originalTeacher = (match as any).originalTeacher
-                needsCopy = true
-              }
-              
-              if (!(p as any).isRoomChange && (match as any).isRoomChange) {
-                copy.isRoomChange = (match as any).isRoomChange
-                if ((match as any).displayRoom) copy.displayRoom = (match as any).displayRoom
-                if ((match as any).originalRoom) copy.originalRoom = (match as any).originalRoom
-                needsCopy = true
-              }
-              
-              if (needsCopy) {
-                changed = true
-                return copy
-              }
+              copy.casualSurname = (match as any).casualSurname
+              changed = true
+              return copy
             }
           } catch (e) {
             // ignore per-item errors
@@ -4548,7 +4501,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         merged[day] = newList
       }
       if (changed) {
-        try { console.debug('[timetable.provider] merged casualSurname and variation flags from cache into refreshed timetable') } catch (e) {}
+        try { console.debug('[timetable.provider] merged casualSurname from cache into refreshed timetable') } catch (e) {}
         setExternalTimetable(merged)
       }
     } catch (e) {
