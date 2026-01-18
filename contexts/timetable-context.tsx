@@ -404,6 +404,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const parsed = JSON.parse(raw)
       // Convert from object to Map with validation
       const map = new Map<string, Record<string, any[]>>()
+      let hasCorruption = false
       for (const [key, value] of Object.entries(parsed)) {
         // CRITICAL: Validate that value is an object with day arrays, not corrupted data
         if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -413,18 +414,37 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (Array.isArray(dayValue)) {
               cleaned[dayKey] = dayValue
             } else {
-              try { console.warn('[timetable.provider] CORRUPTED variation data for', key, dayKey, '- expected array, got:', typeof dayValue, dayValue) } catch (e) {}
+              hasCorruption = true
+              try { console.warn('[timetable.provider] ⚠️ CORRUPTED variation data for', key, dayKey, '- expected array, got:', typeof dayValue, dayValue, '- CLEARING') } catch (e) {}
               cleaned[dayKey] = []
             }
           }
           map.set(key, cleaned)
         } else {
-          try { console.warn('[timetable.provider] CORRUPTED variation data for', key, '- expected object, got:', typeof value) } catch (e) {}
+          hasCorruption = true
+          try { console.warn('[timetable.provider] ⚠️ CORRUPTED variation data for', key, '- expected object, got:', typeof value, '- SKIPPING') } catch (e) {}
         }
       }
+      
+      // If we found corruption, clear localStorage and save the cleaned data
+      if (hasCorruption) {
+        try {
+          console.warn('[timetable.provider] 🔧 Corruption detected - cleaning localStorage')
+          const cleanedObj: Record<string, any> = {}
+          map.forEach((value, key) => { cleanedObj[key] = value })
+          localStorage.setItem('synchron-authoritative-variations', JSON.stringify(cleanedObj))
+          console.warn('[timetable.provider] ✅ localStorage cleaned and saved')
+        } catch (e) {
+          console.error('[timetable.provider] ❌ Failed to clean localStorage:', e)
+        }
+      }
+      
       try { console.debug('[timetable.provider] hydrated authoritative variations from localStorage, dates:', Array.from(map.keys())) } catch (e) {}
       return map
-    } catch (e) { return new Map() }
+    } catch (e) { 
+      try { console.error('[timetable.provider] ❌ Failed to load variations from localStorage:', e) } catch (e2) {}
+      return new Map() 
+    }
   })()
   const __initialBreakLayouts = ((): Record<string, Period[]> | null => {
     try {
@@ -2077,10 +2097,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       if (typeof window === 'undefined') return
       const map = authoritativeVariationsRef.current
       if (!map || map.size === 0) return
-      // Convert Map to plain object for JSON serialization
+      // Convert Map to plain object for JSON serialization with validation
       const obj: Record<string, any> = {}
       map.forEach((value, key) => {
-        obj[key] = value
+        // CRITICAL: Validate before persisting
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const validated: Record<string, any[]> = {}
+          for (const [dayKey, dayValue] of Object.entries(value)) {
+            validated[dayKey] = Array.isArray(dayValue) ? dayValue : []
+          }
+          obj[key] = validated
+        }
       })
       localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
       try { console.debug('[timetable.provider] persisted authoritative variations for', map.size, 'dates') } catch (e) {}
@@ -2225,12 +2252,36 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
         try { console.debug('[timetable.provider] CAPTURED authoritative variations from externalTimetable for', timetableDateIso, '(ref:', externalTimetableDateRef.current, 'selected:', selectedDateObject?.toISOString().slice(0,10), ')', varData) } catch (e) {}
         
-        // Immediately persist to localStorage
+        // Immediately persist to localStorage with validation
         try {
           const obj: Record<string, any> = {}
-          map.forEach((value, key) => { obj[key] = value })
+          map.forEach((value, key) => {
+            // CRITICAL: Validate data before saving to prevent corruption
+            if (value && typeof value === 'object' && !Array.isArray(value)) {
+              const validated: Record<string, any[]> = {}
+              let isValid = true
+              for (const [dayKey, dayValue] of Object.entries(value)) {
+                if (Array.isArray(dayValue)) {
+                  validated[dayKey] = dayValue
+                } else {
+                  isValid = false
+                  try { console.error('[timetable.provider] ❌ Attempted to save INVALID data for', key, dayKey, '- got:', typeof dayValue) } catch (e) {}
+                  validated[dayKey] = []
+                }
+              }
+              if (isValid) {
+                obj[key] = validated
+              } else {
+                // Still save but with cleaned data
+                obj[key] = validated
+                try { console.warn('[timetable.provider] ⚠️ Saved CLEANED data for', key) } catch (e) {}
+              }
+            }
+          })
           localStorage.setItem('synchron-authoritative-variations', JSON.stringify(obj))
-        } catch (e) {}
+        } catch (e) {
+          try { console.error('[timetable.provider] ❌ Failed to save to localStorage:', e) } catch (e2) {}
+        }
       }
     } catch (e) {}
   }, [externalTimetable, externalTimetableByWeek, selectedDateObject, currentWeek])
