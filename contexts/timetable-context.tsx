@@ -1487,15 +1487,15 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // Get authoritative variation for this period (if exists)
             let authVariation: any = null
             try {
-              const candidate = authVarsForDate && Array.isArray(authVarsForDate[day]) ? authVarsForDate[day] : []
-              if (Array.isArray(candidate)) {
-                authVariation = candidate.find((v: any) => String(v.period).trim().toLowerCase() === normPeriod)
-              } else {
-                try { console.debug('[timetable.provider] unexpected candidate type for authVarsForDate[day]', typeof authVarsForDate?.[day], authVarsForDate?.[day]) } catch (e) {}
-                authVariation = null
+              // CRITICAL: Validate that authVarsForDate[day] is actually an array
+              // Sometimes corrupted data in localStorage can cause authVarsForDate[day] to be `true` or other non-array values
+              const dayVars = authVarsForDate ? authVarsForDate[day] : null
+              const candidate = (dayVars && Array.isArray(dayVars)) ? dayVars : []
+              if (candidate.length > 0 && Array.isArray(candidate)) {
+                authVariation = candidate.find((v: any) => v && v.period && String(v.period).trim().toLowerCase() === normPeriod)
               }
             } catch (e) {
-              try { console.warn('[timetable.provider] unexpected authVarsForDate[day] type', typeof authVarsForDate, typeof authVarsForDate?.[day]) } catch (e2) {}
+              try { console.warn('[timetable.provider] error getting authVariation', e, 'authVarsForDate:', authVarsForDate, 'day:', day) } catch (e2) {}
               authVariation = null
             }
             
