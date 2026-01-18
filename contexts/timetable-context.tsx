@@ -498,6 +498,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   
   // Wrapper that ALWAYS merges saved variations before setting
   const setExternalTimetable = useCallback((data: Record<string, Period[]> | null) => {
+    // DEBUG: Log every call to see what's triggering it
+    try {
+      const stack = new Error().stack
+      console.warn('🔴 [SET-EXTERNAL-TIMETABLE] Called for date:', externalTimetableDateRef.current, 'Has data:', !!data, 'Stack:', stack?.split('\n').slice(1, 4).join('\n'))
+      if (data) {
+        let varCount = 0
+        for (const day in data) {
+          varCount += (data[day] || []).filter((p: any) => p.isSubstitute || p.isRoomChange).length
+        }
+        console.warn('🔴 [SET-EXTERNAL-TIMETABLE] Data has', varCount, 'variations before merge')
+      }
+    } catch (e) {}
+    
     if (!data) {
       __setExternalTimetable(null)
       return
@@ -549,7 +562,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    try { console.warn('🔍 [MERGE-WRAPPER] Merged saved variations for date:', dateIso) } catch (e) {}
+    try { 
+      let varCountAfter = 0
+      for (const day in merged) {
+        varCountAfter += (merged[day] || []).filter((p: any) => p.isSubstitute || p.isRoomChange).length
+      }
+      console.warn('🔍 [MERGE-WRAPPER] Merged saved variations for date:', dateIso, 'Result has', varCountAfter, 'variations') 
+    } catch (e) {}
     __setExternalTimetable(merged)
   }, [])
   
