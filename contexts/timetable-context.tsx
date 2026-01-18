@@ -494,7 +494,19 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // marks as a holiday. The cached payload is still available in
   // `__initialParsedCache`/`__initialProcessedCache` for hydration after the
   // calendar check completes.
-  const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
+  const [externalTimetable, __setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
+  
+  // Wrapper that ALWAYS merges saved variations before setting
+  const setExternalTimetable = useCallback((data: Record<string, Period[]> | null) => {
+    if (!data) {
+      __setExternalTimetable(null)
+      return
+    }
+    const dateIso = externalTimetableDateRef.current
+    const merged = dateIso ? mergeSavedVariationsIntoTimetable(data, dateIso) : data
+    __setExternalTimetable(merged)
+  }, [])
+  
   const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
   const [timetableSource, setTimetableSource] = useState<string | null>(() => {
     try {
