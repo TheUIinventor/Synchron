@@ -588,7 +588,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (!timetableData || !dateIso) return timetableData
     
     const savedVars = authoritativeVariationsRef.current.get(dateIso)
-    if (!savedVars) return timetableData
+    if (!savedVars) {
+      try { console.warn('🔍 [MERGE-SAVED] NO saved variations found for date:', dateIso, '- Map has', authoritativeVariationsRef.current.size, 'dates:', Array.from(authoritativeVariationsRef.current.keys())) } catch (e) {}
+      return timetableData
+    }
     
     const merged = { ...timetableData }
     for (const day in savedVars) {
