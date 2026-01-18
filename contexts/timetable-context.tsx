@@ -502,8 +502,54 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       __setExternalTimetable(null)
       return
     }
+    
+    // Inline merge logic to ensure it always has access to current ref values
     const dateIso = externalTimetableDateRef.current
-    const merged = dateIso ? mergeSavedVariationsIntoTimetable(data, dateIso) : data
+    if (!dateIso) {
+      __setExternalTimetable(data)
+      return
+    }
+    
+    const savedVars = authoritativeVariationsRef.current.get(dateIso)
+    if (!savedVars) {
+      try { console.warn('🔍 [MERGE-WRAPPER] NO saved variations for date:', dateIso) } catch (e) {}
+      __setExternalTimetable(data)
+      return
+    }
+    
+    // Merge variations into data
+    const merged = { ...data }
+    for (const day in savedVars) {
+      const dayVars = savedVars[day] || []
+      if (!Array.isArray(dayVars) || dayVars.length === 0) continue
+      
+      const dayPeriods = merged[day]
+      if (!Array.isArray(dayPeriods)) continue
+      
+      for (const v of dayVars) {
+        if (!v || !v.period) continue
+        if (v.dateApplicable && v.dateApplicable !== dateIso) continue
+        
+        const norm = String(v.period).trim().toLowerCase()
+        const idx = dayPeriods.findIndex((p: any) => String(p.period).trim().toLowerCase() === norm)
+        if (idx >= 0) {
+          const period = dayPeriods[idx]
+          if (v.isSubstitute) {
+            (period as any).isSubstitute = true
+            if (v.casualSurname) (period as any).casualSurname = v.casualSurname
+            if (v.displayTeacher) (period as any).displayTeacher = v.displayTeacher
+            if (v.originalTeacher) (period as any).originalTeacher = v.originalTeacher
+          }
+          if (v.isRoomChange) {
+            (period as any).isRoomChange = true
+            if (v.displayRoom) (period as any).displayRoom = v.displayRoom
+            if (v.originalRoom) (period as any).originalRoom = v.originalRoom
+          }
+        }
+      }
+    }
+    
+    try { console.warn('🔍 [MERGE-WRAPPER] Merged saved variations for date:', dateIso) } catch (e) {}
     __setExternalTimetable(merged)
   }, [])
   
