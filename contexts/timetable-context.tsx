@@ -532,7 +532,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalTimetable, __setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
   
   // Wrapper that ALWAYS merges saved variations before setting
-  const setExternalTimetable = useCallback((data: Record<string, Period[]> | null) => {
+  // NOTE: Not using useCallback because refs don't cause re-renders anyway
+  // and we need fresh ref values on every call
+  const setExternalTimetable = (data: Record<string, Period[]> | null) => {
     // DEBUG: Log every call to see what's triggering it
     try {
       const stack = new Error().stack
@@ -605,7 +607,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       console.warn('🔍 [MERGE-WRAPPER] Merged saved variations for date:', dateIso, 'Result has', varCountAfter, 'variations') 
     } catch (e) {}
     __setExternalTimetable(merged)
-  }, [])
+  }
   
   const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
   const [timetableSource, setTimetableSource] = useState<string | null>(() => {
