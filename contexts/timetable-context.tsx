@@ -2531,8 +2531,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // Apply cached substitutions to the fresh timetable
       try {
         const applied = applySubstitutionsToTimetable(externalTimetable, cached, { debug: false })
+        const dateIso = externalTimetableDateRef.current
+        const final = dateIso ? mergeSavedVariationsIntoTimetable(applied, dateIso) : applied
         try { console.debug('[timetable.provider] applied cached substitutions (hydrate/refresh)') } catch (e) {}
-        setExternalTimetable(applied)
+        setExternalTimetable(final)
         subsAppliedRef.current = Date.now()
       } catch (e) {
         try { console.debug('[timetable.provider] error applying cached subs', e) } catch (err) {}
@@ -2577,7 +2579,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 cachedSubsRef.current = subs
               }
             } catch (e) {}
-            setExternalTimetable(applied)
+            const dateIso = externalTimetableDateRef.current
+            const final = dateIso ? mergeSavedVariationsIntoTimetable(applied, dateIso) : applied
+            setExternalTimetable(final)
             subsAppliedRef.current = Date.now()
           } catch (e) {
             try { console.debug('[timetable.provider] error applying substitutions', e) } catch (err) {}
