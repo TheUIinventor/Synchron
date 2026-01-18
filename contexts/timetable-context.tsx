@@ -1400,6 +1400,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             // ignore reconstruction errors
           }
 
+          // DISABLED: Variation application moved to happen BEFORE setExternalTimetable
+          // Applying variations here in the useMemo was causing re-render loops and errors
+          // The data should already have all variations applied when externalTimetable is set
+          /*
           // Apply variations to all periods in this day
           // STRATEGY: Always apply authoritative variations if they exist for this date.
           // Also overlay fresh match data if it has variations (to update the display with newest data).
@@ -1489,6 +1493,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           // Ignore merge errors - display will still work without variations
           try { console.error('[timetable.provider] variation merge error', e) } catch (e2) {}
         }
+        */
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
       // Also fall back to cached break layouts for instant display during sector switches
