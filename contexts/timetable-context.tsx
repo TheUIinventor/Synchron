@@ -2497,6 +2497,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // If we have cached substitutions from a previous session, apply them
   // immediately to the freshly-hydrated external timetable so the UI
   // benefits from substitutions while the live fetch completes.
+  // DISABLED: This effect was causing re-render loops where fresh data with substitutions
+  // would be overwritten by applying cached subs again. Substitutions should be applied
+  // BEFORE setExternalTimetable is called, not after.
+  /*
   useEffect(() => {
     try {
       if (!externalTimetable) return
@@ -2541,7 +2545,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {}
   }, [externalTimetable, timetableSource])
+  */
 
+  // DISABLED: This effect was also causing re-render loops. Substitutions should be part
+  // of the initial data fetch, not applied as a separate step that overwrites fresh data.
+  /*
   useEffect(() => {
     if (!externalTimetable) return
     if (!timetableSource) return
@@ -2599,6 +2607,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     return () => { cancelled = true }
   }, [externalTimetable, timetableSource, selectedDateObject])
+  */
 
   // Remember last known-good external timetable data so we can continue
   // showing it while a reload is in progress or when a refresh falls back.
