@@ -1351,9 +1351,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // Reverting the previous experimental merge logic to keep behavior stable.
     // Prefer grouped timetableByWeek when available (server now returns `timetableByWeek`).
     
+    // Helper: Normalize day names to capitalize first letter (Monday, Tuesday, etc.)
+    // This ensures consistent lookups in authoritativeVariationsRef which uses capitalized keys
+    const normalizeDay = (d: string) => {
+      const lower = String(d || '').toLowerCase().trim()
+      return lower.charAt(0).toUpperCase() + lower.slice(1)
+    }
+    
     if (useExternalTimetableByWeek) {
       const filtered: Record<string, Period[]> = {}
-      for (const [day, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
+      for (const [rawDay, groups] of Object.entries(useExternalTimetableByWeek as Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>)) {
+        const day = normalizeDay(rawDay) // Normalize day name for consistent lookups
         let list: Period[] = []
 
         // If an explicit current week is known, use it.
@@ -1869,7 +1877,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         )
       }
       
-      for (const [day, periods] of Object.entries(useExternalTimetable)) {
+      for (const [rawDay, periods] of Object.entries(useExternalTimetable)) {
+        const day = normalizeDay(rawDay) // Normalize day name for consistent lookups
         const list = Array.isArray(periods) ? periods : []
         // When the server provides week-tagged entries (A/B), prefer entries
         // that match the known `currentWeek`. However, many upstream payloads
@@ -2154,8 +2163,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       
       // Check flat structure - variations are only extracted if this timetable is definitely for timetableDateIso
       if (externalTimetable) {
-        for (const day of Object.keys(externalTimetable)) {
-          const periods = (externalTimetable as any)[day] || []
+        for (const rawDay of Object.keys(externalTimetable)) {
+          const day = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase() // Normalize to "Monday", "Tuesday", etc.
+          const periods = (externalTimetable as any)[rawDay] || []
           // CRITICAL: Only extract variations from timetable data for THIS specific date
           const variations = periods
             .filter((p: any) => {
@@ -2286,7 +2296,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (e) {}
-  }, [externalTimetable, externalTimetableByWeek, selectedDateObject, currentWeek])
+  }, [externalTimetable, externalTimetableByWeek])
+  // NOTE: Do NOT include selectedDateObject or currentWeek as dependencies!
+  // We ONLY want this to run when externalTimetable changes (i.e., new data arrives)
+  // Including selectedDateObject causes premature capture with stale externalTimetableDateRef
 
   // subsAppliedRef is declared earlier in the component (before first usage)
   // Track the last time we attempted to fetch substitutions so we can retry
