@@ -3326,10 +3326,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     const startWithInterval = (ms: number) => {
       if (intervalId != null) window.clearInterval(intervalId)
-      // Fire a refresh immediately and allow this visibility-triggered
-      // call to bypass the MIN refresh throttle by passing `force=true`.
-      void refreshExternal(false, true).catch(() => {})
-      intervalId = window.setInterval(() => { void refreshExternal(false, true).catch(() => {}) }, ms)
+      // Fire a refresh on visibility change, respecting the MIN refresh throttle
+      // to prevent aggressive updates that cause flashing of timetable data
+      void refreshExternal(false, false).catch(() => {})
+      intervalId = window.setInterval(() => { void refreshExternal(false, false).catch(() => {}) }, ms)
     }
 
     function handleVisibility() {
