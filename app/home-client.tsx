@@ -331,7 +331,7 @@ export default function HomeClient() {
     return `${hh}:${mm}:${ss}`
   }
 
-  // Compute bell state for the display day
+  // Compute bell state for the displayed day
   const bellState = getNextBell(bellsForDay as any);
   const noClassesByBells = !bellsForDay || (Array.isArray(bellsForDay) && bellsForDay.length === 0) || (!bellState.nextBell && !bellState.isCurrentlyInPeriod);
 
