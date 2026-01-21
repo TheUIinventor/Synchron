@@ -584,7 +584,7 @@ export default function TimetablePage() {
 
               {isWeekend && (
                 <div className="py-16 text-center">
-                  <Utensils className="h-20 w-20 mx-auto mb-4 text-primary/40" />
+                  <Utensils className="h-12 w-12 mx-auto mb-4 text-primary/40" />
                   <h3 className="text-2xl font-bold text-on-surface mb-2">No periods on this day</h3>
                   <p className="text-on-surface-variant text-lg">Relax, recharge, and enjoy the downtime.</p>
                 </div>
@@ -592,7 +592,7 @@ export default function TimetablePage() {
 
               {!isSchoolDay && !isWeekend && (
                 <div className="py-16 text-center">
-                  <Utensils className="h-20 w-20 mx-auto mb-4 text-primary/40" />
+                  <Utensils className="h-12 w-12 mx-auto mb-4 text-primary/40" />
                   <h3 className="text-2xl font-bold text-on-surface mb-2">No periods on this day</h3>
                   <p className="text-on-surface-variant text-lg">Kick back, find a comfy spot, and let school wait...</p>
                 </div>
@@ -762,7 +762,7 @@ export default function TimetablePage() {
 
               {!isWeekend && isSchoolDay && todaysTimetable.length === 0 && (
                 <div className="py-16 text-center">
-                  <Utensils className="h-20 w-20 mx-auto mb-4 text-primary/40" />
+                  <Utensils className="h-12 w-12 mx-auto mb-4 text-primary/40" />
                   <h3 className="text-2xl font-bold text-on-surface mb-2">No periods on this day</h3>
                   <p className="text-on-surface-variant text-lg">Put your feet up, grab a blanket, and just be...</p>
                 </div>

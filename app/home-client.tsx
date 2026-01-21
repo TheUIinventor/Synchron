@@ -809,7 +809,7 @@ export default function HomeClient() {
                     </div>
                   ) : (
                     <div className="py-12 text-center">
-                      <Utensils className="h-16 w-16 mx-auto mb-3 text-primary/40" />
+                      <Utensils className="h-12 w-12 mx-auto mb-3 text-primary/40" />
                       <h3 className="text-xl font-bold text-on-surface mb-2">No classes today</h3>
                       <p className="text-on-surface-variant">Chill out, grab some snacks, and enjoy your day off!</p>
                     </div>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, Filter } from "lucide-react";
+import { Loader2, AlertCircle, Filter, Utensils } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function NoticesClient() {
@@ -196,8 +196,10 @@ export default function NoticesClient() {
             </div>
           </div>
         ) : (
-          <div className="text-center py-20 text-muted-foreground">
-            <p>No notices found for {selectedYear}</p>
+          <div className="py-16 text-center">
+            <Utensils className="h-12 w-12 mx-auto mb-4 text-primary/40" />
+            <h3 className="text-xl font-bold text-on-surface mb-2">No notices available</h3>
+            <p className="text-on-surface-variant">Nothing to see here for {selectedYear}</p>
           </div>
         )}
       </div>
