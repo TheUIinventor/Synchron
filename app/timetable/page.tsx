@@ -19,6 +19,7 @@ export default function TimetablePage() {
   const [isPhone, setIsPhone] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [schoolWeekInfo, setSchoolWeekInfo] = useState<{ week?: string; weekType?: string } | null>(null)
+  const [isSchoolDay, setIsSchoolDay] = useState(true) // Default to true, set to false if calendar says it's not
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
@@ -39,19 +40,39 @@ export default function TimetablePage() {
           const data = await res.json()
           if (data && data[dateStr]) {
             const dayInfo = data[dateStr]
-            setSchoolWeekInfo({
-              week: dayInfo.week || undefined,
-              weekType: dayInfo.weekType || undefined
-            })
-            try { console.debug('[timetable] School week info:', dayInfo) } catch (e) {}
+            
+            // Check if it's a school day: all of term, week, weekType, dayNumber must be non-zero/non-blank
+            const isSchool = Boolean(
+              dayInfo.term && dayInfo.term !== '0' &&
+              dayInfo.week && dayInfo.week !== '0' &&
+              dayInfo.weekType && dayInfo.weekType !== '' &&
+              dayInfo.dayNumber && dayInfo.dayNumber !== '0'
+            )
+            setIsSchoolDay(isSchool)
+            
+            if (isSchool) {
+              setSchoolWeekInfo({
+                week: dayInfo.week || undefined,
+                weekType: dayInfo.weekType || undefined
+              })
+            } else {
+              setSchoolWeekInfo(null)
+            }
+            try { console.debug('[timetable] School day info:', { isSchool, dayInfo }) } catch (e) {}
           } else {
+            // No day info found - assume it's not a school day
+            setIsSchoolDay(false)
+            setSchoolWeekInfo(null)
             try { console.debug('[timetable] No day info found for date:', dateStr) } catch (e) {}
           }
         } else {
+          // API error - default to showing content
+          setIsSchoolDay(true)
           try { console.debug('[timetable] Calendar API error:', res.status, res.statusText) } catch (e) {}
         }
       } catch (e) {
-        // Silently fail - fall back to generic week
+        // Network error - default to showing content
+        setIsSchoolDay(true)
         console.debug('[timetable] Error fetching school week info:', e)
       }
     }
@@ -567,7 +588,13 @@ export default function TimetablePage() {
                 </div>
               )}
 
-              {!isWeekend && todaysTimetable.length > 0 && (
+              {!isSchoolDay && !isWeekend && (
+                <div className="py-8 text-center text-on-surface-variant bg-surface-container-high/50 rounded-xl">
+                  No classes scheduled for this day (non-school day)
+                </div>
+              )}
+
+              {!isWeekend && isSchoolDay && todaysTimetable.length > 0 && (
                 <>
                   {showDiag && (
                     <div className="w-full mb-4">
@@ -729,7 +756,7 @@ export default function TimetablePage() {
                 </>
               )}
 
-              {!isWeekend && todaysTimetable.length === 0 && (
+              {!isWeekend && isSchoolDay && todaysTimetable.length === 0 && (
                 <div className="py-8 text-center text-on-surface-variant bg-surface-container-high/50 rounded-xl">
                   No classes scheduled for this day
                 </div>
