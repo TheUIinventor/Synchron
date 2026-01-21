@@ -824,6 +824,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 setExternalBellTimes(__initialExternalBellTimes || null)
                 setTimetableSource(__initialTimetableSource || 'cache')
                 setLastRecordedTimetable(final)
+                // Also set external subjects from the cached payload if available
+                try {
+                  const cachedSubjects = src?.subjects || src?.timetable?.subjects || src?.upstream?.subjects || src?.upstream?.day?.timetable?.subjects || src?.upstream?.full?.subjects || null
+                  if (cachedSubjects) {
+                    setExternalSubjects(cachedSubjects)
+                  }
+                } catch (e) {}
               } catch (e) {
               // apply raw map if processing fails
               if (!cancelled && map) {
@@ -882,20 +889,26 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
           const title = (v && (v.title || v.name || v.fullTitle)) ? (v.title || v.name || v.fullTitle) : null
           if (short && title) {
-            shortToTitle[String(short).trim()] = String(title)
+            const shortKey = String(short).trim()
+            shortToTitle[shortKey] = String(title)
+            try { console.debug('[timetable.provider] subject mapping', { short: shortKey, title: String(title) }) } catch (e) {}
           }
         } catch (e) {}
       }
       
       // Apply titles to timetable if we have mappings
       if (Object.keys(shortToTitle).length > 0) {
+        let hasChanges = false
         const updated: Record<string, Period[]> = {}
         for (const day of Object.keys(externalTimetable)) {
           try {
             const arr = externalTimetable[day] || []
             updated[day] = arr.map((p) => {
-              if (!p.title && p.subject && shortToTitle[String(p.subject).trim()]) {
-                return { ...p, title: shortToTitle[String(p.subject).trim()] }
+              const subjectKey = String(p.subject || '').trim()
+              if (!p.title && subjectKey && shortToTitle[subjectKey]) {
+                hasChanges = true
+                try { console.debug('[timetable.provider] applying title', { subject: subjectKey, title: shortToTitle[subjectKey] }) } catch (e) {}
+                return { ...p, title: shortToTitle[subjectKey] }
               }
               return p
             })
@@ -903,12 +916,57 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             updated[day] = externalTimetable[day] || []
           }
         }
-        setExternalTimetable(updated)
+        // Only update if we actually made changes
+        if (hasChanges) {
+          setExternalTimetable(updated)
+        }
+        
+        // Also apply to timetableByWeek if it exists
+        if (externalTimetableByWeek) {
+          try {
+            let hasWeekChanges = false
+            const updatedByWeek: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+            for (const day of Object.keys(externalTimetableByWeek)) {
+              const groups = externalTimetableByWeek[day]
+              updatedByWeek[day] = {
+                A: (groups.A || []).map((p) => {
+                  const subjectKey = String(p.subject || '').trim()
+                  if (!p.title && subjectKey && shortToTitle[subjectKey]) {
+                    hasWeekChanges = true
+                    return { ...p, title: shortToTitle[subjectKey] }
+                  }
+                  return p
+                }),
+                B: (groups.B || []).map((p) => {
+                  const subjectKey = String(p.subject || '').trim()
+                  if (!p.title && subjectKey && shortToTitle[subjectKey]) {
+                    hasWeekChanges = true
+                    return { ...p, title: shortToTitle[subjectKey] }
+                  }
+                  return p
+                }),
+                unknown: (groups.unknown || []).map((p) => {
+                  const subjectKey = String(p.subject || '').trim()
+                  if (!p.title && subjectKey && shortToTitle[subjectKey]) {
+                    hasWeekChanges = true
+                    return { ...p, title: shortToTitle[subjectKey] }
+                  }
+                  return p
+                }),
+              }
+            }
+            if (hasWeekChanges) {
+              setExternalTimetableByWeek(updatedByWeek)
+            }
+          } catch (e) {
+            try { console.error('[timetable.provider] Error applying titles to timetableByWeek:', e) } catch (err) {}
+          }
+        }
       }
     } catch (e) {
       console.error('[timetable.provider] Error applying subject titles:', e)
     }
-  }, [externalSubjects])
+  }, [externalSubjects, externalTimetable])
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
@@ -2467,7 +2525,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             const arr = parsedCache.timetable[d] || []
                             for (const p of arr) {
                               try {
-                                if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                                if (!p.title && p.subject && shortToTitle[String(p.subject).trim()]) {
+                                  p.title = shortToTitle[String(p.subject).trim()]
+                                }
                               } catch (e) {}
                             }
                           } catch (e) {}

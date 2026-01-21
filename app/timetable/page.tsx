@@ -164,11 +164,17 @@ export default function TimetablePage() {
   }
 
   // Get display name for period (remove "Break" for recess/lunch)
+  // Prefers full title when available, falls back to subject
   const getDisplaySubject = (period: any) => {
     if (period.subject === "Break") {
       return period.period // Show "Recess", "Lunch 1", etc. instead of "Break"
     }
-    return (period as any)?.title || period.subject
+    // Prefer title field if it exists and is different from subject
+    if ((period as any)?.title && (period as any).title !== (period as any).subject) {
+      return (period as any).title
+    }
+    // Fallback to subject
+    return period.subject
   }
 
   const getDisplayRoom = (period: any) => {
