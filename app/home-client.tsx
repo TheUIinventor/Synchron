@@ -62,6 +62,7 @@ export default function HomeClient() {
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({})
+  const [isSchoolDay, setIsSchoolDay] = useState(true) // Default to true, set to false if calendar says it's not
   const [givenName, setGivenName] = useState<string | null>(() => {
     try {
       if (typeof window === 'undefined') return null
@@ -133,6 +134,48 @@ export default function HomeClient() {
     window.addEventListener('synchron:canvas-links-updated', reload as EventListener)
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
   }, [])
+
+  // Fetch calendar info for the display date to determine if it's a school day
+  useEffect(() => {
+    const checkSchoolDay = async () => {
+      try {
+        const now = currentDate
+        const isWeekend = now.getDay() === 0 || now.getDay() === 6
+        if (isWeekend || isSchoolDayOver()) {
+          setIsSchoolDay(false)
+          return
+        }
+
+        const dateStr = now.toISOString().slice(0, 10)
+        const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(dateStr)}&to=${encodeURIComponent(dateStr)}`, { credentials: 'include' })
+        
+        if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+          const data = await res.json()
+          if (data && data[dateStr]) {
+            const dayInfo = data[dateStr]
+            
+            // Check if it's a school day: all of term, week, weekType, dayNumber must be non-zero/non-blank
+            const isSchool = Boolean(
+              dayInfo.term && dayInfo.term !== '0' &&
+              dayInfo.week && dayInfo.week !== '0' &&
+              dayInfo.weekType && dayInfo.weekType !== '' &&
+              dayInfo.dayNumber && dayInfo.dayNumber !== '0'
+            )
+            
+            setIsSchoolDay(isSchool)
+          }
+        }
+      } catch (e) {
+        // If calendar check fails, default to showing classes
+        setIsSchoolDay(true)
+      }
+    }
+
+    checkSchoolDay()
+    // Check every minute since currentDate updates every second
+    const interval = setInterval(checkSchoolDay, 60000)
+    return () => clearInterval(interval)
+  }, [currentDate])
 
   
 
@@ -602,7 +645,7 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
-                  {todaysPeriods.length > 0 ? (
+                  {isSchoolDay && todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
