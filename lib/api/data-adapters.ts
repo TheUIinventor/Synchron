@@ -151,14 +151,11 @@ export function applySubstitutionsToTimetable(
         const found = dayNames.filter((dn) => sub.date && dn.toLowerCase().includes(sub.date.toLowerCase()))
         if (found.length > 0) return found
       }
-      // No date - for teacher-only subs, apply to today's day only (safer than all days)
-      // Get today's day name
-      const today = new Date()
-      const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-      const todayName = names[today.getDay()]
-      // Only return today if it exists in the result, otherwise skip entirely
-      if (result[todayName]) return [todayName]
-      return []
+      // No date - for generic subs (no date provided), apply to ALL days since they're
+      // meant to be persistent across the week. This fixes an issue where subs would only
+      // show for "today" and disappear when viewing other days of the week.
+      // Return all available days in the timetable
+      return Object.keys(result)
     })()
 
     // If no candidate days, skip this substitution
@@ -166,6 +163,11 @@ export function applySubstitutionsToTimetable(
 
     // normalizers for comparison
     const normalize = (s?: string) => (s || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim()
+
+    // DEBUG: Log the days selected for this substitution
+    if (options?.debug) {
+      try { console.debug('[adapters] substitution will be applied to days:', candidateDays, 'sub=', { period: sub.period, subject: sub.subject, date: sub.date }) } catch (e) {}
+    }
 
     candidateDays.forEach((day) => {
       result[day].forEach((period) => {
