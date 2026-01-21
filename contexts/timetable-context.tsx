@@ -14,6 +14,7 @@ export type Period = {
   period: string
   time: string
   subject: string
+  title?: string // Full subject title (e.g., "8 Mathematics A" vs shortTitle "MAT A")
   teacher: string
   room: string
   weekType?: "A" | "B"
@@ -23,6 +24,8 @@ export type Period = {
   fullTeacher?: string
   casualSurname?: string
   displayTeacher?: string
+  displayRoom?: string // Room destination if room change
+  originalRoom?: string // Original room before change
   // Subject colour (hex without # prefix, e.g., "448ae6")
   colour?: string
 }
@@ -641,6 +644,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   // `__initialParsedCache`/`__initialProcessedCache` for hydration after the
   // calendar check completes.
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
+  const [externalSubjects, setExternalSubjects] = useState<Record<string, any> | null>(null)
   const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
   const [timetableSource, setTimetableSource] = useState<string | null>(() => {
     try {
@@ -863,6 +867,48 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       // ignore
     }
   }, [externalTimetable, externalTimetableByWeek, externalBellTimes, timetableSource, externalWeekType])
+
+  // Apply subject title mapping: when externalSubjects becomes available,
+  // attach full titles to timetable periods that only have short titles
+  useEffect(() => {
+    if (!externalSubjects || !externalTimetable) return
+    
+    try {
+      // Build shortToTitle mapping from subjects
+      const shortToTitle: Record<string, string> = {}
+      for (const k of Object.keys(externalSubjects)) {
+        try {
+          const v = externalSubjects[k]
+          const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+          const title = (v && (v.title || v.name || v.fullTitle)) ? (v.title || v.name || v.fullTitle) : null
+          if (short && title) {
+            shortToTitle[String(short).trim()] = String(title)
+          }
+        } catch (e) {}
+      }
+      
+      // Apply titles to timetable if we have mappings
+      if (Object.keys(shortToTitle).length > 0) {
+        const updated: Record<string, Period[]> = {}
+        for (const day of Object.keys(externalTimetable)) {
+          try {
+            const arr = externalTimetable[day] || []
+            updated[day] = arr.map((p) => {
+              if (!p.title && p.subject && shortToTitle[String(p.subject).trim()]) {
+                return { ...p, title: shortToTitle[String(p.subject).trim()] }
+              }
+              return p
+            })
+          } catch (e) {
+            updated[day] = externalTimetable[day] || []
+          }
+        }
+        setExternalTimetable(updated)
+      }
+    } catch (e) {
+      console.error('[timetable.provider] Error applying subject titles:', e)
+    }
+  }, [externalSubjects])
 
   const timetableData: Record<string, Period[]> = useMemo(() => {
     try { console.log('[timetable.provider] building timetableData', { currentWeek, hasByWeek: !!externalTimetableByWeek, hasTimetable: !!externalTimetable, hasBellTimes: !!externalBellTimes }) } catch (e) {}
@@ -2426,6 +2472,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                             }
                           } catch (e) {}
                         }
+                        setExternalSubjects(subjectsMap)
                       }
                     } catch (e) {}
                     setExternalTimetable(parsedCache.timetable)
@@ -2664,6 +2711,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 // Track which date this timetable is FOR
                 externalTimetableDateRef.current = computedDate
                 setExternalTimetable(finalTimetable)
+                // Set subjects for title mapping
+                const subjects = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
+                if (subjects) setExternalSubjects(subjects)
                 setTimetableSource(computedSource)
                 setLastFetchedDate(computedDate)
                 if (fetchSummary) setLastFetchedPayloadSummary(fetchSummary)

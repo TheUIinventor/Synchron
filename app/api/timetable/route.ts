@@ -1373,6 +1373,7 @@ export async function GET(req: NextRequest) {
         bellTimesSources: typeof bellTimesSources !== 'undefined' ? bellTimesSources : undefined,
         source: 'sbhs-api',
         weekType: finalWeekType,
+        subjects: (dayRes?.json?.timetable?.subjects) || (fullRes?.json?.timetable?.subjects) || undefined,
         diagnostics: {
           detectedWeekType: detectedWeekType ?? null,
           dominantWeekType: dominantWeekType ?? null,
