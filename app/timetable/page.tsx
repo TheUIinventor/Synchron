@@ -623,7 +623,7 @@ export default function TimetablePage() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[200px] ${getSubjectColor(period.subject)}`}>
+                                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[200px] ${getSubjectColor(period.subject)}`}>
                                       {getDisplaySubject(period)}
                                     </span>
                                   </div>
@@ -645,10 +645,10 @@ export default function TimetablePage() {
                                     </span>
                                   </div>
                                 </div>
-                                <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
+                                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
                                   <div className="flex items-center gap-3 min-w-0">
                                     <div className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject)}`}>
-                                      <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
+                                      <span className="truncate block max-w-full text-xs font-semibold leading-none">{getDisplaySubject(period)}</span>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0 text-right">
