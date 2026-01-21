@@ -34,7 +34,7 @@ export default function TimetablePage() {
     const fetchSchoolWeekInfo = async () => {
       try {
         const dateStr = selectedDateObject.toISOString().slice(0, 10)
-        const res = await fetch(`/api/calendar/days.json?from=${encodeURIComponent(dateStr)}&to=${encodeURIComponent(dateStr)}`, { credentials: 'include' })
+        const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(dateStr)}&to=${encodeURIComponent(dateStr)}`, { credentials: 'include' })
         if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
           const data = await res.json()
           if (data && data[dateStr]) {
@@ -43,7 +43,12 @@ export default function TimetablePage() {
               week: dayInfo.week || undefined,
               weekType: dayInfo.weekType || undefined
             })
+            try { console.debug('[timetable] School week info:', dayInfo) } catch (e) {}
+          } else {
+            try { console.debug('[timetable] No day info found for date:', dateStr) } catch (e) {}
           }
+        } else {
+          try { console.debug('[timetable] Calendar API error:', res.status, res.statusText) } catch (e) {}
         }
       } catch (e) {
         // Silently fail - fall back to generic week
