@@ -42,9 +42,12 @@ export function DatePicker({
   }
 
   const handleDateClick = (day: number) => {
-    // Use startTransition to batch the state updates properly
-    // This matches how the previous/next buttons work
-    const newDate = new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day)
+    // Clone the selected date and update it, matching how previous/next buttons work
+    // This preserves the time of day and avoids timezone issues with new Date(year, month, day)
+    const newDate = new Date(selectedDate)
+    newDate.setFullYear(displayMonth.getFullYear())
+    newDate.setMonth(displayMonth.getMonth())
+    newDate.setDate(day)
     startTransition(() => {
       onDateSelect(newDate)
     })
