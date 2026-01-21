@@ -25,19 +25,12 @@ export function DatePicker({
     return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
   })
 
-  const [tempSelected, setTempSelected] = React.useState(selectedDate)
-
-  // Update temp selection when selectedDate prop changes
-  React.useEffect(() => {
-    setTempSelected(selectedDate)
-  }, [selectedDate])
-
-  // Update display month when opening
+  // Update display month when selectedDate prop changes
   React.useEffect(() => {
     if (open) {
-      setDisplayMonth(new Date(tempSelected.getFullYear(), tempSelected.getMonth(), 1))
+      setDisplayMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))
     }
-  }, [open, tempSelected])
+  }, [selectedDate, open])
 
   const goToPreviousMonth = () => {
     setDisplayMonth(new Date(displayMonth.getFullYear(), displayMonth.getMonth() - 1, 1))
@@ -48,17 +41,10 @@ export function DatePicker({
   }
 
   const handleDateClick = (day: number) => {
+    // Immediately update the selected date, just like the previous/next buttons
     const newDate = new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day)
-    setTempSelected(newDate)
-  }
-
-  const handleConfirm = () => {
-    onDateSelect(tempSelected)
-    onOpenChange(false)
-  }
-
-  const handleCancel = () => {
-    setTempSelected(selectedDate)
+    onDateSelect(newDate)
+    // Close the dialog after selection
     onOpenChange(false)
   }
 
@@ -142,7 +128,7 @@ export function DatePicker({
 
             {/* Days of month */}
             {days.map((day) => {
-              const isSelected = isSameDay(tempSelected, new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day))
+              const isSelected = isSameDay(selectedDate, new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day))
               const isToday = isSameDay(new Date(), new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day))
 
               return (
@@ -166,7 +152,7 @@ export function DatePicker({
           <div className="bg-muted p-4 rounded-lg text-center">
             <p className="text-sm text-muted-foreground mb-1">Selected:</p>
             <p className="text-lg font-semibold">
-              {tempSelected.toLocaleDateString('en-US', {
+              {selectedDate.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric',
@@ -179,16 +165,10 @@ export function DatePicker({
           <div className="flex gap-3 justify-center pt-2">
             <Button
               variant="outline"
-              onClick={handleCancel}
+              onClick={() => onOpenChange(false)}
               className="flex-1"
             >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirm}
-              className="flex-1"
-            >
-              Done
+              Close
             </Button>
           </div>
         </div>
