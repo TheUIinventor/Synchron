@@ -427,7 +427,15 @@ export default function HomeClient() {
                       </span>
                     )}
                     <span>•</span>
-                    <span>{currentPeriod?.room || "Campus"}</span>
+                    {(() => {
+                      // Display room with highlighting for room changes (same logic as timetable list)
+                      const displayRoom = (currentPeriod as any)?.displayRoom || (currentPeriod as any)?.toRoom || (currentPeriod as any)?.roomTo || (currentPeriod as any)?.["room_to"] || (currentPeriod as any)?.newRoom || currentPeriod?.room || "Campus"
+                      return (
+                        <span className={currentPeriod?.isRoomChange ? 'inline-block px-3 py-1 rounded-md font-medium bg-blue-600 text-white' : 'text-current'}>
+                          {displayRoom}
+                        </span>
+                      )
+                    })()}
                   </div>
                 </div>
 
