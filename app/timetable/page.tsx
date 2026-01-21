@@ -18,7 +18,6 @@ export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
   const [isPhone, setIsPhone] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
-  const [schoolWeek, setSchoolWeek] = useState<string | null>(null)
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
@@ -99,44 +98,9 @@ export default function TimetablePage() {
   const nowForDefault = new Date()
   const defaultDisplayDate = (nowForDefault.getDay() === 0 || nowForDefault.getDay() === 6 || isSchoolDayOver()) ? getNextSchoolDay(nowForDefault) : nowForDefault
   const formatSelectedDate = () => {
-    const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }
-    const dateStr = displayDateObject.toLocaleDateString('en-US', opts)
-    return schoolWeek ? `${dateStr} ${schoolWeek}` : dateStr
+    const opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }
+    return displayDateObject.toLocaleDateString('en-US', opts)
   }
-
-  // Fetch school week information from the calendar API
-  useEffect(() => {
-    const fetchSchoolWeek = async () => {
-      try {
-        if (!displayDateObject) return
-        const dateStr = displayDateObject.toISOString().slice(0, 10)
-        const response = await fetch(`/api/timetable/calendar/days.json?from=${dateStr}&to=${dateStr}`, { credentials: 'include' })
-        if (response.ok) {
-          const data = await response.json()
-          // The response is keyed by date, so look for our date
-          if (data && data[dateStr]) {
-            const dayInfo = data[dateStr]
-            // Build week string from week number and week type (e.g., "Wk 10B")
-            if (dayInfo.week && dayInfo.week !== "0" && dayInfo.week !== "") {
-              const weekType = dayInfo.weekType ? dayInfo.weekType : ""
-              setSchoolWeek(`Wk ${dayInfo.week}${weekType}`)
-            } else {
-              setSchoolWeek(null)
-            }
-          } else {
-            setSchoolWeek(null)
-          }
-        }
-      } catch (e) {
-        // Silently fail - calendar week is optional
-        console.debug('[timetable] Failed to fetch school week:', e)
-      }
-    }
-    
-    if (mounted && displayDateObject) {
-      fetchSchoolWeek()
-    }
-  }, [displayDateObject, mounted])
 
   // Navigate dates by updating the provider's selected date object so
   // the whole app stays in sync with navigation actions.
