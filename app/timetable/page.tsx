@@ -5,8 +5,6 @@ import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { ChevronLeft, Calendar as CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { Calendar as DatePicker } from "@/components/ui/calendar"
 import { getWeek } from 'date-fns'
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
@@ -46,7 +44,6 @@ export default function TimetablePage() {
   const [showDiag, setShowDiag] = useState(false)
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
-  const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [showAuthVars, setShowAuthVars] = useState(false)
   const [authVarsPreview, setAuthVarsPreview] = useState<any | null>(null)
 
@@ -394,7 +391,7 @@ export default function TimetablePage() {
               </button>
 
                 <div className="text-center">
-                  {/* Clickable small boxed date that opens a calendar popover */}
+                  {/* Display date without picker */}
                   {(() => {
                     try {
                       const weekday = displayDateObject.toLocaleDateString('en-US', { weekday: 'short' })
@@ -403,37 +400,7 @@ export default function TimetablePage() {
                       const wt = (externalWeekType || currentWeek) || ''
                       const weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
                       const headerShort = `${weekday}, ${dateShort}${weekPart}`
-                      return (
-                        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                          <PopoverTrigger asChild>
-                            <button
-                              aria-label="Select date"
-                              className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest cursor-pointer"
-                              type="button"
-                            >
-                              {headerShort}
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto">
-                            <DatePicker
-                              mode="single"
-                              selected={displayDateObject}
-                              onSelect={(d: any) => {
-                                try {
-                                  if (d) {
-                                    // DayPicker may pass a Date or an array; coerce to Date
-                                    const picked = Array.isArray(d) ? d[0] : d
-                                    if (picked instanceof Date && !Number.isNaN(picked.getTime())) {
-                                      setSelectedDateObject(new Date(picked))
-                                    }
-                                  }
-                                } catch (e) {}
-                                setDatePickerOpen(false)
-                              }}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      )
+                      return <h2 className="font-semibold text-on-surface">{headerShort}</h2>
                     } catch (e) { return <h2 className="font-semibold text-on-surface">{selectedDayName}</h2> }
                   })()}
                 </div>
