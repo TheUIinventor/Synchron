@@ -18,6 +18,7 @@ export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
   const [isPhone, setIsPhone] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+  const [schoolWeekInfo, setSchoolWeekInfo] = useState<{ week?: string; weekType?: string } | null>(null)
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
@@ -27,6 +28,33 @@ export default function TimetablePage() {
     setMounted(true)
     trackSectionUsage("timetable")
   }, [])
+
+  // Fetch school week information for the selected date from calendar API
+  useEffect(() => {
+    const fetchSchoolWeekInfo = async () => {
+      try {
+        const dateStr = selectedDateObject.toISOString().slice(0, 10)
+        const res = await fetch(`/api/calendar/days.json?from=${encodeURIComponent(dateStr)}&to=${encodeURIComponent(dateStr)}`, { credentials: 'include' })
+        if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+          const data = await res.json()
+          if (data && data[dateStr]) {
+            const dayInfo = data[dateStr]
+            setSchoolWeekInfo({
+              week: dayInfo.week || undefined,
+              weekType: dayInfo.weekType || undefined
+            })
+          }
+        }
+      } catch (e) {
+        // Silently fail - fall back to generic week
+        console.debug('[timetable] Error fetching school week info:', e)
+      }
+    }
+    
+    if (mounted) {
+      fetchSchoolWeekInfo()
+    }
+  }, [selectedDateObject, mounted])
 
   // Detect phone devices (exclude tablets which may be portrait but are tablets)
   useEffect(() => {
@@ -404,9 +432,20 @@ export default function TimetablePage() {
                     try {
                       const weekday = displayDateObject.toLocaleDateString('en-US', { weekday: 'short' })
                       const dateShort = displayDateObject.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-                      const weekNum = getWeek(displayDateObject)
-                      const wt = (externalWeekType || currentWeek) || ''
-                      const weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
+                      
+                      // Use school week info if available, otherwise fall back to ISO week
+                      let weekPart = ''
+                      if (schoolWeekInfo?.week) {
+                        // Use actual school week number
+                        const wt = schoolWeekInfo.weekType || (externalWeekType || currentWeek) || ''
+                        weekPart = wt ? ` Wk ${schoolWeekInfo.week}${wt}` : ` Wk ${schoolWeekInfo.week}`
+                      } else {
+                        // Fall back to ISO week number
+                        const weekNum = getWeek(displayDateObject)
+                        const wt = (externalWeekType || currentWeek) || ''
+                        weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
+                      }
+                      
                       const headerShort = `${weekday}, ${dateShort}${weekPart}`
                       return <h2 className="font-semibold text-on-surface">{headerShort}</h2>
                     } catch (e) { return <h2 className="font-semibold text-on-surface">{selectedDayName}</h2> }
