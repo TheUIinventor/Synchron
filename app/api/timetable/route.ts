@@ -373,8 +373,10 @@ export async function GET(req: NextRequest) {
               let isRoomChange = false
               let originalRoom: string | undefined = undefined
               const scheduledRoom = String(periodData.room || '').trim()
-              if (roomVar && roomVar.roomTo) {
-                const newRoom = String(roomVar.roomTo).trim()
+              // Support multiple field name variants: roomTo, room_to, roomFrom, etc.
+              const newRoomVariant = roomVar ? (roomVar.roomTo || roomVar.room_to || roomVar.roomFrom || roomVar.room_from || roomVar.newRoom || roomVar.room) : undefined
+              if (roomVar && newRoomVariant) {
+                const newRoom = String(newRoomVariant).trim()
                 // Only mark as room change if rooms actually differ
                 if (newRoom && newRoom.toLowerCase() !== scheduledRoom.toLowerCase()) {
                   displayRoom = newRoom
@@ -1314,10 +1316,12 @@ export async function GET(req: NextRequest) {
               continue
             }
             const vObj = v as any
-            const newRoom = vObj.roomTo ? String(vObj.roomTo).trim() : ''
+            // Support multiple field name variants: roomTo, room_to, roomFrom, etc.
+            const newRoomVariant = vObj.roomTo || vObj.room_to || vObj.roomFrom || vObj.room_from || vObj.newRoom || vObj.room
+            const newRoom = newRoomVariant ? String(newRoomVariant).trim() : ''
             
             if (!newRoom) {
-              variationsDiag.skippedRoomVars.push({ period: periodKey, reason: 'no roomTo value' })
+              variationsDiag.skippedRoomVars.push({ period: periodKey, reason: 'no room destination value' })
               continue
             }
             
