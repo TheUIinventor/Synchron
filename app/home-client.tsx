@@ -2,7 +2,7 @@
 
 import { useTimetable } from "@/contexts/timetable-context";
 import { format } from "date-fns";
-import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check } from "lucide-react";
+import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as ClipboardIcon, Globe, BookOpen, Settings as SettingsIcon, Cloud, Check, Utensils } from "lucide-react";
 import { useEffect, useState } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
@@ -765,7 +765,11 @@ export default function HomeClient() {
                       <AuthButton />
                     </div>
                   ) : (
-                    <p className="text-muted-foreground text-center py-8">No classes today</p>
+                    <div className="py-12 text-center">
+                      <Utensils className="h-16 w-16 mx-auto mb-3 text-primary/40" />
+                      <h3 className="text-xl font-bold text-on-surface mb-2">No classes today</h3>
+                      <p className="text-on-surface-variant">Chill out, grab some snacks, and enjoy your day off!</p>
+                    </div>
                   )}
                 </div>
             </div>
