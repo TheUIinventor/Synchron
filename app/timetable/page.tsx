@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
-import { ChevronLeft, Calendar as CalendarIcon } from "lucide-react"
+import { ChevronLeft, Calendar as CalendarIcon, Utensils } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getWeek } from 'date-fns'
 import { trackSectionUsage } from "@/utils/usage-tracker"
@@ -559,7 +559,7 @@ export default function TimetablePage() {
               <div className="mb-4 max-w-3xl mx-auto">
                 <Card className="bg-surface-container-high p-3 border-none">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-on-surface">Persisted Authoritative Variations</div>
+                    <div className="font-medium text-on-surface">Variations Debug</div>
                     <div>
                       <button className="px-2 py-1 text-xs rounded-full bg-surface-container-highest text-on-surface" onClick={() => { setShowAuthVars(false); setAuthVarsPreview(null) }}>
                         Close
@@ -583,14 +583,18 @@ export default function TimetablePage() {
               </div>
 
               {isWeekend && (
-                <div className="py-8 text-center text-on-surface-variant bg-surface-container-high/50 rounded-xl">
-                  No classes scheduled for weekends
+                <div className="py-16 text-center">
+                  <Utensils className="h-20 w-20 mx-auto mb-4 text-primary/40" />
+                  <h3 className="text-2xl font-bold text-on-surface mb-2">No periods on this day</h3>
+                  <p className="text-on-surface-variant text-lg">Relax, recharge, and enjoy the downtime.</p>
                 </div>
               )}
 
               {!isSchoolDay && !isWeekend && (
-                <div className="py-8 text-center text-on-surface-variant bg-surface-container-high/50 rounded-xl">
-                  No classes scheduled for this day (non-school day)
+                <div className="py-16 text-center">
+                  <Utensils className="h-20 w-20 mx-auto mb-4 text-primary/40" />
+                  <h3 className="text-2xl font-bold text-on-surface mb-2">No periods on this day</h3>
+                  <p className="text-on-surface-variant text-lg">Kick back, find a comfy spot, and let school wait...</p>
                 </div>
               )}
 
@@ -757,8 +761,10 @@ export default function TimetablePage() {
               )}
 
               {!isWeekend && isSchoolDay && todaysTimetable.length === 0 && (
-                <div className="py-8 text-center text-on-surface-variant bg-surface-container-high/50 rounded-xl">
-                  No classes scheduled for this day
+                <div className="py-16 text-center">
+                  <Utensils className="h-20 w-20 mx-auto mb-4 text-primary/40" />
+                  <h3 className="text-2xl font-bold text-on-surface mb-2">No periods on this day</h3>
+                  <p className="text-on-surface-variant text-lg">Put your feet up, grab a blanket, and just be...</p>
                 </div>
               )}
             </div>
