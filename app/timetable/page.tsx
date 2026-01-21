@@ -11,11 +11,13 @@ import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
+import { DatePicker } from "@/components/date-picker"
 
 
 export default function TimetablePage() {
   const [mounted, setMounted] = useState(false)
   const [isPhone, setIsPhone] = useState(false)
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
@@ -415,7 +417,16 @@ export default function TimetablePage() {
 
             {/* Reset Button: show only when user has moved away from the default applying day */}
             {defaultDisplayDate.toDateString() !== selectedDateObject.toDateString() && (
-              <div className="flex justify-center mb-6">
+              <div className="flex justify-center gap-3 mb-6">
+                <Button
+                  onClick={() => setIsDatePickerOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
+                >
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  Pick Date
+                </Button>
                 <Button
                   onClick={resetToCurrentOrNext}
                   variant="outline"
@@ -424,6 +435,21 @@ export default function TimetablePage() {
                 >
                   <CalendarIcon className="h-4 w-4 mr-2" />
                   Reset
+                </Button>
+              </div>
+            )}
+
+            {/* Show Pick Date button even when not navigated away */}
+            {defaultDisplayDate.toDateString() === selectedDateObject.toDateString() && (
+              <div className="flex justify-center mb-6">
+                <Button
+                  onClick={() => setIsDatePickerOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-outline text-on-surface hover:bg-surface-container-high"
+                >
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  Pick Date
                 </Button>
               </div>
             )}
@@ -834,6 +860,15 @@ export default function TimetablePage() {
             </Card>
           </>
         )}
+
+        {/* Date Picker Dialog */}
+        <DatePicker
+          open={isDatePickerOpen}
+          onOpenChange={setIsDatePickerOpen}
+          selectedDate={selectedDateObject}
+          onDateSelect={setSelectedDateObject}
+          title="Select a Date"
+        />
       </div>
     </PageTransition>
   )
