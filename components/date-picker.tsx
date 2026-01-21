@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { startTransition } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -41,9 +42,12 @@ export function DatePicker({
   }
 
   const handleDateClick = (day: number) => {
-    // Immediately update the selected date, just like the previous/next buttons
+    // Use startTransition to batch the state updates properly
+    // This matches how the previous/next buttons work
     const newDate = new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day)
-    onDateSelect(newDate)
+    startTransition(() => {
+      onDateSelect(newDate)
+    })
     // Close the dialog after selection
     onOpenChange(false)
   }
