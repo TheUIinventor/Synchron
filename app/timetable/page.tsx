@@ -29,39 +29,6 @@ export default function TimetablePage() {
     trackSectionUsage("timetable")
   }, [])
 
-  // Fetch school week information from the calendar API
-  useEffect(() => {
-    const fetchSchoolWeek = async () => {
-      try {
-        const dateStr = displayDateObject.toISOString().slice(0, 10)
-        const response = await fetch(`/api/timetable/calendar/days.json?from=${dateStr}&to=${dateStr}`, { credentials: 'include' })
-        if (response.ok) {
-          const data = await response.json()
-          // The response is keyed by date, so look for our date
-          if (data && data[dateStr]) {
-            const dayInfo = data[dateStr]
-            // Build week string from week number and week type (e.g., "Wk 10B")
-            if (dayInfo.week && dayInfo.week !== "0" && dayInfo.week !== "") {
-              const weekType = dayInfo.weekType ? dayInfo.weekType : ""
-              setSchoolWeek(`Wk ${dayInfo.week}${weekType}`)
-            } else {
-              setSchoolWeek(null)
-            }
-          } else {
-            setSchoolWeek(null)
-          }
-        }
-      } catch (e) {
-        // Silently fail - calendar week is optional
-        console.debug('[timetable] Failed to fetch school week:', e)
-      }
-    }
-    
-    if (mounted && displayDateObject) {
-      fetchSchoolWeek()
-    }
-  }, [displayDateObject, mounted])
-
   // Detect phone devices (exclude tablets which may be portrait but are tablets)
   useEffect(() => {
     function detect() {
@@ -136,6 +103,40 @@ export default function TimetablePage() {
     const dateStr = displayDateObject.toLocaleDateString('en-US', opts)
     return schoolWeek ? `${dateStr} ${schoolWeek}` : dateStr
   }
+
+  // Fetch school week information from the calendar API
+  useEffect(() => {
+    const fetchSchoolWeek = async () => {
+      try {
+        if (!displayDateObject) return
+        const dateStr = displayDateObject.toISOString().slice(0, 10)
+        const response = await fetch(`/api/timetable/calendar/days.json?from=${dateStr}&to=${dateStr}`, { credentials: 'include' })
+        if (response.ok) {
+          const data = await response.json()
+          // The response is keyed by date, so look for our date
+          if (data && data[dateStr]) {
+            const dayInfo = data[dateStr]
+            // Build week string from week number and week type (e.g., "Wk 10B")
+            if (dayInfo.week && dayInfo.week !== "0" && dayInfo.week !== "") {
+              const weekType = dayInfo.weekType ? dayInfo.weekType : ""
+              setSchoolWeek(`Wk ${dayInfo.week}${weekType}`)
+            } else {
+              setSchoolWeek(null)
+            }
+          } else {
+            setSchoolWeek(null)
+          }
+        }
+      } catch (e) {
+        // Silently fail - calendar week is optional
+        console.debug('[timetable] Failed to fetch school week:', e)
+      }
+    }
+    
+    if (mounted && displayDateObject) {
+      fetchSchoolWeek()
+    }
+  }, [displayDateObject, mounted])
 
   // Navigate dates by updating the provider's selected date object so
   // the whole app stays in sync with navigation actions.
