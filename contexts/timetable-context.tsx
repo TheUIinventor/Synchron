@@ -1033,13 +1033,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try {
           // Use the selected date, not just today, so variations work for past/future dates
           const selectedIso = (selectedDateObject || new Date()).toISOString().slice(0, 10)
-          const daySource = useExternalTimetable && Array.isArray((useExternalTimetable as any)[day]) ? (useExternalTimetable as any)[day] as Period[] : []
+          const externalTimetableDate = externalTimetableDateRef.current || null
+          
+          // Only use daySource (fresh variations) if it's actually for the selected date.
+          // This prevents variations from today's data overwriting cached variations for past dates.
+          const daySource = (externalTimetableDate === selectedIso && useExternalTimetable && Array.isArray((useExternalTimetable as any)[day])) ? (useExternalTimetable as any)[day] as Period[] : []
           
           // Check if we have authoritative variations for the selected date
           const authVarsMap = authoritativeVariationsRef.current
           const authVarsForDate = authVarsMap.get(selectedIso)
           
-          try { console.debug('[timetable.provider] variation lookup for', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- mapSize:', authVarsMap.size) } catch (e) {}
+          try { console.debug('[timetable.provider] variation lookup for', selectedIso, 'day', day, '- authVars:', authVarsForDate ? Object.keys(authVarsForDate) : 'none', '- daySourceDate:', externalTimetableDate, '- mapSize:', authVarsMap.size) } catch (e) {}
           
           // Apply variations to all periods in this day
           // STRATEGY: Always apply authoritative variations if they exist for this date.
@@ -1075,6 +1079,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             
             // Also check daySource for FRESH variations that might be newer than cached
             // (This handles the case where a new variation was just added)
+            // NOTE: Only do this if daySource is actually for the selected date to avoid cross-contamination
             if (daySource.length) {
               const normSubject = String(p.subject || '').trim().toLowerCase()
               const match = daySource.find((src) => {
