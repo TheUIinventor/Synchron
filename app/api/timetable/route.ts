@@ -403,17 +403,23 @@ export async function GET(req: NextRequest) {
               const scheduledRoom = String(periodData.room || '').trim()
               // Support multiple field name variants: roomTo, room_to, toRoom, roomFrom, room_from, etc.
               const newRoomVariant = roomVar ? (roomVar.roomTo || roomVar.room_to || roomVar.toRoom || roomVar.roomFrom || roomVar.room_from || roomVar.newRoom || roomVar.room) : undefined
+              if (roomVar) {
+                console.log(`[API] Found roomVar for P${bellKey}:`, roomVar)
+              }
               if (roomVar && newRoomVariant) {
                 const newRoom = String(newRoomVariant).trim()
+                console.log(`[API] Room variant P${bellKey}: ${scheduledRoom} -> ${newRoom}`)
                 // Only mark as room change if rooms actually differ
                 if (newRoom && newRoom.toLowerCase() !== scheduledRoom.toLowerCase()) {
                   displayRoom = newRoom
                   isRoomChange = true
                   originalRoom = scheduledRoom
-                  console.log(`[API] Applied room change for P${bellKey}: ${scheduledRoom} -> ${displayRoom}`)
+                  console.log(`[API] ✅ Applied room change for P${bellKey}: ${scheduledRoom} -> ${displayRoom}`)
                 } else {
-                  console.log(`[API] Skipping room change for P${bellKey}: same as scheduled (${scheduledRoom})`)
+                  console.log(`[API] ⏭️ Skipping room change for P${bellKey}: same as scheduled (${scheduledRoom})`)
                 }
+              } else if (roomVar) {
+                console.log(`[API] ⏭️ roomVar found but no destination: ${JSON.stringify(roomVar)}`)
               }
               
               const start = bell.startTime || bell.start || ''

@@ -579,6 +579,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     selectedDateObjectRef.current = selectedDateObject
   }, [selectedDateObject])
   // Reset selected date to current (or next school day) when the user navigates away
+  // BUT keep the selected date after page refresh (don't reset within same session)
   try {
     const pathname = usePathname()
     const prevPathRef = useRef<string | null>(null)
@@ -593,7 +594,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
             const target = (isWeekendNow || isSchoolDayOver()) ? getNextSchoolDay(now) : now
             setSelectedDateObject(target)
-            try { setLastUserSelectedAt(null) } catch (e) {}
+            try { 
+              setLastUserSelectedAt(null)
+              if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem('timetable_selected_date')
+                sessionStorage.removeItem('timetable_selection_time')
+              }
+            } catch (e) {}
           } catch (e) {}
         }
         prevPathRef.current = nowPath
@@ -3451,11 +3458,31 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     const mainTimetableDayName = days[dayForMainTimetable.getDay()]
     // Respect a recent manual selection by the user: do not override if the user
-    // selected a date within the grace period.
-    const GRACE_MS = 2 * 60 * 1000 // 2 minutes
+    // selected a date. Check both memory (same session) and sessionStorage (after refresh).
+    const GRACE_MS = 30 * 60 * 1000 // 30 minutes - allow for refresh without losing selection
     const nowMs = Date.now()
     const lastUser = lastUserSelectedRef.current
-    const shouldRespectUser = lastUser && (nowMs - lastUser) < GRACE_MS
+    let shouldRespectUser = false
+    
+    // Check if user selected date in memory (same session)
+    if (lastUser && (nowMs - lastUser) < GRACE_MS) {
+      shouldRespectUser = true
+    }
+    // Also check sessionStorage for selection that survived a refresh
+    if (!shouldRespectUser && typeof sessionStorage !== 'undefined') {
+      try {
+        const storedTime = sessionStorage.getItem('timetable_selection_time')
+        if (storedTime) {
+          const storedTs = parseInt(storedTime, 10)
+          if (!isNaN(storedTs) && (nowMs - storedTs) < GRACE_MS) {
+            // Selection was recent and survived a refresh - respect it
+            shouldRespectUser = true
+            // Restore to memory for future checks
+            lastUserSelectedRef.current = storedTs
+          }
+        }
+      } catch (e) {}
+    }
 
     if (!shouldRespectUser) {
       const targetDayName = mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName
@@ -3894,18 +3921,33 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }, [externalTimetable, lastRecordedTimetable])
 
   // Wrapped setters that record a user selection timestamp so automatic
-  // time-based updates can respect manual choices for a short grace period.
+  // time-based updates can respect manual choices. Also persist to sessionStorage
+  // so the selection survives a page refresh (within the same session).
   const userSetSelectedDay = (day: string) => {
     const ts = Date.now()
     lastUserSelectedRef.current = ts
     setLastUserSelectedAt(ts)
     setSelectedDay(day)
+    // Persist to sessionStorage so refresh doesn't reset
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem('timetable_selected_date', day)
+        sessionStorage.setItem('timetable_selection_time', String(ts))
+      } catch (e) {}
+    }
   }
   const userSetSelectedDateObject = (d: Date) => {
     const ts = Date.now()
     lastUserSelectedRef.current = ts
     setLastUserSelectedAt(ts)
     setSelectedDateObject(d)
+    // Persist to sessionStorage so refresh doesn't reset
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem('timetable_selected_date', d.toISOString().slice(0, 10))
+        sessionStorage.setItem('timetable_selection_time', String(ts))
+      } catch (e) {}
+    }
   }
 
   return (
