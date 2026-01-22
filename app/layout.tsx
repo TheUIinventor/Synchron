@@ -12,9 +12,6 @@ export const metadata: Metadata = {
   title: "Synchron",
   description: "A modern, expressive timetable app for SBHS students.",
   manifest: "/manifest.json",
-  appleWebApp: {
-    title: "Synchron",
-  },
   openGraph: {
     siteName: "Synchron",
   },
