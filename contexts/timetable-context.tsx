@@ -1165,6 +1165,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
                 if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
                 if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
+                // Normalize displayTeacher if casualSurname is set but displayTeacher is not
+                if (!((p as any).displayTeacher) && (p as any).casualSurname) {
+                  (p as any).displayTeacher = stripLeadingCasualCode((p as any).casualSurname)
+                }
               }
               if (authVariation.isRoomChange && authVariation.displayRoom) {
                 const scheduledRoom = String(p.room || '').trim().toLowerCase()
@@ -1199,7 +1203,8 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   (p as any).isSubstitute = true
                   if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
                   if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
-                  if ((match as any).displayTeacher) (p as any).displayTeacher = (match as any).displayTeacher
+                  if ((match as any).displayTeacher) (p as any).displayTeacher = stripLeadingCasualCode((match as any).displayTeacher)
+                  else if ((match as any).casualSurname) (p as any).displayTeacher = stripLeadingCasualCode((match as any).casualSurname)
                   if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
                   if (match.teacher) p.teacher = match.teacher
                 }
@@ -1219,6 +1224,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         } catch (e) {
           // Ignore merge errors - display will still work without variations
           try { console.error('[timetable.provider] variation merge error', e) } catch (e2) {}
+        }
+        
+        // CRITICAL: After applying variations, re-reference the arrays to ensure React detects changes.
+        // This is especially important on medium/smaller devices where render cycles may be different.
+        // We do this by mapping the period objects through a shallow copy, which creates new arrays
+        // but preserves the mutated period properties.
+        for (const day of Object.keys(filtered)) {
+          filtered[day] = filtered[day].map((p) => ({ ...p }))
         }
       }
       // Ensure break periods (Recess, Lunch 1, Lunch 2) exist using bellTimesData
