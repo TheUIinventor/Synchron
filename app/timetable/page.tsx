@@ -29,12 +29,39 @@ export default function TimetablePage() {
   useEffect(() => {
     setMounted(true)
     trackSectionUsage("timetable")
+    // Diagnostic: log timetable data to check if room variations are present
+    try {
+      console.log('[Timetable Page] timetableData keys:', Object.keys(timetableData || {}))
+      const dayName = displayDateObject.toLocaleDateString('en-US', { weekday: 'long' })
+      const periods = timetableData[dayName] || []
+      if (periods.length > 0) {
+        console.log(`[Timetable Page] ${dayName} has ${periods.length} periods`)
+        const firstPeriod = periods[0]
+        console.log('[Timetable Page] Sample period fields:', Object.keys(firstPeriod || {}))
+        console.log('[Timetable Page] Room variation fields in first period:', {
+          displayRoom: firstPeriod?.displayRoom,
+          isRoomChange: firstPeriod?.isRoomChange,
+          originalRoom: firstPeriod?.originalRoom
+        })
+      }
+    } catch (e) {}
   }, [])
 
   // Fetch school week information for the selected date from calendar API
   useEffect(() => {
     const fetchSchoolWeekInfo = async () => {
       try {
+        const dayName = selectedDateObject.toLocaleDateString('en-US', { weekday: 'long' })
+        const periods = timetableData[dayName] || []
+        if (periods.length > 0) {
+          const roomChangePeriods = periods.filter((p: any) => p.isRoomChange)
+          if (roomChangePeriods.length > 0) {
+            console.log(`[Timetable Page] Found ${roomChangePeriods.length} periods with room changes on ${dayName}:`, roomChangePeriods.map((p: any) => ({ subject: p.subject, from: p.originalRoom, to: p.displayRoom })))
+          } else {
+            console.log(`[Timetable Page] No room changes found for ${dayName} (${periods.length} total periods)`)
+          }
+        }
+        
         const dateStr = selectedDateObject.toISOString().slice(0, 10)
         const res = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(dateStr)}&to=${encodeURIComponent(dateStr)}`, { credentials: 'include' })
         if (res.ok && res.headers.get('content-type')?.includes('application/json')) {

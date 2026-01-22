@@ -268,6 +268,13 @@ export async function GET(req: NextRequest) {
           console.log(`[API] periodsObj keys: [${Object.keys(periodsObj).join(', ')}]`)
           console.log(`[API] rawSubjects type: ${Array.isArray(rawSubjects) ? 'array' : typeof rawSubjects}, isArray: ${Array.isArray(rawSubjects)}`)
           console.log(`[API] subjectsObj keys: [${Object.keys(subjectsObj).join(', ')}]`)
+          // Debug: Log roomVars BEFORE we try to use them
+          console.log(`[API] === ROOM VARIATIONS DEBUG ===`)
+          console.log(`[API] classVars is array: ${Array.isArray(dj.classVariations)}, keys: ${!Array.isArray(dj.classVariations) && dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'N/A'}`)
+          console.log(`[API] roomVars is array: ${Array.isArray(dj.roomVariations)}, keys: ${!Array.isArray(dj.roomVariations) && dj.roomVariations ? Object.keys(dj.roomVariations).join(',') : 'N/A'}`)
+          if (!Array.isArray(dj.roomVariations) && typeof dj.roomVariations === 'object' && dj.roomVariations) {
+            console.log(`[API] roomVars sample entry:`, JSON.stringify(Object.entries(dj.roomVariations)[0] || 'empty'))
+          }
           // Debug: Log a sample subject to see its structure
           const firstSubjectKey = Object.keys(subjectsObj)[0]
           if (firstSubjectKey) {
