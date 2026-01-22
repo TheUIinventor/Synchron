@@ -1267,8 +1267,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         let bells = (getBellForDay(day) || []).slice()
         const dayPeriods = filtered[day]
         
+        // IMPORTANT: If the day's periods are completely empty (no classes, no break periods),
+        // it means the calendar marked it as a holiday/non-school day.
+        // Do NOT add break periods in this case - keep the day empty.
+        // This prevents breaks from appearing on days when the calendar says there's no school.
+        const hasPeriods = dayPeriods && dayPeriods.length > 0
+        const hasNonBreakPeriods = dayPeriods && dayPeriods.some((p) => !/(?:recess|lunch|break)/i.test(String(p.subject || p.period || '')))
+        
+        // Skip all bell/break insertion if this is explicitly an empty day (holiday)
+        if (!hasPeriods && !hasNonBreakPeriods) {
+          // This day is empty and should stay empty (it's a holiday/non-school day)
+          continue
+        }
+        
         // If no bells available from API, use cached break layouts as fallback
         // This ensures breaks show instantly during sector switches
+        // But only if the day isn't marked as a holiday
         if (bells.length === 0) {
           const cachedBreaks = getCachedBreaksForDay(day)
           for (const breakPeriod of cachedBreaks) {
