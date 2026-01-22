@@ -4,10 +4,11 @@
  */
 
 /**
- * Convert a hex color to a pastel version using the averaging formula
- * New Channel = (Original Channel + 255) / 2
+ * Convert a hex color to a slightly lighter (28% brighter) version
+ * Formula: New Channel = Original + (255 - Original) * 0.28
+ * This creates a subtle brightening effect while maintaining color vibrancy
  * @param hex - Hex color string (with or without #)
- * @returns Pastel hex color string (without #)
+ * @returns Brightened hex color string (without #)
  */
 export function hexToPastel(hex: string): string {
   // Remove # if present
@@ -23,14 +24,14 @@ export function hexToPastel(hex: string): string {
   const g = parseInt(cleaned.substring(2, 4), 16)
   const b = parseInt(cleaned.substring(4, 6), 16)
   
-  // Average with white (255, 255, 255) using Math.floor for standard rounding
-  const pasteR = Math.floor((r + 255) / 2)
-  const pasteG = Math.floor((g + 255) / 2)
-  const pasteB = Math.floor((b + 255) / 2)
+  // Brighten by 28% using: Original + (255 - Original) * 0.28
+  const brightenR = Math.floor(r + (255 - r) * 0.28)
+  const brightenG = Math.floor(g + (255 - g) * 0.28)
+  const brightenB = Math.floor(b + (255 - b) * 0.28)
   
   // Convert back to hex
   const toHex = (n: number) => n.toString(16).padStart(2, '0')
-  return `${toHex(pasteR)}${toHex(pasteG)}${toHex(pasteB)}`
+  return `${toHex(brightenR)}${toHex(brightenG)}${toHex(brightenB)}`
 }
 
 /**
