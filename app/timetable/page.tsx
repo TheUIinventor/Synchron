@@ -29,7 +29,7 @@ export default function TimetablePage() {
   useEffect(() => {
     setMounted(true)
     trackSectionUsage("timetable")
-    // Diagnostic: log timetable data to check if room variations are present
+    // Diagnostics: log timetable data to check if room variations are present
     try {
       console.log('[Timetable Page] timetableData keys:', Object.keys(timetableData || {}))
       const dayName = displayDateObject.toLocaleDateString('en-US', { weekday: 'long' })
