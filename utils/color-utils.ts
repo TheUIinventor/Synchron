@@ -4,9 +4,9 @@
  */
 
 /**
- * Convert a hex color to a slightly lighter (28% brighter) version
- * Formula: New Channel = Original + (255 - Original) * 0.28
- * This creates a subtle brightening effect while maintaining color vibrancy
+ * Convert a hex color using double averaging formula with white
+ * Formula: (((Original + 255) / 2) + 255) / 2
+ * This creates a soft, pastel-like appearance by averaging with white twice
  * @param hex - Hex color string (with or without #)
  * @returns Brightened hex color string (without #)
  */
@@ -24,10 +24,10 @@ export function hexToPastel(hex: string): string {
   const g = parseInt(cleaned.substring(2, 4), 16)
   const b = parseInt(cleaned.substring(4, 6), 16)
   
-  // Brighten by 28% using: Original + (255 - Original) * 0.28
-  const brightenR = Math.floor(r + (255 - r) * 0.28)
-  const brightenG = Math.floor(g + (255 - g) * 0.28)
-  const brightenB = Math.floor(b + (255 - b) * 0.28)
+  // Double averaging: (((Original + 255) / 2) + 255) / 2
+  const brightenR = Math.floor(((r + 255) / 2 + 255) / 2)
+  const brightenG = Math.floor(((g + 255) / 2 + 255) / 2)
+  const brightenB = Math.floor(((b + 255) / 2 + 255) / 2)
   
   // Convert back to hex
   const toHex = (n: number) => n.toString(16).padStart(2, '0')

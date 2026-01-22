@@ -830,6 +830,33 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   const cachedSubjects = src?.subjects || src?.timetable?.subjects || src?.upstream?.subjects || src?.upstream?.day?.timetable?.subjects || src?.upstream?.full?.subjects || null
                   if (cachedSubjects) {
                     setExternalSubjects(cachedSubjects)
+                    // Immediately apply colors from cached subjects to the timetable
+                    try {
+                      const shortToColour: Record<string, string> = {}
+                      for (const k of Object.keys(cachedSubjects)) {
+                        try {
+                          const v = cachedSubjects[k]
+                          const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                          const colour = (v && (v.colour || v.color)) ? (v.colour || v.color) : null
+                          if (short && colour) {
+                            shortToColour[String(short).trim()] = String(colour)
+                          }
+                        } catch (e) {}
+                      }
+                      // Apply colours to the timetable
+                      if (Object.keys(shortToColour).length > 0) {
+                        const withColours: Record<string, Period[]> = {}
+                        for (const day of Object.keys(final)) {
+                          withColours[day] = (final[day] || []).map((p) => {
+                            if (!p.colour && p.subject && shortToColour[String(p.subject).trim()]) {
+                              return { ...p, colour: shortToColour[String(p.subject).trim()] }
+                            }
+                            return p
+                          })
+                        }
+                        setExternalTimetable(withColours)
+                      }
+                    } catch (e) {}
                   }
                 } catch (e) {}
               } catch (e) {
