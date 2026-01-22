@@ -1308,7 +1308,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {
           // Ignore merge errors - display will still work without variations
-          try { console.error('[timetable.provider] variation merge error', e) } catch (e2) {}
+          try { 
+            console.error('[timetable.provider] variation merge error:', e instanceof Error ? e.message : String(e))
+            if (e instanceof Error) console.error('[timetable.provider] stack:', e.stack)
+          } catch (e2) {}
         }
         
         // CRITICAL: After applying variations, re-reference the arrays to ensure React detects changes.
