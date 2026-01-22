@@ -277,11 +277,30 @@ export async function GET(req: NextRequest) {
             console.log(`[API] bells sample (first 2):`, JSON.stringify(bells.slice(0, 2)))
           }
           
+          // Also log a sample period to see if it contains room info
+          const firstPeriodKey = Object.keys(periodsObj)[0]
+          if (firstPeriodKey) {
+            const samplePeriod = periodsObj[firstPeriodKey]
+            console.log(`[API] Sample period "${firstPeriodKey}":`, JSON.stringify(samplePeriod))
+            // Log all keys in the sample period to see what fields are available
+            if (samplePeriod && typeof samplePeriod === 'object') {
+              console.log(`[API] Period keys:`, Object.keys(samplePeriod).join(', '))
+            }
+          }
+          
           // Debug: Log the raw variations from API
           console.log(`[API] Raw classVariations type: ${Array.isArray(dj.classVariations) ? 'array' : typeof dj.classVariations}, keys: ${!Array.isArray(dj.classVariations) && dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'none'}`)
           console.log(`[API] Raw roomVariations type: ${Array.isArray(dj.roomVariations) ? 'array' : typeof dj.roomVariations}, keys: ${!Array.isArray(dj.roomVariations) && dj.roomVariations ? Object.keys(dj.roomVariations).join(',') : 'none'}`)
           if (!Array.isArray(dj.roomVariations) && dj.roomVariations && Object.keys(dj.roomVariations).length > 0) {
             console.log(`[API] roomVariations content:`, JSON.stringify(dj.roomVariations))
+          }
+          
+          // Also check for alternative room variation field names that might be used
+          const alternativeRoomFields = ['variations', 'room_variations', 'room_changes', 'rooms', 'roomChanges', 'room_change']
+          for (const fieldName of alternativeRoomFields) {
+            if ((dj as any)[fieldName] && typeof (dj as any)[fieldName] === 'object') {
+              console.log(`[API] Found alternative room field "${fieldName}":`, JSON.stringify((dj as any)[fieldName]))
+            }
           }
           
           const dowDate = new Date(dateParam)
@@ -331,7 +350,8 @@ export async function GET(req: NextRequest) {
             const date = dj.date || dateParam
             
             byDay[dow] = bells.map((bell: any) => {
-              const bellKey = bell.bell || bell.period || ''
+              // Prefer period over bell ID for looking up variations (period number matches roomVariations/classVariations keys)
+              const bellKey = bell.period || bell.bell || ''
               const periodData = periodsObj[bellKey] || {}
               
               // Build subject lookup key (year + title)
@@ -356,7 +376,7 @@ export async function GET(req: NextRequest) {
               }
               
               // Check for class variation (substitute)
-              const classVar = classVars[bellKey] || classVars[bell.period] || null
+              const classVar = classVars[bellKey] || classVars[bell.period] || classVars[bell.bell] || null
               let casualSurname: string | undefined = undefined
               let isSubstitute = false
               let displayTeacher: string | undefined = undefined
@@ -376,7 +396,7 @@ export async function GET(req: NextRequest) {
               }
               
               // Check for room variation - only if it actually differs from scheduled room
-              const roomVar = roomVars[bellKey] || roomVars[bell.period] || null
+              const roomVar = roomVars[bellKey] || roomVars[bell.period] || roomVars[bell.bell] || null
               let displayRoom: string | undefined = undefined
               let isRoomChange = false
               let originalRoom: string | undefined = undefined
