@@ -1273,14 +1273,24 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               })
               
               // If match has variations, use them (they might be more recent than cached)
+              // BUT ONLY if the fresh data actually contains replacement values - never overwrite
+              // cached casual teachers with empty/undefined from fresh API data
               if (match && ((match as any).isSubstitute || (match as any).isRoomChange)) {
                 if ((match as any).isSubstitute) {
                   (p as any).isSubstitute = true
-                  if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
+                  // Only overwrite casualSurname/displayTeacher if fresh data has non-empty values
+                  // This prevents fresh API data (which may lack casual info) from clearing cached values
+                  if ((match as any).casualSurname && String((match as any).casualSurname).trim()) {
+                    (p as any).casualSurname = (match as any).casualSurname
+                    (p as any).displayTeacher = stripLeadingCasualCode((match as any).casualSurname)
+                  } else if ((match as any).displayTeacher && String((match as any).displayTeacher).trim()) {
+                    (p as any).displayTeacher = stripLeadingCasualCode((match as any).displayTeacher)
+                  }
+                  // Only update token if present
                   if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
-                  if ((match as any).displayTeacher) (p as any).displayTeacher = stripLeadingCasualCode((match as any).displayTeacher)
-                  else if ((match as any).casualSurname) (p as any).displayTeacher = stripLeadingCasualCode((match as any).casualSurname)
+                  // Only update originalTeacher if present
                   if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
+                  // Only update teacher if present
                   if (match.teacher) p.teacher = match.teacher
                 }
                 
