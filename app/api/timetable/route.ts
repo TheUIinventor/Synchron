@@ -360,7 +360,8 @@ export async function GET(req: NextRequest) {
               let casualSurname: string | undefined = undefined
               let isSubstitute = false
               if (classVar && classVar.type !== 'novariation') {
-                casualSurname = classVar.casualSurname || classVar.casual || undefined
+                // Support multiple field name variants for substitute teacher info
+                casualSurname = classVar.casualSurname || classVar.casual || classVar.substitute || classVar.replacement || classVar.teacher || undefined
                 isSubstitute = !!casualSurname
                 if (casualSurname) {
                   console.log(`[API] Applied substitute for P${bellKey}: ${casualSurname}`)
@@ -373,8 +374,8 @@ export async function GET(req: NextRequest) {
               let isRoomChange = false
               let originalRoom: string | undefined = undefined
               const scheduledRoom = String(periodData.room || '').trim()
-              // Support multiple field name variants: roomTo, room_to, roomFrom, etc.
-              const newRoomVariant = roomVar ? (roomVar.roomTo || roomVar.room_to || roomVar.roomFrom || roomVar.room_from || roomVar.newRoom || roomVar.room) : undefined
+              // Support multiple field name variants: roomTo, room_to, toRoom, roomFrom, room_from, etc.
+              const newRoomVariant = roomVar ? (roomVar.roomTo || roomVar.room_to || roomVar.toRoom || roomVar.roomFrom || roomVar.room_from || roomVar.newRoom || roomVar.room) : undefined
               if (roomVar && newRoomVariant) {
                 const newRoom = String(newRoomVariant).trim()
                 // Only mark as room change if rooms actually differ
@@ -438,24 +439,40 @@ export async function GET(req: NextRequest) {
               
               // Apply class variation
               const classVar = classVars[periodKey] || null
-              if (classVar && classVar.type !== 'novariation' && classVar.casualSurname) {
-                base.casualSurname = classVar.casualSurname
-                base.isSubstitute = true
-                base.originalTeacher = base.teacher
-                base.teacher = classVar.casualSurname
-                base.displayTeacher = classVar.casualSurname
+              if (classVar && classVar.type !== 'novariation') {
+                // Support multiple field name variants for substitute teacher info
+                const casualSurname = classVar.casualSurname || classVar.casual || classVar.substitute || classVar.replacement || classVar.teacher || undefined
+                const casualToken = classVar.casualToken || classVar.casual_token || undefined
+                if (casualSurname) {
+                  base.casualSurname = casualSurname
+                  base.casualToken = casualToken
+                  base.isSubstitute = true
+                  base.originalTeacher = base.teacher
+                  base.teacher = casualSurname
+                  base.displayTeacher = casualSurname
+                }
               }
               
               // Apply room variation - only if it actually differs from scheduled room
               const roomVar = roomVars[periodKey] || null
-              if (roomVar && roomVar.roomTo) {
-                const newRoom = String(roomVar.roomTo).trim()
-                const currentRoom = String(base.room || '').trim()
-                // Only mark as room change if the rooms actually differ
-                if (newRoom && newRoom.toLowerCase() !== currentRoom.toLowerCase()) {
-                  base.displayRoom = newRoom
-                  base.isRoomChange = true
-                  base.originalRoom = currentRoom // Preserve for UI
+              if (roomVar) {
+                console.log(`[API] Found room variation for P${periodKey}:`, roomVar)
+                // Support multiple field name variants: roomTo, room_to, toRoom, roomFrom, etc.
+                const newRoomVariant = roomVar.roomTo || roomVar.room_to || roomVar.toRoom || roomVar.roomFrom || roomVar.room_from || roomVar.newRoom || roomVar.room
+                if (newRoomVariant) {
+                  const newRoom = String(newRoomVariant).trim()
+                  const currentRoom = String(base.room || '').trim()
+                  // Only mark as room change if the rooms actually differ
+                  if (newRoom && newRoom.toLowerCase() !== currentRoom.toLowerCase()) {
+                    base.displayRoom = newRoom
+                    base.isRoomChange = true
+                    base.originalRoom = currentRoom // Preserve for UI
+                    console.log(`[API] ✅ Applied room change for P${periodKey}: ${currentRoom} -> ${newRoom}`)
+                  } else if (newRoom) {
+                    console.log(`[API] ⏭️ Room variant for P${periodKey} same as scheduled (${newRoom}), not marking as change`)
+                  }
+                } else {
+                  console.log(`[API] ⏭️ Room variant for P${periodKey} has no room destination value`, roomVar)
                 }
               }
               
@@ -1259,11 +1276,12 @@ export async function GET(req: NextRequest) {
               continue
             }
             
-            const casualSurname = vObj.casualSurname ? String(vObj.casualSurname).trim() : ''
-            const casualToken = vObj.casual ? String(vObj.casual).trim() : ''
+            // Support multiple field name variants for substitute teacher info
+            const casualSurname = vObj.casualSurname || vObj.casual || vObj.substitute || vObj.replacement || vObj.teacher || ''
+            const casualToken = vObj.casualToken || vObj.casual_token || vObj.casual || ''
             
             // For 'nocover' type, there's a sub but no casualSurname - use "No Cover"
-            const displayTeacher = casualSurname || (vObj.type === 'nocover' ? 'No Cover' : '')
+            const displayTeacher = casualSurname.trim() || (vObj.type === 'nocover' ? 'No Cover' : '')
             
             if (!displayTeacher) {
               variationsDiag.skippedClassVars.push({ period: periodKey, reason: `no display teacher (type=${vObj.type})` })
