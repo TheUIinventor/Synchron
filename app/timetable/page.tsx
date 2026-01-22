@@ -12,6 +12,7 @@ import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
 import { DatePicker } from "@/components/date-picker"
+import { hexToPastel, hexToInlineStyle } from "@/utils/color-utils"
 
 
 export default function TimetablePage() {
@@ -181,8 +182,18 @@ export default function TimetablePage() {
     setSelectedDateObject(target)
   }
 
-  // Subject color mapping
-  const getSubjectColor = (subject: string) => {
+  // Subject color mapping - uses API colour when available with pastel conversion
+  const getSubjectColor = (subject: string, apiColour?: string) => {
+    // If API colour is provided, use it with pastel conversion
+    if (apiColour && /^[0-9a-fA-F]{6}$/.test(apiColour)) {
+      const style = hexToInlineStyle(apiColour)
+      // Convert inline style to a className-like appearance
+      // Since we can't dynamically generate Tailwind classes, we'll return empty
+      // and the caller should use inline style instead
+      return "" // Will be handled with inline style
+    }
+    
+    // Fallback to subject-based color mapping
     const s = subject.toUpperCase();
     if (s.includes("ENG")) return "bg-yellow-200 text-yellow-900 dark:bg-yellow-900/50 dark:text-yellow-100";
     if (s.includes("MAT")) return "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-100";
@@ -198,6 +209,14 @@ export default function TimetablePage() {
     if (s.includes("BRE") || s.includes("REC") || s.includes("LUN")) return "bg-surface-variant text-on-surface-variant";
     
     return "bg-surface-container-high text-on-surface";
+  }
+
+  // Helper to get inline style from API colour
+  const getSubjectColorStyle = (subject: string, apiColour?: string): React.CSSProperties | undefined => {
+    if (apiColour && /^[0-9a-fA-F]{6}$/.test(apiColour)) {
+      return hexToInlineStyle(apiColour)
+    }
+    return undefined
   }
 
   // Get subject abbreviation
@@ -705,7 +724,10 @@ export default function TimetablePage() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[200px] ${getSubjectColor(period.subject)}`}>
+                                    <span 
+                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[200px] ${getSubjectColor(period.subject, period.colour)}`}
+                                      style={getSubjectColorStyle(period.subject, period.colour)}
+                                    >
                                       {getDisplaySubject(period)}
                                     </span>
                                   </div>
@@ -729,7 +751,10 @@ export default function TimetablePage() {
                                 </div>
                                 <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
                                   <div className="flex items-center gap-3 min-w-0">
-                                    <div className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject)}`}>
+                                    <div 
+                                      className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject, period.colour)}`}
+                                      style={getSubjectColorStyle(period.subject, period.colour)}
+                                    >
                                       <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
                                     </div>
                                   </div>
@@ -849,7 +874,10 @@ export default function TimetablePage() {
                                         return ''
                                       })()}
                                     </div>
-                                    <div className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject)}`}>
+                                    <div 
+                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                      style={getSubjectColorStyle(period.subject, period.colour)}
+                                    >
                                       {getSubjectAbbr(period.subject)}
                                     </div>
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
@@ -918,7 +946,10 @@ export default function TimetablePage() {
                                         return ''
                                       })()}
                                     </div>
-                                    <div className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject)}`}>
+                                    <div 
+                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                      style={getSubjectColorStyle(period.subject, period.colour)}
+                                    >
                                       {getSubjectAbbr(period.subject)}
                                     </div>
                                     <div className="text-sm font-medium text-on-surface flex-1 min-w-0">

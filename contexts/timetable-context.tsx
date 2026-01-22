@@ -882,23 +882,30 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     if (!externalSubjects || !externalTimetable) return
     
     try {
-      // Build shortToTitle mapping from subjects
+      // Build shortToTitle and shortToColour mappings from subjects
       const shortToTitle: Record<string, string> = {}
+      const shortToColour: Record<string, string> = {}
       for (const k of Object.keys(externalSubjects)) {
         try {
           const v = externalSubjects[k]
           const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
           const title = (v && (v.title || v.name || v.fullTitle)) ? (v.title || v.name || v.fullTitle) : null
+          const colour = (v && (v.colour || v.color)) ? (v.colour || v.color) : null
           if (short && title) {
             const shortKey = String(short).trim()
             shortToTitle[shortKey] = String(title)
             try { console.debug('[timetable.provider] subject mapping', { short: shortKey, title: String(title) }) } catch (e) {}
           }
+          if (short && colour) {
+            const shortKey = String(short).trim()
+            shortToColour[shortKey] = String(colour)
+            try { console.debug('[timetable.provider] colour mapping', { short: shortKey, colour: String(colour) }) } catch (e) {}
+          }
         } catch (e) {}
       }
       
-      // Apply titles to timetable if we have mappings
-      if (Object.keys(shortToTitle).length > 0) {
+      // Apply titles and colours to timetable if we have mappings
+      if (Object.keys(shortToTitle).length > 0 || Object.keys(shortToColour).length > 0) {
         let hasChanges = false
         const updated: Record<string, Period[]> = {}
         for (const day of Object.keys(externalTimetable)) {
@@ -906,12 +913,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const arr = externalTimetable[day] || []
             updated[day] = arr.map((p) => {
               const subjectKey = String(p.subject || '').trim()
+              let changed = false
+              const newPeriod = { ...p }
+              
+              // Apply title if needed
               if (!p.title && subjectKey && shortToTitle[subjectKey]) {
-                hasChanges = true
+                changed = true
                 try { console.debug('[timetable.provider] applying title', { subject: subjectKey, title: shortToTitle[subjectKey] }) } catch (e) {}
-                return { ...p, title: shortToTitle[subjectKey] }
+                newPeriod.title = shortToTitle[subjectKey]
               }
-              return p
+              
+              // Apply colour if needed
+              if (!p.colour && subjectKey && shortToColour[subjectKey]) {
+                changed = true
+                try { console.debug('[timetable.provider] applying colour', { subject: subjectKey, colour: shortToColour[subjectKey] }) } catch (e) {}
+                newPeriod.colour = shortToColour[subjectKey]
+              }
+              
+              if (changed) hasChanges = true
+              return newPeriod
             })
           } catch (e) {
             updated[day] = externalTimetable[day] || []
@@ -932,27 +952,54 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               updatedByWeek[day] = {
                 A: (groups.A || []).map((p) => {
                   const subjectKey = String(p.subject || '').trim()
+                  let changed = false
+                  const newPeriod = { ...p }
+                  
                   if (!p.title && subjectKey && shortToTitle[subjectKey]) {
-                    hasWeekChanges = true
-                    return { ...p, title: shortToTitle[subjectKey] }
+                    changed = true
+                    newPeriod.title = shortToTitle[subjectKey]
                   }
-                  return p
+                  if (!p.colour && subjectKey && shortToColour[subjectKey]) {
+                    changed = true
+                    newPeriod.colour = shortToColour[subjectKey]
+                  }
+                  
+                  if (changed) hasWeekChanges = true
+                  return newPeriod
                 }),
                 B: (groups.B || []).map((p) => {
                   const subjectKey = String(p.subject || '').trim()
+                  let changed = false
+                  const newPeriod = { ...p }
+                  
                   if (!p.title && subjectKey && shortToTitle[subjectKey]) {
-                    hasWeekChanges = true
-                    return { ...p, title: shortToTitle[subjectKey] }
+                    changed = true
+                    newPeriod.title = shortToTitle[subjectKey]
                   }
-                  return p
+                  if (!p.colour && subjectKey && shortToColour[subjectKey]) {
+                    changed = true
+                    newPeriod.colour = shortToColour[subjectKey]
+                  }
+                  
+                  if (changed) hasWeekChanges = true
+                  return newPeriod
                 }),
                 unknown: (groups.unknown || []).map((p) => {
                   const subjectKey = String(p.subject || '').trim()
+                  let changed = false
+                  const newPeriod = { ...p }
+                  
                   if (!p.title && subjectKey && shortToTitle[subjectKey]) {
-                    hasWeekChanges = true
-                    return { ...p, title: shortToTitle[subjectKey] }
+                    changed = true
+                    newPeriod.title = shortToTitle[subjectKey]
                   }
-                  return p
+                  if (!p.colour && subjectKey && shortToColour[subjectKey]) {
+                    changed = true
+                    newPeriod.colour = shortToColour[subjectKey]
+                  }
+                  
+                  if (changed) hasWeekChanges = true
+                  return newPeriod
                 }),
               }
             }
@@ -2535,17 +2582,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 const parsedCache = JSON.parse(cached)
                 if (parsedCache && parsedCache.timetable) {
                   try {
-                    // Attach any available long titles from the cached payload
+                    // Attach any available long titles and colours from the cached payload
                     try {
                       const subjectsMap = parsedCache.subjects || parsedCache.timetable?.subjects || parsedCache.upstream?.subjects || parsedCache.upstream?.day?.timetable?.subjects || parsedCache.upstream?.full?.subjects || null
                       if (subjectsMap && typeof subjectsMap === 'object') {
                         const shortToTitle: Record<string, string> = {}
+                        const shortToColour: Record<string, string> = {}
                         for (const k of Object.keys(subjectsMap)) {
                           try {
                             const v = subjectsMap[k]
                             const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
                             const title = (v && (v.title || v.name || v.fullTitle)) ? (v.title || v.name || v.fullTitle) : null
+                            const colour = (v && (v.colour || v.color)) ? (v.colour || v.color) : null
                             if (short && title) shortToTitle[String(short).trim()] = String(title)
+                            if (short && colour) shortToColour[String(short).trim()] = String(colour)
                           } catch (e) {}
                         }
                         for (const d of Object.keys(parsedCache.timetable)) {
@@ -2555,6 +2605,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                               try {
                                 if (!p.title && p.subject && shortToTitle[String(p.subject).trim()]) {
                                   p.title = shortToTitle[String(p.subject).trim()]
+                                }
+                                if (!p.colour && p.subject && shortToColour[String(p.subject).trim()]) {
+                                  p.colour = shortToColour[String(p.subject).trim()]
                                 }
                               } catch (e) {}
                             }
@@ -2708,17 +2761,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               } catch (e) {
                 // ignore substitution extraction errors
               }
-              // Attach long subject titles when available in the upstream payload
+              // Attach long subject titles and colours when available in the upstream payload
               try {
                 const subjectsSource = j.subjects || j.timetable?.subjects || j.upstream?.subjects || j.upstream?.day?.timetable?.subjects || j.upstream?.full?.subjects || j.diagnostics?.upstream?.full?.subjects || j.diagnostics?.upstream?.day?.timetable?.subjects || null
                 if (subjectsSource && typeof subjectsSource === 'object') {
                   const shortToTitle: Record<string, string> = {}
+                  const shortToColour: Record<string, string> = {}
                   for (const k of Object.keys(subjectsSource)) {
                     try {
                       const v = subjectsSource[k]
                       const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
                       const title = (v && (v.title || v.name || v.fullTeacher || v.fullTitle)) ? (v.title || v.name || v.fullTeacher || v.fullTitle) : null
+                      const colour = (v && (v.colour || v.color)) ? (v.colour || v.color) : null
                       if (short && title) shortToTitle[String(short).trim()] = String(title)
+                      if (short && colour) shortToColour[String(short).trim()] = String(colour)
                     } catch (e) {}
                   }
                   for (const d of Object.keys(finalTimetable)) {
@@ -2727,6 +2783,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       for (const p of arr) {
                         try {
                           if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                          if (!p.colour && p.subject && shortToColour[p.subject]) p.colour = shortToColour[p.subject]
                         } catch (e) {}
                       }
                     } catch (e) {}
@@ -2739,7 +2796,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                           try {
                             const arr = (groups as any)[weekKey] || []
                             for (const p of arr) {
-                              try { if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject] } catch (e) {}
+                              try { 
+                                if (!p.title && p.subject && shortToTitle[p.subject]) p.title = shortToTitle[p.subject]
+                                if (!p.colour && p.subject && shortToColour[p.subject]) p.colour = shortToColour[p.subject]
+                              } catch (e) {}
                             }
                           } catch (e) {}
                         }
