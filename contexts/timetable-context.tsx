@@ -73,6 +73,7 @@ type TimetableContextType = {
   // Authentication state for showing re-auth prompts
   isAuthenticated?: boolean | null
   reauthRequired?: boolean
+  lastUserSelectedAt?: number | null // Timestamp of when user last selected a date
 }
 
 // Create the context
@@ -247,40 +248,7 @@ const clearClientCaches = () => {
   } catch (e) {}
 }
 
-// Try to parse a fetch Response for bell times and apply them to state.
-const extractBellTimesFromResponse = async (res: Response | null) => {
-  if (!res) return
-  try {
-    const ctype = res.headers.get('content-type') || ''
-    if (!ctype.includes('application/json')) return
-    // clone/parse safely
-    let j: any = null
-    try { j = await res.clone().json() } catch (e) { return }
-    if (!j) return
-    try {
-      const computed = buildBellTimesFromPayload(j)
-      const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-      const src = j.bellTimes || {}
-      for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-        if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-        else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-        else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
-        else finalBellTimes[k] = []
-      }
-      const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-      if (hasAny) {
-        try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
-        setExternalBellTimes(finalBellTimes)
-        lastSeenBellTimesRef.current = finalBellTimes
-        lastSeenBellTsRef.current = Date.now()
-      }
-    } catch (e) {
-      // ignore
-    }
-  } catch (e) {
-    // ignore
-  }
-}
+
 
 // Explicit empty timetable used when the upstream API reports "no timetable".
 const emptyByDay: Record<string, Period[]> = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] }
@@ -505,12 +473,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       } catch (e) {}
     }
   } catch (e) {}
-  const __initialExternalTimetableByWeek = ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] } | null> | null => {
+  const __initialExternalTimetableByWeek = ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null => {
     try {
       // Prefer a processed cache payload when available
       const src = __initialProcessedCache || __initialParsedCache
       if (!src) return null
-      if (src.timetableByWeek && typeof src.timetableByWeek === 'object') return src.timetableByWeek
+      if (src.timetableByWeek && typeof src.timetableByWeek === 'object') {
+        // Filter out any entries with null values
+        const filtered: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> = {}
+        for (const [k, v] of Object.entries(src.timetableByWeek)) {
+          if (v && typeof v === 'object' && !Array.isArray(v)) {
+            filtered[k] = v as { A: Period[]; B: Period[]; unknown: Period[] }
+          }
+        }
+        return Object.keys(filtered).length > 0 ? filtered : null
+      }
     } catch (e) {}
     return null
   })()
@@ -654,7 +631,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return null
   })
   const [externalTimetableByWeek, setExternalTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(() => {
-    try { return __initialExternalTimetableByWeek || null } catch (e) { return null }
+    return __initialExternalTimetableByWeek || null
   })
   const [lastRecordedTimetableByWeek, setLastRecordedTimetableByWeek] = useState<Record<string, { A: Period[]; B: Period[]; unknown: Period[] }> | null>(externalTimetableByWeek)
   // Record the authoritative week type provided by the server (A/B) when available
@@ -682,6 +659,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
   const holidayDateRef = useRef<boolean>(false)
+  const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
+  const lastSubsAttemptRef = useRef<number | null>(null)
+  const lastRequestedDateRef = useRef<string | null>(null)
 
   // Aggressive background refresh tuning
   // NOTE: reduced intervals to make visible-refresh more responsive.
@@ -697,6 +677,41 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       lastSeenBellTsRef.current = __initialParsedCache?.savedAt ? Date.parse(__initialParsedCache.savedAt) : Date.now()
     }
   } catch (e) {}
+
+  // Try to parse a fetch Response for bell times and apply them to state.
+  const extractBellTimesFromResponse = async (res: Response | null) => {
+    if (!res) return
+    try {
+      const ctype = res.headers.get('content-type') || ''
+      if (!ctype.includes('application/json')) return
+      // clone/parse safely
+      let j: any = null
+      try { j = await res.clone().json() } catch (e) { return }
+      if (!j) return
+      try {
+        const computed = buildBellTimesFromPayload(j)
+        const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
+        const src = j.bellTimes || {}
+        for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
+          if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
+          else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
+          else if (lastSeenBellTimesRef.current && lastSeenBellTimesRef.current[k] && lastSeenBellTimesRef.current[k].length) finalBellTimes[k] = lastSeenBellTimesRef.current[k]
+          else finalBellTimes[k] = []
+        }
+        const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
+        if (hasAny) {
+          try { console.log('[timetable.provider] extracted bellTimes from response (status', res.status, ')', finalBellTimes) } catch (e) {}
+          setExternalBellTimes(finalBellTimes)
+          lastSeenBellTimesRef.current = finalBellTimes
+          lastSeenBellTsRef.current = Date.now()
+        }
+      } catch (e) {
+        // ignore
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
 
   // If we have locally cached substitutions and no fresh substitution run
   // has occurred yet, we will use them as a best-effort while the live
@@ -1040,8 +1055,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                 try {
                   const casual = (clean as any).casualSurname || undefined
                   const candidate = (clean as any).fullTeacher || (clean as any).teacher || undefined
-                  const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-                  (clean as any).displayTeacher = dt
+                  let displayTeacher: string | undefined = undefined
+                  if (casual) {
+                    displayTeacher = stripLeadingCasualCode(String(casual) || '')
+                  } else if (candidate) {
+                    displayTeacher = stripLeadingCasualCode(String(candidate) || '')
+                  }
+                  (clean as any).displayTeacher = displayTeacher
                 } catch (e) {}
                 return clean
               }
@@ -1050,8 +1070,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             try {
               const casual = (p as any).casualSurname || undefined
               const candidate = (p as any).fullTeacher || (p as any).teacher || undefined
-              const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any)
-              (p as any).displayTeacher = dt
+              let displayTeacher: string | undefined = undefined
+              if (casual) {
+                displayTeacher = stripLeadingCasualCode(String(casual) || '')
+              } else if (candidate) {
+                displayTeacher = stripLeadingCasualCode(String(candidate) || '')
+              }
+              (p as any).displayTeacher = displayTeacher
             } catch (e) {}
             return p
           })
@@ -1677,15 +1702,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {}
   }, [externalTimetable, selectedDateObject])
-
-  // Track whether substitutions have been applied to the current external timetable
-  const subsAppliedRef = useRef<number | null>((__initialCachedSubs && __initialExternalTimetable && Array.isArray(__initialCachedSubs) && __initialCachedSubs.length) ? Date.now() : null)
-  // Track the last time we attempted to fetch substitutions so we can retry
-  // periodically instead of permanently skipping when no subs were present.
-  const lastSubsAttemptRef = useRef<number | null>(null)
-  // Track the last date string we requested from /api/timetable to avoid
-  // redundant concurrent or repeated fetches for the same date.
-  const lastRequestedDateRef = useRef<string | null>(null)
 
   // Helper: fetch substitutions from our server route. Supports JSON responses
   // and HTML fallbacks by scraping via PortalScraper when necessary.
