@@ -806,7 +806,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                       if (candStr.toLowerCase() !== roomStr.toLowerCase()) { item.displayRoom = candStr; item.isRoomChange = true }
                     }
                     try { const casual = item.casualSurname || undefined; const candidate = item.fullTeacher || item.teacher || undefined; const dt = casual ? stripLeadingCasualCode(String(casual)) : stripLeadingCasualCode(candidate as any); item.displayTeacher = dt } catch (e) {}
+                    // Only delete isRoomChange if both: no candidateDest AND no displayRoom from API
                     if (!candidateDest && (item as any).isRoomChange && !(item as any).displayRoom) delete (item as any).isRoomChange
+                    // Preserve isRoomChange if displayRoom is already set from API
+                    if ((item as any).displayRoom && !(item as any).isRoomChange) (item as any).isRoomChange = true
                     return item
                   })
                 }
