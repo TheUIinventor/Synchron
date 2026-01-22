@@ -359,12 +359,19 @@ export async function GET(req: NextRequest) {
               const classVar = classVars[bellKey] || classVars[bell.period] || null
               let casualSurname: string | undefined = undefined
               let isSubstitute = false
+              let displayTeacher: string | undefined = undefined
               if (classVar && classVar.type !== 'novariation') {
                 // Support multiple field name variants for substitute teacher info
                 casualSurname = classVar.casualSurname || classVar.casual || classVar.substitute || classVar.replacement || classVar.teacher || undefined
-                isSubstitute = !!casualSurname
+                // For 'nocover' type with no casualSurname, display "No Cover"
                 if (casualSurname) {
+                  isSubstitute = true
+                  displayTeacher = casualSurname
                   console.log(`[API] Applied substitute for P${bellKey}: ${casualSurname}`)
+                } else if (classVar.type === 'nocover') {
+                  isSubstitute = true
+                  displayTeacher = 'No Cover'
+                  console.log(`[API] Applied no cover for P${bellKey}`)
                 }
               }
               
@@ -400,7 +407,7 @@ export async function GET(req: NextRequest) {
                 period: bellKey,
                 time,
                 subject: subjectData.title || periodData.title || bell.bellDisplay || bellKey,
-                teacher: isSubstitute ? casualSurname : (periodData.fullTeacher || periodData.teacher || ''),
+                teacher: isSubstitute && displayTeacher ? displayTeacher : (periodData.fullTeacher || periodData.teacher || ''),
                 fullTeacher: periodData.fullTeacher || undefined,
                 room: periodData.room || '',
                 weekType: inferred || undefined,
@@ -410,7 +417,7 @@ export async function GET(req: NextRequest) {
                 casualSurname: casualSurname,
                 isSubstitute,
                 originalTeacher: isSubstitute ? (periodData.fullTeacher || periodData.teacher) : undefined,
-                displayTeacher: isSubstitute ? casualSurname : undefined,
+                displayTeacher: displayTeacher || undefined,
                 // Room change info
                 displayRoom,
                 isRoomChange,
@@ -450,6 +457,12 @@ export async function GET(req: NextRequest) {
                   base.originalTeacher = base.teacher
                   base.teacher = casualSurname
                   base.displayTeacher = casualSurname
+                } else if (classVar.type === 'nocover') {
+                  // For 'nocover' type with no casualSurname, display "No Cover"
+                  base.isSubstitute = true
+                  base.displayTeacher = 'No Cover'
+                  base.teacher = 'No Cover'
+                  base.originalTeacher = base.teacher
                 }
               }
               
