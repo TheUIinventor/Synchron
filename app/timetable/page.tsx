@@ -37,21 +37,12 @@ export default function TimetablePage() {
       if (periods.length > 0) {
         console.log(`[Timetable Page] ${dayName} has ${periods.length} periods`)
         const firstPeriod = periods[0]
-        console.log('[Timetable Page] Sample period keys:', Object.keys(firstPeriod || {}))
+        console.log('[Timetable Page] Sample period fields:', Object.keys(firstPeriod || {}))
         console.log('[Timetable Page] Room variation fields in first period:', {
           displayRoom: firstPeriod?.displayRoom,
           isRoomChange: firstPeriod?.isRoomChange,
           originalRoom: firstPeriod?.originalRoom
         })
-        // Log ALL periods that have room changes
-        const roomChangePeriods = periods.filter((p: any) => p.isRoomChange)
-        console.log(`[Timetable Page] 🔍 Found ${roomChangePeriods.length} periods with room changes:`, roomChangePeriods.map((p: any) => ({
-          period: p.period,
-          subject: p.subject,
-          originalRoom: p.originalRoom,
-          displayRoom: p.displayRoom,
-          isRoomChange: p.isRoomChange
-        })))
       }
     } catch (e) {}
   }, [])

@@ -261,6 +261,15 @@ export async function GET(req: NextRequest) {
           const rawSubjects = dj?.timetable?.subjects
           const subjectsObj = (!Array.isArray(rawSubjects) && rawSubjects) ? rawSubjects : {}
           const classVars = !Array.isArray(dj.classVariations) ? (dj.classVariations || {}) : {}
+          
+          // DEBUG: Log raw roomVariations BEFORE any processing
+          console.log(`[API] === RAW ROOM VARIATIONS ===`)
+          console.log(`[API] dj.roomVariations raw (before processing):`, dj.roomVariations)
+          console.log(`[API] typeof dj.roomVariations:`, typeof dj.roomVariations)
+          console.log(`[API] Array.isArray(dj.roomVariations):`, Array.isArray(dj.roomVariations))
+          console.log(`[API] dj.roomVariations === null:`, dj.roomVariations === null)
+          console.log(`[API] dj.roomVariations === undefined:`, dj.roomVariations === undefined)
+          
           const roomVars = !Array.isArray(dj.roomVariations) ? (dj.roomVariations || {}) : {}
           
           // Debug: Log the extracted data structures
@@ -268,8 +277,17 @@ export async function GET(req: NextRequest) {
           console.log(`[API] periodsObj keys: [${Object.keys(periodsObj).join(', ')}]`)
           console.log(`[API] rawSubjects type: ${Array.isArray(rawSubjects) ? 'array' : typeof rawSubjects}, isArray: ${Array.isArray(rawSubjects)}`)
           console.log(`[API] subjectsObj keys: [${Object.keys(subjectsObj).join(', ')}]`)
+          // Debug: Log roomVars AFTER conversion
+          console.log(`[API] === ROOM VARIATIONS AFTER CONVERSION ===`)
+          console.log(`[API] roomVars keys after conversion: [${Object.keys(roomVars).join(', ')}]`)
+          console.log(`[API] roomVars length: ${Object.keys(roomVars).length}`)
+          if (Object.keys(roomVars).length > 0) {
+            const firstKey = Object.keys(roomVars)[0]
+            console.log(`[API] roomVars[${firstKey}]:`, JSON.stringify(roomVars[firstKey]))
+          }
           // Debug: Log roomVars BEFORE we try to use them
           console.log(`[API] === ROOM VARIATIONS DEBUG ===`)
+          console.log(`[API] dj.roomVariations type: ${typeof dj.roomVariations}, isArray: ${Array.isArray(dj.roomVariations)}, value:`, dj.roomVariations)
           console.log(`[API] classVars is array: ${Array.isArray(dj.classVariations)}, keys: ${!Array.isArray(dj.classVariations) && dj.classVariations ? Object.keys(dj.classVariations).join(',') : 'N/A'}`)
           console.log(`[API] roomVars is array: ${Array.isArray(dj.roomVariations)}, keys: ${!Array.isArray(dj.roomVariations) && dj.roomVariations ? Object.keys(dj.roomVariations).join(',') : 'N/A'}`)
           if (!Array.isArray(dj.roomVariations) && typeof dj.roomVariations === 'object' && dj.roomVariations) {
@@ -301,15 +319,21 @@ export async function GET(req: NextRequest) {
           if (!Array.isArray(dj.roomVariations) && dj.roomVariations && Object.keys(dj.roomVariations).length > 0) {
             console.log(`[API] roomVariations content:`, JSON.stringify(dj.roomVariations))
           }
-          // CRITICAL: Check if roomVariations exists at all in the response
-          console.log(`[API] 🔍 roomVariations exists in dj: ${dj.roomVariations !== undefined}, value: ${dj.roomVariations !== undefined ? JSON.stringify(dj.roomVariations).substring(0, 200) : 'undefined'}`)
-          console.log(`[API] 🔍 All top-level keys in dj object:`, Object.keys(dj).join(', '))
           
           // Also check for alternative room variation field names that might be used
           const alternativeRoomFields = ['variations', 'room_variations', 'room_changes', 'rooms', 'roomChanges', 'room_change']
           for (const fieldName of alternativeRoomFields) {
             if ((dj as any)[fieldName] && typeof (dj as any)[fieldName] === 'object') {
               console.log(`[API] Found alternative room field "${fieldName}":`, JSON.stringify((dj as any)[fieldName]))
+            }
+          }
+          
+          // Debug: Show ALL keys in the response to find where room data might be
+          console.log(`[API] === Full dj keys ===`, Object.keys(dj).join(', '))
+          if (dj.timetable && typeof dj.timetable === 'object') {
+            console.log(`[API] === dj.timetable keys ===`, Object.keys(dj.timetable).join(', '))
+            if (dj.timetable.timetable && typeof dj.timetable.timetable === 'object') {
+              console.log(`[API] === dj.timetable.timetable keys ===`, Object.keys(dj.timetable.timetable).join(', '))
             }
           }
           
@@ -358,8 +382,6 @@ export async function GET(req: NextRequest) {
           // This ensures we have proper timing info AND can apply variations
           if (Array.isArray(bells) && bells.length > 0) {
             const date = dj.date || dateParam
-            
-            console.log(`[API] 📋 Processing ${bells.length} bells for ${dow}, roomVars has ${Object.keys(roomVars).length} entries`)
             
             byDay[dow] = bells.map((bell: any) => {
               // Prefer period over bell ID for looking up variations (period number matches roomVariations/classVariations keys)
@@ -441,11 +463,6 @@ export async function GET(req: NextRequest) {
               // Extract colour from subject data (hex without # prefix)
               const subjectColour = subjectData.colour || undefined
               
-              // Log if this period has room variations
-              if (isRoomChange) {
-                console.log(`[API] ✅ Returning P${bellKey} with displayRoom="${displayRoom}", isRoomChange=true`)
-              }
-              
               return {
                 period: bellKey,
                 time,
@@ -467,7 +484,7 @@ export async function GET(req: NextRequest) {
                 isRoomChange,
                 originalRoom,
               }
-            }))
+            })
           } else {
             // Fallback: extract from periods array/object
             let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])
