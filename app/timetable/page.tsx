@@ -280,7 +280,8 @@ export default function TimetablePage() {
 
   const normalizePeriodLabel = (p?: string) => String(p || '').trim().toLowerCase()
   // Keep Roll Call / Period 0 and Break rows visible — show all raw entries
-  const todaysTimetable = todaysTimetableRaw
+  // However, if it's a non-school day, return empty array even if context has cached data
+  const todaysTimetable = isSchoolDay ? todaysTimetableRaw : []
 
   // Helper: normalize labels and build a canonical key for matching.
   const normalizeLabel = (s?: string) => {
