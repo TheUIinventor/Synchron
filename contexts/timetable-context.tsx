@@ -1248,7 +1248,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (authVariation.isSubstitute) {
                 (p as any).isSubstitute = true
                 if (authVariation.casualSurname) (p as any).casualSurname = authVariation.casualSurname
-                if (authVariation.displayTeacher) (p as any).displayTeacher = authVariation.displayTeacher
+                if (authVariation.displayTeacher && typeof authVariation.displayTeacher === 'string') (p as any).displayTeacher = authVariation.displayTeacher
                 if (authVariation.originalTeacher) (p as any).originalTeacher = authVariation.originalTeacher
                 // Normalize displayTeacher if casualSurname is set but displayTeacher is not
                 if (!((p as any).displayTeacher) && (p as any).casualSurname) {
@@ -1288,7 +1288,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
                   (p as any).isSubstitute = true
                   if ((match as any).casualSurname) (p as any).casualSurname = (match as any).casualSurname
                   if ((match as any).casualToken) (p as any).casualToken = (match as any).casualToken
-                  if ((match as any).displayTeacher) (p as any).displayTeacher = stripLeadingCasualCode((match as any).displayTeacher)
+                  if ((match as any).displayTeacher && typeof (match as any).displayTeacher === 'string') (p as any).displayTeacher = (match as any).displayTeacher
                   else if ((match as any).casualSurname) (p as any).displayTeacher = stripLeadingCasualCode((match as any).casualSurname)
                   if ((match as any).originalTeacher) (p as any).originalTeacher = (match as any).originalTeacher
                   if (match.teacher) p.teacher = match.teacher
