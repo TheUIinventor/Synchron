@@ -261,15 +261,6 @@ export async function GET(req: NextRequest) {
           const rawSubjects = dj?.timetable?.subjects
           const subjectsObj = (!Array.isArray(rawSubjects) && rawSubjects) ? rawSubjects : {}
           const classVars = !Array.isArray(dj.classVariations) ? (dj.classVariations || {}) : {}
-          
-          // DEBUG: Log raw roomVariations BEFORE any processing
-          console.log(`[API] === RAW ROOM VARIATIONS ===`)
-          console.log(`[API] dj.roomVariations raw (before processing):`, dj.roomVariations)
-          console.log(`[API] typeof dj.roomVariations:`, typeof dj.roomVariations)
-          console.log(`[API] Array.isArray(dj.roomVariations):`, Array.isArray(dj.roomVariations))
-          console.log(`[API] dj.roomVariations === null:`, dj.roomVariations === null)
-          console.log(`[API] dj.roomVariations === undefined:`, dj.roomVariations === undefined)
-          
           const roomVars = !Array.isArray(dj.roomVariations) ? (dj.roomVariations || {}) : {}
           
           // Debug: Log the extracted data structures
@@ -277,14 +268,6 @@ export async function GET(req: NextRequest) {
           console.log(`[API] periodsObj keys: [${Object.keys(periodsObj).join(', ')}]`)
           console.log(`[API] rawSubjects type: ${Array.isArray(rawSubjects) ? 'array' : typeof rawSubjects}, isArray: ${Array.isArray(rawSubjects)}`)
           console.log(`[API] subjectsObj keys: [${Object.keys(subjectsObj).join(', ')}]`)
-          // Debug: Log roomVars AFTER conversion
-          console.log(`[API] === ROOM VARIATIONS AFTER CONVERSION ===`)
-          console.log(`[API] roomVars keys after conversion: [${Object.keys(roomVars).join(', ')}]`)
-          console.log(`[API] roomVars length: ${Object.keys(roomVars).length}`)
-          if (Object.keys(roomVars).length > 0) {
-            const firstKey = Object.keys(roomVars)[0]
-            console.log(`[API] roomVars[${firstKey}]:`, JSON.stringify(roomVars[firstKey]))
-          }
           // Debug: Log roomVars BEFORE we try to use them
           console.log(`[API] === ROOM VARIATIONS DEBUG ===`)
           console.log(`[API] dj.roomVariations type: ${typeof dj.roomVariations}, isArray: ${Array.isArray(dj.roomVariations)}, value:`, dj.roomVariations)
