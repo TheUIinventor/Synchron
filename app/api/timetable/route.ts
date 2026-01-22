@@ -301,6 +301,9 @@ export async function GET(req: NextRequest) {
           if (!Array.isArray(dj.roomVariations) && dj.roomVariations && Object.keys(dj.roomVariations).length > 0) {
             console.log(`[API] roomVariations content:`, JSON.stringify(dj.roomVariations))
           }
+          // CRITICAL: Check if roomVariations exists at all in the response
+          console.log(`[API] 🔍 roomVariations exists in dj: ${dj.roomVariations !== undefined}, value: ${dj.roomVariations !== undefined ? JSON.stringify(dj.roomVariations).substring(0, 200) : 'undefined'}`)
+          console.log(`[API] 🔍 All top-level keys in dj object:`, Object.keys(dj).join(', '))
           
           // Also check for alternative room variation field names that might be used
           const alternativeRoomFields = ['variations', 'room_variations', 'room_changes', 'rooms', 'roomChanges', 'room_change']
@@ -355,6 +358,8 @@ export async function GET(req: NextRequest) {
           // This ensures we have proper timing info AND can apply variations
           if (Array.isArray(bells) && bells.length > 0) {
             const date = dj.date || dateParam
+            
+            console.log(`[API] 📋 Processing ${bells.length} bells for ${dow}, roomVars has ${Object.keys(roomVars).length} entries`)
             
             byDay[dow] = bells.map((bell: any) => {
               // Prefer period over bell ID for looking up variations (period number matches roomVariations/classVariations keys)
@@ -436,6 +441,11 @@ export async function GET(req: NextRequest) {
               // Extract colour from subject data (hex without # prefix)
               const subjectColour = subjectData.colour || undefined
               
+              // Log if this period has room variations
+              if (isRoomChange) {
+                console.log(`[API] ✅ Returning P${bellKey} with displayRoom="${displayRoom}", isRoomChange=true`)
+              }
+              
               return {
                 period: bellKey,
                 time,
@@ -457,7 +467,7 @@ export async function GET(req: NextRequest) {
                 isRoomChange,
                 originalRoom,
               }
-            })
+            }))
           } else {
             // Fallback: extract from periods array/object
             let arr: any[] = Array.isArray(dj) ? dj : (dj.periods || dj.entries || dj.data || [])

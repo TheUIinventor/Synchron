@@ -2567,6 +2567,25 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             source: j?.source,
             keys: Object.keys(j || {})
           })
+          // Log the timetable structure to see if room variations are there
+          try {
+            const firstDay = Object.keys(j?.timetable || {})[0]
+            if (firstDay) {
+              const firstPeriods = j.timetable[firstDay]
+              if (Array.isArray(firstPeriods) && firstPeriods.length > 0) {
+                const firstPeriod = firstPeriods[0]
+                console.log(`[DEBUG refreshExternal] First period from API (${firstDay}):`, {
+                  period: firstPeriod.period,
+                  subject: firstPeriod.subject,
+                  room: firstPeriod.room,
+                  displayRoom: firstPeriod.displayRoom,
+                  isRoomChange: firstPeriod.isRoomChange,
+                  originalRoom: firstPeriod.originalRoom,
+                  hasRoomFields: (firstPeriod.displayRoom !== undefined || firstPeriod.isRoomChange !== undefined)
+                })
+              }
+            }
+          } catch (e) { console.log('[DEBUG] Error logging first period:', e) }
           // Compute a lightweight hash for this payload and try to reuse
           // any previously-processed result stored under that hash. This
           // allows the UI to show a fully-processed timetable instantly
