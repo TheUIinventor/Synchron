@@ -410,6 +410,7 @@ export async function GET(req: NextRequest) {
                 teacher: isSubstitute && displayTeacher ? displayTeacher : (periodData.fullTeacher || periodData.teacher || ''),
                 fullTeacher: periodData.fullTeacher || undefined,
                 room: periodData.room || '',
+                year: periodData.year || undefined,
                 weekType: inferred || undefined,
                 // Subject colour (hex without # prefix, e.g., "448ae6")
                 colour: subjectColour,
@@ -1028,9 +1029,22 @@ export async function GET(req: NextRequest) {
           const teacherKey = normalizeString(p.teacher).toUpperCase()
           const roomKey = normalizeString(p.room).toUpperCase()
           const weekTypeKey = normalizeString(p.weekType).toUpperCase()
+          // Note: DO NOT include year in the dedupe key - year is used for precedence, not uniqueness
           // include start minute in the dedupe key to avoid merging distinct periods that share labels
           const key = [period, startMin, subjectKey, teacherKey, roomKey, weekTypeKey].join('|')
-          if (!seen.has(key)) seen.set(key, { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), fullTeacher: normalizeString(p.fullTeacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined })
+          const normalized = { ...p, period, time, subject: subjectDisplay, teacher: normalizeString(p.teacher), fullTeacher: normalizeString(p.fullTeacher), room: normalizeString(p.room), weekType: weekTypeKey || undefined, year: p.year || undefined }
+          
+          if (!seen.has(key)) {
+            seen.set(key, normalized)
+          } else {
+            // If duplicate found, keep the one with the higher year (accelerant classes take precedence)
+            const existing = seen.get(key)
+            const existingYear = parseInt(String(existing.year || '0'), 10)
+            const newYear = parseInt(String(normalized.year || '0'), 10)
+            if (newYear > existingYear) {
+              seen.set(key, normalized)
+            }
+          }
         }
         b[dayName] = Array.from(seen.values())
       }
@@ -1079,29 +1093,40 @@ export async function GET(req: NextRequest) {
         const roomKey = normalizeString(p.room).toUpperCase()
         const weekTypeKey = normalizeString(p.weekType).toUpperCase()
         const key = [period, startMin, subjectKey, teacherKey, roomKey, weekTypeKey].join('|')
+        
+        // Create a clean copy WITHOUT date-specific flags like isRoomChange/displayRoom
+        // or isSubstitute/casualSurname. The timetableByWeek represents the cycle/template
+        // data, not date-specific variations. Date-specific info stays in byDay.
+        const clean = { 
+          ...p, 
+          period, 
+          time, 
+          subject: subjectDisplay, 
+          teacher: normalizeString(p.teacher), 
+          fullTeacher: normalizeString(p.fullTeacher), 
+          room: normalizeString(p.room), 
+          weekType: weekTypeKey || undefined,
+          year: p.year || undefined
+        }
+        // Remove date-specific variation flags from the cycle view
+        delete clean.isRoomChange
+        delete clean.displayRoom
+        delete clean.isSubstitute
+        delete clean.casualSurname
+        delete clean.casualToken
+        delete clean.displayTeacher
+        delete clean.originalTeacher
+        
         if (!seen.has(key)) {
-          // Create a clean copy WITHOUT date-specific flags like isRoomChange/displayRoom
-          // or isSubstitute/casualSurname. The timetableByWeek represents the cycle/template
-          // data, not date-specific variations. Date-specific info stays in byDay.
-          const clean = { 
-            ...p, 
-            period, 
-            time, 
-            subject: subjectDisplay, 
-            teacher: normalizeString(p.teacher), 
-            fullTeacher: normalizeString(p.fullTeacher), 
-            room: normalizeString(p.room), 
-            weekType: weekTypeKey || undefined 
-          }
-          // Remove date-specific variation flags from the cycle view
-          delete clean.isRoomChange
-          delete clean.displayRoom
-          delete clean.isSubstitute
-          delete clean.casualSurname
-          delete clean.casualToken
-          delete clean.displayTeacher
-          delete clean.originalTeacher
           seen.set(key, clean)
+        } else {
+          // If duplicate found, keep the one with the higher year (accelerant classes take precedence)
+          const existing = seen.get(key)
+          const existingYear = parseInt(String(existing.year || '0'), 10)
+          const newYear = parseInt(String(clean.year || '0'), 10)
+          if (newYear > existingYear) {
+            seen.set(key, clean)
+          }
         }
       }
       return Array.from(seen.values())

@@ -17,6 +17,7 @@ export type Period = {
   title?: string // Full subject title (e.g., "8 Mathematics A" vs shortTitle "MAT A")
   teacher: string
   room: string
+  year?: string // Year level (e.g., "9", "10", "11" - higher year takes precedence for accelerant classes)
   weekType?: "A" | "B"
   isSubstitute?: boolean // New: Indicates a substitute teacher
   isRoomChange?: boolean // New: Indicates a room change
