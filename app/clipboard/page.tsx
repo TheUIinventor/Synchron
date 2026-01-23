@@ -5,32 +5,229 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import { useAuth } from "@/lib/api/hooks"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Bell, Clipboard as ClipboardIcon, Zap, LogIn } from "lucide-react"
+import { LogIn } from "lucide-react"
 
 const features = [
   {
-    icon: Calendar,
-    title: "Smart Timetable",
-    description: "See your real classes, teachers, and rooms in one beautiful view."
+    title: "Canvas Integration",
+    description: "Click classes to access Canvas directly—all your course materials in one tap.",
+    demo: "canvas"
   },
   {
-    icon: Bell,
-    title: "Instant Notifications",
-    description: "Get notices relevant to your year group and activities as they happen."
+    title: "Dynamic Links",
+    description: "Smart links that adapt to your courses. Your portal connections, seamlessly integrated.",
+    demo: "dynamic"
   },
   {
-    icon: ClipboardIcon,
-    title: "Organize with Clipboard",
-    description: "Seamlessly access your calendar and tasks from the SBHS Portal."
+    title: "Clipboard Integration",
+    description: "Organize your calendar and tasks without leaving Synchron. SBHS Portal at your fingertips.",
+    demo: "clipboard"
   },
   {
-    icon: Zap,
-    title: "Lightning Fast",
-    description: "Optimized for speed so you always know what's next."
+    title: "Daily Notices",
+    description: "Personalized notifications for your year group and activities. Never miss important updates.",
+    demo: "notices"
+  },
+  {
+    title: "Modern Timetable",
+    description: "Beautiful, intuitive schedule that shows real teachers, rooms, and instant substitutions.",
+    demo: "timetable"
+  },
+  {
+    title: "Expressive Design",
+    description: "Thoughtful interface that's delightful to use. Dark mode, smooth animations, and more.",
+    demo: "design"
+  },
+  {
+    title: "Built to Last",
+    description: "Fast, reliable, and constantly improving. Your school timetable app evolved.",
+    demo: "lasting"
   }
 ]
 
-export default function ClipboardPage() {
+// Mini Device Demo Component
+const DeviceDemo = ({ type, progress }: { type: string; progress: number }) => {
+  const animatedProgress = progress < 0.5 
+    ? 2 * progress * progress 
+    : 1 - Math.pow(-2 * progress + 2, 2) / 2
+
+  if (type === "canvas") {
+    return (
+      <div className="relative w-full h-32 flex items-center justify-center">
+        {/* Phone Frame */}
+        <div className="relative w-20 h-32 bg-black rounded-2xl border-4 border-gray-800 shadow-lg overflow-hidden flex flex-col items-center justify-center p-1.5">
+          <div className="w-full h-full bg-gradient-to-b from-primary/20 to-primary/5 flex flex-col items-center justify-center text-center gap-1">
+            <div className="text-xs font-bold text-on-surface">Canvas</div>
+            <div style={{ opacity: Math.max(0, 1 - animatedProgress) }} className="transition-opacity">
+              <div className="text-[8px] text-on-surface-variant">ENG 101</div>
+            </div>
+            <div style={{ opacity: animatedProgress }} className="transition-opacity">
+              <div className="text-[8px] text-primary font-bold">Opening...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (type === "dynamic") {
+    return (
+      <div className="relative w-full h-32 flex items-center justify-center">
+        {/* Tablet Frame */}
+        <div className="relative w-24 h-28 bg-black rounded-xl border-2 border-gray-700 shadow-lg overflow-hidden flex flex-col p-2">
+          <div className="w-full h-full bg-gradient-to-b from-blue-100 to-blue-50 flex flex-col gap-1">
+            <div className="text-[9px] font-bold text-on-surface px-1">Links</div>
+            <div className="flex gap-1 flex-wrap px-1">
+              {["Canvas", "Portal", "Email"].map((link, i) => (
+                <div
+                  key={i}
+                  className="text-[7px] px-1 py-0.5 rounded bg-primary/30 text-primary"
+                  style={{
+                    transform: `scaleX(${animatedProgress > i * 0.33 ? 1 : 0})`,
+                    opacity: animatedProgress > i * 0.33 ? 1 : 0,
+                    transition: "all 0.3s ease"
+                  }}
+                >
+                  {link}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (type === "clipboard") {
+    return (
+      <div className="relative w-full h-32 flex items-center justify-center">
+        {/* Phone Frame */}
+        <div className="relative w-20 h-32 bg-black rounded-2xl border-4 border-gray-800 shadow-lg overflow-hidden flex flex-col p-1.5">
+          <div className="w-full h-full bg-gradient-to-b from-purple-100 to-purple-50 flex flex-col items-center justify-center gap-1.5">
+            <div className="text-[8px] font-bold text-on-surface">Clipboard</div>
+            <div
+              className="w-10 h-6 bg-white rounded border border-purple-200"
+              style={{
+                transform: `translateY(${animatedProgress * 20}px)`,
+                opacity: 1 - animatedProgress * 0.3
+              }}
+            />
+            <div className="text-[7px] text-on-surface-variant">Calendar</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (type === "notices") {
+    return (
+      <div className="relative w-full h-32 flex items-center justify-center">
+        {/* Phone Frame */}
+        <div className="relative w-20 h-32 bg-black rounded-2xl border-4 border-gray-800 shadow-lg overflow-hidden flex flex-col p-1.5">
+          <div className="w-full h-full bg-gradient-to-b from-yellow-100 to-yellow-50 flex flex-col items-center justify-center gap-1">
+            <div className="text-[8px] font-bold text-on-surface">Notices</div>
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-14 h-2 bg-yellow-200 rounded text-[7px]"
+                style={{
+                  opacity: animatedProgress > i * 0.33 ? 1 : 0.3,
+                  transform: `scaleY(${animatedProgress > i * 0.33 ? 1 : 0.5})`,
+                  transition: "all 0.3s ease"
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (type === "timetable") {
+    return (
+      <div className="relative w-full h-32 flex items-center justify-center">
+        {/* Laptop Frame */}
+        <div className="relative">
+          <div className="w-32 h-20 bg-black rounded-t-lg border-2 border-gray-800 overflow-hidden flex flex-col p-2 shadow-lg">
+            <div className="w-full h-full bg-gradient-to-r from-teal-100 to-cyan-100 flex flex-col gap-1.5">
+              <div className="text-[9px] font-bold text-on-surface">Schedule</div>
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  className="flex gap-1 items-center"
+                  style={{
+                    opacity: animatedProgress > i * 0.5 ? 1 : 0.4,
+                    transform: `translateX(${animatedProgress > i * 0.5 ? 0 : -10}px)`,
+                    transition: "all 0.4s ease"
+                  }}
+                >
+                  <div className="w-1 h-3 bg-primary rounded-full" />
+                  <div className="text-[7px] text-on-surface-variant flex-1">Class {i + 1}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="w-32 h-2 bg-gray-900 rounded-b-lg border-2 border-t-0 border-gray-800" />
+        </div>
+      </div>
+    )
+  }
+
+  if (type === "design") {
+    return (
+      <div className="relative w-full h-32 flex items-center justify-center">
+        {/* Phone Frame with theme animation */}
+        <div className="relative w-20 h-32 bg-black rounded-2xl border-4 border-gray-800 shadow-lg overflow-hidden flex flex-col p-1.5">
+          <div
+            className="w-full h-full bg-gradient-to-b from-orange-100 to-orange-50 flex flex-col items-center justify-center gap-2 transition-all duration-700"
+            style={{
+              background: animatedProgress > 0.5 
+                ? "linear-gradient(to bottom, rgb(17, 24, 39), rgb(31, 41, 55))" 
+                : "linear-gradient(to bottom, rgb(254, 243, 224), rgb(254, 237, 213))"
+            }}
+          >
+            <div className="text-[8px] font-bold" style={{ color: animatedProgress > 0.5 ? "#fff" : "#000" }}>
+              Theme
+            </div>
+            <div className="w-3 h-3 rounded-full bg-primary" />
+            <div className="text-[7px]" style={{ color: animatedProgress > 0.5 ? "#ccc" : "#666" }}>
+              {animatedProgress > 0.5 ? "Dark" : "Light"}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (type === "lasting") {
+    return (
+      <div className="relative w-full h-32 flex items-center justify-center">
+        {/* All devices together */}
+        <div className="flex gap-2 items-end">
+          {/* Phone */}
+          <div className="relative w-12 h-20 bg-black rounded-xl border-2 border-gray-800 shadow-lg overflow-hidden">
+            <div className="w-full h-full bg-gradient-to-b from-green-100 to-green-50" />
+          </div>
+          {/* Tablet */}
+          <div className="relative w-16 h-20 bg-black rounded-lg border-2 border-gray-800 shadow-lg overflow-hidden">
+            <div className="w-full h-full bg-gradient-to-b from-green-100 to-green-50" />
+          </div>
+          {/* Laptop */}
+          <div className="relative">
+            <div className="w-20 h-12 bg-black rounded-t-lg border-2 border-gray-800 overflow-hidden shadow-lg">
+              <div className="w-full h-full bg-gradient-to-b from-green-100 to-green-50" />
+            </div>
+            <div className="w-20 h-1.5 bg-gray-900 rounded-b-lg border-2 border-t-0 border-gray-800" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+
+
   const { isAuthenticated, loading } = useAuth()
   const [iframeKey, setIframeKey] = useState(0)
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0)
@@ -116,62 +313,21 @@ export default function ClipboardPage() {
   // Block access if not authenticated
   if (!isAuthenticated) {
     const currentFeature = features[currentFeatureIndex]
-    const CurrentIcon = currentFeature.icon
-    const nextFeature = features[(currentFeatureIndex + 1) % features.length]
-    const NextIcon = nextFeature.icon
-
-    // Ease animation progress for smooth transitions
-    const easeProgress = animationProgress < 0.5 
-      ? 2 * animationProgress * animationProgress 
-      : 1 - Math.pow(-2 * animationProgress + 2, 2) / 2
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
         <Card className="w-full max-w-2xl bg-card border border-border rounded-m3-xl shadow-elevation-1 overflow-hidden">
           <div className="flex flex-col md:flex-row h-96">
-            {/* Left Side - Animated Carousel */}
+            {/* Left Side - Animated Device Demo */}
             <div className="flex-1 bg-gradient-to-br from-primary/10 to-primary/5 flex flex-col items-center justify-center p-8 relative overflow-hidden">
               {/* Animated background circles */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="absolute w-48 h-48 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
               </div>
               
-              {/* Current Feature Card - Scaling out and moving up */}
-              <div 
-                className="absolute text-center space-y-3"
-                style={{
-                  transform: `scale(${1 - easeProgress * 0.4}) translateY(${easeProgress * -30}px)`,
-                  opacity: Math.max(0, 1 - easeProgress * 1.2),
-                  transition: 'none'
-                }}
-              >
-                <div className="flex justify-center">
-                  <div className="p-4 bg-primary/20 rounded-full">
-                    <CurrentIcon className="h-12 w-12 text-primary" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-on-surface">{currentFeature.title}</h3>
-                </div>
-              </div>
-
-              {/* Next Feature Card - Scaling in from below */}
-              <div 
-                className="absolute text-center space-y-3"
-                style={{
-                  transform: `scale(${easeProgress * 0.7 + 0.3}) translateY(${(1 - easeProgress) * 40}px)`,
-                  opacity: Math.min(1, easeProgress * 1.5),
-                  transition: 'none'
-                }}
-              >
-                <div className="flex justify-center">
-                  <div className="p-4 bg-primary/20 rounded-full">
-                    <NextIcon className="h-12 w-12 text-primary" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-on-surface">{nextFeature.title}</h3>
-                </div>
+              {/* Device Demo Animation */}
+              <div className="relative z-10 flex items-center justify-center">
+                <DeviceDemo type={currentFeature.demo} progress={animationProgress} />
               </div>
 
               {/* Carousel Indicators */}
