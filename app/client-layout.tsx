@@ -194,7 +194,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
             {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
             <ConditionalTopRightIcons />
             <AppSidebar />
-            <div className="px-2 sm:px-3 md:pl-20 lg:pl-28 pb-8 md:pb-10">{children}</div>
+            <div className="px-2 sm:px-3 md:pl-20 md:pr-3 lg:pl-28 lg:pr-4 pb-8 md:pb-10 overflow-x-hidden">{children}</div>
             <BottomNav />
             </TimetableProvider>
           </QueryClientProviderWrapper>

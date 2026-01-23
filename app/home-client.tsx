@@ -379,7 +379,7 @@ export default function HomeClient() {
   const noClassesByBells = !bellsForDay || (Array.isArray(bellsForDay) && bellsForDay.length === 0) || (!bellState.nextBell && !bellState.isCurrentlyInPeriod);
 
   return (
-    <div className="space-y-4 pb-6 md:pb-6 animate-in fade-in duration-700">
+    <div className="space-y-4 pb-6 md:pb-6 animate-in fade-in duration-700 max-w-full">
       
       {/* Header Section */}
       <div className="flex items-start justify-between gap-4 pt-4 md:pt-0">
@@ -412,7 +412,7 @@ export default function HomeClient() {
 
         {/* Small inline sync indicator placed left of settings icon */}
       {/* Main Expressive Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start md:items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-4 items-start md:items-stretch w-full max-w-full overflow-hidden">
         
         {/* HERO: Current/Next Period - Spans full width on mobile, 6 cols on desktop */}
         <div className="md:col-span-6 space-y-3 flex flex-col md:h-full">
