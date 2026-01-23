@@ -4,8 +4,8 @@ import { useEffect, useState, useRef } from "react"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import { useAuth } from "@/lib/api/hooks"
 import { Card } from "@/components/ui/card"
-import { Calendar, Bell, Clipboard as ClipboardIcon, Zap } from "lucide-react"
-import SignInButton from "@/components/auth/sign-in-button"
+import { Button } from "@/components/ui/button"
+import { Calendar, Bell, Clipboard as ClipboardIcon, Zap, LogIn } from "lucide-react"
 
 const features = [
   {
@@ -34,6 +34,7 @@ export default function ClipboardPage() {
   const { isAuthenticated, loading } = useAuth()
   const [iframeKey, setIframeKey] = useState(0)
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0)
+  const [animationProgress, setAnimationProgress] = useState(0)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
   useEffect(() => {
@@ -41,12 +42,28 @@ export default function ClipboardPage() {
     trackSectionUsage("clipboard")
   }, [])
 
-  // Cycle through features every 4 seconds
+  // Cycle through features every 4 seconds with smooth animation
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentFeatureIndex((prev) => (prev + 1) % features.length)
-    }, 4000)
-    return () => clearInterval(interval)
+    let animationFrame: number
+    let startTime = Date.now()
+    const cycleDuration = 4000 // 4 seconds per feature
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime
+      const progress = (elapsed % cycleDuration) / cycleDuration
+
+      setAnimationProgress(progress)
+
+      // Switch feature when progress completes
+      if (elapsed % cycleDuration < 16) { // Only update index once per cycle
+        setCurrentFeatureIndex(Math.floor(elapsed / cycleDuration) % features.length)
+      }
+
+      animationFrame = requestAnimationFrame(animate)
+    }
+
+    animationFrame = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(animationFrame)
   }, [])
 
   // Show helper immediately (user requested instant visibility)
@@ -100,28 +117,73 @@ export default function ClipboardPage() {
   if (!isAuthenticated) {
     const currentFeature = features[currentFeatureIndex]
     const CurrentIcon = currentFeature.icon
+    const nextFeature = features[(currentFeatureIndex + 1) % features.length]
+    const NextIcon = nextFeature.icon
+
+    // Ease animation progress for smooth transitions
+    const easeProgress = animationProgress < 0.5 
+      ? 2 * animationProgress * animationProgress 
+      : 1 - Math.pow(-2 * animationProgress + 2, 2) / 2
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
         <Card className="w-full max-w-2xl bg-card border border-border rounded-m3-xl shadow-elevation-1 overflow-hidden">
           <div className="flex flex-col md:flex-row h-96">
-            {/* Left Side - Animated Feature */}
+            {/* Left Side - Animated Carousel */}
             <div className="flex-1 bg-gradient-to-br from-primary/10 to-primary/5 flex flex-col items-center justify-center p-8 relative overflow-hidden">
               {/* Animated background circles */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="absolute w-32 h-32 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="absolute w-48 h-48 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
               </div>
               
-              {/* Feature Icon and Content */}
-              <div className="relative z-10 text-center space-y-4">
+              {/* Current Feature Card - Scaling out and moving up */}
+              <div 
+                className="absolute text-center space-y-3"
+                style={{
+                  transform: `scale(${1 - easeProgress * 0.4}) translateY(${easeProgress * -30}px)`,
+                  opacity: Math.max(0, 1 - easeProgress * 1.2),
+                  transition: 'none'
+                }}
+              >
                 <div className="flex justify-center">
-                  <div className="p-4 bg-primary/20 rounded-full animate-in fade-in duration-500">
+                  <div className="p-4 bg-primary/20 rounded-full">
                     <CurrentIcon className="h-12 w-12 text-primary" />
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-on-surface">{currentFeature.title}</h3>
+                  <h3 className="text-lg font-bold text-on-surface">{currentFeature.title}</h3>
                 </div>
+              </div>
+
+              {/* Next Feature Card - Scaling in from below */}
+              <div 
+                className="absolute text-center space-y-3"
+                style={{
+                  transform: `scale(${easeProgress * 0.7 + 0.3}) translateY(${(1 - easeProgress) * 40}px)`,
+                  opacity: Math.min(1, easeProgress * 1.5),
+                  transition: 'none'
+                }}
+              >
+                <div className="flex justify-center">
+                  <div className="p-4 bg-primary/20 rounded-full">
+                    <NextIcon className="h-12 w-12 text-primary" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-on-surface">{nextFeature.title}</h3>
+                </div>
+              </div>
+
+              {/* Carousel Indicators */}
+              <div className="absolute bottom-4 flex gap-2 z-10">
+                {features.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      idx === currentFeatureIndex ? 'bg-primary w-6' : 'bg-primary/30 w-2'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
 
@@ -134,15 +196,23 @@ export default function ClipboardPage() {
                 
                 {/* Feature Description that changes with animation */}
                 <div className="min-h-16 pt-2">
-                  <p className="text-on-surface-variant text-sm animate-in fade-in duration-500">
+                  <p className="text-on-surface-variant text-sm">
                     {currentFeature.description}
                   </p>
                 </div>
               </div>
 
-              {/* Sign In Button - Full Width at Bottom */}
+              {/* Login Button - Full Width at Bottom */}
               <div className="pt-6 border-t border-border">
-                <SignInButton onSuccess={() => window.location.reload()} />
+                <Button 
+                  onClick={() => {
+                    try { window.location.href = '/api/auth/login' } catch { window.location.assign('/api/auth/login') }
+                  }}
+                  className="w-full rounded-m3-lg h-11 text-base font-medium"
+                >
+                  <LogIn className="mr-2 h-5 w-5" />
+                  Sign in to SBHS Portal
+                </Button>
               </div>
             </div>
           </div>
