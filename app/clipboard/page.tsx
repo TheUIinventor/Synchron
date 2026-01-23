@@ -227,7 +227,7 @@ const DeviceDemo = ({ type, progress }: { type: string; progress: number }) => {
   return null
 }
 
-
+export default function ClipboardPage() {
   const { isAuthenticated, loading } = useAuth()
   const [iframeKey, setIframeKey] = useState(0)
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0)
@@ -378,7 +378,6 @@ const DeviceDemo = ({ type, progress }: { type: string; progress: number }) => {
   }
 
   return (
-    <>
-    </>
+    <div ref={iframeRef as any} />
   )
 }
