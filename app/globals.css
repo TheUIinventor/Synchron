@@ -116,10 +116,10 @@
   body {
     @apply bg-background text-foreground font-sans overflow-x-hidden;
     background-image: 
-      radial-gradient(ellipse 900px 400px at 0% 0%, hsla(var(--primary) / 0.2) 0%, transparent 60%),
-      radial-gradient(ellipse 800px 350px at 100% 0%, hsla(var(--accent) / 0.15) 0%, transparent 55%),
-      radial-gradient(ellipse 850px 380px at 100% 100%, hsla(var(--secondary) / 0.15) 0%, transparent 58%),
-      radial-gradient(ellipse 750px 320px at 0% 100%, hsla(var(--primary) / 0.12) 0%, transparent 60%);
+      radial-gradient(ellipse 1000px 450px at 0% 0%, hsla(var(--primary) / 0.3) 0%, transparent 65%),
+      radial-gradient(ellipse 900px 400px at 100% 0%, hsla(var(--accent) / 0.22) 0%, transparent 60%),
+      radial-gradient(ellipse 950px 420px at 100% 100%, hsla(var(--secondary) / 0.22) 0%, transparent 62%),
+      radial-gradient(ellipse 850px 380px at 0% 100%, hsla(var(--primary) / 0.18) 0%, transparent 65%);
     background-attachment: fixed;
   }
 }
@@ -166,16 +166,16 @@
     /* Solid card backing (no translucency): use opaque HSL or a soft gradient */
     background-color: hsl(var(--card) / 1) !important;
     background-image: 
-      radial-gradient(ellipse 600px 250px at 20% 30%, hsla(var(--primary) / 0.08) 0%, transparent 65%),
-      radial-gradient(ellipse 550px 220px at 85% 70%, hsla(var(--accent) / 0.06) 0%, transparent 60%),
-      radial-gradient(ellipse 500px 200px at 50% 85%, hsla(var(--secondary) / 0.05) 0%, transparent 68%);
+      radial-gradient(ellipse 700px 300px at 15% 25%, hsla(var(--primary) / 0.25) 0%, transparent 70%),
+      radial-gradient(ellipse 650px 280px at 85% 75%, hsla(var(--accent) / 0.2) 0%, transparent 65%),
+      radial-gradient(ellipse 600px 250px at 50% 85%, hsla(var(--secondary) / 0.18) 0%, transparent 70%);
     transition: background-image 220ms ease, transform 160ms ease;
   }
   .glass-card:hover {
     background-image: 
-      radial-gradient(ellipse 650px 280px at 20% 30%, hsla(var(--primary) / 0.1) 0%, transparent 65%),
-      radial-gradient(ellipse 600px 250px at 85% 70%, hsla(var(--accent) / 0.08) 0%, transparent 60%),
-      radial-gradient(ellipse 550px 230px at 50% 85%, hsla(var(--secondary) / 0.07) 0%, transparent 68%);
+      radial-gradient(ellipse 750px 320px at 15% 25%, hsla(var(--primary) / 0.32) 0%, transparent 70%),
+      radial-gradient(ellipse 700px 300px at 85% 75%, hsla(var(--accent) / 0.26) 0%, transparent 65%),
+      radial-gradient(ellipse 650px 270px at 50% 85%, hsla(var(--secondary) / 0.24) 0%, transparent 70%);
     transform: translateY(-2px);
   }
   .glass-border {
@@ -188,8 +188,8 @@
   }
   .glass-button:hover {
     background-image: 
-      radial-gradient(ellipse 500px 200px at 30% 40%, hsla(var(--primary) / 0.08) 0%, transparent 65%),
-      radial-gradient(ellipse 450px 180px at 75% 65%, hsla(var(--accent) / 0.06) 0%, transparent 60%);
+      radial-gradient(ellipse 550px 220px at 30% 40%, hsla(var(--primary) / 0.15) 0%, transparent 65%),
+      radial-gradient(ellipse 500px 200px at 75% 65%, hsla(var(--accent) / 0.12) 0%, transparent 60%);
   }
   /* Make popovers translucent in light mode; darker in dark mode still uses slightly stronger tint */
   .bg-popover {
@@ -237,16 +237,16 @@
   .dark .glass-card {
     background-color: hsl(var(--card) / 0.94) !important;
     background-image: 
-      radial-gradient(ellipse 600px 250px at 20% 30%, hsla(var(--primary) / 0.12) 0%, transparent 65%),
-      radial-gradient(ellipse 550px 220px at 85% 70%, hsla(var(--accent) / 0.09) 0%, transparent 60%),
-      radial-gradient(ellipse 500px 200px at 50% 85%, hsla(var(--secondary) / 0.08) 0%, transparent 68%);
+      radial-gradient(ellipse 700px 300px at 15% 25%, hsla(var(--primary) / 0.3) 0%, transparent 70%),
+      radial-gradient(ellipse 650px 280px at 85% 75%, hsla(var(--accent) / 0.25) 0%, transparent 65%),
+      radial-gradient(ellipse 600px 250px at 50% 85%, hsla(var(--secondary) / 0.22) 0%, transparent 70%);
     box-shadow: 0 6px 24px rgba(0,0,0,0.45);
   }
 
   .dark .glass-button:hover {
     background-image: 
-      radial-gradient(ellipse 500px 200px at 30% 40%, hsla(var(--primary) / 0.12) 0%, transparent 65%),
-      radial-gradient(ellipse 450px 180px at 75% 65%, hsla(var(--accent) / 0.09) 0%, transparent 60%);
+      radial-gradient(ellipse 550px 220px at 30% 40%, hsla(var(--primary) / 0.2) 0%, transparent 65%),
+      radial-gradient(ellipse 500px 200px at 75% 65%, hsla(var(--accent) / 0.15) 0%, transparent 60%);
   }
 
   .dark .now-card {
