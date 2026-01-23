@@ -9,12 +9,24 @@ export const dynamic = "force-dynamic"
 
 export default function ClipboardPage() {
   const [iframeKey, setIframeKey] = useState(0)
+  const [isMounted, setIsMounted] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const { toast } = useToast()
+  const toastShownRef = useRef(false)
+
+  // Mount check to ensure we only show toast when fully mounted
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   useEffect(() => {
+    if (!isMounted) return
+    
     // Track clipboard usage
     trackSectionUsage("clipboard")
+    
+    // Only show toast once per component mount
+    if (toastShownRef.current) return
     
     // Get access count from localStorage
     const storedCount = localStorage.getItem("synchron-clipboard-access-count")
@@ -26,6 +38,8 @@ export default function ClipboardPage() {
     const shouldShowToast = accessCount <= 5 || (accessCount % 20 === 0)
     
     if (shouldShowToast) {
+      toastShownRef.current = true
+      
       toast({
         title: "Clipboard Access",
         description: "Are you experiencing difficulty accessing Clipboard from Synchron?",
@@ -34,7 +48,7 @@ export default function ClipboardPage() {
             <ToastAction
               altText="No"
               onClick={() => {
-                // Dismiss the toast
+                // Dismiss the toast by doing nothing - user explicitly closed it
               }}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
@@ -57,7 +71,7 @@ export default function ClipboardPage() {
         ),
       })
     }
-  }, [toast])
+  }, [isMounted, toast])
 
   // Show helper immediately (user requested instant visibility)
   useEffect(() => {
