@@ -88,6 +88,12 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     // Apply the color theme to CSS variables immediately
     const colors = getThemeColors(theme)
     const root = document.documentElement
+    
+    // Remove old theme classes
+    root.classList.remove("blue", "purple", "green", "red", "orange")
+    // Add new theme class for CSS selectors
+    root.classList.add(theme)
+    
     applyThemeColors(colors, root)
   }
 
@@ -163,6 +169,11 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const colors = getThemeColors(colorTheme)
     const root = document.documentElement
+    
+    // Apply theme class for CSS selectors
+    root.classList.remove("blue", "purple", "green", "red", "orange")
+    root.classList.add(colorTheme)
+    
     applyThemeColors(colors, root)
 
     // Observe class changes on the document element (e.g., `dark` toggled) and re-apply theme variables.

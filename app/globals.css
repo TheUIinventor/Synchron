@@ -125,6 +125,93 @@
 }
 
 @layer utilities {
+  /* Theme-specific gradient overrides - match color theme selection */
+  
+  /* Blue theme - light blue to white gradient */
+  html[data-theme="blue"] .glass-card,
+  html.blue .glass-card {
+    background-image: 
+      radial-gradient(ellipse 700px 300px at 15% 25%, hsla(217, 91%, 60% / 0.22) 0%, transparent 70%),
+      radial-gradient(ellipse 650px 280px at 85% 75%, hsla(217, 91%, 85% / 0.18) 0%, transparent 65%),
+      radial-gradient(ellipse 600px 250px at 50% 85%, hsla(217, 91%, 95% / 0.15) 0%, transparent 70%) !important;
+  }
+  
+  html[data-theme="blue"] .glass-card:hover,
+  html.blue .glass-card:hover {
+    background-image: 
+      radial-gradient(ellipse 750px 320px at 15% 25%, hsla(217, 91%, 60% / 0.28) 0%, transparent 70%),
+      radial-gradient(ellipse 700px 300px at 85% 75%, hsla(217, 91%, 85% / 0.24) 0%, transparent 65%),
+      radial-gradient(ellipse 650px 270px at 50% 85%, hsla(217, 91%, 95% / 0.20) 0%, transparent 70%) !important;
+  }
+  
+  /* Purple theme - purple to light pink gradient */
+  html[data-theme="purple"] .glass-card,
+  html.purple .glass-card {
+    background-image: 
+      radial-gradient(ellipse 700px 300px at 15% 25%, hsla(262, 83%, 58% / 0.25) 0%, transparent 70%),
+      radial-gradient(ellipse 650px 280px at 85% 75%, hsla(280, 85%, 75% / 0.20) 0%, transparent 65%),
+      radial-gradient(ellipse 600px 250px at 50% 85%, hsla(300, 90%, 90% / 0.16) 0%, transparent 70%) !important;
+  }
+  
+  html[data-theme="purple"] .glass-card:hover,
+  html.purple .glass-card:hover {
+    background-image: 
+      radial-gradient(ellipse 750px 320px at 15% 25%, hsla(262, 83%, 58% / 0.32) 0%, transparent 70%),
+      radial-gradient(ellipse 700px 300px at 85% 75%, hsla(280, 85%, 75% / 0.26) 0%, transparent 65%),
+      radial-gradient(ellipse 650px 270px at 50% 85%, hsla(300, 90%, 90% / 0.22) 0%, transparent 70%) !important;
+  }
+  
+  /* Green theme - mint to light green gradient */
+  html[data-theme="green"] .glass-card,
+  html.green .glass-card {
+    background-image: 
+      radial-gradient(ellipse 700px 300px at 15% 25%, hsla(142, 76%, 36% / 0.24) 0%, transparent 70%),
+      radial-gradient(ellipse 650px 280px at 85% 75%, hsla(150, 80%, 65% / 0.19) 0%, transparent 65%),
+      radial-gradient(ellipse 600px 250px at 50% 85%, hsla(160, 85%, 85% / 0.15) 0%, transparent 70%) !important;
+  }
+  
+  html[data-theme="green"] .glass-card:hover,
+  html.green .glass-card:hover {
+    background-image: 
+      radial-gradient(ellipse 750px 320px at 15% 25%, hsla(142, 76%, 36% / 0.31) 0%, transparent 70%),
+      radial-gradient(ellipse 700px 300px at 85% 75%, hsla(150, 80%, 65% / 0.25) 0%, transparent 65%),
+      radial-gradient(ellipse 650px 270px at 50% 85%, hsla(160, 85%, 85% / 0.21) 0%, transparent 70%) !important;
+  }
+  
+  /* Red theme - red to pink gradient */
+  html[data-theme="red"] .glass-card,
+  html.red .glass-card {
+    background-image: 
+      radial-gradient(ellipse 700px 300px at 15% 25%, hsla(0, 84%, 60% / 0.26) 0%, transparent 70%),
+      radial-gradient(ellipse 650px 280px at 85% 75%, hsla(15, 90%, 75% / 0.21) 0%, transparent 65%),
+      radial-gradient(ellipse 600px 250px at 50% 85%, hsla(25, 95%, 90% / 0.17) 0%, transparent 70%) !important;
+  }
+  
+  html[data-theme="red"] .glass-card:hover,
+  html.red .glass-card:hover {
+    background-image: 
+      radial-gradient(ellipse 750px 320px at 15% 25%, hsla(0, 84%, 60% / 0.33) 0%, transparent 70%),
+      radial-gradient(ellipse 700px 300px at 85% 75%, hsla(15, 90%, 75% / 0.27) 0%, transparent 65%),
+      radial-gradient(ellipse 650px 270px at 50% 85%, hsla(25, 95%, 90% / 0.23) 0%, transparent 70%) !important;
+  }
+  
+  /* Orange theme - orange to yellow gradient */
+  html[data-theme="orange"] .glass-card,
+  html.orange .glass-card {
+    background-image: 
+      radial-gradient(ellipse 700px 300px at 15% 25%, hsla(25, 95%, 53% / 0.27) 0%, transparent 70%),
+      radial-gradient(ellipse 650px 280px at 85% 75%, hsla(40, 95%, 70% / 0.22) 0%, transparent 65%),
+      radial-gradient(ellipse 600px 250px at 50% 85%, hsla(50, 98%, 85% / 0.18) 0%, transparent 70%) !important;
+  }
+  
+  html[data-theme="orange"] .glass-card:hover,
+  html.orange .glass-card:hover {
+    background-image: 
+      radial-gradient(ellipse 750px 320px at 15% 25%, hsla(25, 95%, 53% / 0.34) 0%, transparent 70%),
+      radial-gradient(ellipse 700px 300px at 85% 75%, hsla(40, 95%, 70% / 0.28) 0%, transparent 65%),
+      radial-gradient(ellipse 650px 270px at 50% 85%, hsla(50, 98%, 85% / 0.24) 0%, transparent 70%) !important;
+  }
+
   /* Aurora gradient utilities - multi-directional radial gradients creating aurora-like effects */
   .aurora-gradient-primary {
     background-image:
