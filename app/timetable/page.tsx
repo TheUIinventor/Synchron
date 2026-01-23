@@ -414,7 +414,7 @@ export default function TimetablePage() {
 
   return (
     <PageTransition>
-      <div className="w-full mx-auto px-3 sm:px-4 md:px-6 py-4 pb-28 sm:pb-20 overflow-x-hidden min-w-0">
+      <div className="w-full mx-auto px-2 sm:px-3 md:px-4 py-4 pb-28 sm:pb-20 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
             href="/"
@@ -619,7 +619,7 @@ export default function TimetablePage() {
             )}
 
             {/* Daily Schedule (wide format) */}
-            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-3 sm:p-4 mx-auto">
+            <div className="w-full bg-surface-container rounded-m3-xl border-none shadow-elevation-1 p-2 sm:p-3 md:p-4 mx-auto">
               <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-5 w-5" />
