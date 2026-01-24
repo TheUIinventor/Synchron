@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import InstallAppButton from "@/components/install-app-button"
-import { getSubjectColorOverride, setSubjectColorOverride, resetSubjectColorOverride, resetAllSubjectColorOverrides } from "@/utils/subject-color-override"
+import { getSubjectColorOverride, setSubjectColorOverride, resetSubjectColorOverride, resetAllSubjectColorOverrides, isPastelModeEnabled, loadPastelMode } from "@/utils/subject-color-override"
 import { hexToInlineStyle } from "@/utils/color-utils"
 
 const CANVAS_LINKS_KEY = "synchron-canvas-links"
@@ -151,12 +151,15 @@ function SubjectColorsEditor() {
   const timetableData = timetableCtx?.timetableData || {}
   const { toast } = useToast()
   const [overrides, setOverrides] = useState<Record<string, string>>({})
+  const [pastelModes, setPastelModes] = useState<Record<string, boolean>>({})
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null)
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('synchron-subject-color-overrides')
       if (saved) setOverrides(JSON.parse(saved))
+      const modes = loadPastelMode()
+      setPastelModes(modes)
     } catch (e) {}
   }, [])
 
@@ -165,6 +168,8 @@ function SubjectColorsEditor() {
       try {
         const saved = localStorage.getItem('synchron-subject-color-overrides')
         if (saved) setOverrides(JSON.parse(saved))
+        const modes = loadPastelMode()
+        setPastelModes(modes)
       } catch (e) {}
     }
     window.addEventListener('synchron:subject-colors-updated', handler)
@@ -181,9 +186,22 @@ function SubjectColorsEditor() {
   ).sort()
 
   function handleColorChange(subject: string, hex: string) {
-    setSubjectColorOverride(subject, hex)
+    const usePastel = pastelModes[subject] !== false // Default true
+    setSubjectColorOverride(subject, hex, usePastel)
     setOverrides((prev) => ({ ...prev, [subject]: hex.replace(/^#/, '') }))
     try { toast({ title: `Color updated for ${subject}` }) } catch (e) {}
+  }
+
+  function handlePastelModeChange(subject: string, usePastel: boolean) {
+    setPastelModes((prev) => ({ ...prev, [subject]: usePastel }))
+    const hex = overrides[subject]
+    if (hex) {
+      setSubjectColorOverride(subject, `#${hex}`, usePastel)
+    }
+    try { 
+      const modeLabel = usePastel ? 'pastel' : 'raw'
+      toast({ title: `${subject} set to ${modeLabel} mode` }) 
+    } catch (e) {}
   }
 
   function handleReset(subject: string) {
@@ -210,7 +228,7 @@ function SubjectColorsEditor() {
     <div className="space-y-4">
       <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900 p-4 mb-4">
         <p className="text-sm text-blue-900 dark:text-blue-100">
-          <strong>💡 Tip:</strong> Pastel colors work best for readability. Try lighter, softer tones rather than bright or dark colors.
+          <strong>💡 Tip:</strong> Pastel mode softens colors for readability (default). Raw mode uses your exact color choice.
         </p>
       </div>
 
@@ -218,47 +236,67 @@ function SubjectColorsEditor() {
         const override = overrides[subject]
         const hasOverride = !!override
         const displayColor = override ? `#${override}` : undefined
+        const usePastel = pastelModes[subject] !== false // Default true
 
         return (
-          <div key={subject} className="flex gap-3 items-center p-3 rounded-lg bg-surface-container-high">
-            <div className="flex-1">
-              <div className="text-sm font-medium text-on-surface">{subject}</div>
-              {hasOverride && (
-                <div className="text-xs text-on-surface-variant mt-1">
-                  Custom color: {displayColor}
-                </div>
-              )}
-            </div>
+          <div key={subject} className="flex flex-col gap-3 p-3 rounded-lg bg-surface-container-high">
+            <div className="flex gap-3 items-center">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-on-surface">{subject}</div>
+                {hasOverride && (
+                  <div className="text-xs text-on-surface-variant mt-1">
+                    Custom color: {displayColor}
+                  </div>
+                )}
+              </div>
 
-            <div className="flex items-center gap-2">
-              {/* Color preview */}
-              {displayColor && (
-                <div
-                  className="w-10 h-10 rounded-md border-2 border-outline"
-                  style={hexToInlineStyle(displayColor)}
+              <div className="flex items-center gap-2">
+                {/* Color preview */}
+                {displayColor && (
+                  <div
+                    className="w-10 h-10 rounded-md border-2 border-outline"
+                    style={hexToInlineStyle(displayColor, usePastel)}
+                  />
+                )}
+
+                {/* Color picker input */}
+                <input
+                  type="color"
+                  value={displayColor || '#ffffff'}
+                  onChange={(e) => handleColorChange(subject, e.target.value)}
+                  className="w-10 h-10 rounded-md cursor-pointer border border-outline"
+                  title={`Pick color for ${subject}`}
                 />
-              )}
 
-              {/* Color picker input */}
-              <input
-                type="color"
-                value={displayColor || '#ffffff'}
-                onChange={(e) => handleColorChange(subject, e.target.value)}
-                className="w-10 h-10 rounded-md cursor-pointer border border-outline"
-                title={`Pick color for ${subject}`}
-              />
-
-              {/* Reset button - only show if override exists */}
-              {hasOverride && (
-                <button
-                  onClick={() => handleReset(subject)}
-                  className="px-3 py-2 text-sm rounded-md bg-surface text-on-surface hover:bg-surface-variant transition-colors"
-                  title={`Reset ${subject} to default color`}
-                >
-                  Reset
-                </button>
-              )}
+                {/* Reset button - only show if override exists */}
+                {hasOverride && (
+                  <button
+                    onClick={() => handleReset(subject)}
+                    className="px-3 py-2 text-sm rounded-md bg-surface text-on-surface hover:bg-surface-variant transition-colors"
+                    title={`Reset ${subject} to default color`}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Pastel mode toggle - only show if override exists */}
+            {hasOverride && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-surface/50 rounded-md">
+                <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={usePastel}
+                    onChange={(e) => handlePastelModeChange(subject, e.target.checked)}
+                    className="w-4 h-4 rounded border-outline cursor-pointer"
+                  />
+                  <span className="text-sm text-on-surface-variant">
+                    {usePastel ? 'Pastel mode' : 'Raw color mode'}
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
         )
       })}

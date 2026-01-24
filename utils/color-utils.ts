@@ -36,19 +36,20 @@ export function hexToPastel(hex: string): string {
 
 /**
  * Generate an inline style with background and text color from a hex color
- * Uses the pastel version for background and ensures good contrast
+ * Supports both pastel mode (with double averaging) and raw mode
  * @param hex - Hex color string (with or without #)
+ * @param usePastel - Whether to apply pastel filter (default true)
  * @returns CSS style object for use in inline styles
  */
-export function hexToInlineStyle(hex: string): React.CSSProperties {
-  const pastel = hexToPastel(hex)
-  const bgColor = `#${pastel}`
+export function hexToInlineStyle(hex: string, usePastel: boolean = true): React.CSSProperties {
+  const bgColor = usePastel ? `#${hexToPastel(hex)}` : `#${(hex || '').replace(/^#/, '')}`
   
   // Determine text color based on brightness
-  // For pastel colors (which are light), use dark text
-  const r = parseInt(pastel.substring(0, 2), 16)
-  const g = parseInt(pastel.substring(2, 4), 16)
-  const b = parseInt(pastel.substring(4, 6), 16)
+  // For pastel colors or custom colors, determine contrast
+  const cleanHex = usePastel ? hexToPastel(hex) : (hex || '').replace(/^#/, '')
+  const r = parseInt(cleanHex.substring(0, 2), 16)
+  const g = parseInt(cleanHex.substring(2, 4), 16)
+  const b = parseInt(cleanHex.substring(4, 6), 16)
   
   // Calculate luminance
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255

@@ -11,7 +11,7 @@ import { getNextBell } from "@/utils/bell-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn, stripLeadingCasualCode } from "@/lib/utils";
-import { getSubjectColorOverride } from "@/utils/subject-color-override";
+import { getSubjectColorOverride, isPastelModeEnabled } from "@/utils/subject-color-override";
 import { hexToInlineStyle } from "@/utils/color-utils";
 
   // Subject color mapping (copied from timetable page for consistency)
@@ -42,7 +42,8 @@ import { hexToInlineStyle } from "@/utils/color-utils";
   const getSubjectColorStyle = (subject: string): React.CSSProperties | undefined => {
     const colorOverride = getSubjectColorOverride(subject)
     if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
-      return hexToInlineStyle(colorOverride)
+      const usePastel = isPastelModeEnabled(subject)
+      return hexToInlineStyle(colorOverride, usePastel)
     }
     return undefined
   }

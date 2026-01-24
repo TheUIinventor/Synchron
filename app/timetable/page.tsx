@@ -13,7 +13,7 @@ import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } fro
 import { stripLeadingCasualCode } from "@/lib/utils"
 import { DatePicker } from "@/components/date-picker"
 import { hexToPastel, hexToInlineStyle } from "@/utils/color-utils"
-import { getSubjectColorOverride } from "@/utils/subject-color-override"
+import { getSubjectColorOverride, isPastelModeEnabled } from "@/utils/subject-color-override"
 
 
 export default function TimetablePage() {
@@ -262,12 +262,13 @@ export default function TimetablePage() {
     // First check for user override
     const colorOverride = getSubjectColorOverride(subject)
     if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
-      return hexToInlineStyle(colorOverride)
+      const usePastel = isPastelModeEnabled(subject)
+      return hexToInlineStyle(colorOverride, usePastel)
     }
 
     // Then check API colour
     if (apiColour && /^[0-9a-fA-F]{6}$/.test(apiColour)) {
-      return hexToInlineStyle(apiColour)
+      return hexToInlineStyle(apiColour, true) // Always use pastel for API colors
     }
     return undefined
   }
