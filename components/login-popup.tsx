@@ -16,9 +16,18 @@ export default function LoginPopup() {
     setMounted(true)
   }, [])
 
-  // Don't render anything until mounted on client
-  // Show popup only if NOT authenticated
-  if (!mounted || isAuthenticated) {
+  // Don't render until mounted
+  if (!mounted) {
+    return null
+  }
+
+  // Show popup if explicitly NOT authenticated (false or null = not authenticated)
+  // Only HIDE if explicitly authenticated (true)
+  const shouldShowPopup = isAuthenticated !== true
+  
+  console.log('[LoginPopup] isAuthenticated:', isAuthenticated, 'shouldShow:', shouldShowPopup)
+
+  if (!shouldShowPopup) {
     return null
   }
 
