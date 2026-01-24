@@ -14,17 +14,30 @@ export default function LoginPopup() {
   useEffect(() => {
     setMounted(true);
     
-    // ONLY read from cache - never fetch
-    const cachedStatus = sessionStorage.getItem('synchron:user-logged-in');
-    console.log('[LoginPopup] Initial cache read:', cachedStatus);
+    // Function to check and update auth status from cache
+    const updateAuthStatus = () => {
+      const cachedStatus = sessionStorage.getItem('synchron:user-logged-in');
+      console.log('[LoginPopup] Cache check:', cachedStatus);
+      
+      if (cachedStatus !== null) {
+        const isLogged = cachedStatus === 'true';
+        setIsLoggedIn(isLogged);
+        if (isLogged) {
+          console.log('[LoginPopup] ✓ Detected login!');
+        }
+      } else {
+        setIsLoggedIn(false);
+      }
+    };
     
-    if (cachedStatus !== null) {
-      setIsLoggedIn(cachedStatus === 'true');
-    } else {
-      // If cache is empty on mount, assume not logged in
-      // (ClientLayout should have populated it already)
-      setIsLoggedIn(false);
-    }
+    // Initial read
+    updateAuthStatus();
+    
+    // Poll cache every 500ms to catch updates from ClientLayout
+    // (sessionStorage changes from other effects won't trigger storage event in same tab)
+    const pollInterval = setInterval(updateAuthStatus, 500);
+    
+    return () => clearInterval(pollInterval);
   }, []);
 
   // Don't render until mounted and auth status determined
