@@ -26,7 +26,15 @@ export default function LoginPopup() {
   // 2. There's no timetable data and no current week loaded
   const shouldShowPopup = reauthRequired || (!timetableData?.currentWeek && !timetableData?.hasByWeek)
   
-  console.log('[LoginPopup] reauthRequired:', reauthRequired, 'hasTimetable:', !!timetableData?.currentWeek, 'shouldShow:', shouldShowPopup)
+  console.log('[LoginPopup] FULL DEBUG:', {
+    reauthRequired,
+    timetableData,
+    'timetableData?.currentWeek': timetableData?.currentWeek,
+    'timetableData?.hasByWeek': timetableData?.hasByWeek,
+    'check1_reauthRequired': reauthRequired,
+    'check2_noData': !timetableData?.currentWeek && !timetableData?.hasByWeek,
+    shouldShowPopup
+  })
 
   if (!shouldShowPopup) {
     return null
