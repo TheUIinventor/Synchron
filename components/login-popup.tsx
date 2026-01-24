@@ -48,14 +48,19 @@ export default function LoginPopup() {
     // If no timetable data, check the error to determine if it's auth-related
     // Unauthorized/Forbidden errors = not logged in (show popup)
     // Other errors (holiday, etc) = user IS logged in but API returned error (don't show popup)
-    const isAuthError = error && (
-      error.toLowerCase().includes('unauthorized') ||
-      error.toLowerCase().includes('forbidden') ||
-      error.toLowerCase().includes('401') ||
-      error.toLowerCase().includes('403')
-    )
-    
-    setShowPopup(!!isAuthError)
+    if (error) {
+      // Error exists - check if it's an auth error
+      const isAuthError = 
+        error.toLowerCase().includes('unauthorized') ||
+        error.toLowerCase().includes('forbidden') ||
+        error.toLowerCase().includes('401') ||
+        error.toLowerCase().includes('403')
+      
+      setShowPopup(isAuthError)
+    } else {
+      // No error and no timetable data = user likely not authenticated, show popup
+      setShowPopup(true)
+    }
   }, [timetableData, error, isLoading, mounted])
 
   // Don't render anything until mounted to avoid hydration issues
