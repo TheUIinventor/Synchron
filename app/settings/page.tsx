@@ -189,7 +189,7 @@ function SubjectColorsEditor() {
     const usePastel = pastelModes[subject] !== false // Default true
     setSubjectColorOverride(subject, hex, usePastel)
     setOverrides((prev) => ({ ...prev, [subject]: hex.replace(/^#/, '') }))
-    try { toast({ title: `Color updated for ${subject}` }) } catch (e) {}
+    try { toast({ title: `Colour updated for ${subject}` }) } catch (e) {}
   }
 
   function handlePastelModeChange(subject: string, usePastel: boolean) {
@@ -211,7 +211,7 @@ function SubjectColorsEditor() {
       delete copy[subject]
       return copy
     })
-    try { toast({ title: `Color reset for ${subject}` }) } catch (e) {}
+    try { toast({ title: `Colour reset for ${subject}` }) } catch (e) {}
   }
 
   function handleResetAll() {
@@ -232,74 +232,71 @@ function SubjectColorsEditor() {
         </p>
       </div>
 
-      {subjects.map((subject) => {
-        const override = overrides[subject]
-        const hasOverride = !!override
-        const displayColor = override ? `#${override}` : undefined
-        const usePastel = pastelModes[subject] !== false // Default true
+      <div className="grid grid-cols-2 gap-4">
+        {subjects.map((subject) => {
+          const override = overrides[subject]
+          const hasOverride = !!override
+          const displayColor = override ? `#${override}` : undefined
+          const usePastel = pastelModes[subject] !== false // Default true
 
-        return (
-          <div key={subject} className="flex flex-col gap-3 p-3 rounded-lg bg-surface-container-high">
-            <div className="flex gap-3 items-center">
-              <div className="flex-1">
-                <div className="text-sm font-medium text-on-surface">{subject}</div>
-                {hasOverride && (
-                  <div className="text-xs text-on-surface-variant mt-1">
-                    Custom color: {displayColor}
-                  </div>
-                )}
+          return (
+            <div key={subject} className="rounded-lg bg-surface-container-high p-4 space-y-3">
+              {/* Timetable preview card */}
+              <div 
+                className="rounded-md px-3 py-2 text-sm font-semibold flex-shrink-0 text-center min-h-[40px] flex items-center justify-center"
+                style={displayColor ? hexToInlineStyle(displayColor, usePastel) : { backgroundColor: 'var(--md-sys-color-surface-variant)', color: 'var(--md-sys-color-on-surface-variant)' }}
+              >
+                {subject}
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* Color preview */}
-                {displayColor && (
-                  <div
-                    className="w-10 h-10 rounded-md border-2 border-outline"
-                    style={hexToInlineStyle(displayColor, usePastel)}
-                  />
-                )}
+              {/* Custom colour indicator */}
+              {hasOverride && (
+                <div className="text-xs text-on-surface-variant text-center">
+                  Custom: {displayColor}
+                </div>
+              )}
 
-                {/* Color picker input */}
+              {/* Controls */}
+              <div className="flex items-center gap-2">
+                {/* Colour picker input */}
                 <input
                   type="color"
                   value={displayColor || '#ffffff'}
                   onChange={(e) => handleColorChange(subject, e.target.value)}
-                  className="w-10 h-10 rounded-md cursor-pointer border border-outline"
-                  title={`Pick color for ${subject}`}
+                  className="w-10 h-10 rounded-md cursor-pointer border border-outline flex-shrink-0"
+                  title={`Pick colour for ${subject}`}
                 />
 
                 {/* Reset button - only show if override exists */}
                 {hasOverride && (
                   <button
                     onClick={() => handleReset(subject)}
-                    className="px-3 py-2 text-sm rounded-md bg-surface text-on-surface hover:bg-surface-variant transition-colors"
-                    title={`Reset ${subject} to default color`}
+                    className="px-2 py-1 text-xs rounded-md bg-surface text-on-surface hover:bg-surface-variant transition-colors flex-shrink-0"
+                    title={`Reset ${subject} to default colour`}
                   >
                     Reset
                   </button>
                 )}
               </div>
-            </div>
 
-            {/* Pastel mode toggle - only show if override exists */}
-            {hasOverride && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-surface/50 rounded-md">
-                <label className="flex items-center gap-2 flex-1 cursor-pointer">
+              {/* Pastel mode toggle - only show if override exists */}
+              {hasOverride && (
+                <label className="flex items-center gap-2 cursor-pointer bg-surface/50 rounded-md px-2 py-1.5">
                   <input
                     type="checkbox"
                     checked={usePastel}
                     onChange={(e) => handlePastelModeChange(subject, e.target.checked)}
-                    className="w-4 h-4 rounded border-outline cursor-pointer"
+                    className="w-3 h-3 rounded border-outline cursor-pointer"
                   />
-                  <span className="text-sm text-on-surface-variant">
-                    {usePastel ? 'Pastel mode' : 'Raw colour mode'}
+                  <span className="text-xs text-on-surface-variant">
+                    {usePastel ? 'Pastel' : 'Raw'}
                   </span>
                 </label>
-              </div>
-            )}
-          </div>
-        )
-      })}
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       {Object.keys(overrides).length > 0 && (
         <div className="pt-3 flex justify-end">
@@ -307,7 +304,7 @@ function SubjectColorsEditor() {
             onClick={handleResetAll}
             className="px-4 py-2 rounded-full bg-surface text-on-surface hover:bg-surface-variant transition-colors"
           >
-            Reset All Colors
+            Reset All Colours
           </button>
         </div>
       )}
@@ -583,6 +580,18 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             )}
+
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Subject Colours</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Customize colours for individual subjects. Overrides the default colour scheme.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <SubjectColorsEditor />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="feedback" className="space-y-6 mt-0">
@@ -638,7 +647,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-
           
           {!isMobile && (
             <TabsContent value="integrations" className="space-y-4 mt-0">
@@ -652,18 +660,6 @@ export default function SettingsPage() {
               <CardContent className="space-y-3">
                 <p className="text-sm text-on-surface-variant">Links are stored locally in your browser.</p>
                 <CanvasLinksEditor />
-              </CardContent>
-            </Card>
-
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Subject Colours</CardTitle>
-                <CardDescription className="text-on-surface-variant">
-                  Customize colours for individual subjects. Overrides the default colour scheme.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <SubjectColorsEditor />
               </CardContent>
             </Card>
             </TabsContent>
