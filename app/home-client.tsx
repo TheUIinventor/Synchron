@@ -484,8 +484,10 @@ export default function HomeClient() {
                       ) : (
                         <>{currentPeriod.subject}</>
                       )
+                    ) : nextPeriod ? (
+                      "Transition"
                     ) : (
-                      "Free Period"
+                      "Out of Hours"
                     )}
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
