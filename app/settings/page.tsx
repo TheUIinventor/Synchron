@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast"
 import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import InstallAppButton from "@/components/install-app-button"
+import { getSubjectColorOverride, setSubjectColorOverride, resetSubjectColorOverride, resetAllSubjectColorOverrides } from "@/utils/subject-color-override"
+import { hexToInlineStyle } from "@/utils/color-utils"
 
 const CANVAS_LINKS_KEY = "synchron-canvas-links"
 
@@ -139,6 +141,137 @@ function CanvasLinksEditor() {
 
       {saved && (
         <div className="text-sm text-primary">Saved {saved === 'all' ? 'all links' : saved}</div>
+      )}
+    </div>
+  )
+}
+
+function SubjectColorsEditor() {
+  const timetableCtx = useTimetableSafe()
+  const timetableData = timetableCtx?.timetableData || {}
+  const { toast } = useToast()
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
+  const [expandedSubject, setExpandedSubject] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('synchron-subject-color-overrides')
+      if (saved) setOverrides(JSON.parse(saved))
+    } catch (e) {}
+  }, [])
+
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const saved = localStorage.getItem('synchron-subject-color-overrides')
+        if (saved) setOverrides(JSON.parse(saved))
+      } catch (e) {}
+    }
+    window.addEventListener('synchron:subject-colors-updated', handler)
+    return () => window.removeEventListener('synchron:subject-colors-updated', handler)
+  }, [])
+
+  const subjects = Array.from(
+    new Set(
+      Object.values(timetableData || {})
+        .flat()
+        .map((p: any) => (p.subject ?? "").trim())
+        .filter((s: string) => !!s && s.toLowerCase() !== "break")
+    )
+  ).sort()
+
+  function handleColorChange(subject: string, hex: string) {
+    setSubjectColorOverride(subject, hex)
+    setOverrides((prev) => ({ ...prev, [subject]: hex.replace(/^#/, '') }))
+    try { toast({ title: `Color updated for ${subject}` }) } catch (e) {}
+  }
+
+  function handleReset(subject: string) {
+    resetSubjectColorOverride(subject)
+    setOverrides((prev) => {
+      const copy = { ...prev }
+      delete copy[subject]
+      return copy
+    })
+    try { toast({ title: `Color reset for ${subject}` }) } catch (e) {}
+  }
+
+  function handleResetAll() {
+    resetAllSubjectColorOverrides()
+    setOverrides({})
+    try { toast({ title: 'All subject colors reset to defaults' }) } catch (e) {}
+  }
+
+  if (subjects.length === 0) {
+    return <p className="text-sm text-on-surface-variant">No subjects found in timetable yet.</p>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900 p-4 mb-4">
+        <p className="text-sm text-blue-900 dark:text-blue-100">
+          <strong>💡 Tip:</strong> Pastel colors work best for readability. Try lighter, softer tones rather than bright or dark colors.
+        </p>
+      </div>
+
+      {subjects.map((subject) => {
+        const override = overrides[subject]
+        const hasOverride = !!override
+        const displayColor = override ? `#${override}` : undefined
+
+        return (
+          <div key={subject} className="flex gap-3 items-center p-3 rounded-lg bg-surface-container-high">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-on-surface">{subject}</div>
+              {hasOverride && (
+                <div className="text-xs text-on-surface-variant mt-1">
+                  Custom color: {displayColor}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Color preview */}
+              {displayColor && (
+                <div
+                  className="w-10 h-10 rounded-md border-2 border-outline"
+                  style={hexToInlineStyle(displayColor)}
+                />
+              )}
+
+              {/* Color picker input */}
+              <input
+                type="color"
+                value={displayColor || '#ffffff'}
+                onChange={(e) => handleColorChange(subject, e.target.value)}
+                className="w-10 h-10 rounded-md cursor-pointer border border-outline"
+                title={`Pick color for ${subject}`}
+              />
+
+              {/* Reset button - only show if override exists */}
+              {hasOverride && (
+                <button
+                  onClick={() => handleReset(subject)}
+                  className="px-3 py-2 text-sm rounded-md bg-surface text-on-surface hover:bg-surface-variant transition-colors"
+                  title={`Reset ${subject} to default color`}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      {Object.keys(overrides).length > 0 && (
+        <div className="pt-3 flex justify-end">
+          <button
+            onClick={handleResetAll}
+            className="px-4 py-2 rounded-full bg-surface text-on-surface hover:bg-surface-variant transition-colors"
+          >
+            Reset All Colors
+          </button>
+        </div>
       )}
     </div>
   )
@@ -481,6 +614,18 @@ export default function SettingsPage() {
               <CardContent className="space-y-3">
                 <p className="text-sm text-on-surface-variant">Links are stored locally in your browser.</p>
                 <CanvasLinksEditor />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Subject Colors</CardTitle>
+                <CardDescription className="text-on-surface-variant">
+                  Customize colors for individual subjects. Overrides the default color scheme.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <SubjectColorsEditor />
               </CardContent>
             </Card>
             </TabsContent>

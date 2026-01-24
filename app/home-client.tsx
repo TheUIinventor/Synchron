@@ -11,9 +11,18 @@ import { getNextBell } from "@/utils/bell-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn, stripLeadingCasualCode } from "@/lib/utils";
+import { getSubjectColorOverride } from "@/utils/subject-color-override";
+import { hexToInlineStyle } from "@/utils/color-utils";
 
   // Subject color mapping (copied from timetable page for consistency)
+  // Also checks for user-defined color overrides
   const getSubjectColor = (subject: string) => {
+    // First check for user override
+    const colorOverride = getSubjectColorOverride(subject)
+    if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
+      return "" // Will be handled with inline style
+    }
+
     const s = (subject || '').toUpperCase();
     if (s.includes("ENG")) return "bg-yellow-200 text-yellow-900 dark:bg-yellow-900/50 dark:text-yellow-100";
     if (s.includes("MAT")) return "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-100";
@@ -27,6 +36,15 @@ import { cn, stripLeadingCasualCode } from "@/lib/utils";
     if (s.includes("REL") || s.includes("SCR") || s.includes("CAT")) return "bg-indigo-200 text-indigo-900 dark:bg-indigo-900/50 dark:text-indigo-100";
     if (s.includes("BRE") || s.includes("REC") || s.includes("LUN")) return "bg-surface-variant text-on-surface-variant";
     return "bg-surface-container-high text-on-surface";
+  }
+
+  // Helper to get inline style from user override
+  const getSubjectColorStyle = (subject: string): React.CSSProperties | undefined => {
+    const colorOverride = getSubjectColorOverride(subject)
+    if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
+      return hexToInlineStyle(colorOverride)
+    }
+    return undefined
   }
 
   const getSubjectAbbr = (subject: string) => {
@@ -133,6 +151,16 @@ export default function HomeClient() {
     // Custom event dispatched from settings when links change
     window.addEventListener('synchron:canvas-links-updated', reload as EventListener)
     return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
+  }, [])
+
+  // Listen for subject color override changes to trigger re-render
+  useEffect(() => {
+    const handler = () => {
+      // Force component re-render when colors are updated
+      setCurrentDate(new Date())
+    }
+    window.addEventListener('synchron:subject-colors-updated', handler)
+    return () => window.removeEventListener('synchron:subject-colors-updated', handler)
   }, [])
 
   // Fetch calendar info for the display date to determine if it's a school day
@@ -701,7 +729,10 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}>
+                                    <span 
+                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}
+                                      style={getSubjectColorStyle(period.subject)}
+                                    >
                                       {period.subject}
                                     </span>
                                   </div>
@@ -762,7 +793,10 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                      <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}>
+                                      <span 
+                                        className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}
+                                        style={getSubjectColorStyle(period.subject)}
+                                      >
                                         {period.subject}
                                       </span>
                                   </div>

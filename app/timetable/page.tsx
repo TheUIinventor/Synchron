@@ -13,6 +13,7 @@ import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } fro
 import { stripLeadingCasualCode } from "@/lib/utils"
 import { DatePicker } from "@/components/date-picker"
 import { hexToPastel, hexToInlineStyle } from "@/utils/color-utils"
+import { getSubjectColorOverride } from "@/utils/subject-color-override"
 
 
 export default function TimetablePage() {
@@ -45,6 +46,17 @@ export default function TimetablePage() {
         })
       }
     } catch (e) {}
+  }, [])
+
+  // Listen for subject color override changes to trigger re-render
+  useEffect(() => {
+    const handler = () => {
+      // Force component re-render when colors are updated
+      // This is a no-op but causes the component to re-render
+      setMounted(prev => !prev ? true : true)
+    }
+    window.addEventListener('synchron:subject-colors-updated', handler)
+    return () => window.removeEventListener('synchron:subject-colors-updated', handler)
   }, [])
 
   // Fetch school week information for the selected date from calendar API
@@ -210,7 +222,14 @@ export default function TimetablePage() {
   }
 
   // Subject color mapping - uses API colour when available with pastel conversion
+  // Also checks for user-defined color overrides
   const getSubjectColor = (subject: string, apiColour?: string) => {
+    // First check if user has overridden the color for this subject
+    const colorOverride = getSubjectColorOverride(subject)
+    if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
+      return "" // Will be handled with inline style
+    }
+
     // If API colour is provided, use it with pastel conversion
     if (apiColour && /^[0-9a-fA-F]{6}$/.test(apiColour)) {
       const style = hexToInlineStyle(apiColour)
@@ -238,8 +257,15 @@ export default function TimetablePage() {
     return "bg-surface-container-high text-on-surface";
   }
 
-  // Helper to get inline style from API colour
+  // Helper to get inline style from API colour or user override
   const getSubjectColorStyle = (subject: string, apiColour?: string): React.CSSProperties | undefined => {
+    // First check for user override
+    const colorOverride = getSubjectColorOverride(subject)
+    if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
+      return hexToInlineStyle(colorOverride)
+    }
+
+    // Then check API colour
     if (apiColour && /^[0-9a-fA-F]{6}$/.test(apiColour)) {
       return hexToInlineStyle(apiColour)
     }
