@@ -145,7 +145,7 @@ function CanvasLinksEditor() {
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"appearance" | "integrations" | "feedback">("appearance")
+  const [activeTab, setActiveTab] = useState<"appearance" | "integrations" | "feedback" | "devtools">("appearance")
   const [appearanceTabClicks, setAppearanceTabClicks] = useState(0)
   const [showFontSelector, setShowFontSelector] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -245,7 +245,7 @@ export default function SettingsPage() {
 
   return (
     <PageTransition>
-      <div className="container max-w-lg mx-auto px-4 py-6 pb-24">
+      <div className="container max-w-2xl mx-auto px-4 py-6 pb-24">
         <div className="flex items-center justify-between mb-6">
           <Link href="/" className="hidden md:flex text-on-surface-variant hover:text-on-surface transition-colors">
             <ChevronLeft className="h-6 w-6" />
@@ -255,7 +255,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
+          <TabsList className="grid w-full grid-cols-4 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
               <TabsTrigger 
                 value="appearance" 
                 className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2 relative"
@@ -283,6 +283,12 @@ export default function SettingsPage() {
               >
                 Feedback
               </TabsTrigger>
+              <TabsTrigger 
+                value="devtools" 
+                className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2"
+              >
+                Devtools
+              </TabsTrigger>
             </TabsList>
 
           {/* General tab removed - navigation settings moved into Appearance tab */}
@@ -301,21 +307,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
-                <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-on-surface-variant">Aggressive background refresh</div>
-                  <div className="flex items-center gap-3">
-                    <Switch checked={Boolean(aggressiveLocal)} onCheckedChange={(v) => { try { setAggressiveLocal(Boolean(v)) } catch (e) {} }} />
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-on-surface-variant">When enabled, the app will poll more frequently while visible and immediately refresh when you return to the tab. This may increase network usage.</p>
-              </CardContent>
-            </Card>
+            {/* Background Refresh moved to Devtools tab */}
 
             {/* Navigation Tabs control removed - navigation is fixed in this build */}
 
@@ -422,8 +414,6 @@ export default function SettingsPage() {
             )}
           </TabsContent>
 
-          
-
           <TabsContent value="feedback" className="space-y-6 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
@@ -448,7 +438,37 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Integrations content hidden on mobile */}
+          <TabsContent value="devtools" className="space-y-6 mt-0">
+            <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
+                <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-on-surface-variant">Aggressive background refresh</div>
+                  <div className="flex items-center gap-3">
+                    <Switch checked={Boolean(aggressiveLocal)} onCheckedChange={(v) => { try { setAggressiveLocal(Boolean(v)) } catch (e) {} }} />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-on-surface-variant">When enabled, the app will poll more frequently while visible and immediately refresh when you return to the tab. This may increase network usage.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-red-50 dark:bg-red-950/20 rounded-m3-xl border border-red-200 dark:border-red-900 shadow-elevation-1">
+              <CardContent className="p-6">
+                <div className="flex gap-3">
+                  <div className="text-2xl">⚠️</div>
+                  <div>
+                    <p className="font-semibold text-red-900 dark:text-red-100 mb-1">Warning</p>
+                    <p className="text-sm text-red-800 dark:text-red-200">Only touch these settings if you know what you're doing!</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          
           {!isMobile && (
             <TabsContent value="integrations" className="space-y-4 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
