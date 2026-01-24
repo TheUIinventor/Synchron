@@ -29,7 +29,10 @@ export default function LoginPopup() {
   console.log('[LoginPopup] FULL DEBUG:', {
     reauthRequired,
     'timetableData?.noTimetable': timetableData?.noTimetable,
-    'timetableData keys': timetableData ? Object.keys(timetableData) : 'null',
+    'timetableData?.timetable': timetableData?.timetable,
+    'timetableData?.error': timetableData?.error,
+    'timetableData?.source': timetableData?.source,
+    'timetableData keys': timetableData ? Object.keys(timetableData).join(',') : 'null',
     shouldShowPopup
   })
 
