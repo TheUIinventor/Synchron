@@ -9,7 +9,7 @@ import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
-  const { timetableData, isReauthRequired } = useTimetable()
+  const { timetableData, reauthRequired } = useTimetable()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -24,9 +24,9 @@ export default function LoginPopup() {
   // Show popup if:
   // 1. User is marked as needing to re-authenticate, OR
   // 2. There's no timetable data and no current week loaded
-  const shouldShowPopup = isReauthRequired || (!timetableData?.currentWeek && !timetableData?.hasByWeek)
+  const shouldShowPopup = reauthRequired || (!timetableData?.currentWeek && !timetableData?.hasByWeek)
   
-  console.log('[LoginPopup] isReauthRequired:', isReauthRequired, 'hasTimetable:', !!timetableData?.currentWeek, 'shouldShow:', shouldShowPopup)
+  console.log('[LoginPopup] reauthRequired:', reauthRequired, 'hasTimetable:', !!timetableData?.currentWeek, 'shouldShow:', shouldShowPopup)
 
   if (!shouldShowPopup) {
     return null
@@ -35,8 +35,6 @@ export default function LoginPopup() {
   const handleSignIn = async () => {
     await initiateLogin()
   }
-
-  console.log('[LoginPopup] rendering - isAuthenticated:', isAuthenticated)
 
   return (
     <>
