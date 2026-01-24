@@ -5,50 +5,20 @@ import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
-
-// Check if there's a valid access token in cookies RIGHT NOW
-const hasValidAccessToken = (): boolean => {
-  if (typeof document === 'undefined') return false
-  try {
-    const match = document.cookie.match(/(?:^|; )sbhs_access_token=([^;]*)/)
-    const token = match ? decodeURIComponent(match[1]) : null
-    // Check token exists AND is not empty
-    const isValid = token && token.length > 0 && token !== 'undefined'
-    console.log('[LoginPopup] cookie check - token:', token, 'isValid:', isValid)
-    return isValid
-  } catch (e) {
-    console.log('[LoginPopup] cookie check error:', e)
-    return false
-  }
-}
+import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
+  const { isAuthenticated } = useTimetable()
   const [mounted, setMounted] = useState(false)
-  const [hasToken, setHasToken] = useState(true)
 
   useEffect(() => {
-    // Only run on client
-    if (typeof document === 'undefined') return
-    
     setMounted(true)
-    // Check immediately on mount
-    const token = hasValidAccessToken()
-    console.log('[LoginPopup] checking token on mount:', token)
-    setHasToken(token)
-    console.log('[LoginPopup] full cookies:', document.cookie)
-    
-    // Also set up an interval to check frequently
-    const interval = setInterval(() => {
-      const token = hasValidAccessToken()
-      setHasToken(token)
-    }, 100)
-    
-    return () => clearInterval(interval)
   }, [])
 
   // Don't render anything until mounted on client
-  if (!mounted || hasToken) {
+  // Show popup only if NOT authenticated
+  if (!mounted || isAuthenticated) {
     return null
   }
 
@@ -56,7 +26,7 @@ export default function LoginPopup() {
     await initiateLogin()
   }
 
-  console.log('[LoginPopup] render check - showing login popup')
+  console.log('[LoginPopup] rendering - isAuthenticated:', isAuthenticated)
 
   return (
     <>
