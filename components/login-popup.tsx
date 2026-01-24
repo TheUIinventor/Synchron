@@ -9,7 +9,7 @@ import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
-  const { timetableData, reauthRequired } = useTimetable()
+  const { timetableData, reauthRequired, error, isLoading, isRefreshing } = useTimetable()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -21,11 +21,20 @@ export default function LoginPopup() {
     return null
   }
 
-  // Show popup ONLY if user is marked as needing to re-authenticate
-  // This is set to true when API calls return 401 and refresh fails
-  const shouldShowPopup = reauthRequired
+  // Show popup if:
+  // 1. User is marked as needing to re-authenticate, OR
+  // 2. Data failed to load with an error (but not while currently loading)
+  const hasError = !!error
+  const isCurrentlyLoading = isLoading || isRefreshing
+  const shouldShowPopup = reauthRequired || (hasError && !isCurrentlyLoading)
   
-  console.log('[LoginPopup] reauthRequired:', reauthRequired, 'shouldShow:', shouldShowPopup)
+  console.log('[LoginPopup] DEBUG:', {
+    reauthRequired,
+    hasError,
+    isCurrentlyLoading,
+    shouldShowPopup,
+    error: error?.substring?.(0, 50)
+  })
 
   if (!shouldShowPopup) {
     return null
