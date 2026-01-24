@@ -15,61 +15,52 @@ export default function LoginPopup() {
     setMounted(true)
     
     // Check if cached value exists from client-layout's early fetch
-    const checkAuth = () => {
+    const checkAuth = async () => {
       if (typeof window === 'undefined') return
       
       const cachedStatus = sessionStorage.getItem('synchron:user-logged-in')
-      console.log('[LoginPopup] Cache value:', cachedStatus, 'Type:', typeof cachedStatus)
       
       if (cachedStatus !== null) {
         // Use cached value immediately
         const isLoggedInValue = cachedStatus === 'true'
-        console.log('[LoginPopup] Setting isLoggedIn to:', isLoggedInValue, 'from cache:', cachedStatus)
+        console.log('[LoginPopup] From cache:', isLoggedInValue)
         setIsLoggedIn(isLoggedInValue)
       } else {
-        // Fallback: if cache not ready yet, fetch it
-        // But this should rarely happen since client-layout fetches it first
-        console.log('[LoginPopup] No cache found, fetching /api/portal/userinfo')
-        fetch('/api/portal/userinfo', { credentials: 'include' })
-          .then(res => res.json())
-          .then(data => {
-            const loggedIn = data?.success === true
-            console.log('[LoginPopup] API response:', JSON.stringify(data), 'loggedIn:', loggedIn)
-            setIsLoggedIn(loggedIn)
-            sessionStorage.setItem('synchron:user-logged-in', loggedIn ? 'true' : 'false')
-          })
-          .catch(() => {
-            console.error('[LoginPopup] Fetch error')
-            setIsLoggedIn(false)
-          })
+        // Fallback: if cache not ready yet, fetch it directly
+        console.log('[LoginPopup] Cache empty, fetching directly')
+        try {
+          const res = await fetch('/api/portal/userinfo', { credentials: 'include' })
+          const data = await res.json()
+          const loggedIn = data?.success === true
+          console.log('[LoginPopup] API fetch result:', loggedIn)
+          setIsLoggedIn(loggedIn)
+          sessionStorage.setItem('synchron:user-logged-in', loggedIn ? 'true' : 'false')
+        } catch (err) {
+          console.error('[LoginPopup] Fetch error:', err)
+          setIsLoggedIn(false)
+        }
       }
     }
     
     checkAuth()
     
-    // Listen for storage changes (when client-layout updates the cache)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'synchron:user-logged-in' && e.newValue) {
-        console.log('[LoginPopup] Storage event detected, new value:', e.newValue)
-        setIsLoggedIn(e.newValue === 'true')
-      }
-    }
-    window.addEventListener('storage', handleStorageChange)
-    
-    // Also check every 5 seconds initially, then 30 seconds after 1 minute
+    // Check very frequently (every 1 second) for the first 10 seconds to catch sign-in
     let checkCount = 0
     const interval = setInterval(() => {
       checkCount++
-      // Check every 5 seconds for the first 12 checks (60 seconds), then every 30 seconds
-      if (checkCount <= 12 || checkCount % 6 === 0) {
+      if (checkCount <= 10) {
+        // First 10 seconds: check every 1 second
         checkAuth()
+      } else if (checkCount <= 70) {
+        // Next 60 seconds: check every 5 seconds
+        if (checkCount % 5 === 0) checkAuth()
+      } else {
+        // After that: check every 30 seconds
+        if (checkCount % 30 === 0) checkAuth()
       }
-    }, 5000)
+    }, 1000)
     
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('storage', handleStorageChange)
-    }
+    return () => clearInterval(interval)
   }, [])
 
   // Don't render until mounted and auth status determined
