@@ -9,7 +9,7 @@ import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
-  const { timetableData, reauthRequired } = useTimetable()
+  const { timetableData } = useTimetable()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -21,22 +21,11 @@ export default function LoginPopup() {
     return null
   }
 
-  // Show popup if:
-  // 1. User is marked as needing to re-authenticate, OR
-  // 2. There's no timetable data and no current week loaded
-  const shouldShowPopup = reauthRequired || (!timetableData?.currentWeek && !timetableData?.hasByWeek)
+  // Simple logic: if timetableData has actual class information, user is authenticated
+  // If not, show the login popup
+  const hasValidTimetable = timetableData?.hasByWeek || (timetableData?.currentWeek && Object.keys(timetableData.currentWeek).length > 0)
   
-  console.log('[LoginPopup] FULL DEBUG:', {
-    reauthRequired,
-    timetableData,
-    'timetableData?.currentWeek': timetableData?.currentWeek,
-    'timetableData?.hasByWeek': timetableData?.hasByWeek,
-    'check1_reauthRequired': reauthRequired,
-    'check2_noData': !timetableData?.currentWeek && !timetableData?.hasByWeek,
-    shouldShowPopup
-  })
-
-  if (!shouldShowPopup) {
+  if (hasValidTimetable) {
     return null
   }
 
