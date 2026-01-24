@@ -12,6 +12,7 @@ export default function LoginPopup() {
   const timetableContext = useTimetable() as any
   const timetableData = timetableContext?.timetableData
   const isLoading = timetableContext?.isLoading
+  const error = timetableContext?.error
   const [mounted, setMounted] = useState(false)
   const [showPopup, setShowPopup] = useState(false)
 
@@ -29,9 +30,7 @@ export default function LoginPopup() {
       return
     }
 
-    // The most reliable indicator: if timetableData has actual class data, user IS authenticated
-    // timetableData is an object like { Monday: [...], Tuesday: [...], etc }
-    // If empty or null, user is not authenticated
+    // Check if we have actual timetable data
     const hasTimetableData = 
       timetableData && 
       typeof timetableData === 'object' &&
@@ -40,8 +39,24 @@ export default function LoginPopup() {
         Array.isArray(dayPeriods) && dayPeriods.length > 0
       )
     
-    setShowPopup(!hasTimetableData)
-  }, [timetableData, isLoading, mounted])
+    // If we have timetable data, user is authenticated (show nothing)
+    if (hasTimetableData) {
+      setShowPopup(false)
+      return
+    }
+
+    // If no timetable data, check the error to determine if it's auth-related
+    // Unauthorized/Forbidden errors = not logged in (show popup)
+    // Other errors (holiday, etc) = user IS logged in but API returned error (don't show popup)
+    const isAuthError = error && (
+      error.toLowerCase().includes('unauthorized') ||
+      error.toLowerCase().includes('forbidden') ||
+      error.toLowerCase().includes('401') ||
+      error.toLowerCase().includes('403')
+    )
+    
+    setShowPopup(!!isAuthError)
+  }, [timetableData, error, isLoading, mounted])
 
   // Don't render anything until mounted to avoid hydration issues
   if (!mounted || !showPopup) {
