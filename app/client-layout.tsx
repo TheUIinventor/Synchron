@@ -17,51 +17,15 @@ import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [userInfoReady, setUserInfoReady] = useState(false);
   
+  // useEffect(() => {
+  //   // Auth is initialized by AuthInitializer - nothing to do here
+  // }, [])
+
+  // Emergency unregister is disabled by default to avoid reload loops that
+  // block navigation and user interactions. To enable temporarily set
+  // `sessionStorage['synchron:do-emergency']= 'true'` from the console.
   useEffect(() => {
-    // PRIORITY 1: Fetch user info IMMEDIATELY - this MUST complete before anything else
-    // Use a simple fetch with abort to timeout if it takes too long
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    fetch('/api/portal/userinfo', { 
-      method: 'GET', 
-      credentials: 'include',
-      signal: controller.signal,
-      priority: 'high' as any // Hint to browser to prioritize this
-    })
-      .then(res => res.json())
-      .then(data => {
-        clearTimeout(timeoutId);
-        const isLoggedIn = data?.success === true;
-        console.log('[ClientLayout] ✓ USERINFO LOADED FIRST:', { 
-          isLoggedIn, 
-          givenName: data?.data?.givenName,
-          timestamp: new Date().toISOString()
-        });
-        // Cache it IMMEDIATELY
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
-          if (isLoggedIn && data?.data?.givenName) {
-            sessionStorage.setItem('synchron:user-name', data.data.givenName);
-          }
-          // Signal that userinfo fetch is complete
-          sessionStorage.setItem('synchron:userinfo-ready', 'true');
-        }
-        setUserInfoReady(true);
-      })
-      .catch(err => {
-        clearTimeout(timeoutId);
-        console.warn('[ClientLayout] USERINFO failed or timed out:', err.message);
-        // Cache failed state
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('synchron:user-logged-in', 'false');
-          sessionStorage.setItem('synchron:userinfo-ready', 'true');
-        }
-        setUserInfoReady(true);
-      });
-  }, [])
 
 
   // Emergency unregister is disabled by default to avoid reload loops that

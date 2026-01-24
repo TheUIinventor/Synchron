@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ClientLayout from "./client-layout";
+import AuthInitializer from "./auth-initializer";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Roboto_Flex } from "next/font/google";
@@ -42,12 +43,14 @@ export default function RootLayout({
           blocked client navigation. If emergency unregister is needed,
           enable it manually by setting `sessionStorage['synchron:panic-cleared']=true`
           or reintroducing a controlled script. */}
-        <ClientLayout>
-          {children}
-          <Toaster />
-          <SonnerToaster />
-          <Analytics />
-        </ClientLayout>
+        <AuthInitializer>
+          <ClientLayout>
+            {children}
+            <Toaster />
+            <SonnerToaster />
+            <Analytics />
+          </ClientLayout>
+        </AuthInitializer>
       </body>
     </html>
   );
