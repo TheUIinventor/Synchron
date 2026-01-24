@@ -533,18 +533,15 @@ export default function TimetablePage() {
                       const weekday = displayDateObject.toLocaleDateString('en-US', { weekday: 'short' })
                       const dateShort = displayDateObject.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
                       
-                      // Use school week info if available, otherwise fall back to ISO week
+                      // Only show week info if calendar data is complete (isSchoolDay is true)
                       let weekPart = ''
-                      if (schoolWeekInfo?.week) {
+                      if (isSchoolDay && schoolWeekInfo?.week) {
                         // Use actual school week number
                         const wt = schoolWeekInfo.weekType || (externalWeekType || currentWeek) || ''
                         weekPart = wt ? ` Wk ${schoolWeekInfo.week}${wt}` : ` Wk ${schoolWeekInfo.week}`
-                      } else {
-                        // Fall back to ISO week number
-                        const weekNum = getWeek(displayDateObject)
-                        const wt = (externalWeekType || currentWeek) || ''
-                        weekPart = wt ? ` Wk ${weekNum}${wt}` : ` Wk ${weekNum}`
                       }
+                      // Note: If calendar data is incomplete (isSchoolDay is false), don't show any week part
+                      // just show date only
                       
                       const headerShort = `${weekday}, ${dateShort}${weekPart}`
                       return <h2 className="font-semibold text-on-surface">{headerShort}</h2>
