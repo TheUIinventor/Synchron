@@ -17,6 +17,8 @@ import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [userInfoReady, setUserInfoReady] = useState(false);
+  
   useEffect(() => {
     // PRIORITY 1: Fetch user info IMMEDIATELY - this MUST complete before anything else
     // Use a simple fetch with abort to timeout if it takes too long
@@ -45,6 +47,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
             sessionStorage.setItem('synchron:user-name', data.data.givenName);
           }
         }
+        setUserInfoReady(true);
       })
       .catch(err => {
         clearTimeout(timeoutId);
@@ -53,6 +56,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('synchron:user-logged-in', 'false');
         }
+        setUserInfoReady(true);
       });
   }, [])
 
@@ -221,15 +225,23 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       <UserSettingsProvider>
         <ErrorBoundary>
           <QueryClientProviderWrapper>
-            <TimetableProvider>
-            {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
-            {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
-            <ConditionalTopRightIcons />
-            <LoginPopup />
-            <AppSidebar />
-            <div className="px-2 sm:px-3 md:pl-20 lg:pl-28 pb-8 md:pb-10">{children}</div>
-            <BottomNav />
-            </TimetableProvider>
+            {/* Only render TimetableProvider after userinfo has been fetched */}
+            {userInfoReady ? (
+              <TimetableProvider>
+                {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
+                {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
+                <ConditionalTopRightIcons />
+                <LoginPopup />
+                <AppSidebar />
+                <div className="px-2 sm:px-3 md:pl-20 lg:pl-28 pb-8 md:pb-10">{children}</div>
+                <BottomNav />
+              </TimetableProvider>
+            ) : (
+              <>
+                <LoginPopup />
+                <div className="px-2 sm:px-3 md:pl-20 lg:pl-28 pb-8 md:pb-10">{children}</div>
+              </>
+            )}
           </QueryClientProviderWrapper>
         </ErrorBoundary>
       </UserSettingsProvider>
