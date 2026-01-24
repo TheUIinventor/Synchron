@@ -232,38 +232,45 @@ function SubjectColorsEditor() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
         {subjects.map((subject) => {
           const override = overrides[subject]
           const hasOverride = !!override
           const displayColor = override ? `#${override}` : undefined
           const usePastel = pastelModes[subject] !== false // Default true
 
+          // Get the raw colour for the bar
+          const rawColour = override || undefined
+
           return (
-            <div key={subject} className="rounded-lg bg-surface-container-high p-4 space-y-3">
-              {/* Timetable preview card */}
-              <div 
-                className="rounded-md px-3 py-2 text-sm font-semibold flex-shrink-0 text-center min-h-[40px] flex items-center justify-center"
-                style={displayColor ? hexToInlineStyle(displayColor, usePastel) : { backgroundColor: 'var(--md-sys-color-surface-variant)', color: 'var(--md-sys-color-on-surface-variant)' }}
-              >
-                {subject}
+            <div key={subject} className="flex items-center gap-3 p-3 rounded-lg bg-surface-container-high group hover:bg-surface-container-highest transition-colors">
+              {/* Exact timetable card layout preview */}
+              <div className="flex-1 flex items-center gap-2 min-w-0">
+                {/* Colour bar - shows raw colour */}
+                {rawColour && (
+                  <div 
+                    className="w-1 min-w-[4px] rounded-lg h-12" 
+                    style={{ backgroundColor: `#${rawColour}` }} 
+                  />
+                )}
+                
+                {/* Subject badge with squircle style */}
+                <div
+                  className="rounded-md px-3 py-1.5 text-sm font-semibold flex-shrink-0 text-center min-h-[40px] flex items-center justify-center"
+                  style={displayColor ? hexToInlineStyle(displayColor, usePastel) : { backgroundColor: 'var(--md-sys-color-surface-variant)', color: 'var(--md-sys-color-on-surface-variant)' }}
+                >
+                  {subject}
+                </div>
               </div>
 
-              {/* Custom colour indicator */}
-              {hasOverride && (
-                <div className="text-xs text-on-surface-variant text-center">
-                  Custom: {displayColor}
-                </div>
-              )}
-
               {/* Controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 {/* Colour picker input */}
                 <input
                   type="color"
                   value={displayColor || '#ffffff'}
                   onChange={(e) => handleColorChange(subject, e.target.value)}
-                  className="w-10 h-10 rounded-md cursor-pointer border border-outline flex-shrink-0"
+                  className="w-9 h-9 rounded-md cursor-pointer border border-outline"
                   title={`Pick colour for ${subject}`}
                 />
 
@@ -271,28 +278,28 @@ function SubjectColorsEditor() {
                 {hasOverride && (
                   <button
                     onClick={() => handleReset(subject)}
-                    className="px-2 py-1 text-xs rounded-md bg-surface text-on-surface hover:bg-surface-variant transition-colors flex-shrink-0"
+                    className="px-2 py-1 text-xs rounded-md bg-surface text-on-surface hover:bg-surface-variant transition-colors"
                     title={`Reset ${subject} to default colour`}
                   >
                     Reset
                   </button>
                 )}
-              </div>
 
-              {/* Pastel mode toggle - only show if override exists */}
-              {hasOverride && (
-                <label className="flex items-center gap-2 cursor-pointer bg-surface/50 rounded-md px-2 py-1.5">
-                  <input
-                    type="checkbox"
-                    checked={usePastel}
-                    onChange={(e) => handlePastelModeChange(subject, e.target.checked)}
-                    className="w-3 h-3 rounded border-outline cursor-pointer"
-                  />
-                  <span className="text-xs text-on-surface-variant">
-                    {usePastel ? 'Pastel' : 'Raw'}
-                  </span>
-                </label>
-              )}
+                {/* Pastel mode toggle - only show if override exists */}
+                {hasOverride && (
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-surface/50 rounded-md px-2 py-1.5" title="Toggle pastel vs raw colour mode">
+                    <input
+                      type="checkbox"
+                      checked={usePastel}
+                      onChange={(e) => handlePastelModeChange(subject, e.target.checked)}
+                      className="w-3 h-3 rounded border-outline cursor-pointer"
+                    />
+                    <span className="text-xs text-on-surface-variant">
+                      {usePastel ? 'Pastel' : 'Raw'}
+                    </span>
+                  </label>
+                )}
+              </div>
             </div>
           )
         })}
