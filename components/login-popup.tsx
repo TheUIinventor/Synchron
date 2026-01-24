@@ -12,56 +12,20 @@ export default function LoginPopup() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
 
   useEffect(() => {
-    setMounted(true)
+    setMounted(true);
     
-    // Check if cached value exists from client-layout's early fetch
-    const checkAuth = async () => {
-      if (typeof window === 'undefined') return
-      
-      const cachedStatus = sessionStorage.getItem('synchron:user-logged-in')
-      
-      if (cachedStatus !== null) {
-        // Use cached value immediately
-        const isLoggedInValue = cachedStatus === 'true'
-        console.log('[LoginPopup] From cache:', isLoggedInValue)
-        setIsLoggedIn(isLoggedInValue)
-      } else {
-        // Fallback: if cache not ready yet, fetch it directly
-        console.log('[LoginPopup] Cache empty, fetching directly')
-        try {
-          const res = await fetch('/api/portal/userinfo', { credentials: 'include' })
-          const data = await res.json()
-          const loggedIn = data?.success === true
-          console.log('[LoginPopup] API fetch result:', loggedIn)
-          setIsLoggedIn(loggedIn)
-          sessionStorage.setItem('synchron:user-logged-in', loggedIn ? 'true' : 'false')
-        } catch (err) {
-          console.error('[LoginPopup] Fetch error:', err)
-          setIsLoggedIn(false)
-        }
-      }
+    // ONLY read from cache - never fetch
+    const cachedStatus = sessionStorage.getItem('synchron:user-logged-in');
+    console.log('[LoginPopup] Initial cache read:', cachedStatus);
+    
+    if (cachedStatus !== null) {
+      setIsLoggedIn(cachedStatus === 'true');
+    } else {
+      // If cache is empty on mount, assume not logged in
+      // (ClientLayout should have populated it already)
+      setIsLoggedIn(false);
     }
-    
-    checkAuth()
-    
-    // Check very frequently (every 1 second) for the first 10 seconds to catch sign-in
-    let checkCount = 0
-    const interval = setInterval(() => {
-      checkCount++
-      if (checkCount <= 10) {
-        // First 10 seconds: check every 1 second
-        checkAuth()
-      } else if (checkCount <= 70) {
-        // Next 60 seconds: check every 5 seconds
-        if (checkCount % 5 === 0) checkAuth()
-      } else {
-        // After that: check every 30 seconds
-        if (checkCount % 30 === 0) checkAuth()
-      }
-    }, 1000)
-    
-    return () => clearInterval(interval)
-  }, [])
+  }, []);
 
   // Don't render until mounted and auth status determined
   if (!mounted || isLoggedIn === null) {

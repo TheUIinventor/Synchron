@@ -131,35 +131,56 @@ export async function GET(req: NextRequest) {
     }
 
     // First: try a list of likely API hosts/paths that may expose JSON userinfo.
+    // OPTIMIZE: Try all endpoints in PARALLEL (Promise.allSettled) instead of sequentially
     const apiHosts = ['https://api.sbhs.net.au', 'https://student.sbhs.net.au', 'https://student.sbhs.net.au/api']
     const apiPaths = ['/details/userinfo.json', '/details/userinfo', '/api/userinfo.json', '/api/userinfo', '/details/profile.json', '/details/profile']
 
+    // Build all possible URLs
+    const urls = [];
     for (const host of apiHosts) {
       for (const path of apiPaths) {
-        try {
-          const url = `${host.replace(/\/$/, '')}${path.startsWith('/') ? path : '/' + path}`
-          const r = await fetch(url, { headers })
-          if (!r.ok) continue
-          const ct = r.headers.get('content-type') || ''
-          if (ct.includes('application/json')) {
-            try {
-              const j = await r.json()
-              const found = extractNameFromJson(j)
-              if (found) {
-                const given = found.split(/\s+/)[0]
-                const res = NextResponse.json({ success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${host}${path}` }, { headers: cacheHeaders(req) })
-                // propagate any set-cookie header we received
-                const sc = r.headers.get('set-cookie')
-                if (sc) res.headers.set('set-cookie', sc.replace(/;\s*Domain=[^;]+/gi, ''))
-                return res
-              }
-            } catch (e) {
-              // ignore JSON parse errors and continue
-            }
-          }
-        } catch (e) {
-          // ignore fetch errors for these probes
+        const url = `${host.replace(/\/$/, '')}${path.startsWith('/') ? path : '/' + path}`;
+        urls.push(url);
+      }
+    }
+
+    // Try all URLs in parallel with a timeout
+    const fetchWithTimeout = (url: string, timeoutMs: number = 2000) =>
+      Promise.race([
+        fetch(url, { headers }).then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const ct = r.headers.get('content-type') || '';
+          if (!ct.includes('application/json')) throw new Error('Not JSON');
+          return r;
+        }),
+        new Promise<Response>((_, reject) => 
+          setTimeout(() => reject(new Error('timeout')), timeoutMs)
+        ),
+      ]);
+
+    const results = await Promise.allSettled(
+      urls.map(url => fetchWithTimeout(url))
+    );
+
+    // Find the first successful response
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      try {
+        const r = result.value;
+        const j = await r.json();
+        const found = extractNameFromJson(j);
+        if (found) {
+          const given = found.split(/\s+/)[0];
+          const res = NextResponse.json(
+            { success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${r.url}` },
+            { headers: cacheHeaders(req) }
+          );
+          const sc = r.headers.get('set-cookie');
+          if (sc) res.headers.set('set-cookie', sc.replace(/;\s*Domain=[^;]+/gi, ''));
+          return res;
         }
+      } catch (e) {
+        // Continue to next result
       }
     }
 

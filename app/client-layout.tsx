@@ -18,37 +18,42 @@ import ErrorBoundary from "@/components/error-boundary"
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   useEffect(() => {
-    // Priority 1: Fetch user info IMMEDIATELY to determine login status
-    // This allows LoginPopup to show/hide instantly
-    fetch('/api/portal/userinfo', { method: 'GET', credentials: 'include' })
+    // PRIORITY 1: Fetch user info IMMEDIATELY - this MUST complete before anything else
+    // Use a simple fetch with abort to timeout if it takes too long
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    fetch('/api/portal/userinfo', { 
+      method: 'GET', 
+      credentials: 'include',
+      signal: controller.signal,
+      priority: 'high' as any // Hint to browser to prioritize this
+    })
       .then(res => res.json())
       .then(data => {
-        console.log('[ClientLayout] FULL API RESPONSE:', data)
-        const isLoggedIn = data?.success === true
-        console.log('[ClientLayout] data.success:', data?.success, 'TYPE:', typeof data?.success)
-        console.log('[ClientLayout] isLoggedIn calculation:', isLoggedIn)
-        // Cache the result for LoginPopup to use immediately
+        clearTimeout(timeoutId);
+        const isLoggedIn = data?.success === true;
+        console.log('[ClientLayout] ✓ USERINFO LOADED FIRST:', { 
+          isLoggedIn, 
+          givenName: data?.data?.givenName,
+          timestamp: new Date().toISOString()
+        });
+        // Cache it IMMEDIATELY
         if (typeof window !== 'undefined') {
-          const cacheValue = isLoggedIn ? 'true' : 'false'
-          console.log('[ClientLayout] Setting cache to:', cacheValue)
-          sessionStorage.setItem('synchron:user-logged-in', cacheValue)
+          sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
           if (isLoggedIn && data?.data?.givenName) {
-            sessionStorage.setItem('synchron:user-name', data.data.givenName)
+            sessionStorage.setItem('synchron:user-name', data.data.givenName);
           }
         }
       })
       .catch(err => {
-        console.error('[ClientLayout] userinfo fetch error:', err)
+        clearTimeout(timeoutId);
+        console.warn('[ClientLayout] USERINFO failed or timed out:', err.message);
+        // Cache failed state
         if (typeof window !== 'undefined') {
-          sessionStorage.setItem('synchron:user-logged-in', 'false')
+          sessionStorage.setItem('synchron:user-logged-in', 'false');
         }
-      })
-    
-    // Priority 2: Attempt a silent server-side refresh on initial load to restore session if possible
-    fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
-      .then(res => res.json())
-      .then(data => { if (!data.success) console.debug('auth refresh failed', data) })
-      .catch(err => console.debug('auth refresh error', err))
+      });
   }, [])
 
 
