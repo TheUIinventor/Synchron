@@ -21,17 +21,20 @@ const hasValidAccessToken = (): boolean => {
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const [hasToken, setHasToken] = useState(false)
+  const [hasToken, setHasToken] = useState(true) // Start as true (don't show) to be safe
 
   useEffect(() => {
     setMounted(true)
     // Check immediately on mount
-    setHasToken(hasValidAccessToken())
+    const token = hasValidAccessToken()
+    console.log('[LoginPopup] checking token on mount:', token)
+    setHasToken(token)
     
-    // Also set up an interval to check periodically (in case cookie changes)
+    // Also set up an interval to check frequently
     const interval = setInterval(() => {
-      setHasToken(hasValidAccessToken())
-    }, 500)
+      const token = hasValidAccessToken()
+      setHasToken(token)
+    }, 100)
     
     return () => clearInterval(interval)
   }, [])
@@ -42,6 +45,7 @@ export default function LoginPopup() {
   }
 
   // Show popup only if NO valid token exists
+  console.log('[LoginPopup] render check - hasToken:', hasToken)
   if (hasToken) {
     return null
   }
