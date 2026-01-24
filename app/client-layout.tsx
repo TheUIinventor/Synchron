@@ -18,7 +18,29 @@ import ErrorBoundary from "@/components/error-boundary"
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   useEffect(() => {
-    // Attempt a silent server-side refresh on initial load to restore session if possible
+    // Priority 1: Fetch user info IMMEDIATELY to determine login status
+    // This allows LoginPopup to show/hide instantly
+    fetch('/api/portal/userinfo', { method: 'GET', credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        const isLoggedIn = data?.success === true
+        console.log('[ClientLayout] User info loaded:', { isLoggedIn, givenName: data?.data?.givenName })
+        // Cache the result for LoginPopup to use immediately
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false')
+          if (isLoggedIn && data?.data?.givenName) {
+            sessionStorage.setItem('synchron:user-name', data.data.givenName)
+          }
+        }
+      })
+      .catch(err => {
+        console.debug('userinfo fetch error', err)
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('synchron:user-logged-in', 'false')
+        }
+      })
+    
+    // Priority 2: Attempt a silent server-side refresh on initial load to restore session if possible
     fetch('/api/auth/refresh', { method: 'GET', credentials: 'include' })
       .then(res => res.json())
       .then(data => { if (!data.success) console.debug('auth refresh failed', data) })

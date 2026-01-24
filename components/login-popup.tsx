@@ -9,35 +9,44 @@ import { useAuth } from "@/lib/api/hooks"
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
 
   useEffect(() => {
     setMounted(true)
     
-    // Check authentication status via /api/portal/userinfo
-    const checkAuth = async () => {
-      try {
-        const res = await fetch('/api/portal/userinfo', { credentials: 'include' })
-        const data = await res.json()
-        // User is logged in if success is true
-        const loggedIn = data?.success === true
-        console.log('[LoginPopup] Auth check:', { success: data?.success, loggedIn })
-        setIsLoggedIn(loggedIn)
-      } catch (e) {
-        console.log('[LoginPopup] Auth check error:', e)
-        setIsLoggedIn(false)
+    // Check if cached value exists from client-layout's early fetch
+    const checkAuth = () => {
+      if (typeof window === 'undefined') return
+      
+      const cachedStatus = sessionStorage.getItem('synchron:user-logged-in')
+      console.log('[LoginPopup] Auth status:', cachedStatus)
+      
+      if (cachedStatus !== null) {
+        // Use cached value immediately
+        setIsLoggedIn(cachedStatus === 'true')
+      } else {
+        // Fallback: if cache not ready yet, fetch it
+        // But this should rarely happen since client-layout fetches it first
+        fetch('/api/portal/userinfo', { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => {
+            const loggedIn = data?.success === true
+            setIsLoggedIn(loggedIn)
+            sessionStorage.setItem('synchron:user-logged-in', loggedIn ? 'true' : 'false')
+          })
+          .catch(() => setIsLoggedIn(false))
       }
     }
     
     checkAuth()
     
-    // Re-check every 5 seconds to catch auth changes
-    const interval = setInterval(checkAuth, 5000)
+    // Re-check every 30 seconds to detect logout (reduced from 5s to save CPU)
+    const interval = setInterval(checkAuth, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  // Don't render until mounted
-  if (!mounted) {
+  // Don't render until mounted and auth status determined
+  if (!mounted || isLoggedIn === null) {
     return null
   }
 
