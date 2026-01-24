@@ -5,33 +5,13 @@ import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
-
-// Check if user has valid auth tokens in localStorage
-const hasValidAuthTokens = (): boolean => {
-  if (typeof window === 'undefined') return false
-  try {
-    const sessionId = localStorage.getItem("sbhs_session_id")
-    const csrfToken = localStorage.getItem("sbhs_csrf_token")
-    const expiresAt = localStorage.getItem("sbhs_session_expires")
-    
-    if (!sessionId || !csrfToken) return false
-    
-    // Check if token hasn't expired
-    if (expiresAt) {
-      const expirationTime = parseInt(expiresAt, 10)
-      if (expirationTime && expirationTime < Date.now()) {
-        return false
-      }
-    }
-    
-    return true
-  } catch (e) {
-    return false
-  }
-}
+import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
-  const { initiateLogin, isAuthenticated, loading: authLoading } = useAuth()
+  const { initiateLogin } = useAuth()
+  const timetableContext = useTimetable() as any
+  const timetableData = timetableContext?.timetableData
+  const isLoading = timetableContext?.isLoading
   const [mounted, setMounted] = useState(false)
   const [showPopup, setShowPopup] = useState(false)
 
@@ -39,23 +19,32 @@ export default function LoginPopup() {
     setMounted(true)
   }, [])
 
-  // Update popup visibility based on authentication state
+  // Update popup visibility based on whether timetable data exists
   useEffect(() => {
     if (!mounted) return
 
-    // If still loading, don't change popup state yet
-    if (authLoading) return
+    // If still loading, don't show popup yet
+    if (isLoading) {
+      setShowPopup(false)
+      return
+    }
 
-    // Check authentication via multiple sources for reliability:
-    // 1. useAuth hook's isAuthenticated
-    // 2. Valid tokens in localStorage (more reliable since it persists across navigations)
-    const isUserAuthenticated = isAuthenticated || hasValidAuthTokens()
+    // The most reliable indicator: if timetableData has actual class data, user IS authenticated
+    // timetableData is an object like { Monday: [...], Tuesday: [...], etc }
+    // If empty or null, user is not authenticated
+    const hasTimetableData = 
+      timetableData && 
+      typeof timetableData === 'object' &&
+      Object.keys(timetableData).length > 0 &&
+      Object.values(timetableData).some((dayPeriods: any) => 
+        Array.isArray(dayPeriods) && dayPeriods.length > 0
+      )
     
-    setShowPopup(!isUserAuthenticated)
-  }, [isAuthenticated, authLoading, mounted])
+    setShowPopup(!hasTimetableData)
+  }, [timetableData, isLoading, mounted])
 
   // Don't render anything until mounted to avoid hydration issues
-  if (!mounted || showPopup === false) {
+  if (!mounted || !showPopup) {
     return null
   }
 
