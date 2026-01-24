@@ -23,9 +23,10 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     fetch('/api/portal/userinfo', { method: 'GET', credentials: 'include' })
       .then(res => res.json())
       .then(data => {
+        console.log('[ClientLayout] FULL API RESPONSE:', data)
         const isLoggedIn = data?.success === true
-        console.log('[ClientLayout] Userinfo response:', JSON.stringify(data))
-        console.log('[ClientLayout] isLoggedIn:', isLoggedIn)
+        console.log('[ClientLayout] data.success:', data?.success, 'TYPE:', typeof data?.success)
+        console.log('[ClientLayout] isLoggedIn calculation:', isLoggedIn)
         // Cache the result for LoginPopup to use immediately
         if (typeof window !== 'undefined') {
           const cacheValue = isLoggedIn ? 'true' : 'false'

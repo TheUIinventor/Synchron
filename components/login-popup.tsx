@@ -58,9 +58,12 @@ export default function LoginPopup() {
   }
 
   // Show popup only if NOT logged in
-  if (isLoggedIn) {
+  if (isLoggedIn === true) {
+    console.log('[LoginPopup] NOT rendering - user is logged in')
     return null
   }
+
+  console.log('[LoginPopup] RENDERING - user is NOT logged in')
 
   const handleSignIn = async () => {
     await initiateLogin()
