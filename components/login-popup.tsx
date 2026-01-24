@@ -10,7 +10,6 @@ import { useTimetable } from "@/contexts/timetable-context"
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const timetableContext = useTimetable() as any
-  const error = timetableContext?.error
   const reauthRequired = timetableContext?.reauthRequired
   const [mounted, setMounted] = useState(false)
 
@@ -23,14 +22,8 @@ export default function LoginPopup() {
     return null
   }
 
-  // Show popup if:
-  // 1. reauthRequired is true (set on 401 responses)
-  // 2. Error contains the unauthorized message from API
-  const shouldShowLogin = 
-    reauthRequired === true || 
-    (error && error.includes("Unauthorized from SBHS timetable API"))
-
-  if (!shouldShowLogin) {
+  // Show popup if reauthRequired is true (set on 401 responses from API)
+  if (reauthRequired !== true) {
     return null
   }
 
