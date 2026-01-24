@@ -21,11 +21,17 @@ export default function LoginPopup() {
     return null
   }
 
-  // Show popup ONLY if reauthRequired is explicitly true
-  // This is the flag the TimetableContext sets when auth fails (401 errors)
-  const shouldShowPopup = reauthRequired === true
+  // Show popup if:
+  // 1. User is marked as needing to re-authenticate, OR
+  // 2. Timetable indicates no timetable data (noTimetable flag is true)
+  const shouldShowPopup = reauthRequired || timetableData?.noTimetable
   
-  console.log('[LoginPopup] reauthRequired:', reauthRequired, 'shouldShowPopup:', shouldShowPopup)
+  console.log('[LoginPopup] FULL DEBUG:', {
+    reauthRequired,
+    'timetableData?.noTimetable': timetableData?.noTimetable,
+    'timetableData keys': timetableData ? Object.keys(timetableData) : 'null',
+    shouldShowPopup
+  })
 
   if (!shouldShowPopup) {
     return null
