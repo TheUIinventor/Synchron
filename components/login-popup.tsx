@@ -5,9 +5,12 @@ import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
+import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
-  const { isAuthenticated, loading, initiateLogin } = useAuth()
+  const { initiateLogin } = useAuth()
+  const timetableContext = useTimetable() as any
+  const isAuthenticated = timetableContext?.isAuthenticated
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -15,12 +18,12 @@ export default function LoginPopup() {
   }, [])
 
   // Don't render anything until mounted to avoid hydration issues
-  if (!mounted || loading) {
+  if (!mounted) {
     return null
   }
 
-  // Hide popup if authenticated
-  if (isAuthenticated) {
+  // Hide popup if authenticated or loading
+  if (isAuthenticated === true || isAuthenticated === undefined) {
     return null
   }
 
