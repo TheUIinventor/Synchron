@@ -21,13 +21,11 @@ export default function LoginPopup() {
     return null
   }
 
-  // Show popup if:
-  // 1. User is marked as needing to re-authenticate, OR
-  // 2. timetableData is null/undefined (completely missing, not loaded yet)
-  // DO NOT check for currentWeek/hasByWeek as they might not be set even when authenticated
-  const shouldShowPopup = reauthRequired || !timetableData
+  // Show popup ONLY if user is marked as needing to re-authenticate
+  // This is set to true when API calls return 401 and refresh fails
+  const shouldShowPopup = reauthRequired
   
-  console.log('[LoginPopup] reauthRequired:', reauthRequired, 'hasTimetableData:', !!timetableData, 'shouldShow:', shouldShowPopup)
+  console.log('[LoginPopup] reauthRequired:', reauthRequired, 'shouldShow:', shouldShowPopup)
 
   if (!shouldShowPopup) {
     return null
