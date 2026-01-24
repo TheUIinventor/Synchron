@@ -9,7 +9,7 @@ import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
-  const { timetableData, error } = useTimetable()
+  const { timetableData } = useTimetable()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -21,12 +21,11 @@ export default function LoginPopup() {
     return null
   }
 
-  // The ONLY reliable way to know if user is authenticated:
-  // If there's an error in timetableData, user is definitely NOT authenticated
-  // Errors only appear when auth fails
-  const isNotAuthenticated = error !== null && error !== undefined
+  // Simple logic: if timetableData has actual class information, user is authenticated
+  // If not, show the login popup
+  const hasValidTimetable = timetableData?.hasByWeek || (timetableData?.currentWeek && Object.keys(timetableData.currentWeek).length > 0)
   
-  if (!isNotAuthenticated) {
+  if (hasValidTimetable) {
     return null
   }
 
