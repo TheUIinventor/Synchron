@@ -24,17 +24,20 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       .then(res => res.json())
       .then(data => {
         const isLoggedIn = data?.success === true
-        console.log('[ClientLayout] User info loaded:', { isLoggedIn, givenName: data?.data?.givenName })
+        console.log('[ClientLayout] Userinfo response:', JSON.stringify(data))
+        console.log('[ClientLayout] isLoggedIn:', isLoggedIn)
         // Cache the result for LoginPopup to use immediately
         if (typeof window !== 'undefined') {
-          sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false')
+          const cacheValue = isLoggedIn ? 'true' : 'false'
+          console.log('[ClientLayout] Setting cache to:', cacheValue)
+          sessionStorage.setItem('synchron:user-logged-in', cacheValue)
           if (isLoggedIn && data?.data?.givenName) {
             sessionStorage.setItem('synchron:user-name', data.data.givenName)
           }
         }
       })
       .catch(err => {
-        console.debug('userinfo fetch error', err)
+        console.error('[ClientLayout] userinfo fetch error:', err)
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('synchron:user-logged-in', 'false')
         }

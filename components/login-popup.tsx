@@ -19,22 +19,29 @@ export default function LoginPopup() {
       if (typeof window === 'undefined') return
       
       const cachedStatus = sessionStorage.getItem('synchron:user-logged-in')
-      console.log('[LoginPopup] Auth status:', cachedStatus)
+      console.log('[LoginPopup] Cache value:', cachedStatus, 'Type:', typeof cachedStatus)
       
       if (cachedStatus !== null) {
         // Use cached value immediately
-        setIsLoggedIn(cachedStatus === 'true')
+        const isLoggedInValue = cachedStatus === 'true'
+        console.log('[LoginPopup] Setting isLoggedIn to:', isLoggedInValue, 'from cache:', cachedStatus)
+        setIsLoggedIn(isLoggedInValue)
       } else {
         // Fallback: if cache not ready yet, fetch it
         // But this should rarely happen since client-layout fetches it first
+        console.log('[LoginPopup] No cache found, fetching /api/portal/userinfo')
         fetch('/api/portal/userinfo', { credentials: 'include' })
           .then(res => res.json())
           .then(data => {
             const loggedIn = data?.success === true
+            console.log('[LoginPopup] API response:', JSON.stringify(data), 'loggedIn:', loggedIn)
             setIsLoggedIn(loggedIn)
             sessionStorage.setItem('synchron:user-logged-in', loggedIn ? 'true' : 'false')
           })
-          .catch(() => setIsLoggedIn(false))
+          .catch(() => {
+            console.error('[LoginPopup] Fetch error')
+            setIsLoggedIn(false)
+          })
       }
     }
     
