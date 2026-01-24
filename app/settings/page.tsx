@@ -228,7 +228,7 @@ function SubjectColorsEditor() {
     <div className="space-y-4">
       <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900 p-4 mb-4">
         <p className="text-sm text-blue-900 dark:text-blue-100">
-          <strong>💡 Tip:</strong> Pastel mode softens colors for readability (default). Raw mode uses your exact color choice.
+          <strong>💡 Tip:</strong> Pastel mode softens colours for readability (default). Raw mode uses your exact colour choice.
         </p>
       </div>
 
@@ -292,7 +292,7 @@ function SubjectColorsEditor() {
                     className="w-4 h-4 rounded border-outline cursor-pointer"
                   />
                   <span className="text-sm text-on-surface-variant">
-                    {usePastel ? 'Pastel mode' : 'Raw color mode'}
+                    {usePastel ? 'Pastel mode' : 'Raw colour mode'}
                   </span>
                 </label>
               </div>

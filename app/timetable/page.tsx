@@ -768,13 +768,17 @@ export default function TimetablePage() {
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
                           ) : (
                             <div className={`${cardClass} flex items-center gap-2`}>
-                              {/* Subject colour bar */}
-                              {period.colour && (
-                                <div 
-                                  className="w-1 min-w-[4px] rounded-lg self-stretch" 
-                                  style={{ backgroundColor: `#${period.colour}` }} 
-                                />
-                              )}
+                              {/* Subject colour bar - always show raw custom colour if set, otherwise raw API colour */}
+                              {(() => {
+                                const customColour = getSubjectColorOverride(period.subject)
+                                const displayColour = customColour || period.colour
+                                return displayColour ? (
+                                  <div 
+                                    className="w-1 min-w-[4px] rounded-lg self-stretch" 
+                                    style={{ backgroundColor: `#${displayColour}` }} 
+                                  />
+                                ) : null
+                              })()}
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">

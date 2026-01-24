@@ -1,14 +1,14 @@
 /**
- * Color utility functions for converting hex colors to pastel versions
- * and generating Tailwind/inline CSS from hex colors
+ * Color utility functions for converting hex colours to pastel versions
+ * and generating Tailwind/inline CSS from hex colours
  */
 
 /**
- * Convert a hex color using double averaging formula with white
+ * Convert a hex colour using double averaging formula with white
  * Formula: (((Original + 255) / 2) + 255) / 2
  * This creates a soft, pastel-like appearance by averaging with white twice
- * @param hex - Hex color string (with or without #)
- * @returns Brightened hex color string (without #)
+ * @param hex - Hex colour string (with or without #)
+ * @returns Brightened hex colour string (without #)
  */
 export function hexToPastel(hex: string): string {
   // Remove # if present
@@ -42,7 +42,7 @@ export function hexToPastel(hex: string): string {
  * @returns CSS style object for use in inline styles
  */
 export function hexToInlineStyle(hex: string, usePastel: boolean = true): React.CSSProperties {
-  const bgColor = usePastel ? `#${hexToPastel(hex)}` : `#${(hex || '').replace(/^#/, '')}`
+  const bgColour = usePastel ? `#${hexToPastel(hex)}` : `#${(hex || '').replace(/^#/, '')}`
   
   // Determine text color based on brightness
   // For pastel colors or custom colors, determine contrast
@@ -56,15 +56,15 @@ export function hexToInlineStyle(hex: string, usePastel: boolean = true): React.
   const textColor = luminance > 0.5 ? '#000000' : '#ffffff'
   
   return {
-    backgroundColor: bgColor,
+    backgroundColor: bgColour,
     color: textColor,
   }
 }
 
 /**
- * Generate a Tailwind-style class string from a hex color
- * Falls back to a neutral color if hex is invalid
- * @param hex - Hex color string (with or without #)
+ * Generate a Tailwind-style class string from a hex colour
+ * Falls back to a neutral colour if hex is invalid
+ * @param hex - Hex colour string (with or without #)
  * @returns Tailwind class string and style object for fallback
  */
 export function hexToTailwindStyle(hex: string): {
