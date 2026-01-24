@@ -6,21 +6,48 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
 
+// Check if there's a valid access token in cookies RIGHT NOW
+const hasValidAccessToken = (): boolean => {
+  if (typeof document === 'undefined') return false
+  try {
+    const cookies = document.cookie.split(';')
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=')
+      if (name === 'Authorization' || name.includes('access') || name.includes('token')) {
+        return !!value
+      }
+    }
+    return false
+  } catch (e) {
+    return false
+  }
+}
+
 export default function LoginPopup() {
-  const { initiateLogin, isAuthenticated, loading } = useAuth()
+  const { initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
+  const [hasToken, setHasToken] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    // Check immediately on mount
+    setHasToken(hasValidAccessToken())
+    
+    // Also set up an interval to check periodically (in case cookie changes)
+    const interval = setInterval(() => {
+      setHasToken(hasValidAccessToken())
+    }, 500)
+    
+    return () => clearInterval(interval)
   }, [])
 
-  // Don't render anything until mounted to avoid hydration issues
-  if (!mounted || loading) {
+  // Don't render anything until mounted
+  if (!mounted) {
     return null
   }
 
-  // Simple logic: only show if NOT authenticated
-  if (isAuthenticated) {
+  // Show popup only if NO valid token exists
+  if (hasToken) {
     return null
   }
 
