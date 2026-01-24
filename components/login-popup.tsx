@@ -47,9 +47,29 @@ export default function LoginPopup() {
     
     checkAuth()
     
-    // Re-check every 30 seconds to detect logout (reduced from 5s to save CPU)
-    const interval = setInterval(checkAuth, 30000)
-    return () => clearInterval(interval)
+    // Listen for storage changes (when client-layout updates the cache)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'synchron:user-logged-in' && e.newValue) {
+        console.log('[LoginPopup] Storage event detected, new value:', e.newValue)
+        setIsLoggedIn(e.newValue === 'true')
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    
+    // Also check every 5 seconds initially, then 30 seconds after 1 minute
+    let checkCount = 0
+    const interval = setInterval(() => {
+      checkCount++
+      // Check every 5 seconds for the first 12 checks (60 seconds), then every 30 seconds
+      if (checkCount <= 12 || checkCount % 6 === 0) {
+        checkAuth()
+      }
+    }, 5000)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [])
 
   // Don't render until mounted and auth status determined
