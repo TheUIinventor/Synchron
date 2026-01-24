@@ -5,33 +5,57 @@ import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
-import { useStudentProfile } from "@/lib/api/hooks"
+
+// Check if user has valid auth tokens in localStorage
+const hasValidAuthTokens = (): boolean => {
+  if (typeof window === 'undefined') return false
+  try {
+    const sessionId = localStorage.getItem("sbhs_session_id")
+    const csrfToken = localStorage.getItem("sbhs_csrf_token")
+    const expiresAt = localStorage.getItem("sbhs_session_expires")
+    
+    if (!sessionId || !csrfToken) return false
+    
+    // Check if token hasn't expired
+    if (expiresAt) {
+      const expirationTime = parseInt(expiresAt, 10)
+      if (expirationTime && expirationTime < Date.now()) {
+        return false
+      }
+    }
+    
+    return true
+  } catch (e) {
+    return false
+  }
+}
 
 export default function LoginPopup() {
-  const { initiateLogin } = useAuth()
-  const { data: studentProfile, loading: profileLoading } = useStudentProfile()
+  const { initiateLogin, isAuthenticated, loading: authLoading } = useAuth()
   const [mounted, setMounted] = useState(false)
+  const [showPopup, setShowPopup] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Update popup visibility based on authentication state
+  useEffect(() => {
+    if (!mounted) return
+
+    // If still loading, don't change popup state yet
+    if (authLoading) return
+
+    // Check authentication via multiple sources for reliability:
+    // 1. useAuth hook's isAuthenticated
+    // 2. Valid tokens in localStorage (more reliable since it persists across navigations)
+    const isUserAuthenticated = isAuthenticated || hasValidAuthTokens()
+    
+    setShowPopup(!isUserAuthenticated)
+  }, [isAuthenticated, authLoading, mounted])
+
   // Don't render anything until mounted to avoid hydration issues
-  if (!mounted) {
-    return null
-  }
-
-  // Don't show while profile is still loading
-  if (profileLoading) {
-    return null
-  }
-
-  // Show popup if profile fetch completed but has no data (i.e., user is not authenticated)
-  // If studentProfile has givenName, the user IS authenticated
-  const hasUserData = studentProfile?.givenName
-  const shouldShowLogin = !hasUserData
-
-  if (!shouldShowLogin) {
+  if (!mounted || showPopup === false) {
     return null
   }
 
