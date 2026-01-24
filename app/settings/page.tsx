@@ -217,7 +217,7 @@ function SubjectColorsEditor() {
   function handleResetAll() {
     resetAllSubjectColorOverrides()
     setOverrides({})
-    try { toast({ title: 'All subject colors reset to defaults' }) } catch (e) {}
+    try { toast({ title: 'All subject colours reset to defaults' }) } catch (e) {}
   }
 
   if (subjects.length === 0) {
@@ -484,9 +484,9 @@ export default function SettingsPage() {
 
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Color Theme</CardTitle>
+                <CardTitle className="text-lg font-semibold text-on-surface">Colour Theme</CardTitle>
                 <CardDescription className="text-on-surface-variant">
-                  Choose the accent color for the app
+                  Choose the accent colour for the app
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -657,9 +657,9 @@ export default function SettingsPage() {
 
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Subject Colors</CardTitle>
+                <CardTitle className="text-lg font-semibold text-on-surface">Subject Colours</CardTitle>
                 <CardDescription className="text-on-surface-variant">
-                  Customize colors for individual subjects. Overrides the default color scheme.
+                  Customize colours for individual subjects. Overrides the default colour scheme.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">

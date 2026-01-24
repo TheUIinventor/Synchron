@@ -1,6 +1,6 @@
 /**
- * Subject Color Override System
- * Allows users to override default subject colors with custom hex colors
+ * Subject Colour Override System
+ * Allows users to override default subject colours with custom hex colours
  */
 
 const SUBJECT_COLOR_OVERRIDES_KEY = 'synchron-subject-color-overrides'
