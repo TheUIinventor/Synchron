@@ -2245,6 +2245,20 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     async function loadExternal() {
       try {
+        // WAIT for userinfo to be fetched first (priority 1 in client-layout)
+        // This ensures /api/portal/userinfo completes before /api/timetable is called
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          let maxWait = 5000; // 5 second timeout
+          const start = Date.now();
+          while (!window.sessionStorage.getItem('synchron:userinfo-ready')) {
+            if (Date.now() - start > maxWait) {
+              console.warn('[timetable] userinfo fetch timeout, proceeding anyway');
+              break;
+            }
+            await new Promise(r => setTimeout(r, 100));
+          }
+          console.log('[timetable] userinfo ready, proceeding with timetable load');
+        }
         await refreshExternal()
       } catch (e) {
         // ignore errors from refreshExternal
