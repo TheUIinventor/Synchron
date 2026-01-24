@@ -5,15 +5,35 @@ import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
-import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
-  const { timetableData } = useTimetable()
   const [mounted, setMounted] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    
+    // Check authentication status via /api/portal/userinfo
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/portal/userinfo', { credentials: 'include' })
+        const data = await res.json()
+        // User is logged in if success is true
+        const loggedIn = data?.success === true
+        console.log('[LoginPopup] Auth check:', { success: data?.success, loggedIn })
+        setIsLoggedIn(loggedIn)
+      } catch (e) {
+        console.log('[LoginPopup] Auth check error:', e)
+        setIsLoggedIn(false)
+      }
+    }
+    
+    checkAuth()
+    
+    // Re-check every 5 seconds to catch auth changes
+    const interval = setInterval(checkAuth, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   // Don't render until mounted
@@ -21,11 +41,8 @@ export default function LoginPopup() {
     return null
   }
 
-  // Simple logic: if timetableData has actual class information, user is authenticated
-  // If not, show the login popup
-  const hasValidTimetable = timetableData?.hasByWeek || (timetableData?.currentWeek && Object.keys(timetableData.currentWeek).length > 0)
-  
-  if (hasValidTimetable) {
+  // Show popup only if NOT logged in
+  if (isLoggedIn) {
     return null
   }
 
