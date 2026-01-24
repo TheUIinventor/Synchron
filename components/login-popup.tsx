@@ -12,8 +12,12 @@ const hasValidAccessToken = (): boolean => {
   try {
     const match = document.cookie.match(/(?:^|; )sbhs_access_token=([^;]*)/)
     const token = match ? decodeURIComponent(match[1]) : null
-    return !!token
+    // Check token exists AND is not empty
+    const isValid = token && token.length > 0 && token !== 'undefined'
+    console.log('[LoginPopup] cookie check - token:', token, 'isValid:', isValid)
+    return isValid
   } catch (e) {
+    console.log('[LoginPopup] cookie check error:', e)
     return false
   }
 }
@@ -21,14 +25,18 @@ const hasValidAccessToken = (): boolean => {
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const [hasToken, setHasToken] = useState(true) // Start as true (don't show) to be safe
+  const [hasToken, setHasToken] = useState(true)
 
   useEffect(() => {
+    // Only run on client
+    if (typeof document === 'undefined') return
+    
     setMounted(true)
     // Check immediately on mount
     const token = hasValidAccessToken()
     console.log('[LoginPopup] checking token on mount:', token)
     setHasToken(token)
+    console.log('[LoginPopup] full cookies:', document.cookie)
     
     // Also set up an interval to check frequently
     const interval = setInterval(() => {
@@ -39,20 +47,16 @@ export default function LoginPopup() {
     return () => clearInterval(interval)
   }, [])
 
-  // Don't render anything until mounted
-  if (!mounted) {
-    return null
-  }
-
-  // Show popup only if NO valid token exists
-  console.log('[LoginPopup] render check - hasToken:', hasToken)
-  if (hasToken) {
+  // Don't render anything until mounted on client
+  if (!mounted || hasToken) {
     return null
   }
 
   const handleSignIn = async () => {
     await initiateLogin()
   }
+
+  console.log('[LoginPopup] render check - showing login popup')
 
   return (
     <>
