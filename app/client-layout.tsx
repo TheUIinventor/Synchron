@@ -217,6 +217,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       document.documentElement.style.setProperty('--ui-scale', '1')
     }
   }, [pathname])
+  
   return (
     <ThemeProvider
       attribute="class"

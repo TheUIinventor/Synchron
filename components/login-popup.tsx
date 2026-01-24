@@ -17,14 +17,10 @@ export default function LoginPopup() {
     // Function to check and update auth status from cache
     const updateAuthStatus = () => {
       const cachedStatus = sessionStorage.getItem('synchron:user-logged-in');
-      console.log('[LoginPopup] Cache check:', cachedStatus);
       
       if (cachedStatus !== null) {
         const isLogged = cachedStatus === 'true';
         setIsLoggedIn(isLogged);
-        if (isLogged) {
-          console.log('[LoginPopup] ✓ Detected login!');
-        }
       } else {
         setIsLoggedIn(false);
       }
@@ -33,11 +29,25 @@ export default function LoginPopup() {
     // Initial read
     updateAuthStatus();
     
-    // Poll cache every 500ms to catch updates from ClientLayout
-    // (sessionStorage changes from other effects won't trigger storage event in same tab)
-    const pollInterval = setInterval(updateAuthStatus, 500);
+    // After auth callback (redirect from /api/auth/callback), 
+    // userinfo cache gets updated quickly. Poll very frequently for first 5 seconds
+    // to catch the auth response, then back off to 2 seconds
+    let timeElapsed = 0;
+    const baseInterval = setInterval(() => {
+      timeElapsed += 100;
+      updateAuthStatus();
+    }, 100);
     
-    return () => clearInterval(pollInterval);
+    // After 5 seconds, switch to less aggressive polling
+    const switchInterval = setTimeout(() => {
+      clearInterval(baseInterval);
+      setInterval(updateAuthStatus, 2000);
+    }, 5000);
+    
+    return () => {
+      clearInterval(baseInterval);
+      clearTimeout(switchInterval);
+    };
   }, []);
 
   // Don't render until mounted and auth status determined
