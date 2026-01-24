@@ -5,15 +5,11 @@ import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
-import { useTimetable } from "@/contexts/timetable-context"
+import { useStudentProfile } from "@/lib/api/hooks"
 
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
-  const timetableContext = useTimetable() as any
-  const reauthRequired = timetableContext?.reauthRequired
-  const timetableSource = timetableContext?.timetableSource
-  const externalTimetable = timetableContext?.externalTimetable
-  const isLoading = timetableContext?.isLoading
+  const { data: studentProfile, loading: profileLoading } = useStudentProfile()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -25,19 +21,15 @@ export default function LoginPopup() {
     return null
   }
 
-  // Don't show while loading - this prevents flicker
-  if (isLoading) {
+  // Don't show while profile is still loading
+  if (profileLoading) {
     return null
   }
 
-  // Show popup if:
-  // 1. reauthRequired is true (set on 401 responses from API), OR
-  // 2. timetableSource is 'external-empty' (API returned no timetable) AND
-  //    externalTimetable is null or empty (confirming no actual data)
-  const hasNoTimetableData = !externalTimetable || Object.keys(externalTimetable).length === 0
-  const shouldShowLogin = 
-    reauthRequired === true || 
-    (timetableSource === 'external-empty' && hasNoTimetableData)
+  // Show popup if profile fetch completed but has no data (i.e., user is not authenticated)
+  // If studentProfile has givenName, the user IS authenticated
+  const hasUserData = studentProfile?.givenName
+  const shouldShowLogin = !hasUserData
 
   if (!shouldShowLogin) {
     return null
