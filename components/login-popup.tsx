@@ -1,14 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { LogIn, AlertCircle } from "lucide-react"
+import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
 
 export default function LoginPopup() {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -23,6 +22,10 @@ export default function LoginPopup() {
   // Hide popup if authenticated
   if (isAuthenticated) {
     return null
+  }
+
+  const handleSignIn = async () => {
+    await initiateLogin()
   }
 
   return (
@@ -52,12 +55,13 @@ export default function LoginPopup() {
 
             {/* Call to action */}
             <div className="space-y-3 w-full">
-              <Link href="/auth" className="block">
-                <Button className="w-full rounded-full h-12 text-base font-semibold shadow-elevation-1 hover:shadow-elevation-2 transition-shadow">
-                  <LogIn className="mr-2 h-5 w-5" />
-                  Sign In
-                </Button>
-              </Link>
+              <Button 
+                onClick={handleSignIn}
+                className="w-full rounded-full h-12 text-base font-semibold shadow-elevation-1 hover:shadow-elevation-2 transition-shadow"
+              >
+                <LogIn className="mr-2 h-5 w-5" />
+                Sign In
+              </Button>
               <p className="text-xs text-on-surface-variant px-2">
                 Use your SBHS portal credentials to sign in.
               </p>
