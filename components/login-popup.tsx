@@ -10,14 +10,9 @@ import { useAuth } from "@/lib/api/hooks"
 const hasValidAccessToken = (): boolean => {
   if (typeof document === 'undefined') return false
   try {
-    const cookies = document.cookie.split(';')
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=')
-      if (name === 'Authorization' || name.includes('access') || name.includes('token')) {
-        return !!value
-      }
-    }
-    return false
+    const match = document.cookie.match(/(?:^|; )sbhs_access_token=([^;]*)/)
+    const token = match ? decodeURIComponent(match[1]) : null
+    return !!token
   } catch (e) {
     return false
   }
