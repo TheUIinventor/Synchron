@@ -11,6 +11,8 @@ export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const timetableContext = useTimetable() as any
   const reauthRequired = timetableContext?.reauthRequired
+  const timetableSource = timetableContext?.timetableSource
+  const externalTimetable = timetableContext?.externalTimetable
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -22,8 +24,14 @@ export default function LoginPopup() {
     return null
   }
 
-  // Show popup if reauthRequired is true (set on 401 responses from API)
-  if (reauthRequired !== true) {
+  // Show popup if:
+  // 1. reauthRequired is true (set on 401 responses from API), OR
+  // 2. timetableSource is 'external-empty' (API returned no timetable - user not authenticated)
+  const shouldShowLogin = 
+    reauthRequired === true || 
+    timetableSource === 'external-empty'
+
+  if (!shouldShowLogin) {
     return null
   }
 
