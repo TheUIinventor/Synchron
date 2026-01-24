@@ -332,11 +332,18 @@ export default function SettingsPage() {
   const [aggressiveLocal, setAggressiveLocal] = useState<boolean>(() => {
     try { const raw = localStorage.getItem('synchron-aggressive-refresh'); return raw === 'false' ? false : true } catch (e) { return true }
   })
+  const [devtoolsEnabled, setDevtoolsEnabled] = useState<boolean>(() => {
+    try { const raw = localStorage.getItem('synchron-devtools-enabled'); return raw === 'true' } catch (e) { return false }
+  })
 
   useEffect(() => {
     try { localStorage.setItem('synchron-aggressive-refresh', aggressiveLocal ? 'true' : 'false') } catch (e) {}
     try { window.dispatchEvent(new CustomEvent('synchron:aggressive-refresh-changed', { detail: { value: aggressiveLocal } })) } catch (e) {}
   }, [aggressiveLocal])
+
+  useEffect(() => {
+    try { localStorage.setItem('synchron-devtools-enabled', devtoolsEnabled ? 'true' : 'false') } catch (e) {}
+  }, [devtoolsEnabled])
 
   // Navigation tabs are not user-configurable in this build.
 
@@ -628,31 +635,118 @@ export default function SettingsPage() {
           <TabsContent value="devtools" className="space-y-6 mt-0">
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
-                <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
+                <CardTitle className="text-lg font-semibold text-on-surface">Developer Tools</CardTitle>
+                <CardDescription className="text-on-surface-variant">Enable or disable developer tools and debugging utilities</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-on-surface-variant">Aggressive background refresh</div>
+                  <div className="text-sm text-on-surface-variant">Enable Developer Tools</div>
                   <div className="flex items-center gap-3">
-                    <Switch checked={Boolean(aggressiveLocal)} onCheckedChange={(v) => { try { setAggressiveLocal(Boolean(v)) } catch (e) {} }} />
+                    <Switch checked={devtoolsEnabled} onCheckedChange={(v) => { try { setDevtoolsEnabled(Boolean(v)) } catch (e) {} }} />
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-on-surface-variant">When enabled, the app will poll more frequently while visible and immediately refresh when you return to the tab. This may increase network usage.</p>
+                <p className="mt-2 text-xs text-on-surface-variant">When enabled, debugging tools and API exploration options will be available below.</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-red-50 dark:bg-red-950/20 rounded-m3-xl border border-red-200 dark:border-red-900 shadow-elevation-1">
-              <CardContent className="p-6">
-                <div className="flex gap-3">
-                  <div className="text-2xl">⚠️</div>
-                  <div>
-                    <p className="font-semibold text-red-900 dark:text-red-100 mb-1">Warning</p>
-                    <p className="text-sm text-red-800 dark:text-red-200">Only touch these settings if you know what you're doing!</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {devtoolsEnabled ? (
+              <>
+                <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
+                    <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-on-surface-variant">Aggressive background refresh</div>
+                      <div className="flex items-center gap-3">
+                        <Switch checked={Boolean(aggressiveLocal)} onCheckedChange={(v) => { try { setAggressiveLocal(Boolean(v)) } catch (e) {} }} />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-on-surface-variant">When enabled, the app will poll more frequently while visible and immediately refresh when you return to the tab. This may increase network usage.</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-semibold text-on-surface">API Debug Tools</CardTitle>
+                    <CardDescription className="text-on-surface-variant">Explore raw API responses from the calendar and timetable endpoints</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-on-surface-variant">Click any of these links to view raw API data and debug responses:</p>
+                    <div className="grid grid-cols-1 gap-3">
+                      <Link
+                        href="/debug-timetable"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-md bg-primary text-on-primary hover:bg-primary/90 transition-colors text-sm font-medium text-center"
+                      >
+                        View Timetable API
+                      </Link>
+                      <Link
+                        href="/debug-calendar"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-md bg-primary text-on-primary hover:bg-primary/90 transition-colors text-sm font-medium text-center"
+                      >
+                        View Calendar API
+                      </Link>
+                      <Link
+                        href="/debug-subs"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-md bg-primary text-on-primary hover:bg-primary/90 transition-colors text-sm font-medium text-center"
+                      >
+                        View Substitutions API
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-semibold text-on-surface">Variations Debug</CardTitle>
+                    <CardDescription className="text-on-surface-variant">View stored timetable variations in localStorage</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-on-surface-variant">Inspect persisted class and room variations:</p>
+                    <button
+                      onClick={() => {
+                        try {
+                          const raw = localStorage.getItem('synchron-authoritative-variations')
+                          const parsed = JSON.parse(raw || '{}')
+                          const keys = Object.keys(parsed || {})
+                          const sampleKey = keys[0]
+                          const sample = sampleKey ? parsed[sampleKey] : null
+                          alert(`Variations Debug\n\nDates with data: ${keys.length}\nSample date: ${sampleKey || 'None'}\n\n${JSON.stringify({ keys: keys.slice(0, 5), sampleKey, sample }, null, 2)}`)
+                        } catch (e) {
+                          alert(`Error: ${String(e)}`)
+                        }
+                      }}
+                      className="w-full px-4 py-2 rounded-md border border-outline bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors text-sm font-medium"
+                    >
+                      View Stored Variations
+                    </button>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-red-50 dark:bg-red-950/20 rounded-m3-xl border border-red-200 dark:border-red-900 shadow-elevation-1">
+                  <CardContent className="p-6">
+                    <div className="flex gap-3">
+                      <div className="text-2xl">⚠️</div>
+                      <div>
+                        <p className="font-semibold text-red-900 dark:text-red-100 mb-1">Warning</p>
+                        <p className="text-sm text-red-800 dark:text-red-200">These tools are for debugging only. Modifying raw data may cause unexpected behaviour. Use at your own risk.</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <div className="py-12 text-center">
+                <p className="text-on-surface-variant">Developer Tools are disabled. Enable them above to access debugging utilities.</p>
+              </div>
+            )}
           </TabsContent>
           
           {!isMobile && (

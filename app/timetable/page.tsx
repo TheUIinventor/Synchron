@@ -140,8 +140,6 @@ export default function TimetablePage() {
   const [showDiag, setShowDiag] = useState(false)
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
-  const [showAuthVars, setShowAuthVars] = useState(false)
-  const [authVarsPreview, setAuthVarsPreview] = useState<any | null>(null)
 
   const fetchDiagnostics = async () => {
     setShowDiag(true)
@@ -593,52 +591,6 @@ export default function TimetablePage() {
                   <CalendarIcon className="h-4 w-4 mr-2" />
                   Pick Date
                 </Button>
-              </div>
-            )}
-
-            {/* Debug: view persisted authoritative variations (localStorage) */}
-            <div className="flex justify-center mb-4">
-              <button
-                onClick={() => {
-                  try {
-                    const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-authoritative-variations') : null
-                    if (!raw) {
-                      setAuthVarsPreview(null)
-                      setShowAuthVars(true)
-                      return
-                    }
-                    const parsed = JSON.parse(raw)
-                    // build a small preview: keys (dates) and first entry
-                    const keys = Object.keys(parsed || {})
-                    const sampleKey = keys[0]
-                    const sample = sampleKey ? parsed[sampleKey] : null
-                    setAuthVarsPreview({ keys, sampleKey, sample })
-                    setShowAuthVars(true)
-                  } catch (e) {
-                    setAuthVarsPreview({ error: String(e) })
-                    setShowAuthVars(true)
-                  }
-                }}
-                className="px-3 py-1 rounded-md text-xs font-medium border bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
-                type="button"
-              >
-                View stored variations
-              </button>
-            </div>
-
-            {showAuthVars && (
-              <div className="mb-4 max-w-3xl mx-auto">
-                <Card className="bg-surface-container-high p-3 border-none">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-on-surface">Variations Debug</div>
-                    <div>
-                      <button className="px-2 py-1 text-xs rounded-full bg-surface-container-highest text-on-surface" onClick={() => { setShowAuthVars(false); setAuthVarsPreview(null) }}>
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                  <pre className="text-xs overflow-x-auto max-h-60">{authVarsPreview ? JSON.stringify(authVarsPreview, null, 2) : 'No persisted variations found'}</pre>
-                </Card>
               </div>
             )}
 
