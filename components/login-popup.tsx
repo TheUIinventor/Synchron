@@ -5,66 +5,22 @@ import { LogIn } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/api/hooks"
-import { useTimetable } from "@/contexts/timetable-context"
 
 export default function LoginPopup() {
-  const { initiateLogin } = useAuth()
-  const timetableContext = useTimetable() as any
-  const timetableData = timetableContext?.timetableData
-  const isLoading = timetableContext?.isLoading
-  const error = timetableContext?.error
+  const { initiateLogin, isAuthenticated, loading } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const [showPopup, setShowPopup] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Update popup visibility based on whether timetable data exists
-  useEffect(() => {
-    if (!mounted) return
-
-    // If still loading, don't show popup yet
-    if (isLoading) {
-      setShowPopup(false)
-      return
-    }
-
-    // Check if we have actual timetable data
-    const hasTimetableData = 
-      timetableData && 
-      typeof timetableData === 'object' &&
-      Object.keys(timetableData).length > 0 &&
-      Object.values(timetableData).some((dayPeriods: any) => 
-        Array.isArray(dayPeriods) && dayPeriods.length > 0
-      )
-    
-    // If we have timetable data, user is authenticated (show nothing)
-    if (hasTimetableData) {
-      setShowPopup(false)
-      return
-    }
-
-    // If no timetable data, check the error to determine if it's auth-related
-    // Unauthorized/Forbidden errors = not logged in (show popup)
-    // Other errors (holiday, etc) = user IS logged in but API returned error (don't show popup)
-    if (error) {
-      // Error exists - check if it's an auth error
-      const isAuthError = 
-        error.toLowerCase().includes('unauthorized') ||
-        error.toLowerCase().includes('forbidden') ||
-        error.toLowerCase().includes('401') ||
-        error.toLowerCase().includes('403')
-      
-      setShowPopup(isAuthError)
-    } else {
-      // No error and no timetable data = user likely not authenticated, show popup
-      setShowPopup(true)
-    }
-  }, [timetableData, error, isLoading, mounted])
-
   // Don't render anything until mounted to avoid hydration issues
-  if (!mounted || !showPopup) {
+  if (!mounted || loading) {
+    return null
+  }
+
+  // Simple logic: only show if NOT authenticated
+  if (isAuthenticated) {
     return null
   }
 
