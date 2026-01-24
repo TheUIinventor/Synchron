@@ -21,20 +21,11 @@ export default function LoginPopup() {
     return null
   }
 
-  // Show popup if:
-  // 1. User is marked as needing to re-authenticate, OR
-  // 2. There's no timetable data and no current week loaded
-  const shouldShowPopup = reauthRequired || (!timetableData?.currentWeek && !timetableData?.hasByWeek)
+  // Show popup ONLY if reauthRequired is explicitly true
+  // This is the flag the TimetableContext sets when auth fails (401 errors)
+  const shouldShowPopup = reauthRequired === true
   
-  console.log('[LoginPopup] FULL DEBUG:', {
-    reauthRequired,
-    timetableData,
-    'timetableData?.currentWeek': timetableData?.currentWeek,
-    'timetableData?.hasByWeek': timetableData?.hasByWeek,
-    'check1_reauthRequired': reauthRequired,
-    'check2_noData': !timetableData?.currentWeek && !timetableData?.hasByWeek,
-    shouldShowPopup
-  })
+  console.log('[LoginPopup] reauthRequired:', reauthRequired, 'shouldShowPopup:', shouldShowPopup)
 
   if (!shouldShowPopup) {
     return null
