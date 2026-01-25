@@ -26,7 +26,6 @@ export default function LoginPopup() {
         }
       } else {
         setIsLoggedIn(false);
-        console.log('[LoginPopup] Cache is still null');
       }
     };
     
@@ -34,25 +33,14 @@ export default function LoginPopup() {
     console.log('[LoginPopup] Mount - initial cache read');
     updateAuthStatus();
     
-    // After auth callback (redirect from /api/auth/callback), 
-    // userinfo cache gets updated quickly. Poll very frequently for first 5 seconds
-    // to catch the auth response, then back off to 2 seconds
-    let timeElapsed = 0;
-    const baseInterval = setInterval(() => {
-      timeElapsed += 100;
+    // Keep polling frequently until we detect a logged-in state
+    // Even if it takes 20+ seconds for /api/portal/userinfo to respond
+    const interval = setInterval(() => {
       updateAuthStatus();
-    }, 100);
-    
-    // After 5 seconds, switch to less aggressive polling
-    const switchInterval = setTimeout(() => {
-      clearInterval(baseInterval);
-      console.log('[LoginPopup] Switching to 2-second polling');
-      setInterval(updateAuthStatus, 2000);
-    }, 5000);
+    }, 200); // Check every 200ms continuously
     
     return () => {
-      clearInterval(baseInterval);
-      clearTimeout(switchInterval);
+      clearInterval(interval);
     };
   }, []);
 

@@ -3,6 +3,7 @@
 "use client";
 import TopRightActionIcons from "@/components/top-right-action-icons";
 import LoginPopup from "@/components/login-popup";
+import { initAuthBlocking } from './init-auth';
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -17,6 +18,17 @@ import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  // Initialize auth on every page load/hydration
+  // This is critical after OAuth redirects back to home page
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    console.log('[ClientLayout] Mounted, fetching auth status');
+    (async () => {
+      await initAuthBlocking();
+      console.log('[ClientLayout] Auth fetch complete');
+    })();
+  }, []);
 
   // Emergency unregister is disabled by default to avoid reload loops that
   // block navigation and user interactions. To enable temporarily set
