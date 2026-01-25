@@ -1,5 +1,6 @@
 // Initialize authentication as the very first thing
-// This runs BEFORE any other code and blocks all subsequent API calls until done
+// Uses /api/timetable endpoint which is faster and already performs auth checks
+// Returns quickly regardless of whether it's a school day or not
 
 export async function initAuthBlocking() {
   // If we're on the server, skip
@@ -11,28 +12,39 @@ export async function initAuthBlocking() {
     return;
   }
 
-  // Fetch userinfo FIRST and WAIT
+  // Fetch timetable for today - this checks auth faster than /api/portal/userinfo
   try {
     const startTime = Date.now();
-    console.log('[init-auth] ⏳ Fetching /api/portal/userinfo FIRST');
-    const res = await fetch('/api/portal/userinfo', {
+    
+    // Get today's date in YYYY/MM/DD format
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${year}/${month}/${day}`;
+    
+    console.log(`[init-auth] ⏳ Fetching /api/timetable?date=${dateStr}`);
+    
+    const res = await fetch(`/api/timetable?date=${dateStr}`, {
       method: 'GET',
       credentials: 'include',
     });
+    
     const data = await res.json();
-    const isLoggedIn = data?.success === true;
+    
+    // Check if authenticated by looking for "Unauthorized" error message
+    // Authenticated: returns timetable data (even if noTimetable=true for non-school days)
+    // Not authenticated: returns {"upstream":{"day":{"status":"error","message":"Unauthorized"},...}}
+    const isLoggedIn = !(data?.upstream?.day?.message === 'Unauthorized');
     const elapsed = Date.now() - startTime;
 
-    console.log(`[init-auth] ✓ Auth initialized in ${elapsed}ms:`, isLoggedIn);
+    console.log(`[init-auth] ✓ Auth check in ${elapsed}ms:`, isLoggedIn);
 
     // Cache the result
     sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
-    if (isLoggedIn && data?.data?.givenName) {
-      sessionStorage.setItem('synchron:user-name', data.data.givenName);
-    }
     sessionStorage.setItem('synchron:userinfo-ready', 'true');
   } catch (err) {
-    console.error('[init-auth] ✗ Error fetching userinfo:', err);
+    console.error('[init-auth] ✗ Error checking auth:', err);
     sessionStorage.setItem('synchron:user-logged-in', 'false');
     sessionStorage.setItem('synchron:userinfo-ready', 'true');
   }
