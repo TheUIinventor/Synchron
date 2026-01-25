@@ -9,43 +9,41 @@ import { useAuth } from "@/lib/api/hooks"
 export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false) // Default to false, not null
 
   useEffect(() => {
     setMounted(true);
+    console.log('[LoginPopup] Mount');
     
     // Function to check and update auth status from cache
     const updateAuthStatus = () => {
       const cachedStatus = sessionStorage.getItem('synchron:user-logged-in');
+      const isLogged = cachedStatus === 'true';
       
-      if (cachedStatus !== null) {
-        const isLogged = cachedStatus === 'true';
-        setIsLoggedIn(isLogged);
-        if (isLogged) {
-          console.log('[LoginPopup] ✓ Auth detected: logged in');
-        }
-      } else {
+      if (isLogged) {
+        console.log('[LoginPopup] ✓ Auth detected: logged in, hiding popup');
+        setIsLoggedIn(true);
+      } else if (cachedStatus !== null) {
+        // Cache exists but is false
         setIsLoggedIn(false);
       }
+      // If cache is null, keep previous state (don't set to false until cache is ready)
     };
     
     // Initial read
-    console.log('[LoginPopup] Mount - initial cache read');
     updateAuthStatus();
     
-    // Keep polling frequently until we detect a logged-in state
-    // Even if it takes 20+ seconds for /api/portal/userinfo to respond
-    const interval = setInterval(() => {
-      updateAuthStatus();
-    }, 200); // Check every 200ms continuously
+    // Keep polling continuously to detect auth state changes
+    // This ensures we catch the cache update whenever it completes
+    const interval = setInterval(updateAuthStatus, 200);
     
     return () => {
       clearInterval(interval);
     };
   }, []);
 
-  // Don't render until mounted and auth status determined
-  if (!mounted || isLoggedIn === null) {
+  // Don't render until mounted
+  if (!mounted) {
     return null
   }
 

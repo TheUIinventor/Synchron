@@ -6,23 +6,16 @@ export async function initAuthBlocking() {
   // If we're on the server, skip
   if (typeof window === 'undefined') return;
 
-  // Check if already initialized
-  if (sessionStorage.getItem('synchron:userinfo-ready') === 'true') {
-    console.log('[init-auth] Already initialized, skipping');
-    return;
-  }
+  // Get today's date in YYYY/MM/DD format
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateStr = `${year}/${month}/${day}`;
 
   // Fetch timetable for today - this checks auth faster than /api/portal/userinfo
   try {
     const startTime = Date.now();
-    
-    // Get today's date in YYYY/MM/DD format
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const dateStr = `${year}/${month}/${day}`;
-    
     console.log(`[init-auth] ⏳ Fetching /api/timetable?date=${dateStr}`);
     
     const res = await fetch(`/api/timetable?date=${dateStr}`, {

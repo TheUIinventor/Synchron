@@ -38,25 +38,33 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Fetch userinfo FIRST before React renders anything */}
+        {/* Fetch timetable FIRST before React renders anything - checks auth faster */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (async function() {
                 const start = Date.now();
-                console.log('[head-script] Starting userinfo fetch');
+                
+                // Get today's date in YYYY/MM/DD format
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const dateStr = year + '/' + month + '/' + day;
+                
+                console.log('[head-script] Starting timetable auth check for ' + dateStr);
                 try {
-                  const res = await fetch('/api/portal/userinfo', { 
+                  const res = await fetch('/api/timetable?date=' + dateStr, { 
                     method: 'GET', 
                     credentials: 'include'
                   });
                   const data = await res.json();
-                  const isLoggedIn = data?.success === true;
+                  
+                  // Check if authenticated by looking for "Unauthorized" error
+                  const isLoggedIn = !(data?.upstream?.day?.message === 'Unauthorized');
                   console.log('[head-script] Response received after', Date.now() - start, 'ms:', isLoggedIn);
+                  
                   sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
-                  if (isLoggedIn && data?.data?.givenName) {
-                    sessionStorage.setItem('synchron:user-name', data.data.givenName);
-                  }
                   sessionStorage.setItem('synchron:userinfo-ready', 'true');
                   console.log('[head-script] Cache updated, ready flag set');
                 } catch (err) {
