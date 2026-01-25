@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/api/hooks"
 import { cn } from "@/lib/utils"
 import { useTimetable } from "@/contexts/timetable-context"
 import { useToast } from "@/hooks/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 
 export function AuthButton() {
   // We're using the hook to get the authentication state and functions
@@ -39,7 +40,42 @@ export function AuthButton() {
   const handleAuth = () => {
     // If the user is authenticated, we call the logout function from the hook
     if (isAuthenticated) {
-      logout()
+      // Ask for confirmation via toast with action buttons
+      let promptToast: any
+
+      const handleConfirm = async () => {
+        try {
+          // Dismiss the prompt toast first (we'll do a navigation next)
+          promptToast?.dismiss()
+        } catch (e) {}
+        try {
+          await logout()
+        } catch (e) {}
+        try {
+          window.location.href = '/api/auth/logout'
+        } catch {
+          window.location.assign('/api/auth/logout')
+        }
+      }
+
+      // Show confirmation toast; create then update to include scoped handlers
+      promptToast = toast({
+        title: 'Log out?'
+        , description: 'Are you sure you want to sign out of Synchron?'
+      })
+
+      promptToast.update({
+        action: (
+          <div className="flex items-center gap-2">
+            <ToastAction onClick={() => { try { promptToast.dismiss() } catch {} }}>
+              Cancel
+            </ToastAction>
+            <ToastAction onClick={() => { try { handleConfirm() } catch {} }}>
+              Yes
+            </ToastAction>
+          </div>
+        ),
+      })
     } else {
       // Delegate to server route that builds the correct authorize URL and manages state cookie
       if (typeof initiateLogin === 'function') {

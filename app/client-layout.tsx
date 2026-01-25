@@ -7,6 +7,7 @@ import { initAuthBlocking } from './init-auth';
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { useToast } from '@/hooks/use-toast'
 
 import type { ReactNode } from "react"
 import { BottomNav } from "@/components/bottom-nav"
@@ -18,6 +19,7 @@ import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { toast } = useToast()
 
   // Initialize auth on every page load/hydration
   // This is critical after OAuth redirects back to home page
@@ -29,6 +31,24 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       console.log('[ClientLayout] Auth fetch complete');
     })();
   }, []);
+
+  // Show a friendly confirmation when we land after logout
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const loggedOut = params.get('logged_out') === 'true'
+      if (loggedOut) {
+        try {
+          toast({ title: 'Signed out', description: 'You have been logged out.' })
+        } catch (e) {
+          // fallback: no-op
+        }
+        // Clean up URL so it doesn't persist
+        try { window.history.replaceState({}, document.title, window.location.pathname) } catch (e) {}
+      }
+    } catch (e) {}
+  }, [])
 
   // Emergency unregister is disabled by default to avoid reload loops that
   // block navigation and user interactions. To enable temporarily set
