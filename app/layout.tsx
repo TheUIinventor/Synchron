@@ -38,34 +38,31 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Check for OAuth callback success flag first - instant auth detection */}
+        {/* CRITICAL: Check for OAuth callback FIRST - must run synchronously before anything else */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              (function() {
-                // Check if we just completed OAuth - auth_success=true in URL
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('auth_success') === 'true') {
-                  console.log('[head-script] OAuth callback detected, setting auth to true immediately');
-                  sessionStorage.setItem('synchron:user-logged-in', 'true');
-                  sessionStorage.setItem('synchron:userinfo-ready', 'true');
-                  // Clean up URL
-                  const cleanUrl = window.location.pathname;
-                  window.history.replaceState({}, document.title, cleanUrl);
-                  return; // Don't need to fetch, we already know we're authenticated
-                }
-              })();
+              // Check if we just completed OAuth - auth_success=true in URL
+              // Run synchronously to set cache BEFORE React hydrates
+              const urlParams = new URLSearchParams(window.location.search);
+              if (urlParams.get('auth_success') === 'true') {
+                console.log('[head-script] OAuth callback detected, setting auth to true IMMEDIATELY');
+                sessionStorage.setItem('synchron:user-logged-in', 'true');
+                sessionStorage.setItem('synchron:userinfo-ready', 'true');
+                // Clean up URL without waiting
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }
             `,
           }}
         />
-        {/* Fetch timetable FIRST before React renders anything - checks auth faster */}
+        {/* Fetch timetable for auth check - only if OAuth flag not found */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (async function() {
                 // Skip if already set by OAuth callback
                 if (sessionStorage.getItem('synchron:userinfo-ready') === 'true') {
-                  console.log('[head-script] Auth already set, skipping timetable fetch');
+                  console.log('[head-script] Auth already set by OAuth, skipping timetable fetch');
                   return;
                 }
                 
