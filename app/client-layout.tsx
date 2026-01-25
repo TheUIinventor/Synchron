@@ -22,12 +22,6 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
   // block navigation and user interactions. To enable temporarily set
   // `sessionStorage['synchron:do-emergency']= 'true'` from the console.
   useEffect(() => {
-
-
-  // Emergency unregister is disabled by default to avoid reload loops that
-  // block navigation and user interactions. To enable temporarily set
-  // `sessionStorage['synchron:do-emergency']= 'true'` from the console.
-  useEffect(() => {
     if (typeof window === 'undefined') return
     try {
       const doEmergency = sessionStorage.getItem('synchron:do-emergency') === 'true'
