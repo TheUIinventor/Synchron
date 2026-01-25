@@ -21,12 +21,17 @@ export default function LoginPopup() {
       if (cachedStatus !== null) {
         const isLogged = cachedStatus === 'true';
         setIsLoggedIn(isLogged);
+        if (isLogged) {
+          console.log('[LoginPopup] ✓ Auth detected: logged in');
+        }
       } else {
         setIsLoggedIn(false);
+        console.log('[LoginPopup] Cache is still null');
       }
     };
     
     // Initial read
+    console.log('[LoginPopup] Mount - initial cache read');
     updateAuthStatus();
     
     // After auth callback (redirect from /api/auth/callback), 
@@ -41,6 +46,7 @@ export default function LoginPopup() {
     // After 5 seconds, switch to less aggressive polling
     const switchInterval = setTimeout(() => {
       clearInterval(baseInterval);
+      console.log('[LoginPopup] Switching to 2-second polling');
       setInterval(updateAuthStatus, 2000);
     }, 5000);
     

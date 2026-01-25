@@ -43,6 +43,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (async function() {
+                const start = Date.now();
+                console.log('[head-script] Starting userinfo fetch');
                 try {
                   const res = await fetch('/api/portal/userinfo', { 
                     method: 'GET', 
@@ -50,12 +52,15 @@ export default function RootLayout({
                   });
                   const data = await res.json();
                   const isLoggedIn = data?.success === true;
+                  console.log('[head-script] Response received after', Date.now() - start, 'ms:', isLoggedIn);
                   sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
                   if (isLoggedIn && data?.data?.givenName) {
                     sessionStorage.setItem('synchron:user-name', data.data.givenName);
                   }
                   sessionStorage.setItem('synchron:userinfo-ready', 'true');
+                  console.log('[head-script] Cache updated, ready flag set');
                 } catch (err) {
+                  console.error('[head-script] Error:', err);
                   sessionStorage.setItem('synchron:user-logged-in', 'false');
                   sessionStorage.setItem('synchron:userinfo-ready', 'true');
                 }
