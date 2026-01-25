@@ -17,10 +17,6 @@ import ErrorBoundary from "@/components/error-boundary"
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  
-  // useEffect(() => {
-  //   // Auth is initialized by AuthInitializer - nothing to do here
-  // }, [])
 
   // Emergency unregister is disabled by default to avoid reload loops that
   // block navigation and user interactions. To enable temporarily set
