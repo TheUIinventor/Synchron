@@ -46,8 +46,45 @@ export function AuthButton() {
 
       const handleConfirm = async () => {
         try { promptToast?.dismiss() } catch (e) {}
-        try { await logout() } catch (e) {}
-        try { window.location.href = '/api/auth/logout' } catch { window.location.assign('/api/auth/logout') }
+        try {
+          // Ask server to clear httpOnly cookies and clear client-side storage
+          await logout()
+
+          // Clear client-accessible cookies
+          try {
+            document.cookie = 'sbhs_access_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;'
+            document.cookie = 'sbhs_refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;'
+          } catch (e) {}
+
+          // Clear session/local storage keys used by the app
+          try {
+            sessionStorage.removeItem('synchron:user-logged-in')
+            sessionStorage.removeItem('synchron:userinfo-ready')
+            sessionStorage.removeItem('synchron:user-name')
+            localStorage.removeItem('synchron-given-name')
+            localStorage.removeItem('synchron-canvas-links')
+            localStorage.removeItem('sbhs_session_id')
+            localStorage.removeItem('sbhs_csrf_token')
+            localStorage.removeItem('sbhs_session_expires')
+          } catch (e) {}
+
+          // Clear caches if available
+          if (typeof window !== 'undefined' && 'caches' in window) {
+            try {
+              const cacheKeys = await caches.keys()
+              for (const k of cacheKeys) {
+                try { await caches.delete(k) } catch (e) {}
+              }
+            } catch (e) {}
+          }
+
+          // Show signed out toast and navigate home
+          try { toast({ title: 'Signed out', description: 'You have been logged out.' }) } catch (e) {}
+          try { window.location.href = '/' } catch { window.location.assign('/') }
+        } catch (e) {
+          // Best-effort: still navigate home
+          try { window.location.href = '/' } catch { window.location.assign('/') }
+        }
       }
 
       // Create a confirmation toast with inline action buttons

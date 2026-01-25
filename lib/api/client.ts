@@ -277,9 +277,11 @@ class SBHSPortalClient {
 
   async logout(): Promise<void> {
     try {
-      await this.makePortalRequest("/logout", { method: "POST" })
+      // Ask our server to clear httpOnly auth cookies. This avoids CORS issues
+      // with the upstream portal and centralises cookie clearing on the server.
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     } catch (error) {
-      // Ignore logout errors
+      // Ignore logout errors — we'll still clear local session
     }
     this.clearSession()
   }
