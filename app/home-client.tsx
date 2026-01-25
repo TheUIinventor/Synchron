@@ -6,6 +6,9 @@ import { Loader2, Bell, MapPin, Calendar, ArrowRight, Mail, Clipboard as Clipboa
 import { useEffect, useState } from "react";
 import { sbhsPortal } from "@/lib/api/client";
 import { AuthButton } from "@/components/auth-button";
+import { useAuth } from "@/lib/api/hooks";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils";
 import { getNextBell } from "@/utils/bell-utils";
 import { Badge } from "@/components/ui/badge";
@@ -435,7 +438,27 @@ export default function HomeClient() {
             <Link href="/settings" className="rounded-full p-2 hover:bg-surface-variant transition-colors">
               <SettingsIcon className="h-5 w-5 text-muted-foreground" />
             </Link>
-            <AuthButton />
+            {/* Top-right home page auth button converted to a logout button per request */}
+            {(() => {
+              try {
+                const { logout } = useAuth()
+                return (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="glass-button border-0 transition-all duration-200 bg-transparent hover:bg-white/30 dark:hover:bg-white/15 rounded-full px-3 h-10"
+                    onClick={() => { try { logout() } catch (e) {} }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <LogOut className="h-4 w-4" />
+                      <span className="whitespace-nowrap">Log out</span>
+                    </div>
+                  </Button>
+                )
+              } catch (e) {
+                return <AuthButton />
+              }
+            })()}
           </div>
       </div>
 
