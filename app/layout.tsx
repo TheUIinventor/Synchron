@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ClientLayout from "./client-layout";
-import AuthInitializer from "./auth-initializer";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Roboto_Flex } from "next/font/google";
@@ -38,19 +37,44 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Fetch userinfo FIRST before React renders anything */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (async function() {
+                try {
+                  const res = await fetch('/api/portal/userinfo', { 
+                    method: 'GET', 
+                    credentials: 'include'
+                  });
+                  const data = await res.json();
+                  const isLoggedIn = data?.success === true;
+                  sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
+                  if (isLoggedIn && data?.data?.givenName) {
+                    sessionStorage.setItem('synchron:user-name', data.data.givenName);
+                  }
+                  sessionStorage.setItem('synchron:userinfo-ready', 'true');
+                } catch (err) {
+                  sessionStorage.setItem('synchron:user-logged-in', 'false');
+                  sessionStorage.setItem('synchron:userinfo-ready', 'true');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={`${roboto.variable} font-sans antialiased bg-background text-foreground transition-colors duration-300`}>
         {/* Emergency inline recovery script removed — caused reload loops and
           blocked client navigation. If emergency unregister is needed,
           enable it manually by setting `sessionStorage['synchron:panic-cleared']=true`
           or reintroducing a controlled script. */}
-        <AuthInitializer>
-          <ClientLayout>
-            {children}
-            <Toaster />
-            <SonnerToaster />
-            <Analytics />
-          </ClientLayout>
-        </AuthInitializer>
+        <ClientLayout>
+          {children}
+          <Toaster />
+          <SonnerToaster />
+          <Analytics />
+        </ClientLayout>
       </body>
     </html>
   );
