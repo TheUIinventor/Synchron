@@ -6,6 +6,12 @@ export async function initAuthBlocking() {
   // If we're on the server, skip
   if (typeof window === 'undefined') return;
 
+  // If another script already set the auth state (e.g. head-script after OAuth), skip re-fetching
+  if (sessionStorage.getItem('synchron:userinfo-ready') === 'true') {
+    console.log('[init-auth] userinfo-ready already set, skipping fetch to avoid overwrite');
+    return;
+  }
+
   // Get today's date in YYYY/MM/DD format
   const now = new Date();
   const year = now.getFullYear();

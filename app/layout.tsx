@@ -38,6 +38,29 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Instrumentation: log every sessionStorage.setItem call to trace overwrites */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                try {
+                  const originalSet = sessionStorage.setItem.bind(sessionStorage);
+                  sessionStorage.setItem = function(k, v) {
+                    try {
+                      console.log('[sessionStorage.setItem] key=' + k + ' value=' + v);
+                      console.log(new Error().stack);
+                    } catch(e){}
+                    return originalSet(k, v);
+                  };
+                  console.log('[head-instrument] sessionStorage.setItem wrapped');
+                } catch(e) {
+                  console.error('[head-instrument] failed to wrap sessionStorage.setItem', e);
+                }
+              })();
+            `,
+          }}
+        />
+
         {/* CRITICAL: Check for OAuth callback FIRST - must run synchronously before anything else */}
         <script
           dangerouslySetInnerHTML={{
