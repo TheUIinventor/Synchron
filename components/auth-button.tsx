@@ -38,33 +38,22 @@ export function AuthButton() {
 
   // This is the client-side logic to handle both login and logout
   const handleAuth = () => {
+    console.log('[AuthButton] clicked, isAuthenticated=', isAuthenticated)
     // If the user is authenticated, we call the logout function from the hook
     if (isAuthenticated) {
       // Ask for confirmation via toast with action buttons
       let promptToast: any
 
       const handleConfirm = async () => {
-        try {
-          // Dismiss the prompt toast first (we'll do a navigation next)
-          promptToast?.dismiss()
-        } catch (e) {}
-        try {
-          await logout()
-        } catch (e) {}
-        try {
-          window.location.href = '/api/auth/logout'
-        } catch {
-          window.location.assign('/api/auth/logout')
-        }
+        try { promptToast?.dismiss() } catch (e) {}
+        try { await logout() } catch (e) {}
+        try { window.location.href = '/api/auth/logout' } catch { window.location.assign('/api/auth/logout') }
       }
 
-      // Show confirmation toast; create then update to include scoped handlers
+      // Create a confirmation toast with inline action buttons
       promptToast = toast({
-        title: 'Log out?'
-        , description: 'Are you sure you want to sign out of Synchron?'
-      })
-
-      promptToast.update({
+        title: 'Log out?',
+        description: 'Are you sure you want to sign out of Synchron?',
         action: (
           <div className="flex items-center gap-2">
             <ToastAction onClick={() => { try { promptToast.dismiss() } catch {} }}>
