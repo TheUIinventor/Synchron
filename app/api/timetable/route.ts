@@ -199,6 +199,7 @@ export async function GET(req: NextRequest) {
     let dayRes: any = null
     let fullRes: any = null
     let bellsRes: any = null
+    let upstreamHost: string | null = null
 
     // Try each host until we get a JSON response
     for (const host of hosts) {
@@ -220,6 +221,7 @@ export async function GET(req: NextRequest) {
       // If any of these responded with JSON, adopt them and stop trying further hosts
       if ((dr as any).json || (fr as any).json || (br as any).json) {
         dayRes = dr; fullRes = fr; bellsRes = br
+        upstreamHost = host
         break
       }
       // Keep last responses for potential HTML forwarding below
@@ -327,6 +329,7 @@ export async function GET(req: NextRequest) {
                 weekType: detectedWeekType,
                 isHoliday: true,
                 noTimetable: true,
+                upstreamHost,
                 upstream: { day: dj, full: null, bells: null },
               }, { status: 200, headers: cacheHeaders(req) })
             }
@@ -1454,6 +1457,7 @@ export async function GET(req: NextRequest) {
           variations: variationsDiag,
           variationTargetDay: dayResDay,
           variationPeriodNumbers: dayPeriodNumbers,
+          upstreamHost,
           // Include raw upstream payloads to help diagnose where A/B info may be present
           upstream: {
             day: dayRes?.json ?? null,
