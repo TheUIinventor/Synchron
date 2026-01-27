@@ -330,7 +330,14 @@ export default function SettingsPage() {
   // read/write localStorage and notify provider via custom event so the provider
   // can pick up changes when possible.
   const [aggressiveLocal, setAggressiveLocal] = useState<boolean>(() => {
-    try { const raw = localStorage.getItem('synchron-aggressive-refresh'); return raw === 'false' ? false : true } catch (e) { return true }
+    try {
+      const raw = localStorage.getItem('synchron-aggressive-refresh')
+      const devtoolsRaw = localStorage.getItem('synchron-devtools-enabled')
+      // When Devtools are enabled and the user has not explicitly set a preference,
+      // default aggressive refresh to OFF to avoid noisy polling during development.
+      if (raw === null && devtoolsRaw === 'true') return false
+      return raw === 'false' ? false : true
+    } catch (e) { return true }
   })
   const [devtoolsEnabled, setDevtoolsEnabled] = useState<boolean>(() => {
     try { const raw = localStorage.getItem('synchron-devtools-enabled'); return raw === 'true' } catch (e) { return false }
@@ -343,6 +350,18 @@ export default function SettingsPage() {
 
   useEffect(() => {
     try { localStorage.setItem('synchron-devtools-enabled', devtoolsEnabled ? 'true' : 'false') } catch (e) {}
+  }, [devtoolsEnabled])
+
+  // If Devtools are enabled *after* mount and the user has not explicitly
+  // set a preference for aggressive refresh, default it to OFF to avoid
+  // noisy background polling during development sessions.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('synchron-aggressive-refresh')
+      if (devtoolsEnabled && raw === null) {
+        setAggressiveLocal(false)
+      }
+    } catch (e) {}
   }, [devtoolsEnabled])
 
   // Navigation tabs are not user-configurable in this build.
@@ -654,7 +673,7 @@ export default function SettingsPage() {
                 <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
                   <CardHeader>
                     <CardTitle className="text-lg font-semibold text-on-surface">Background Refresh</CardTitle>
-                    <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. Aggressive is on by default.</CardDescription>
+                    <CardDescription className="text-on-surface-variant">Control how aggressively the app polls for timetable updates. When Devtools are enabled, aggressive refresh defaults to off.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">

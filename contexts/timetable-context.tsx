@@ -684,12 +684,45 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const lastRefreshTsRef = useRef<number | null>(null)
   const holidayDateRef = useRef<boolean>(false)
 
-  // Aggressive background refresh tuning
-  // NOTE: reduced intervals to make visible-refresh more responsive.
-  // MIN_REFRESH_MS is the minimum time between *non-forced* refreshes.
-  const MIN_REFRESH_MS = 9 * 1000 // never refresh faster than ~9s (was 45s)
-  const VISIBLE_REFRESH_MS = 12 * 1000 // target interval while visible (was 60s)
-  const HIDDEN_REFRESH_MS = 60 * 1000 // target interval while hidden (was 5m)
+  // Background refresh tuning - values depend on user preference.
+  // Aggressive mode polls frequently (useful for demo/dev), while
+  // conservative mode uses larger intervals to reduce network usage.
+  // Determine initial preference from localStorage, defaulting to
+  // OFF when Devtools are enabled and no explicit preference exists.
+  const readAggressivePref = () => {
+    try {
+      if (typeof window === 'undefined') return true
+      const raw = localStorage.getItem('synchron-aggressive-refresh')
+      if (raw === null) {
+        // if devtools enabled and no explicit preference -> default OFF
+        const devtools = localStorage.getItem('synchron-devtools-enabled') === 'true'
+        return devtools ? false : true
+      }
+      return raw === 'true'
+    } catch (e) { return true }
+  }
+
+  let aggressivePref = readAggressivePref()
+  let MIN_REFRESH_MS = aggressivePref ? 9 * 1000 : 45 * 1000
+  let VISIBLE_REFRESH_MS = aggressivePref ? 12 * 1000 : 60 * 1000
+  let HIDDEN_REFRESH_MS = aggressivePref ? 60 * 1000 : 5 * 60 * 1000
+
+  // Listen for runtime changes to the aggressive-refresh preference so we
+  // can update intervals immediately when the user flips the switch.
+  try {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('synchron:aggressive-refresh-changed', (ev: any) => {
+        try {
+          const val = !!(ev && ev.detail && ev.detail.value)
+          aggressivePref = val
+          MIN_REFRESH_MS = aggressivePref ? 9 * 1000 : 45 * 1000
+          VISIBLE_REFRESH_MS = aggressivePref ? 12 * 1000 : 60 * 1000
+          HIDDEN_REFRESH_MS = aggressivePref ? 60 * 1000 : 5 * 60 * 1000
+          try { console.debug('[timetable.provider] aggressive-refresh changed ->', aggressivePref) } catch (e) {}
+        } catch (e) {}
+      })
+    }
+  } catch (e) {}
   // Hydrate last-seen bell refs from the initial cache so components that
   // read `lastSeenBellTimesRef` synchronously can access bell buckets.
   try {
