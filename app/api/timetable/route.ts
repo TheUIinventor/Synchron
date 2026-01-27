@@ -312,17 +312,26 @@ export async function GET(req: NextRequest) {
           }
           
           if (!isSchoolDay) {
-            console.log(`[API] No classes for ${dateParam} - likely holiday or non-school day`)
-            return NextResponse.json({
-              timetable: byDay, // Empty timetable
-              timetableByWeek: null,
-              bellTimes: undefined,
-              source: 'sbhs-api-day',
-              weekType: detectedWeekType,
-              isHoliday: true,
-              noTimetable: true,
-              upstream: { day: dj, full: null, bells: null },
-            }, { status: 200, headers: cacheHeaders(req) })
+            // If there are no real class entries but bells exist, prefer
+            // to build a bells-derived placeholder timetable so clients
+            // still receive period structure and break times. Only treat
+            // the date as an empty/non-school day when there are neither
+            // class periods nor bells.
+            if (!hasBells) {
+              console.log(`[API] No classes and no bells for ${dateParam} - likely holiday or non-school day`)
+              return NextResponse.json({
+                timetable: byDay, // Empty timetable
+                timetableByWeek: null,
+                bellTimes: undefined,
+                source: 'sbhs-api-day',
+                weekType: detectedWeekType,
+                isHoliday: true,
+                noTimetable: true,
+                upstream: { day: dj, full: null, bells: null },
+              }, { status: 200, headers: cacheHeaders(req) })
+            }
+            console.log(`[API] No classes for ${dateParam} but bells exist - building bells-derived placeholders`)
+            // fall through to bells-based construction below
           }
           
           // Build periods from bells (like competitor's dttSchema.transform)
