@@ -16,7 +16,7 @@ export function BottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[9999] p-4 md:hidden" style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}>
+    <div className="fixed bottom-0 left-0 right-0 z-[10001] p-4 md:hidden" style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}>
       <div className="mx-auto max-w-md bg-surface-container-high/90 backdrop-blur-lg border border-white/10 shadow-elevation-3 rounded-full px-6 py-3 flex items-center justify-between" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
         {navItems.map((item) => {
           const isActive = pathname === item.href;
