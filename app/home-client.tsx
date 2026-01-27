@@ -510,7 +510,7 @@ export default function HomeClient() {
                     ) : nextPeriod ? (
                       "Transition"
                     ) : (
-                      "Out of Hours"
+                      "Outside School Hours"
                     )}
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
