@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Calendar, Bell, Menu, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const navItems = [
     { href: "/", icon: Home, label: "My Synchron" },
@@ -23,10 +24,23 @@ export function BottomNav() {
           const Icon = item.icon;
 
           return (
+            // Use Link for semantics but also handle clicks via router.push to
+            // ensure navigation occurs even if a parent event handler prevents
+            // the default anchor navigation (some overlays or listeners may do this).
             <Link
               key={item.href}
               href={item.href}
               className="relative group flex flex-col items-center justify-center"
+              onClick={(e: any) => {
+                try {
+                  // prefer client-side push to avoid relying on default anchor
+                  e.preventDefault()
+                  router.push(item.href)
+                } catch (err) {
+                  // fallback to default behaviour if push fails
+                }
+              }}
+              aria-label={item.label}
             >
               <div
                 className={cn(
@@ -35,6 +49,8 @@ export function BottomNav() {
                     ? "bg-primary-container text-primary-container-foreground w-20"
                     : "text-muted-foreground hover:bg-surface-variant/50"
                 )}
+                // Ensure the target captures pointer events
+                style={{ pointerEvents: 'auto' }}
               >
                 <Icon
                   className={cn(
@@ -45,9 +61,6 @@ export function BottomNav() {
                   strokeWidth={isActive ? 2.5 : 2}
                 />
               </div>
-              {/* Optional: Label appears only on non-mobile or specific states if desired, 
-                  but strictly Expressive Mobile Bottom bar usually omits labels for core nav 
-                  or keeps them always. We'll omit for the clean pill look here. */}
             </Link>
           );
         })}

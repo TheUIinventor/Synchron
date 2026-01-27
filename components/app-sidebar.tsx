@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Calendar, Bell, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const navItems = [
     { href: "/", icon: Home, label: "My Synchron" },
@@ -27,6 +28,12 @@ export function AppSidebar() {
               key={item.href}
               href={item.href}
               className="group flex flex-col items-center gap-1 w-full px-2"
+              onClick={(e: any) => {
+                try {
+                  e.preventDefault()
+                  router.push(item.href)
+                } catch (err) {}
+              }}
             >
               <div
                 className={cn(
