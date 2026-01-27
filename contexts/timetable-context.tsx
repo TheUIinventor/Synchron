@@ -3513,6 +3513,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
               if (diffMs > 0) {
                 // Create a lightweight synthetic period marker for UI use.
                 info.nextPeriod = { ...found.period, isRollCallMarker: true } as any
+                info.nextPeriodStart = found.start
                 info.timeUntil = `School in ${formatDurationShort(diffMs)} until roll call`
               }
             }

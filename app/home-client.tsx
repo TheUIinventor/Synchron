@@ -229,7 +229,18 @@ export default function HomeClient() {
     );
   }
 
-  const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass } = currentMomentPeriodInfo;
+  const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass, nextPeriodStart } = currentMomentPeriodInfo as any;
+  const shouldShowTransition = (() => {
+    try {
+      if (!nextPeriod) return false
+      if (nextPeriodStart) {
+        const sixAm = new Date(nextPeriodStart.getFullYear(), nextPeriodStart.getMonth(), nextPeriodStart.getDate(), 6, 0, 0, 0)
+        return currentDate >= sixAm
+      }
+      // Fallback: assume nextPeriod refers to today
+      return true
+    } catch (e) { return false }
+  })()
   
   // Determine the date to display for the HOME page. The home page should
   // not be influenced by a manual date selection on the timetable page, so
@@ -375,7 +386,11 @@ export default function HomeClient() {
       }
 
       if (!target) {
-        return timeUntil || ""
+        // Only show countdowns when currently in class or when we should
+        // show the transition (i.e. after 6am on the day the next period applies).
+        if (isCurrentlyInClass) return timeUntil || ""
+        if (shouldShowTransition) return timeUntil || ""
+        return ""
       }
 
       let diff = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000))
@@ -507,10 +522,8 @@ export default function HomeClient() {
                       ) : (
                         <>{currentPeriod.subject}</>
                       )
-                    ) : nextPeriod ? (
-                      "Transition"
                     ) : (
-                      "Outside School Hours"
+                      shouldShowTransition ? "Transition" : "Outside School Hours"
                     )}
                   </h2>
                   <div className="flex items-center gap-3 text-lg opacity-80 font-medium">
@@ -539,7 +552,7 @@ export default function HomeClient() {
                 <div className="mt-6">
                   <div className="flex flex-col items-end text-sm mb-1">
                     <span className="text-[15px] opacity-90">
-                      {nextPeriod?.subject ? (
+                      {shouldShowTransition && nextPeriod?.subject ? (
                         <>
                           <span className="inline md:hidden">{nextPeriod.subject}</span>
                           <span className="hidden md:inline">{(nextPeriod as any)?.title || nextPeriod.subject}</span>

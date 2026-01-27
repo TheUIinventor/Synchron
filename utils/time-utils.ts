@@ -88,6 +88,7 @@ export const getTimeUntilNextPeriod = (
   currentPeriods: Array<{ period: string; time: string; subject: string; teacher: string; room: string }>,
 ): {
   nextPeriod: { period: string; time: string; subject: string; teacher: string; room: string } | null
+  nextPeriodStart?: Date | null
   timeUntil: string
   isCurrentlyInClass: boolean
   currentPeriod: { period: string; time: string; subject: string; teacher: string; room: string } | null
@@ -119,6 +120,11 @@ export const getTimeUntilNextPeriod = (
   const currentIndex = currentPeriods.findIndex((p) => p.period === currentPeriod?.period)
     if (currentIndex < currentPeriods.length - 1) {
       nextPeriod = currentPeriods[currentIndex + 1]
+      // include start date for the next period (anchored to today)
+      try {
+        const { start } = parseTimeRange((nextPeriod as any).time)
+        ;(nextPeriod as any).__start = start
+      } catch (e) {}
     }
 
     // Format time remaining in current period with seconds
@@ -140,6 +146,9 @@ export const getTimeUntilNextPeriod = (
       const { start } = parseTimeRange(period.time)
       if (now < start) {
         nextPeriod = period
+
+        // attach start Date so callers can determine the exact day/time
+        ;(nextPeriod as any).__start = start
 
         const diffMs = start.getTime() - now.getTime()
         const totalSeconds = Math.floor(diffMs / 1000)
@@ -165,7 +174,10 @@ export const getTimeUntilNextPeriod = (
     timeUntil = "No more classes today"
   }
 
-  return { nextPeriod, timeUntil, isCurrentlyInClass, currentPeriod }
+  // Expose canonical nextPeriodStart if available
+  const nextPeriodStart = (nextPeriod && (nextPeriod as any).__start) ? (nextPeriod as any).__start : null
+
+  return { nextPeriod, nextPeriodStart, timeUntil, isCurrentlyInClass, currentPeriod }
 }
 
 // Parse a time range but anchored to a specific date. Returns start/end Date on that date.
