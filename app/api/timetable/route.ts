@@ -190,11 +190,17 @@ export async function GET(req: NextRequest) {
     let bellSchedules: Record<string, { period: string; time: string }[]> | undefined = undefined
     let bellTimesSources: Record<string, string> | undefined = undefined
 
-    // Define candidate hosts and paths. If we have a bearer token, prefer the public API host as well.
-    const hosts = [
-      'https://student.sbhs.net.au',
-      'https://api.sbhs.net.au',
-    ]
+    // Define candidate hosts and paths. If we have a bearer token, prioritize api.sbhs.net.au
+    // as it may have more up-to-date data (e.g., 2026 timetables). Otherwise fall back to student portal.
+    const hosts = accessToken
+      ? [
+          'https://api.sbhs.net.au',
+          'https://student.sbhs.net.au',
+        ]
+      : [
+          'https://student.sbhs.net.au',
+          'https://api.sbhs.net.au',
+        ]
 
     let dayRes: any = null
     let fullRes: any = null
