@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
     // Build list of endpoints to test
     const hosts = ['student.sbhs.net.au', 'api.sbhs.net.au'];
     const paths = [
+      // Standard endpoints
       `/api/timetable/daytimetable.json?date=${encodeURIComponent(dateParam)}`,
       `/api/timetable/timetable.json`,
       `/api/students/timetable?date=${encodeURIComponent(dateParam)}`,
@@ -74,6 +75,16 @@ export async function GET(req: NextRequest) {
       `/api/timetable.json?date=${encodeURIComponent(dateParam)}`,
       `/timetable/daytimetable.json?date=${encodeURIComponent(dateParam)}`,
       `/timetable.json`,
+      // Endpoints visible in competitor network trace
+      `/sessions?date%5Bbefore%5D=${encodeURIComponent(dateParam)}&date%5Bafter%5D=${encodeURIComponent(dateParam)}`,
+      `/dates?date%5Bbefore%5D=${encodeURIComponent(dateParam)}&date%5Bafter%5D=${encodeURIComponent(dateParam)}`,
+      `/sessions?date%5Bbefore%5D=2026-12-31&date%5Bafter%5D=${encodeURIComponent(dateParam)}`,
+      `/classes?date=${encodeURIComponent(dateParam)}`,
+      `/subjects.getSubjects?batch=1&input=`,
+      `/subjects.getSubjects?batch=1&input=%7B%7D`,
+      `/subjects.getSubjects`,
+      `/classes`,
+      `/dates?date%5Bbefore%5D=2026-12-31&date%5Bafter%5D=2026-01-28`,
     ];
 
     const requests = [];
