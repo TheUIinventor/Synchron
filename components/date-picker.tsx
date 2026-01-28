@@ -60,7 +60,10 @@ export function DatePicker({
   }
 
   const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+    // JS `getDay()` returns 0=Sunday..6=Saturday. We want a Monday-first grid,
+    // so shift the index: Monday -> 0, Tuesday -> 1, ..., Sunday -> 6
+    const raw = new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+    return (raw + 6) % 7
   }
 
   const formatMonthYear = (date: Date) => {
