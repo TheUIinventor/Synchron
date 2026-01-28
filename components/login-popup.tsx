@@ -10,37 +10,61 @@ export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false) // Default to false, not null
-
   useEffect(() => {
-    setMounted(true);
-    console.log('[LoginPopup] Mount');
-    
-    // Function to check and update auth status from cache
+    setMounted(true)
+    // Log mount once for diagnostics
+    console.log('[LoginPopup] Mount')
+
+    let intervalId: number | null = null
+    let lastSeen: string | null = null
+
     const updateAuthStatus = () => {
-      const cachedStatus = sessionStorage.getItem('synchron:user-logged-in');
-      const isLogged = cachedStatus === 'true';
-      
-      if (isLogged) {
-        console.log('[LoginPopup] ✓ Auth detected: logged in, hiding popup');
-        setIsLoggedIn(true);
-      } else if (cachedStatus !== null) {
-        // Cache exists but is false
-        setIsLoggedIn(false);
+      try {
+        const cachedStatus = sessionStorage.getItem('synchron:user-logged-in')
+        // Only act when the cached value is available
+        if (cachedStatus === null) return
+
+        // If we reach here, we have a defined cached value; stop polling
+        if (intervalId !== null) {
+          clearInterval(intervalId)
+          intervalId = null
+        }
+
+        if (cachedStatus !== lastSeen) {
+          lastSeen = cachedStatus
+          const isLogged = cachedStatus === 'true'
+          if (isLogged) {
+            console.log('[LoginPopup] ✓ Auth detected: logged in, hiding popup')
+            setIsLoggedIn(true)
+          } else {
+            console.log('[LoginPopup] Auth cache present and not logged in')
+            setIsLoggedIn(false)
+          }
+        }
+      } catch (err) {
+        // ignore
       }
-      // If cache is null, keep previous state (don't set to false until cache is ready)
-    };
-    
-    // Initial read
-    updateAuthStatus();
-    
-    // Keep polling continuously to detect auth state changes
-    // This ensures we catch the cache update whenever it completes
-    const interval = setInterval(updateAuthStatus, 200);
-    
+    }
+
+    // Initial read: if the key is already present, this will set state immediately
+    updateAuthStatus()
+
+    // If the key is not present yet, poll at a reasonable interval (1s) until it appears
+    if (sessionStorage.getItem('synchron:user-logged-in') === null) {
+      intervalId = window.setInterval(updateAuthStatus, 1000)
+    }
+
+    // Also listen for storage events (cross-tab updates)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'synchron:user-logged-in') updateAuthStatus()
+    }
+    window.addEventListener('storage', onStorage)
+
     return () => {
-      clearInterval(interval);
-    };
-  }, []);
+      if (intervalId !== null) clearInterval(intervalId)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
 
   // Don't render until mounted
   if (!mounted) {
