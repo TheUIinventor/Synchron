@@ -124,7 +124,7 @@ export function DatePicker({
           {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-2 mb-6">
             {/* Weekday headers */}
-            {adjustedWeekDays.map((day) => (
+            {weekDays.map((day) => (
               <div
                 key={day}
                 className="text-center text-sm font-medium text-muted-foreground py-2"
