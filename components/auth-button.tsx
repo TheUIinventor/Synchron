@@ -60,6 +60,7 @@ export function AuthButton() {
           try {
             sessionStorage.removeItem('synchron:user-logged-in')
             sessionStorage.removeItem('synchron:userinfo-ready')
+            sessionStorage.removeItem('synchron:did-autoreload')
             sessionStorage.removeItem('synchron:user-name')
             localStorage.removeItem('synchron-given-name')
             localStorage.removeItem('synchron-canvas-links')

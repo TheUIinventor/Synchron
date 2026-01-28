@@ -33,6 +33,47 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     })();
   }, []);
 
+  // If auth completes and indicates the user is logged in, perform a single
+  // autonomous reload shortly after so client-side data and caches refresh.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const attemptReloadIfLoggedIn = () => {
+      try {
+        const ready = sessionStorage.getItem('synchron:userinfo-ready')
+        const loggedIn = sessionStorage.getItem('synchron:user-logged-in')
+        if (ready === 'true' && loggedIn === 'true') {
+          const markerKey = 'synchron:did-autoreload'
+          const did = sessionStorage.getItem(markerKey)
+          if (!did) {
+            try { sessionStorage.setItem(markerKey, String(Date.now())) } catch (e) {}
+            // Delay up to 1500ms to allow any immediate UI updates, but ensure
+            // reload occurs well within 5s per user request.
+            setTimeout(() => {
+              try { location.reload() } catch (e) {}
+            }, 1500)
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Listen for same-window event dispatched by init-auth or head-script
+    window.addEventListener('synchron:userinfo-ready', attemptReloadIfLoggedIn)
+    // Also respond to cross-window storage updates
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'synchron:userinfo-ready' || e.key === 'synchron:user-logged-in') attemptReloadIfLoggedIn()
+    }
+    window.addEventListener('storage', onStorage)
+
+    // Try immediately in case auth was already set before this effect ran
+    attemptReloadIfLoggedIn()
+
+    return () => {
+      try { window.removeEventListener('synchron:userinfo-ready', attemptReloadIfLoggedIn) } catch (e) {}
+      try { window.removeEventListener('storage', onStorage) } catch (e) {}
+    }
+  }, [])
+
   // Show a friendly confirmation when we land after logout
   useEffect(() => {
     if (typeof window === 'undefined') return
