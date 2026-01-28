@@ -81,6 +81,8 @@ export default function HomeClient() {
     timetableSource,
     bellTimes,
     reauthRequired } = useTimetable() as any;
+  const { visible: loginVisible } = useLoginPromptVisible()
+  const auth = useAuth()
   
   // Initialize immediately so header can render without waiting for effects
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -441,53 +443,34 @@ export default function HomeClient() {
             <div className="flex items-center">
               {/* On medium+ screens the cloud icon is moved to the sidebar; show it here only on small screens */}
               <div className="sm:hidden">
-                {(() => {
-                  try {
-                    if (isLoading || isRefreshing) return <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
-                    const { visible: loginVisible } = useLoginPromptVisible()
-                    if (loginVisible) {
-                      return (
-                        <div className="relative w-5 h-5" title="Not logged in">
-                          <Cloud className="h-5 w-5 text-muted-foreground" />
-                          <span className="absolute -right-0 -top-0 bg-white rounded-full">
-                            <svg className="h-3 w-3 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18" />
-                              <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                          </span>
-                        </div>
-                      )
-                    }
-
-                    if (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') {
-                      return (
-                        <div className="relative w-5 h-5" title="Synced to cloud">
-                          <Cloud className="h-5 w-5 text-muted-foreground" />
-                          <span className="absolute -right-0 -top-0 bg-white rounded-full">
-                            <Check className="h-3 w-3 text-green-600" />
-                          </span>
-                        </div>
-                      )
-                    }
-                  } catch (e) {}
-                  return null
-                })()}
+                {isLoading || isRefreshing ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
+                ) : loginVisible ? (
+                  <div className="relative w-5 h-5" title="Not logged in">
+                    <Cloud className="h-5 w-5 text-muted-foreground" />
+                    <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                      <svg className="h-3 w-3 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </span>
+                  </div>
+                ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
+                  <div className="relative w-5 h-5" title="Synced to cloud">
+                    <Cloud className="h-5 w-5 text-muted-foreground" />
+                    <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                      <Check className="h-3 w-3 text-green-600" />
+                    </span>
+                  </div>
+                ) : null}
               </div>
               {/* On medium+ screens, show the login CTA inline when needed (login state checked via hook) */}
               <div className="hidden sm:flex items-center">
-                {(() => {
-                  try {
-                    const { visible } = useLoginPromptVisible()
-                    if (visible) {
-                      return (
-                        <a href="/api/auth/login" className="hidden md:inline-flex items-center gap-2 bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-md hover:brightness-95 transition mr-2">
-                          Log in to see latest data
-                        </a>
-                      )
-                    }
-                  } catch (e) {}
-                  return null
-                })()}
+                {loginVisible && (
+                  <a href="/api/auth/login" className="hidden md:inline-flex items-center gap-2 bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-md hover:brightness-95 transition mr-2">
+                    Log in to see latest data
+                  </a>
+                )}
               </div>
             </div>
 
@@ -495,26 +478,21 @@ export default function HomeClient() {
               <SettingsIcon className="h-5 w-5 text-muted-foreground" />
             </Link>
             {/* Top-right home page auth button converted to a logout button per request */}
-            {(() => {
-              try {
-                const { logout } = useAuth()
-                return (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    className="glass-button border-0 transition-all duration-200 bg-transparent hover:bg-white/30 dark:hover:bg-white/15 rounded-full px-3 h-10"
-                    onClick={() => { try { logout() } catch (e) {} }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <LogOut className="h-4 w-4" />
-                      <span className="whitespace-nowrap">Log out</span>
-                    </div>
-                  </Button>
-                )
-              } catch (e) {
-                return <AuthButton />
-              }
-            })()}
+            {auth && auth.logout ? (
+              <Button
+                variant="outline"
+                size="default"
+                className="glass-button border-0 transition-all duration-200 bg-transparent hover:bg-white/30 dark:hover:bg-white/15 rounded-full px-3 h-10"
+                onClick={() => { try { auth.logout() } catch (e) {} }}
+              >
+                <div className="flex items-center gap-2">
+                  <LogOut className="h-4 w-4" />
+                  <span className="whitespace-nowrap">Log out</span>
+                </div>
+              </Button>
+            ) : (
+              <AuthButton />
+            )}
           </div>
       </div>
 
