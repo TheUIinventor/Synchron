@@ -117,7 +117,8 @@ export async function GET(req: NextRequest) {
   // Helper: fetch JSON from either student portal or API host, following small redirect chains
   async function getJson(path: string) {
     const sep = path.includes('?') ? '&' : '?'
-    let nextUrl = dateParam ? `${path}${sep}date=${encodeURIComponent(dateParam)}` : path
+    // Don't add dateParam again - it should already be in the path if needed
+    let nextUrl = path
     let response: Response | null = null
     for (let i = 0; i < 5; i++) {
       response = await fetch(nextUrl, { headers: baseHeaders, redirect: 'manual' })
