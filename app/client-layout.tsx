@@ -3,6 +3,7 @@
 "use client";
 import TopRightActionIcons from "@/components/top-right-action-icons";
 import LoginPopup from "@/components/login-popup";
+import LoginPromptBanner from "@/components/login-prompt-banner";
 import { initAuthBlocking } from './init-auth';
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -219,6 +220,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
               {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
               {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
               <ConditionalTopRightIcons />
+              <LoginPromptBanner />
               <LoginPopup />
               <AppSidebar />
               <div className="px-2 sm:px-3 md:pl-20 lg:pl-28 pb-8 md:pb-10">{children}</div>
