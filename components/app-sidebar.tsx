@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Home, Calendar, Bell, Clipboard, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTimetable } from "@/contexts/timetable-context";
+import { useLoginPromptVisible } from "@/components/login-prompt-banner";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -69,7 +70,26 @@ export function AppSidebar() {
         {(() => {
           try {
             const { isLoading, isRefreshing, timetableSource } = useTimetable() as any
+            const { visible: loginPromptVisible } = useLoginPromptVisible()
+
             if (isLoading || isRefreshing) return <Cloud className="h-5 w-5 animate-spin text-primary" />
+
+            // If the app has detected a missing SBHS access token (login prompt visible),
+            // show a cloud with a red cross overlay to indicate not logged in.
+            if (loginPromptVisible) {
+              return (
+                <div className="relative w-6 h-6" title="Not logged in">
+                  <Cloud className="h-6 w-6 text-muted-foreground" />
+                  <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                    <svg className="h-3 w-3 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </span>
+                </div>
+              )
+            }
+
             if (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') {
               return (
                 <div className="relative w-6 h-6" title="Synced to cloud">

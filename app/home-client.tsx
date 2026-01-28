@@ -441,16 +441,37 @@ export default function HomeClient() {
             <div className="flex items-center">
               {/* On medium+ screens the cloud icon is moved to the sidebar; show it here only on small screens */}
               <div className="sm:hidden">
-                {(isLoading || isRefreshing) ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
-                ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
-                  <div className="relative w-5 h-5" title="Synced to cloud">
-                    <Cloud className="h-5 w-5 text-muted-foreground" />
-                    <span className="absolute -right-0 -top-0 bg-white rounded-full">
-                      <Check className="h-3 w-3 text-green-600" />
-                    </span>
-                  </div>
-                ) : null}
+                {(() => {
+                  try {
+                    if (isLoading || isRefreshing) return <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
+                    const { visible: loginVisible } = useLoginPromptVisible()
+                    if (loginVisible) {
+                      return (
+                        <div className="relative w-5 h-5" title="Not logged in">
+                          <Cloud className="h-5 w-5 text-muted-foreground" />
+                          <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                            <svg className="h-3 w-3 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          </span>
+                        </div>
+                      )
+                    }
+
+                    if (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') {
+                      return (
+                        <div className="relative w-5 h-5" title="Synced to cloud">
+                          <Cloud className="h-5 w-5 text-muted-foreground" />
+                          <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                            <Check className="h-3 w-3 text-green-600" />
+                          </span>
+                        </div>
+                      )
+                    }
+                  } catch (e) {}
+                  return null
+                })()}
               </div>
               {/* On medium+ screens, show the login CTA inline when needed (login state checked via hook) */}
               <div className="hidden sm:flex items-center">
