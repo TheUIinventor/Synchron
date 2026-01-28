@@ -457,7 +457,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6 bg-surface-container-high rounded-full p-1 h-auto">
+          <TabsList className={"grid w-full " + (isMobile ? "grid-cols-3" : "grid-cols-4") + " mb-6 bg-surface-container-high rounded-full p-1 h-auto"}>
               <TabsTrigger 
                 value="appearance" 
                 className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-on-primary py-2 relative"
