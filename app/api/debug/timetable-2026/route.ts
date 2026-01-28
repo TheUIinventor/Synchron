@@ -64,6 +64,32 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  function getRecommendation(studentResult: any, apiResult: any, hasToken: boolean): string {
+    const studentOk = studentResult.status === 200 && !studentResult.parseError;
+    const apiOk = apiResult.status === 200 && !apiResult.parseError;
+    
+    // Mirrors logic in app/api/timetable/route.ts:
+    // If authenticated, try api.sbhs.net.au first, then fallback to student.sbhs.net.au
+    if (hasToken) {
+      if (apiOk) {
+        return 'Using api.sbhs.net.au (prioritized for authenticated users)';
+      }
+      if (studentOk) {
+        return 'api.sbhs.net.au failed (404), falling back to student.sbhs.net.au';
+      }
+      return 'Both hosts failed; no data available';
+    }
+    
+    // If not authenticated, try student.sbhs.net.au first, then fallback to api.sbhs.net.au
+    if (studentOk) {
+      return 'Using student.sbhs.net.au (prioritized for unauthenticated users)';
+    }
+    if (apiOk) {
+      return 'student.sbhs.net.au failed, falling back to api.sbhs.net.au';
+    }
+    return 'Both hosts failed; no data available';
+  }
+
   try {
     const [studentResult, apiResult] = await Promise.all([
       fetchFromHost('https://student.sbhs.net.au'),
@@ -87,11 +113,7 @@ export async function GET(req: NextRequest) {
         apiHasClasses: apiResult.hasClasses,
         studentYear: studentResult.studentYear,
         apiYear: apiResult.studentYear,
-        recommendation: studentResult.status === 200 && apiResult.status === 200 && apiResult.hasClasses && !studentResult.hasClasses
-          ? 'api.sbhs.net.au has classes when student portal does not. Consider prioritizing api.sbhs.net.au for this date.'
-          : accessToken
-          ? 'Using prioritized api.sbhs.net.au (has auth token)'
-          : 'Using student.sbhs.net.au (no auth token)',
+        recommendation: getRecommendation(studentResult, apiResult, !!accessToken),
       },
     }, { status: 200 });
   } catch (e: any) {
