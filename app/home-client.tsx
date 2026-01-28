@@ -579,7 +579,7 @@ export default function HomeClient() {
 
             {/* Quick Links (replaces Up Next card) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 w-full md:w-full md:items-stretch">
-              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-container-highest transition-colors duration-300 flex flex-col justify-between h-full overflow-hidden sm:overflow-visible">
+              <div className="rounded-m3-xl bg-surface-container-high p-4 hover:bg-surface-container-highest transition-colors duration-300 flex flex-col h-full overflow-hidden">
                 <div className="flex flex-wrap items-center gap-3">
                   <a
                     href="https://mail.google.com/a/student.sbhs.nsw.edu.au"
@@ -614,7 +614,7 @@ export default function HomeClient() {
                 {/* Divider and adaptive class links row */}
                 <div className="mt-4">
                   <div className="border-t border-outline-variant" />
-                  <div className="mt-3 flex items-center gap-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
                     {(() => {
                       const subject = (currentPeriod?.subject ?? "").trim()
                       // Normalize subject: remove digits/punctuation and lower-case
@@ -663,7 +663,7 @@ export default function HomeClient() {
                               href={matched.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex-1 min-w-[6rem] px-4 py-3 rounded-md border border-outline-variant bg-surface-container-high hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-2"
+                              className="flex-1 basis-0 min-w-0 sm:min-w-[6rem] px-4 py-3 rounded-md border border-outline-variant bg-surface-container-high hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-2"
                             >
                               <Globe className="h-4 w-4" />
                               <span className="font-medium">{matched.label}</span>
@@ -675,7 +675,7 @@ export default function HomeClient() {
                         return (
                           <div
                             key={i}
-                            className="flex-1 min-w-[6rem] h-10 rounded-md border border-outline-variant bg-transparent"
+                            className="flex-1 basis-0 min-w-0 sm:min-w-[6rem] px-4 py-3 rounded-md border border-outline-variant bg-transparent"
                             aria-hidden
                           />
                         )
