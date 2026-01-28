@@ -51,6 +51,8 @@ export async function GET(req: NextRequest) {
         parseError,
         textPreview: text.substring(0, 500),
         hasClasses: json ? (Object.keys(json?.timetable?.timetable?.periods || {}).length > 0) : false,
+        periodsCount: json?.timetable?.timetable?.periods ? Object.keys(json.timetable.timetable.periods).length : 0,
+        bellsCount: json?.bells ? (Array.isArray(json.bells) ? json.bells.length : 0) : 0,
         studentYear: json?.timetable?.student?.year,
         date: json?.date || dateParam,
       };
