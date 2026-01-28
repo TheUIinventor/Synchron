@@ -78,15 +78,10 @@ export function DatePicker({
   const daysInMonth = getDaysInMonth(displayMonth)
   const firstDay = getFirstDayOfMonth(displayMonth)
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+  const emptyDays = Array.from({ length: firstDay }, (_, i) => i)
 
-  // When showing a Monday-first calendar, compute the number of empty
-  // leading cells before the 1st of the month. `getDay()` returns 0=Sun..6=Sat,
-  // so converting to Monday-first requires shifting by 6 (mod 7).
-  const leadingEmptyCount = (firstDay + 6) % 7
-  const emptyDays = Array.from({ length: leadingEmptyCount }, (_, i) => i)
-
-  // Weekday labels starting Monday
   const weekDays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+  const adjustedWeekDays = [...weekDays.slice(1), weekDays[0]] // Rotate to start with Monday
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,7 +119,7 @@ export function DatePicker({
           {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-2 mb-6">
             {/* Weekday headers */}
-            {weekDays.map((day) => (
+            {adjustedWeekDays.map((day) => (
               <div
                 key={day}
                 className="text-center text-sm font-medium text-muted-foreground py-2"
