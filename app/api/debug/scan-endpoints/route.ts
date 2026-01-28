@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const dateParam = url.searchParams.get('date') || '2026-02-02';
   const accessToken = req.cookies.get('sbhs_access_token')?.value;
   const incomingCookie = req.headers.get('cookie') || '';
+  const testAuth = req.headers.get('x-test-authorization') || null;
 
   const baseHeaders: Record<string, string> = {
     'Accept': 'application/json',
@@ -26,7 +27,12 @@ export async function GET(req: NextRequest) {
   const tryEndpoint = async (host: string, path: string) => {
     try {
       const fullUrl = `https://${host}${path}`;
-      const response = await fetch(fullUrl, { headers: baseHeaders, redirect: 'follow' });
+      // Copy base headers and allow dev-only Authorization override
+      const headers: Record<string, string> = { ...baseHeaders };
+      if (testAuth) {
+        headers['Authorization'] = testAuth;
+      }
+      const response = await fetch(fullUrl, { headers, redirect: 'follow' });
       const text = await response.text();
       
       let json: any = null;
@@ -85,6 +91,10 @@ export async function GET(req: NextRequest) {
       `/subjects.getSubjects`,
       `/classes`,
       `/dates?date%5Bbefore%5D=2026-12-31&date%5Bafter%5D=2026-01-28`,
+      // Core API endpoints used by Timetabl v2 (student-specific)
+      `/api/core/students/449596935/timetable/classes`,
+      `/api/core/students/449596935/timetable/dates?date%5Bbefore%5D=${encodeURIComponent(dateParam)}&date%5Bafter%5D=${encodeURIComponent(dateParam)}`,
+      `/api/core/students/449596935/timetable/dates?date%5Bbefore%5D=2026-12-31&date%5Bafter%5D=${encodeURIComponent(dateParam)}`,
     ];
 
     const requests = [];
