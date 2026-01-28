@@ -42,9 +42,16 @@ export async function initAuthBlocking() {
     // Cache the result
     sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
     sessionStorage.setItem('synchron:userinfo-ready', 'true');
+    try {
+      // Notify other parts of the app in the same window that auth cache is ready
+      window.dispatchEvent(new CustomEvent('synchron:userinfo-ready'))
+    } catch (e) {}
   } catch (err) {
     console.error('[init-auth] ✗ Error checking auth:', err);
     sessionStorage.setItem('synchron:user-logged-in', 'false');
     sessionStorage.setItem('synchron:userinfo-ready', 'true');
+    try {
+      window.dispatchEvent(new CustomEvent('synchron:userinfo-ready'))
+    } catch (e) {}
   }
 }

@@ -33,11 +33,35 @@ export function useLoginPromptVisible() {
     } catch (e) {}
 
     let mounted = true
+    const handleUserinfoReady = () => {
+      try {
+        const ready = sessionStorage.getItem('synchron:userinfo-ready')
+        const loggedIn = sessionStorage.getItem('synchron:user-logged-in')
+        if (ready === 'true') {
+          // If init-auth ran and says user is not logged in, show the prompt.
+          if (loggedIn === 'false') setVisible(true)
+          else setVisible(false)
+          setChecked(true)
+        }
+      } catch (e) {}
+    }
+
+    // Respond to cross-window storage changes
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'synchron:userinfo-ready' || e.key === 'synchron:user-logged-in') {
+        handleUserinfoReady()
+      }
+    }
+
+    // Respond to same-window auth initialization
+    const onCustom = () => handleUserinfoReady()
+
+    let mountedFlag = true
     ;(async () => {
       try {
         const res = await fetch('/api/portal/userinfo', { credentials: 'include' })
         const ctype = res.headers.get('content-type') || ''
-        if (!mounted) return
+        if (!mountedFlag) return
         if (!res.ok) {
           // If 401 and exact missing-token message, show banner
           try {
@@ -58,7 +82,11 @@ export function useLoginPromptVisible() {
       }
     })()
 
-    return () => { mounted = false }
+    // Listen for auth-ready events and storage updates
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('synchron:userinfo-ready', onCustom)
+
+    return () => { mountedFlag = false; window.removeEventListener('storage', onStorage); window.removeEventListener('synchron:userinfo-ready', onCustom) }
   }, [])
 
   return { visible, checked }
