@@ -3,9 +3,8 @@
 import React from "react"
 import { useEffect, useState } from "react"
 
-// Small fixed banner/button shown top-right when cached timetable exists
-// but the portal userinfo indicates the SBHS access token is missing.
-export default function LoginPromptBanner() {
+// Hook to determine whether the login prompt should be shown.
+export function useLoginPromptVisible() {
   const [visible, setVisible] = useState(false)
   const [checked, setChecked] = useState(false)
 
@@ -21,6 +20,17 @@ export default function LoginPromptBanner() {
       setChecked(true)
       return
     }
+
+    // Prefer quick session cache if init-auth already ran
+    try {
+      const ready = sessionStorage.getItem('synchron:userinfo-ready')
+      const loggedIn = sessionStorage.getItem('synchron:user-logged-in')
+      if (ready === 'true' && loggedIn === 'false') {
+        setVisible(true)
+        setChecked(true)
+        return
+      }
+    } catch (e) {}
 
     let mounted = true
     ;(async () => {
@@ -51,8 +61,13 @@ export default function LoginPromptBanner() {
     return () => { mounted = false }
   }, [])
 
-  if (!visible) return null
+  return { visible, checked }
+}
 
+// Default component: fixed top-right banner variant
+export default function LoginPromptBanner() {
+  const { visible } = useLoginPromptVisible()
+  if (!visible) return null
   return (
     <div className="fixed top-4 right-4 z-50">
       <a

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Calendar, Bell, Clipboard } from "lucide-react";
+import { Home, Calendar, Bell, Clipboard, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTimetable } from "@/contexts/timetable-context";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -63,7 +64,28 @@ export function AppSidebar() {
           );
         })}
       </div>
-      {/* bell times removed */}
+      {/* cloud / sync indicator at bottom center */}
+      <div className="w-full flex items-center justify-center mt-6">
+        {(() => {
+          try {
+            const { isLoading, isRefreshing, timetableSource } = useTimetable() as any
+            if (isLoading || isRefreshing) return <Cloud className="h-5 w-5 animate-spin text-primary" />
+            if (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') {
+              return (
+                <div className="relative w-6 h-6" title="Synced to cloud">
+                  <Cloud className="h-6 w-6 text-muted-foreground" />
+                  <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                    <svg className="h-3 w-3 text-green-600" viewBox="0 0 24 24" fill="currentColor"><path d="M20.285 6.709a7 7 0 0 0-9.9 9.9 7.002 7.002 0 0 0 9.9-9.9zm-9.285 9.291l-3.292-3.291 1.414-1.414 1.877 1.877 4.95-4.95 1.414 1.414L11 16z"/></svg>
+                  </span>
+                </div>
+              )
+            }
+            return <Cloud className="h-5 w-5 text-muted-foreground" />
+          } catch (e) {
+            return <Cloud className="h-5 w-5 text-muted-foreground" />
+          }
+        })()}
+      </div>
     </aside>
   );
 }

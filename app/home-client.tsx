@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/api/hooks";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils";
+import { useLoginPromptVisible } from "@/components/login-prompt-banner";
 import { getNextBell } from "@/utils/bell-utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -438,16 +439,35 @@ export default function HomeClient() {
           <div className="flex items-center gap-3">
             {/* Sync indicator placed left of the settings icon. Spinner while loading, cloud+check when synced. */}
             <div className="flex items-center">
-              {(isLoading || isRefreshing) ? (
-                <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
-              ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
-                <div className="relative w-5 h-5" title="Synced to cloud">
-                  <Cloud className="h-5 w-5 text-muted-foreground" />
-                  <span className="absolute -right-0 -top-0 bg-white rounded-full">
-                    <Check className="h-3 w-3 text-green-600" />
-                  </span>
-                </div>
-              ) : null}
+              {/* On medium+ screens the cloud icon is moved to the sidebar; show it here only on small screens */}
+              <div className="sm:hidden">
+                {(isLoading || isRefreshing) ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" title="Syncing" />
+                ) : (timetableSource && timetableSource !== 'fallback-sample' && timetableSource !== 'cache') ? (
+                  <div className="relative w-5 h-5" title="Synced to cloud">
+                    <Cloud className="h-5 w-5 text-muted-foreground" />
+                    <span className="absolute -right-0 -top-0 bg-white rounded-full">
+                      <Check className="h-3 w-3 text-green-600" />
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+              {/* On medium+ screens, show the login CTA inline when needed (login state checked via hook) */}
+              <div className="hidden sm:flex items-center">
+                {(() => {
+                  try {
+                    const { visible } = useLoginPromptVisible()
+                    if (visible) {
+                      return (
+                        <a href="/api/auth/login" className="hidden md:inline-flex items-center gap-2 bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-md hover:brightness-95 transition mr-2">
+                          Log in to see latest data
+                        </a>
+                      )
+                    }
+                  } catch (e) {}
+                  return null
+                })()}
+              </div>
             </div>
 
             <Link href="/settings" className="rounded-full p-2 hover:bg-surface-variant transition-colors">
@@ -475,6 +495,25 @@ export default function HomeClient() {
               }
             })()}
           </div>
+      </div>
+
+      {/* Home page mobile: show login CTA underneath the logout/settings/cloud icons */}
+      <div className="sm:hidden mt-3">
+        {(() => {
+          try {
+            const { visible } = useLoginPromptVisible()
+            if (visible) {
+              return (
+                <div className="px-2">
+                  <a href="/api/auth/login" className="w-full inline-flex items-center justify-center gap-2 bg-destructive text-destructive-foreground px-3 py-2 rounded-md text-sm font-medium shadow-md hover:brightness-95 transition">
+                    Log in to see latest data
+                  </a>
+                </div>
+              )
+            }
+          } catch (e) {}
+          return null
+        })()}
       </div>
 
         {/* Small inline sync indicator placed left of settings icon */}
