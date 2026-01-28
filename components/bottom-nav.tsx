@@ -27,20 +27,14 @@ export function BottomNav() {
             // Use Link for semantics but also handle clicks via router.push to
             // ensure navigation occurs even if a parent event handler prevents
             // the default anchor navigation (some overlays or listeners may do this).
-            <Link
+            <button
               key={item.href}
-              href={item.href}
-              className="relative group flex flex-col items-center justify-center"
-              onClick={(e: any) => {
-                try {
-                  // prefer client-side push to avoid relying on default anchor
-                  e.preventDefault()
-                  router.push(item.href)
-                } catch (err) {
-                  // fallback to default behaviour if push fails
-                }
+              onClick={() => {
+                try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
               }}
+              className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}
+              title={item.label}
             >
               <div
                 className={cn(
@@ -49,7 +43,6 @@ export function BottomNav() {
                     ? "bg-primary-container text-primary-container-foreground w-20"
                     : "text-muted-foreground hover:bg-surface-variant/50"
                 )}
-                // Ensure the target captures pointer events
                 style={{ pointerEvents: 'auto' }}
               >
                 <Icon
@@ -57,11 +50,10 @@ export function BottomNav() {
                     "h-6 w-6 transition-transform duration-300",
                     isActive ? "scale-110" : "group-hover:scale-110"
                   )}
-                  // Simulate filled icon state if library supported it, or just use bold stroke
                   strokeWidth={isActive ? 2.5 : 2}
                 />
               </div>
-            </Link>
+            </button>
           );
         })}
       </div>

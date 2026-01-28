@@ -23,8 +23,15 @@ export function DatePicker({
   title = "Select Date"
 }: DatePickerProps) {
   const [displayMonth, setDisplayMonth] = React.useState<Date>(() => {
-    return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
+    try {
+      return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
+    } catch (e) {
+      console.error('[DatePicker] invalid selectedDate, falling back to today', e)
+      return new Date()
+    }
   })
+
+  const [renderError, setRenderError] = React.useState<boolean>(false)
 
   // Update display month when selectedDate prop changes
   React.useEffect(() => {
@@ -86,14 +93,33 @@ export function DatePicker({
   const weekDays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
   const adjustedWeekDays = [...weekDays.slice(1), weekDays[0]] // Rotate to start with Monday
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-sm p-6">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
+  if (renderError) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-full max-w-sm p-6">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 text-center">
+            <div className="text-sm text-on-surface-variant">An error occurred while showing the date picker.</div>
+            <div className="text-xs text-muted-foreground mt-2">Try again or pick a date using the header controls.</div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 
-        <div className="space-y-4">
+  // Wrap render-critical sections in a try/catch so client-side failures
+  // inside the calendar don't crash the whole page.
+  try {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-full max-w-sm p-6">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
           {/* Month/Year Navigation */}
           <div className="flex items-center justify-between mb-4">
             <Button
@@ -184,5 +210,24 @@ export function DatePicker({
         </div>
       </DialogContent>
     </Dialog>
-  )
+    )
+  } catch (err) {
+    try { console.error('[DatePicker] render error', err) } catch (e) {}
+    // Flip a persistent render error flag so subsequent renders show a
+    // small non-crashing fallback instead of repeatedly throwing.
+    try { setRenderError(true) } catch (e) {}
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-full max-w-sm p-6">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 text-center">
+            <div className="text-sm text-on-surface-variant">An error occurred while showing the date picker.</div>
+            <div className="text-xs text-muted-foreground mt-2">Try again or pick a date using the header controls.</div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 }
