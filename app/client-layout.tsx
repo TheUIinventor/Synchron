@@ -33,44 +33,52 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  // If auth completes and indicates the user is logged in, perform a single
-  // autonomous reload shortly after so client-side data and caches refresh.
+  // If auth completes and indicates the user is logged in, trigger a small
+  // series of background refresh attempts (1s, 5s, 10s) that call the
+  // timetable provider's refreshExternal via a custom event. This avoids a
+  // full page reload while ensuring the provider fetches fresh data shortly
+  // after login.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const attemptReloadIfLoggedIn = () => {
+    let timeouts: number[] = []
+
+    const scheduleBackgroundRefreshes = () => {
       try {
         const ready = sessionStorage.getItem('synchron:userinfo-ready')
         const loggedIn = sessionStorage.getItem('synchron:user-logged-in')
         if (ready === 'true' && loggedIn === 'true') {
           const markerKey = 'synchron:did-autoreload'
           const did = sessionStorage.getItem(markerKey)
-          if (!did) {
-            try { sessionStorage.setItem(markerKey, String(Date.now())) } catch (e) {}
-            // Delay up to 1500ms to allow any immediate UI updates, but ensure
-            // reload occurs well within 5s per user request.
-            setTimeout(() => {
-              try { location.reload() } catch (e) {}
-            }, 1500)
+          if (did) return
+          try { sessionStorage.setItem(markerKey, String(Date.now())) } catch (e) {}
+
+          const delays = [1000, 5000, 10000]
+          for (const d of delays) {
+            const id = window.setTimeout(() => {
+              try { window.dispatchEvent(new CustomEvent('synchron:run-background-refresh')) } catch (e) {}
+            }, d)
+            timeouts.push(id as unknown as number)
           }
         }
       } catch (e) {}
     }
 
     // Listen for same-window event dispatched by init-auth or head-script
-    window.addEventListener('synchron:userinfo-ready', attemptReloadIfLoggedIn)
+    window.addEventListener('synchron:userinfo-ready', scheduleBackgroundRefreshes)
     // Also respond to cross-window storage updates
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'synchron:userinfo-ready' || e.key === 'synchron:user-logged-in') attemptReloadIfLoggedIn()
+      if (e.key === 'synchron:userinfo-ready' || e.key === 'synchron:user-logged-in') scheduleBackgroundRefreshes()
     }
     window.addEventListener('storage', onStorage)
 
     // Try immediately in case auth was already set before this effect ran
-    attemptReloadIfLoggedIn()
+    scheduleBackgroundRefreshes()
 
     return () => {
-      try { window.removeEventListener('synchron:userinfo-ready', attemptReloadIfLoggedIn) } catch (e) {}
+      try { window.removeEventListener('synchron:userinfo-ready', scheduleBackgroundRefreshes) } catch (e) {}
       try { window.removeEventListener('storage', onStorage) } catch (e) {}
+      try { for (const t of timeouts) clearTimeout(t) } catch (e) {}
     }
   }, [])
 

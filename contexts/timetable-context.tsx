@@ -3894,6 +3894,22 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [selectedDateObject])
 
+  // Listen for explicit background-refresh requests from other same-window
+  // code (e.g., after login). This allows the app to request a small number
+  // of immediate background refresh attempts without forcing a full reload.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = () => {
+      try {
+        // Force=true to bypass the MIN_REFRESH_MS throttle for these
+        // immediate post-login refresh attempts.
+        void refreshExternal(false, true).catch(() => {})
+      } catch (e) {}
+    }
+    window.addEventListener('synchron:run-background-refresh', handler)
+    return () => { try { window.removeEventListener('synchron:run-background-refresh', handler) } catch (e) {} }
+  }, [])
+
   // Keep currentWeek synchronized with the server-provided externalWeekType
   useEffect(() => {
     if (externalWeekType && currentWeek !== externalWeekType) {
