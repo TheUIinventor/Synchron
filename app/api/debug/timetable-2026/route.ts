@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         json,
         parseError,
         textPreview: text.substring(0, 500),
-        hasClasses: json ? (Object.keys(json?.timetable?.timetable?.periods || {}).length > 0) : false,
+        hasClasses: json ? (Object.keys(json?.timetable?.timetable?.periods || json?.timetable?.periods || {}).length > 0) : false,
         studentYear: json?.timetable?.student?.year,
         date: json?.date || dateParam,
       };
