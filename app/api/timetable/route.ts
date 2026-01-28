@@ -207,34 +207,57 @@ export async function GET(req: NextRequest) {
     let fullRes: any = null
     let bellsRes: any = null
     let upstreamHost: string | null = null
-
-    // Try each host until we get a JSON response
+    let upstreamEndpoint: string | null = null
+    // Try each host until we get a JSON response. If a date was requested, prefer
+    // the authoritative per-day endpoint (`daytimetable.json`) on each host first.
     for (const host of hosts) {
-      const dayUrl = dateParam 
+      const dayUrl = dateParam
         ? `${host}/api/timetable/daytimetable.json?date=${dateParam}`
         : `${host}/api/timetable/daytimetable.json`
       const bellUrl = dateParam
         ? `${host}/api/timetable/bells.json?date=${dateParam}`
         : `${host}/api/timetable/bells.json`
       const fullUrl = `${host}/api/timetable/timetable.json`
-      
-      // OPTIMIZATION: Fetch all 3 endpoints in parallel for faster loading
-      const [dr, fr, br] = await Promise.all([
-        getJson(dayUrl),
-        getJson(fullUrl),
-        getJson(bellUrl)
-      ])
-      
-      // If any of these responded successfully with JSON, adopt them and stop trying further hosts
-      // Only break if at least one response was successful (ok: true) and returned valid JSON
-      if ((dr as any).ok || (fr as any).ok || (br as any).ok) {
-        // At least one endpoint succeeded on this host; use this host
+
+      if (dateParam) {
+        // Try the day endpoint first when a date is requested. If it returns
+        // a successful JSON payload, use it immediately and stop trying other hosts.
+        const dr = await getJson(dayUrl)
+        if ((dr as any).ok && (dr as any).json) {
+          dayRes = dr; fullRes = null; bellsRes = null
+          upstreamHost = host
+          upstreamEndpoint = 'daytimetable'
+          break
+        }
+        // otherwise fall through to fetch the other endpoints for this host
+        const [fr, br] = await Promise.all([
+          getJson(fullUrl),
+          getJson(bellUrl),
+        ])
+        // Adopt this host if either timetable or bells returned a successful JSON
+        if ((fr as any).ok || (br as any).ok) {
+          dayRes = dr; fullRes = fr; bellsRes = br
+          upstreamHost = host
+          upstreamEndpoint = (fr && (fr as any).ok) ? 'timetable' : 'bells'
+          break
+        }
+        // Keep last responses for potential HTML forwarding below
         dayRes = dr; fullRes = fr; bellsRes = br
-        upstreamHost = host
-        break
+      } else {
+        // No specific date requested - fetch all endpoints in parallel as before
+        const [dr, fr, br] = await Promise.all([
+          getJson(dayUrl),
+          getJson(fullUrl),
+          getJson(bellUrl)
+        ])
+        if ((dr as any).ok || (fr as any).ok || (br as any).ok) {
+          dayRes = dr; fullRes = fr; bellsRes = br
+          upstreamHost = host
+          upstreamEndpoint = (dr && (dr as any).ok) ? 'daytimetable' : (fr && (fr as any).ok) ? 'timetable' : 'bells'
+          break
+        }
+        dayRes = dr; fullRes = fr; bellsRes = br
       }
-      // Keep last responses for potential HTML forwarding below
-      dayRes = dr; fullRes = fr; bellsRes = br
     }
 
     // Shared byDay structure - declared once here so date-specific path
@@ -1467,6 +1490,7 @@ export async function GET(req: NextRequest) {
           variationTargetDay: dayResDay,
           variationPeriodNumbers: dayPeriodNumbers,
           upstreamHost,
+          upstreamEndpoint,
           // Include raw upstream payloads to help diagnose where A/B info may be present
           upstream: {
             day: dayRes?.json ?? null,
@@ -1493,6 +1517,8 @@ export async function GET(req: NextRequest) {
         diagnostics: {
           hasAccessToken: !!accessToken,
           forwardedCookies: incomingCookie ? true : false,
+          upstreamHost,
+          upstreamEndpoint,
         },
       },
       { status: 502, headers: cacheHeaders(req) },
