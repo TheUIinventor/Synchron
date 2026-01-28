@@ -72,6 +72,7 @@ export default function RootLayout({
                 console.log('[head-script] OAuth callback detected, setting auth to true IMMEDIATELY');
                 sessionStorage.setItem('synchron:user-logged-in', 'true');
                 sessionStorage.setItem('synchron:userinfo-ready', 'true');
+                try { window.dispatchEvent(new CustomEvent('synchron:userinfo-ready')) } catch (e) {}
                 // Clean up URL without waiting
                 window.history.replaceState({}, document.title, window.location.pathname);
               }
@@ -112,11 +113,13 @@ export default function RootLayout({
                   
                   sessionStorage.setItem('synchron:user-logged-in', isLoggedIn ? 'true' : 'false');
                   sessionStorage.setItem('synchron:userinfo-ready', 'true');
+                  try { window.dispatchEvent(new CustomEvent('synchron:userinfo-ready')) } catch (e) {}
                   console.log('[head-script] Cache updated, ready flag set');
                 } catch (err) {
                   console.error('[head-script] Error:', err);
                   sessionStorage.setItem('synchron:user-logged-in', 'false');
                   sessionStorage.setItem('synchron:userinfo-ready', 'true');
+                  try { window.dispatchEvent(new CustomEvent('synchron:userinfo-ready')) } catch (e) {}
                 }
               })();
             `,
