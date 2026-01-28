@@ -132,7 +132,7 @@ export default function DebugEndpointScanPage() {
           <li>api.sbhs.net.au /api/timetable/timetable.json</li>
           <li>student.sbhs.net.au /api/students/timetable</li>
           <li>api.sbhs.net.au /api/students/timetable</li>
-          <li>student.sbhs.net.au /api/timetable/year/{year}/timetable.json</li>
+          <li>student.sbhs.net.au /api/timetable/year/[year]/timetable.json</li>
           <li>And more variants...</li>
         </ul>
       </div>
