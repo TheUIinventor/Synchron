@@ -224,8 +224,10 @@ export async function GET(req: NextRequest) {
         getJson(bellUrl)
       ])
       
-      // If any of these responded with JSON, adopt them and stop trying further hosts
-      if ((dr as any).json || (fr as any).json || (br as any).json) {
+      // If any of these responded successfully with JSON, adopt them and stop trying further hosts
+      // Only break if at least one response was successful (ok: true) and returned valid JSON
+      if ((dr as any).ok || (fr as any).ok || (br as any).ok) {
+        // At least one endpoint succeeded on this host; use this host
         dayRes = dr; fullRes = fr; bellsRes = br
         upstreamHost = host
         break
