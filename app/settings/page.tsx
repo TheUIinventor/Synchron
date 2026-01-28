@@ -375,11 +375,12 @@ export default function SettingsPage() {
     setAppearanceTabClicks(0)
   }, [])
 
-  // Detect small/mobile screens (Tailwind `sm` breakpoint = 640px)
+  // Detect small screens: hide Integrations on non-medium+ devices
+  // Tailwind `md` breakpoint = 768px
   useEffect(() => {
     function check() {
       try {
-        setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 640 : false)
+        setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
       } catch (e) {
         setIsMobile(false)
       }
