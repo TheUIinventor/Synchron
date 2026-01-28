@@ -106,6 +106,8 @@ export default function DebugTimetable2026Page() {
                         <>
                           <p><strong>Status:</strong> {result.results[host].status} {result.results[host].statusText}</p>
                           <p><strong>Has Classes:</strong> {result.results[host].hasClasses ? '✓ Yes' : '✗ No'}</p>
+                          <p><strong>Periods Count:</strong> {result.results[host].periodsCount ?? 'N/A'}</p>
+                          <p><strong>Bells Count:</strong> {result.results[host].bellsCount ?? 'N/A'}</p>
                           <p><strong>Student Year:</strong> {result.results[host].studentYear || 'N/A'}</p>
                           <p><strong>Date:</strong> {result.results[host].date}</p>
                           {result.results[host].parseError && (
