@@ -7,6 +7,7 @@ import { ChevronLeft, Calendar as CalendarIcon, Utensils } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getWeek } from 'date-fns'
 import { trackSectionUsage } from "@/utils/usage-tracker"
+import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
@@ -25,25 +26,6 @@ export default function TimetablePage() {
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
   const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
-  const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('synchron-canvas-links')
-      if (raw) setCanvasLinks(JSON.parse(raw))
-      else setCanvasLinks({})
-    } catch (e) { setCanvasLinks({}) }
-
-    const reload = () => {
-      try {
-        const raw = localStorage.getItem('synchron-canvas-links')
-        if (raw) setCanvasLinks(JSON.parse(raw))
-        else setCanvasLinks({})
-      } catch (e) { setCanvasLinks({}) }
-    }
-    window.addEventListener('synchron:canvas-links-updated', reload as EventListener)
-    return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
-  }, [])
 
   useEffect(() => {
     setMounted(true)
@@ -458,7 +440,7 @@ export default function TimetablePage() {
   if (!mounted) return null
 
   return (
-    <>
+    <PageTransition>
       <div className="w-full mx-auto px-2 sm:px-3 md:px-4 py-4 pb-28 sm:pb-20 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
@@ -725,7 +707,6 @@ export default function TimetablePage() {
                         return displayRoom
                       })()
                       
-                      const link = canvasLinks[(period.subject ?? '').trim()]
                       const cardClass = 'flex-1 w-full min-w-0 px-3 py-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
 
                       return (
@@ -736,8 +717,6 @@ export default function TimetablePage() {
 
                           {isBreak ? (
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
-                          ) : link ? (
-                            <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} flex items-center gap-2`}>
                           ) : (
                             <div className={`${cardClass} flex items-center gap-2`}>
                               {/* Subject colour bar - always show raw custom colour if set, otherwise raw API colour */}
@@ -833,7 +812,7 @@ export default function TimetablePage() {
 
             {/* Grid Timetable */}
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
-              <div className="p-4 md:p-6">
+              <div className="p-6">
                 <div className="text-center mb-6">
                   <h2 className="text-xl font-semibold text-on-surface">Full Cycle Timetable</h2>
                   <p className="text-sm text-on-surface-variant">Week A and Week B</p>
@@ -857,7 +836,7 @@ export default function TimetablePage() {
                     return (
                       <div key={day} className="space-y-3">
                         {/* Week A */}
-                        <div className="p-4 md:p-2 rounded-md bg-surface-container-high">
+                        <div className="p-2 rounded-md bg-surface-container-high">
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium">Week A</div>
                           </div>
@@ -869,7 +848,7 @@ export default function TimetablePage() {
                               return itemsA.map((period: any, idx: number) => (
                                 period.subject === 'Break' ? (
                                   <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div className="hidden md:block w-14 sm:w-16 text-sm font-medium text-on-surface-variant">
+                                    <div className="w-14 sm:w-16 text-sm font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
                                           const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''
@@ -883,7 +862,7 @@ export default function TimetablePage() {
                                   </div>
                                 ) : (
                                   <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div className="hidden md:block w-16 text-sm font-medium text-on-surface-variant">
+                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
                                           if (period.time) {
@@ -905,7 +884,7 @@ export default function TimetablePage() {
                                       })()}
                                     </div>
                                     <div 
-                                      className={`rounded-md px-3 py-1 text-sm sm:text-xs sm:px-2 sm:py-0.5 font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
                                       style={getSubjectColorStyle(period.subject, period.colour)}
                                     >
                                       {getSubjectAbbr(period.subject)}
@@ -914,7 +893,7 @@ export default function TimetablePage() {
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
                                         <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                        <div className={`block md:hidden text-sm mt-2 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-2 py-0.5 rounded-md font-medium inline-block' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>
@@ -927,7 +906,7 @@ export default function TimetablePage() {
                         </div>
 
                         {/* Week B */}
-                        <div className="p-4 md:p-2 rounded-md bg-surface-container-high">
+                        <div className="p-2 rounded-md bg-surface-container-high">
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium">Week B</div>
                           </div>
@@ -942,7 +921,7 @@ export default function TimetablePage() {
                               return itemsB.map((period: any, idx: number) => (
                                 period.subject === 'Break' ? (
                                   <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
-                                    <div className="hidden md:block w-16 text-sm font-medium text-on-surface-variant">
+                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
                                       {(() => {
                                         try {
                                           const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
@@ -977,7 +956,7 @@ export default function TimetablePage() {
                                       })()}
                                     </div>
                                     <div 
-                                      className={`rounded-md px-3 py-1 text-sm sm:text-xs sm:px-2 sm:py-0.5 font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
                                       style={getSubjectColorStyle(period.subject, period.colour)}
                                     >
                                       {getSubjectAbbr(period.subject)}
@@ -986,7 +965,7 @@ export default function TimetablePage() {
                                       <div className="flex items-center justify-between">
                                         {/* Only show classroom on the right; remove duplicate class name and teacher */}
                                         <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                        <div className={`block md:hidden text-sm mt-2 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-2 py-0.5 rounded-md font-medium inline-block' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
+                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
                                       </div>
                                     </div>
                                   </div>
@@ -1015,6 +994,6 @@ export default function TimetablePage() {
           title="Select a Date"
         />
       </div>
-    </>
+    </PageTransition>
   )
 }
