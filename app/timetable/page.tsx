@@ -13,7 +13,6 @@ import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } fro
 import { stripLeadingCasualCode } from "@/lib/utils"
 import { DatePicker } from "@/components/date-picker"
 import { hexToPastel, hexToInlineStyle } from "@/utils/color-utils"
-import { getVariationColorOverride, isVariationPastelModeEnabled } from '@/utils/variation-color-override'
 import { getSubjectColorOverride, isPastelModeEnabled } from "@/utils/subject-color-override"
 
 
@@ -26,7 +25,7 @@ export default function TimetablePage() {
   // Use selected date from timetable context so the header date follows
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
-  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes, clearUserSelection } = useTimetable()
+  const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
 
   useEffect(() => {
     setMounted(true)
@@ -218,7 +217,6 @@ export default function TimetablePage() {
     const isWeekendNow = now.getDay() === 0 || now.getDay() === 6
     const target = (isWeekendNow || isSchoolDayOver()) ? getNextSchoolDay(now) : now
     setSelectedDateObject(target)
-    try { if ((useTimetable as any) && typeof clearUserSelection === 'function') {} } catch (e) {}
   }
 
   // Subject color mapping - uses API colour when available with pastel conversion
@@ -745,14 +743,7 @@ export default function TimetablePage() {
                                   <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                                     {isSubstitutePeriod(period) ? (
                                       <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
-                                        style={(() => {
-                                          try {
-                                            const key = 'substitute'
-                                            const hex = getVariationColorOverride(key)
-                                            if (hex) return hexToInlineStyle(hex, isVariationPastelModeEnabled(key))
-                                          } catch (e) {}
-                                          return { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }
-                                        })()}
+                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
                                       >
                                         {teacherDisplay}
                                       </span>
@@ -761,15 +752,7 @@ export default function TimetablePage() {
                                     )}
                                     <span>•</span>
                                     <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
-                                      style={(() => {
-                                        try {
-                                          if (!period.isRoomChange) return {}
-                                          const key = 'roomChange'
-                                          const hex = getVariationColorOverride(key)
-                                          if (hex) return hexToInlineStyle(hex, isVariationPastelModeEnabled(key))
-                                        } catch (e) {}
-                                        return period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}
-                                      })()}
+                                      style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
                                     >
                                       {roomDisplay}
                                     </span>
