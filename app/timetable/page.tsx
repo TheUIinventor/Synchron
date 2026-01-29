@@ -26,6 +26,25 @@ export default function TimetablePage() {
   // the provider's school-day logic (shows next school day after school ends).
   const [viewMode, setViewMode] = useState<"daily" | "cycle">("daily")
   const { currentWeek, externalWeekType, timetableData, timetableSource, refreshExternal, selectedDateObject, setSelectedDateObject, timetableByWeek, lastUserSelectedAt, bellTimes } = useTimetable()
+  const [canvasLinks, setCanvasLinks] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('synchron-canvas-links')
+      if (raw) setCanvasLinks(JSON.parse(raw))
+      else setCanvasLinks({})
+    } catch (e) { setCanvasLinks({}) }
+
+    const reload = () => {
+      try {
+        const raw = localStorage.getItem('synchron-canvas-links')
+        if (raw) setCanvasLinks(JSON.parse(raw))
+        else setCanvasLinks({})
+      } catch (e) { setCanvasLinks({}) }
+    }
+    window.addEventListener('synchron:canvas-links-updated', reload as EventListener)
+    return () => window.removeEventListener('synchron:canvas-links-updated', reload as EventListener)
+  }, [])
 
   useEffect(() => {
     setMounted(true)
@@ -707,6 +726,7 @@ export default function TimetablePage() {
                         return displayRoom
                       })()
                       
+                      const link = canvasLinks[(period.subject ?? '').trim()]
                       const cardClass = 'flex-1 w-full min-w-0 px-3 py-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
 
                       return (
@@ -717,6 +737,8 @@ export default function TimetablePage() {
 
                           {isBreak ? (
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
+                          ) : link ? (
+                            <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} flex items-center gap-2`}>
                           ) : (
                             <div className={`${cardClass} flex items-center gap-2`}>
                               {/* Subject colour bar - always show raw custom colour if set, otherwise raw API colour */}
