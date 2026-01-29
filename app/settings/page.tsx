@@ -19,6 +19,7 @@ import { trackSectionUsage } from "@/utils/usage-tracker"
 import PageTransition from "@/components/page-transition"
 import InstallAppButton from "@/components/install-app-button"
 import { getSubjectColorOverride, setSubjectColorOverride, resetSubjectColorOverride, resetAllSubjectColorOverrides, isPastelModeEnabled, loadPastelMode } from "@/utils/subject-color-override"
+import { setVariationColorOverride } from '@/utils/variation-color-override'
 import { hexToInlineStyle } from "@/utils/color-utils"
 
 const CANVAS_LINKS_KEY = "synchron-canvas-links"
@@ -315,6 +316,88 @@ function SubjectColorsEditor() {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function VariationColorsEditor() {
+  const { toast } = useToast()
+  const [overrides, setOverrides] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem('synchron-variation-color-overrides')
+      if (raw) return JSON.parse(raw)
+    } catch (e) {}
+    return {}
+  })
+  const [modes, setModes] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem('synchron-variation-color-pastel-mode')
+      if (raw) return JSON.parse(raw)
+    } catch (e) {}
+    return {}
+  })
+
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const raw = localStorage.getItem('synchron-variation-color-overrides')
+        setOverrides(raw ? JSON.parse(raw) : {})
+        const rm = localStorage.getItem('synchron-variation-color-pastel-mode')
+        setModes(rm ? JSON.parse(rm) : {})
+      } catch (e) {}
+    }
+    window.addEventListener('synchron:variation-colors-updated', handler)
+    return () => window.removeEventListener('synchron:variation-colors-updated', handler)
+  }, [])
+
+  const items = [{ key: 'substitute', label: 'Substitute highlight' }, { key: 'roomChange', label: 'Room change highlight' }]
+
+  return (
+    <div className="space-y-3">
+      {items.map((it) => {
+        const val = overrides[it.key]
+        const usePastel = modes[it.key] !== false
+        return (
+          <div key={it.key} className="flex items-center gap-3">
+            <div className="flex-1">
+              <label className="text-sm font-medium">{it.label}</label>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  className="w-36 p-2 rounded-md bg-surface-container-high border border-transparent"
+                  placeholder="#RRGGBB"
+                  value={val ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/^#/, '')
+                    try {
+                      const raw = localStorage.getItem('synchron-variation-color-overrides')
+                      const parsed = raw ? JSON.parse(raw) : {}
+                      parsed[it.key] = v
+                      localStorage.setItem('synchron-variation-color-overrides', JSON.stringify(parsed))
+                      setOverrides(parsed)
+                      window.dispatchEvent(new CustomEvent('synchron:variation-colors-updated', { detail: { key: it.key } }))
+                    } catch (e) {}
+                  }}
+                />
+                <button className="px-3 py-2 rounded-md bg-primary text-on-primary" onClick={() => {
+                  try { setVariationColorOverride(it.key, overrides[it.key] || '', usePastel); toast({ title: 'Saved' }) } catch (e) {}
+                }}>Save</button>
+                <button className="px-3 py-2 rounded-md bg-surface text-on-surface" onClick={() => {
+                  try {
+                    const raw = localStorage.getItem('synchron-variation-color-overrides')
+                    const parsed = raw ? JSON.parse(raw) : {}
+                    delete parsed[it.key]
+                    localStorage.setItem('synchron-variation-color-overrides', JSON.stringify(parsed))
+                    setOverrides(parsed)
+                    window.dispatchEvent(new CustomEvent('synchron:variation-colors-updated', { detail: { key: it.key } }))
+                    toast({ title: 'Reset' })
+                  } catch (e) {}
+                }}>Reset</button>
+              </div>
+            </div>
+            <div className="text-sm text-on-surface-variant">Preview</div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -624,6 +707,10 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <SubjectColorsEditor />
+                <div className="pt-4 border-t border-outline-variant">
+                  <h3 className="text-sm font-medium text-on-surface mb-2">Variation Colours</h3>
+                  <VariationColorsEditor />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

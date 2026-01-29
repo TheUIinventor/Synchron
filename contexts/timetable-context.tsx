@@ -3506,10 +3506,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const mainTimetableDayName = days[dayForMainTimetable.getDay()]
     // Respect a recent manual selection by the user: do not override if the user
     // selected a date within the grace period.
-    const GRACE_MS = 2 * 60 * 1000 // 2 minutes
-    const nowMs = Date.now()
+    // Respect a manual user selection indefinitely until they explicitly
+    // reset it or navigate away. Previously this used a short grace period;
+    // change behavior so a user-chosen date sticks until cleared.
     const lastUser = lastUserSelectedRef.current
-    const shouldRespectUser = lastUser && (nowMs - lastUser) < GRACE_MS
+    const shouldRespectUser = Boolean(lastUser)
 
     if (!shouldRespectUser) {
       const targetDayName = mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName
@@ -3979,6 +3980,13 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     setSelectedDateObject(d)
   }
 
+  const clearUserSelection = () => {
+    try {
+      lastUserSelectedRef.current = null
+      setLastUserSelectedAt(null)
+    } catch (e) {}
+  }
+
   return (
     <TimetableContext.Provider
       value={{
@@ -3990,6 +3998,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         selectedDateObject, // Provide the new state
         setSelectedDay: userSetSelectedDay,
         setSelectedDateObject: userSetSelectedDateObject,
+        clearUserSelection,
         lastUserSelectedAt,
         timetableData,
         currentMomentPeriodInfo, // Provide the new state
