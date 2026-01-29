@@ -7,7 +7,6 @@ import { ChevronLeft, Calendar as CalendarIcon, Utensils } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getWeek } from 'date-fns'
 import { trackSectionUsage } from "@/utils/usage-tracker"
-import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
@@ -459,7 +458,7 @@ export default function TimetablePage() {
   if (!mounted) return null
 
   return (
-    <PageTransition>
+    <>
       <div className="w-full mx-auto px-2 sm:px-3 md:px-4 py-4 pb-28 sm:pb-20 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
@@ -1016,6 +1015,6 @@ export default function TimetablePage() {
           title="Select a Date"
         />
       </div>
-    </PageTransition>
+    </>
   )
 }
