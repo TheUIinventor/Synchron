@@ -844,57 +844,24 @@ export default function TimetablePage() {
                             // Prefer provider's grouped data if available
                             try {
                               const itemsA = tt && tt[day] && Array.isArray(tt[day].A) ? tt[day].A : (timetableData[day] || [])
-                              const bucketA = bellTimes ? (day === 'Friday' ? bellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
-                              return itemsA.map((period: any, idx: number) => (
+                              return itemsA.map((period: any) => (
                                 period.subject === 'Break' ? (
                                   <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div className="w-14 sm:w-16 text-sm font-medium text-on-surface-variant">
-                                      {(() => {
-                                        try {
-                                          const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''
-                                          const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
-                                          const { start } = parseTimeRange(timeSrc || '')
-                                          return formatTo12Hour(start)
-                                        } catch (e) { return ((period.time || (bucketA && bucketA[idx] && bucketA[idx].time) || '').split(' - ')[0] || '') }
-                                      })()}
-                                    </div>
                                     <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                                   </div>
                                 ) : (
                                   <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
-                                      {(() => {
-                                        try {
-                                          if (period.time) {
-                                            const { start } = parseTimeRange(period.time || '')
-                                            return formatTo12Hour(start)
-                                          }
-                                            try {
-                                              const apiTime = findBellTimeForPeriod(period, bucketA, idx) || ''
-                                              const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
-                                              if (timeSrc) {
-                                                const { start } = parseTimeRange(timeSrc || '')
-                                                return formatTo12Hour(start)
-                                              }
-                                            } catch (e) {}
-                                        
-                                          return ''
-                                        } catch (e) {}
-                                        return ''
-                                      })()}
-                                    </div>
-                                    <div 
-                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                    <div
+                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
                                       style={getSubjectColorStyle(period.subject, period.colour)}
                                     >
                                       {getSubjectAbbr(period.subject)}
                                     </div>
-                                    <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
-                                      <div className="flex items-center justify-between">
-                                        {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                      </div>
+                                    <div className="flex-1">
+                                      <div className="text-sm font-medium text-on-surface truncate">{getDisplaySubject(period)}</div>
+                                    </div>
+                                    <div className="ml-2 text-sm font-medium text-on-surface-variant bg-surface p-2 rounded-md min-w-[44px] text-center">
+                                      {period.room || getDisplayRoom(period)}
                                     </div>
                                   </div>
                                 )
@@ -917,56 +884,24 @@ export default function TimetablePage() {
                                 // no grouped data available; indicate there's only one week available
                                 return <div className="text-xs text-on-surface-variant">Only one week available</div>
                               }
-                              const bucketB = bellTimes ? (day === 'Friday' ? bellTimes.Fri : (day === 'Wednesday' || day === 'Thursday' ? bellTimes['Wed/Thurs'] : bellTimes['Mon/Tues'])) : null
-                              return itemsB.map((period: any, idx: number) => (
+                              return itemsB.map((period: any) => (
                                 period.subject === 'Break' ? (
                                   <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
-                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
-                                      {(() => {
-                                        try {
-                                          const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
-                                          const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
-                                          const { start } = parseTimeRange(timeSrc || '')
-                                          return formatTo12Hour(start)
-                                        } catch (e) { return ((period.time || (bucketB && bucketB[idx] && bucketB[idx].time) || '').split(' - ')[0] || '') }
-                                      })()}
-                                    </div>
                                     <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                                   </div>
                                 ) : (
                                   <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
-                                    <div className="w-16 text-sm font-medium text-on-surface-variant">
-                                      {(() => {
-                                        try {
-                                          if (period.time) {
-                                            const { start } = parseTimeRange(period.time || '')
-                                            return formatTo12Hour(start)
-                                          }
-                                            try {
-                                              const apiTime = findBellTimeForPeriod(period, bucketB, idx) || ''
-                                              const timeSrc = bellTimes ? (apiTime || (period.time || '')) : ((period.time || '') || apiTime) || ''
-                                              if (timeSrc) {
-                                                const { start } = parseTimeRange(timeSrc || '')
-                                                return formatTo12Hour(start)
-                                              }
-                                            } catch (e) {}
-                                            return ''
-                                        } catch (e) {}
-                                        return ''
-                                      })()}
-                                    </div>
-                                    <div 
-                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 min-w-[32px] text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                    <div
+                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
                                       style={getSubjectColorStyle(period.subject, period.colour)}
                                     >
                                       {getSubjectAbbr(period.subject)}
                                     </div>
-                                    <div className="text-sm font-medium text-on-surface flex-1 min-w-0">
-                                      <div className="flex items-center justify-between">
-                                        {/* Only show classroom on the right; remove duplicate class name and teacher */}
-                                        <div className={`text-xs hidden md:block ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                        <div className={`md:hidden text-xs mt-1 truncate ${period.isRoomChange ? 'bg-blue-600 text-white px-3 py-1 rounded-full font-medium' : 'text-on-surface-variant'}`}>{getDisplayRoom(period)}</div>
-                                      </div>
+                                    <div className="flex-1">
+                                      <div className="text-sm font-medium text-on-surface truncate">{getDisplaySubject(period)}</div>
+                                    </div>
+                                    <div className="ml-2 text-sm font-medium text-on-surface-variant bg-surface p-2 rounded-md min-w-[44px] text-center">
+                                      {period.room || getDisplayRoom(period)}
                                     </div>
                                   </div>
                                 )
