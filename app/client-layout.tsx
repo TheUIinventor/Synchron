@@ -33,11 +33,9 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  // If auth completes and indicates the user is logged in, trigger a small
-  // series of background refresh attempts (1s, 5s, 10s) that call the
-  // timetable provider's refreshExternal via a custom event. This avoids a
-  // full page reload while ensuring the provider fetches fresh data shortly
-  // after login.
+  // If auth completes and indicates the user is logged in, trigger immediate
+  // and background refresh attempts to fetch fresh data right after login.
+  // This ensures data is available instantly rather than waiting for intervals.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -53,7 +51,11 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
           if (did) return
           try { sessionStorage.setItem(markerKey, String(Date.now())) } catch (e) {}
 
-          const delays = [1000, 5000, 10000]
+          // Trigger immediate refresh (no delay) followed by additional refreshes
+          // to ensure data is fetched right away after sign-in
+          try { window.dispatchEvent(new CustomEvent('synchron:run-background-refresh')) } catch (e) {}
+          
+          const delays = [500, 2000, 5000] // Faster sequence: 500ms, 2s, 5s
           for (const d of delays) {
             const id = window.setTimeout(() => {
               try { window.dispatchEvent(new CustomEvent('synchron:run-background-refresh')) } catch (e) {}

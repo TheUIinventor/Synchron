@@ -131,7 +131,9 @@ export default function HomeClient() {
 
   useEffect(() => {
     let mounted = true
-    ;(async () => {
+    
+    // Function to fetch profile data
+    const fetchProfile = async () => {
       try {
         const res = await sbhsPortal.getStudentProfile()
         if (!mounted) return
@@ -147,8 +149,21 @@ export default function HomeClient() {
       } catch (e) {
         // ignore
       }
-    })()
-    return () => { mounted = false }
+    }
+    
+    // Fetch profile immediately on mount
+    fetchProfile()
+    
+    // Also fetch profile immediately when user signs in
+    const handleAuthSuccess = () => {
+      try { fetchProfile() } catch (e) {}
+    }
+    window.addEventListener('synchron:run-background-refresh', handleAuthSuccess)
+    
+    return () => { 
+      mounted = false
+      window.removeEventListener('synchron:run-background-refresh', handleAuthSuccess)
+    }
   }, [])
 
   useEffect(() => {
