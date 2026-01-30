@@ -847,17 +847,17 @@ export default function HomeClient() {
                                   <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
                                     <div className="flex items-center gap-3 min-w-0">
                                       <div 
-                                        className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                        className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject, period.colour)}`}
                                         style={getSubjectColorStyle(period.subject, period.colour)}
                                       >
-                                        <span className="truncate block max-w-[160px] text-xs font-semibold leading-none">{period.subject}</span>
+                                        <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
                                       </div>
+                                    <div 
+                                      className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject, period.colour)}`}
+                                      style={getSubjectColorStyle(period.subject, period.colour)}
+                                    >
+                                      <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0 text-right">
-                                      {isSubstitutePeriod(period) ? (
-                                        <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[92px]"
-                                          style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                        >
                                           {displayTeacher(period)}
                                         </span>
                                       ) : (
