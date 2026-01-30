@@ -33,6 +33,7 @@ export function BottomNav() {
                 try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
               }}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
+              style={{ pointerEvents: 'auto' }}
               aria-label={item.label}
               title={item.label}
             >
