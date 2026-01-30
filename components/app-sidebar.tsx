@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Calendar, Bell, Clipboard, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,16 +26,14 @@ export function AppSidebar() {
           const Icon = item.icon;
 
           return (
-            <Link
+            <button
               key={item.href}
-              href={item.href}
-              className="group flex flex-col items-center gap-1 w-full px-2"
-              onClick={(e: any) => {
-                try {
-                  e.preventDefault()
-                  router.push(item.href)
-                } catch (err) {}
+              onClick={() => {
+                try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
               }}
+              className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
+              aria-label={item.label}
+              title={item.label}
             >
               <div
                 className={cn(
@@ -62,7 +59,7 @@ export function AppSidebar() {
               >
                 {item.label}
               </span>
-            </Link>
+            </button>
           );
         })}
       </div>
