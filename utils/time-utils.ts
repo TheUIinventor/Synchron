@@ -268,7 +268,7 @@ export const formatDate = (date: Date = new Date()): string => {
   return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 }
 
-// Check if current time is within school hours (8:00 AM to 4:00 PM)
+// Check if current time is within school hours (8:00 AM to 4:00 PM, or 9:25 AM on Friday)
 export const isWithinSchoolHours = (): boolean => {
   const now = new Date()
   const day = now.getDay() // 0 is Sunday, 6 is Saturday
@@ -279,8 +279,13 @@ export const isWithinSchoolHours = (): boolean => {
   const hours = now.getHours()
   const minutes = now.getMinutes()
 
-  // School hours: 8:00 AM to 3:10 PM (inclusive of 8:00, exclusive of 3:10)
-  // This function is for general "within school hours" check, not "school day over"
+  // Friday (day 5) starts at 9:25 AM
+  if (day === 5) {
+    // Friday: 9:25 AM to 3:10 PM
+    return (hours === 9 && minutes >= 25) || (hours > 9 && hours < 15) || (hours === 15 && minutes < 10)
+  }
+
+  // Monday-Thursday: 8:00 AM to 3:10 PM (inclusive of 8:00, exclusive of 3:10)
   return hours >= 8 && (hours < 15 || (hours === 15 && minutes < 10))
 }
 
