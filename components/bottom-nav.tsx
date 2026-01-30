@@ -30,6 +30,17 @@ export function BottomNav() {
               onPointerUp={() => {
                 try { router.push(item.href) } catch (e) {}
               }}
+              onPointerDownCapture={(e) => {
+                try {
+                  // Capture-phase navigation: run before other handlers that may call preventDefault
+                  // Also log in dev to help debugging
+                  if (typeof window !== 'undefined' && sessionStorage.getItem('synchron:debug-clicks') === 'true') {
+                    // eslint-disable-next-line no-console
+                    console.debug('[nav-capture] pointerdown', item.href)
+                  }
+                  try { router.push(item.href) } catch (err) {}
+                } catch (err) {}
+              }}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}
               title={item.label}

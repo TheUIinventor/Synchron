@@ -19,6 +19,9 @@ export default function SettingsMenu() {
       className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
       onClick={() => doNavigate()}
       onPointerUp={() => doNavigate()}
+      onPointerDownCapture={() => {
+        try { doNavigate() } catch (e) {}
+      }}
     >
       <div className="glass-icon-enhanced rounded-full p-1">
         <Settings className="h-4 w-4" />

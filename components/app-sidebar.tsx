@@ -33,6 +33,15 @@ export function AppSidebar() {
               onPointerUp={() => {
                 try { router.push(item.href) } catch (e) {}
               }}
+              onPointerDownCapture={(e) => {
+                try {
+                  if (typeof window !== 'undefined' && sessionStorage.getItem('synchron:debug-clicks') === 'true') {
+                    // eslint-disable-next-line no-console
+                    console.debug('[nav-capture] pointerdown', item.href)
+                  }
+                  try { router.push(item.href) } catch (err) {}
+                } catch (err) {}
+              }}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}
               title={item.label}
