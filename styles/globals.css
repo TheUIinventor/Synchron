@@ -106,4 +106,18 @@
   .liquid-bob {
     animation: liquid-move 2.2s ease-in-out infinite;
   }
+  @keyframes slide-in-from-right {
+    0% { transform: translateX(16%); opacity: 0 }
+    100% { transform: translateX(0); opacity: 1 }
+  }
+  @keyframes slide-in-from-left {
+    0% { transform: translateX(-16%); opacity: 0 }
+    100% { transform: translateX(0); opacity: 1 }
+  }
+  .animate-slide-in-right {
+    animation: slide-in-from-right 320ms cubic-bezier(.2,.9,.2,1);
+  }
+  .animate-slide-in-left {
+    animation: slide-in-from-left 320ms cubic-bezier(.2,.9,.2,1);
+  }
 }

@@ -517,7 +517,7 @@ export default function TimetablePage() {
         </div>
 
         {viewMode === "daily" && (
-          <>
+          <div className="animate-slide-in-right">
             {/* Date Navigation */}
             <div className="flex items-center justify-between mb-4 w-full max-w-full mx-auto">
               <button
@@ -804,11 +804,11 @@ export default function TimetablePage() {
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         {viewMode === "cycle" && (
-          <>
+          <div className="animate-slide-in-left">
             {/* Full Cycle View (show both Week A and Week B) */}
 
             {/* Grid Timetable */}
@@ -954,7 +954,7 @@ export default function TimetablePage() {
                 </div>
               </div>
             </Card>
-          </>
+          </div>
         )}
 
         {/* Date Picker Dialog */}
