@@ -12,20 +12,9 @@ export default function SettingsMenu() {
       variant="outline"
       size="icon"
       className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
-      onClick={(e) => {
-        // Prevent parent handlers or default behaviors interfering with navigation
-        try { e.preventDefault?.() } catch {}
-        try { e.stopPropagation?.() } catch {}
-
-        // Persist easter-egg flag before navigating so it isn't lost
-        try { localStorage.setItem("chronicl-easter-egg-discovered", "true") } catch {}
-
-        // Use assign for a deterministic navigation; fallback to router.push
-        try {
-          window.location.assign("https://synchron.work/settings")
-        } catch (e) {
-          try { router.push("/settings") } catch (_) {}
-        }
+      onClick={() => {
+        router.push("/settings")
+        localStorage.setItem("chronicl-easter-egg-discovered", "true")
       }}
     >
       <div className="glass-icon-enhanced rounded-full p-1">
