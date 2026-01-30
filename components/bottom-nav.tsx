@@ -30,7 +30,14 @@ export function BottomNav() {
             <button
               key={item.href}
               onClick={() => {
-                try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
+                const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
+                try {
+                  // Prefer a hard navigation to the canonical domain
+                  window.location.href = target
+                } catch (e) {
+                  // Fallback to client-side Next navigation if available
+                  try { router.push(item.href) } catch (err) { /* swallow */ }
+                }
               }}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}

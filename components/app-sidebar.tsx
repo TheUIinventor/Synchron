@@ -29,7 +29,12 @@ export function AppSidebar() {
             <button
               key={item.href}
               onClick={() => {
-                try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
+                const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
+                try {
+                  window.location.href = target
+                } catch (e) {
+                  try { router.push(item.href) } catch (err) { /* swallow */ }
+                }
               }}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}

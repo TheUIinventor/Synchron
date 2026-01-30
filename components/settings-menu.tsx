@@ -13,7 +13,11 @@ export default function SettingsMenu() {
       size="icon"
       className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
       onClick={() => {
-        router.push("/settings")
+        try {
+          window.location.href = "https://synchron.work/settings"
+        } catch (e) {
+          try { router.push("/settings") } catch (_) {}
+        }
         localStorage.setItem("chronicl-easter-egg-discovered", "true")
       }}
     >
