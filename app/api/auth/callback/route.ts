@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
         secure: process.env.NODE_ENV !== 'development',
         sameSite: 'lax',
         path: '/',
-        maxAge: 60 * 60 * 24 * 30,
+        maxAge: 60 * 60 * 24 * 90, // Extended from 30 to 90 days for longer session retention
       })
     }
     // Clear state cookie
