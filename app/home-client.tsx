@@ -817,13 +817,13 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
                                       <span 
-                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium max-w-none whitespace-normal ${getSubjectColor(period.subject, period.colour)}`}
+                                      className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium max-w-none whitespace-normal ${getSubjectColor(period.subject, period.colour) || 'bg-surface text-on-surface'}`}
                                       style={getSubjectColorStyle(period.subject, period.colour)}
                                     >
                                       {period.subject}
                                     </span>
                                   </div>
-                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     {(isSubstitutePeriod(period)) ? (
                                       <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
                                         style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
@@ -843,34 +843,7 @@ export default function HomeClient() {
                                       )
                                     })()}
                                   </div>
-                                </div>
-                                  <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      <div 
-                                        className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour) || 'bg-surface text-on-surface'}`}
-                                        style={getSubjectColorStyle(period.subject, period.colour)}
-                                      >
-                                        <span className="block max-w-[160px] text-xs font-semibold leading-none whitespace-normal">{period.subject}</span>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0 text-right">
-                                      {isSubstitutePeriod(period) ? (
-                                        <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[92px]"
-                                          style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                        >
-                                          {displayTeacher(period)}
-                                        </span>
-                                      ) : (
-                                        <span className="text-on-surface-variant truncate max-w-[92px]">{displayTeacher(period)}</span>
-                                      )}
-                                      <span className="text-on-surface-variant">•</span>
-                                      <span className={`truncate max-w-[56px] text-xs ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
-                                        style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
-                                      >
-                                        {(period as any).displayRoom || period.room}
-                                      </span>
-                                    </div>
-                                  </div>
+                                  
                               </div>
                             </a>
                           ) : (
@@ -890,13 +863,13 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
                                       <span 
-                                        className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium max-w-none whitespace-normal ${getSubjectColor(period.subject, period.colour)}`}
+                                        className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium max-w-none whitespace-normal ${getSubjectColor(period.subject, period.colour) || 'bg-surface text-on-surface'}`}
                                         style={getSubjectColorStyle(period.subject, period.colour)}
                                       >
                                         {period.subject}
                                       </span>
                                   </div>
-                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     {(isSubstitutePeriod(period)) ? (
                                       <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
                                         style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
