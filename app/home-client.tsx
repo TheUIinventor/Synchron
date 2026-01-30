@@ -817,7 +817,7 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
                                       <span 
-                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium ${getSubjectColor(period.subject, period.colour)}`}
+                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium max-w-none whitespace-normal ${getSubjectColor(period.subject, period.colour)}`}
                                       style={getSubjectColorStyle(period.subject, period.colour)}
                                     >
                                       {period.subject}
@@ -890,7 +890,7 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
                                       <span 
-                                        className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium ${getSubjectColor(period.subject, period.colour)}`}
+                                        className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium max-w-none whitespace-normal ${getSubjectColor(period.subject, period.colour)}`}
                                         style={getSubjectColorStyle(period.subject, period.colour)}
                                       >
                                         {period.subject}
