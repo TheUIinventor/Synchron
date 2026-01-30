@@ -19,12 +19,15 @@ import { getSubjectColorOverride, isPastelModeEnabled } from "@/utils/subject-co
 import { hexToInlineStyle } from "@/utils/color-utils";
 
   // Subject color mapping (copied from timetable page for consistency)
-  // Also checks for user-defined color overrides
-  const getSubjectColor = (subject: string) => {
-    // First check for user override
+  // Also checks for user-defined color overrides and API colours
+  const getSubjectColor = (subject: string, apiColour?: string) => {
     const colorOverride = getSubjectColorOverride(subject)
     if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
-      return "" // Will be handled with inline style
+      return "" // Handled with inline style
+    }
+
+    if (apiColour && /^[0-9a-fA-F]{6}$/.test(apiColour)) {
+      return "" // Will be handled with inline style (pastel)
     }
 
     const s = (subject || '').toUpperCase();
@@ -42,12 +45,15 @@ import { hexToInlineStyle } from "@/utils/color-utils";
     return "bg-surface-container-high text-on-surface";
   }
 
-  // Helper to get inline style from user override
-  const getSubjectColorStyle = (subject: string): React.CSSProperties | undefined => {
+  // Helper to get inline style from user override or API colour using pastel algorithm
+  const getSubjectColorStyle = (subject: string, apiColour?: string): React.CSSProperties | undefined => {
     const colorOverride = getSubjectColorOverride(subject)
     if (colorOverride && /^[0-9a-fA-F]{6}$/.test(colorOverride)) {
       const usePastel = isPastelModeEnabled(subject)
       return hexToInlineStyle(colorOverride, usePastel)
+    }
+    if (apiColour && /^[0-9a-fA-F]{6}$/.test(apiColour)) {
+      return hexToInlineStyle(apiColour, true)
     }
     return undefined
   }
@@ -810,9 +816,9 @@ export default function HomeClient() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span 
-                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[200px] ${getSubjectColor(period.subject)}`}
-                                      style={getSubjectColorStyle(period.subject)}
+                                      <span 
+                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium ${getSubjectColor(period.subject, period.colour)}`}
+                                      style={getSubjectColorStyle(period.subject, period.colour)}
                                     >
                                       {period.subject}
                                     </span>
@@ -841,10 +847,10 @@ export default function HomeClient() {
                                   <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
                                     <div className="flex items-center gap-3 min-w-0">
                                       <div 
-                                        className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject)}`}
-                                        style={getSubjectColorStyle(period.subject)}
+                                        className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                        style={getSubjectColorStyle(period.subject, period.colour)}
                                       >
-                                        <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
+                                        <span className="truncate block max-w-[160px] text-xs font-semibold leading-none">{period.subject}</span>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0 text-right">
@@ -884,8 +890,8 @@ export default function HomeClient() {
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0">
                                       <span 
-                                        className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}
-                                        style={getSubjectColorStyle(period.subject)}
+                                        className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium ${getSubjectColor(period.subject, period.colour)}`}
+                                        style={getSubjectColorStyle(period.subject, period.colour)}
                                       >
                                         {period.subject}
                                       </span>
