@@ -795,132 +795,52 @@ export default function HomeClient() {
                             {isNonClass ? (
                             <div className="flex-1 text-sm text-muted-foreground flex items-center">{nonClassLabel}</div>
                           ) : link ? (
-                            <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} flex items-stretch gap-2`}>
-                              {/* Subject colour bar - always show raw custom colour if set, otherwise raw API colour */}
+                            <a href={link} target="_blank" rel="noopener noreferrer" className={`${cardClass} flex items-stretch gap-2`}> 
                               {(() => {
                                 const customColour = getSubjectColorOverride(period.subject)
                                 const displayColour = customColour || period.colour
-                                return displayColour ? (
-                                  <div 
-                                    className="w-1 min-w-[4px] rounded-lg self-stretch" 
-                                    style={{ backgroundColor: `#${displayColour}` }} 
-                                  />
-                                ) : null
-                              })()}
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span 
-                                      className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[200px] ${getSubjectColor(period.subject)}`}
-                                      style={getSubjectColorStyle(period.subject)}
-                                    >
-                                      {period.subject}
-                                    </span>
-                                  </div>
-                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    {(isSubstitutePeriod(period)) ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
-                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                      >
-                                        {displayTeacher(period)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
-                                    )}
-                                    <span>•</span>
-                                    {/* Room: prefer destination room fields when present; highlight if a room change */}
-                                    {(() => {
-                                      // NOTE: Do NOT include `.to` - that field is commonly used for end times
-                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
-                                      return (
-                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
-                                      )
-                                    })()}
-                                  </div>
-                                </div>
-                                  <div className="md:hidden flex items-center justify-between gap-3 text-xs text-muted-foreground w-full">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      <div 
-                                        className={`rounded-lg px-2 py-0.5 text-xs font-semibold flex-shrink-0 text-center max-w-[220px] truncate ${getSubjectColor(period.subject)}`}
-                                        style={getSubjectColorStyle(period.subject)}
-                                      >
-                                        <span className="truncate block max-w-full text-xs font-semibold leading-none">{period.subject}</span>
+                                const cardTint = displayColour ? { backgroundColor: `#${displayColour}11` } : undefined
+                                const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                                return (
+                                  <div className="flex items-center w-full rounded-md p-1.5" style={cardTint}>
+                                    {displayColour ? (
+                                      <div className="w-1 min-w-[4px] rounded-lg self-stretch mr-2" style={{ backgroundColor: `#${displayColour}` }} />
+                                    ) : null}
+                                    <div className="flex-1 flex items-center justify-between">
+                                      <div className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject)}`} style={getSubjectColorStyle(period.subject)}>
+                                        {getSubjectAbbr(period.subject)}
+                                      </div>
+                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
+                                        {displayRoom}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0 text-right">
-                                      {isSubstitutePeriod(period) ? (
-                                        <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[92px]"
-                                          style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                        >
-                                          {displayTeacher(period)}
-                                        </span>
-                                      ) : (
-                                        <span className="text-on-surface-variant truncate max-w-[92px]">{displayTeacher(period)}</span>
-                                      )}
-                                      <span className="text-on-surface-variant">•</span>
-                                      <span className={`truncate max-w-[56px] text-xs ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
-                                        style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
-                                      >
-                                        {(period as any).displayRoom || period.room}
-                                      </span>
-                                    </div>
                                   </div>
-                              </div>
+                                )
+                              })()}
                             </a>
                           ) : (
                             <div className={`${cardClass} flex items-stretch gap-2`}>
-                              {/* Subject colour bar - always show raw custom colour if set, otherwise raw API colour */}
                               {(() => {
                                 const customColour = getSubjectColorOverride(period.subject)
                                 const displayColour = customColour || period.colour
-                                return displayColour ? (
-                                  <div 
-                                    className="w-1 min-w-[4px] rounded-lg self-stretch" 
-                                    style={{ backgroundColor: `#${displayColour}` }} 
-                                  />
-                                ) : null
+                                const cardTint = displayColour ? { backgroundColor: `#${displayColour}11` } : undefined
+                                const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                                return (
+                                  <div className="flex items-center w-full rounded-md p-1.5" style={cardTint}>
+                                    {displayColour ? (
+                                      <div className="w-1 min-w-[4px] rounded-lg self-stretch mr-2" style={{ backgroundColor: `#${displayColour}` }} />
+                                    ) : null}
+                                    <div className="flex-1 flex items-center justify-between">
+                                      <div className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject)}`} style={getSubjectColorStyle(period.subject)}>
+                                        {getSubjectAbbr(period.subject)}
+                                      </div>
+                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
+                                        {displayRoom}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
                               })()}
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                      <span 
-                                        className={`hidden md:inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px] ${getSubjectColor(period.subject)}`}
-                                        style={getSubjectColorStyle(period.subject)}
-                                      >
-                                        {period.subject}
-                                      </span>
-                                  </div>
-                                  <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-                                    {(isSubstitutePeriod(period)) ? (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[100px]"
-                                        style={{ backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' }}
-                                      >
-                                        {displayTeacher(period)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-on-surface-variant truncate max-w-[100px]">{displayTeacher(period)}</span>
-                                    )}
-                                    <span>•</span>
-                                    <span className="text-on-surface-variant">{(period as any).displayRoom || period.room}</span>
-                                  </div>
-                                </div>
-                                <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                                  <span className={`text-sm truncate max-w-[100px] ${isSubstitutePeriod(period) ? 'bg-tertiary-container text-on-tertiary-container px-2 py-1 rounded-md' : 'text-on-surface-variant'}`}>
-                                    {displayTeacher(period)}
-                                    </span>
-                                    <span className="mx-2">•</span>
-                                    {(() => {
-                                      // NOTE: Do NOT include `.to` - that field is commonly used for end times
-                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
-                                      return (
-                                        <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : (isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}
-                                          style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>
-                                          {displayRoom}
-                                        </span>
-                                      )
-                                    })()}
-                                </div>
-                              </div>
                             </div>
                           )}
                         </div>
