@@ -906,7 +906,6 @@ export default function TimetablePage() {
                                   </div>
                                 ))}
                               </div>
-                            )
                             } catch (e) {
                               return <div className="text-xs text-on-surface-variant">No data</div>
                             }
