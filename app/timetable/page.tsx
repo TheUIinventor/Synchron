@@ -816,14 +816,7 @@ export default function TimetablePage() {
               <div className="p-6">
                 {/* Header removed: per-day labels shown instead of global title */}
 
-                {/* Days Header */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 mb-6">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
-                    <div key={day} className="text-center">
-                      <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}</h3>
-                    </div>
-                  ))}
-                </div>
+                {/* Days Header removed - per-day labels are shown within each column */}
 
                 {/* Timetable Grid: each day shows Week A then Week B */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6">
