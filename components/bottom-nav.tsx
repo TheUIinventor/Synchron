@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Calendar, Bell, Menu, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const navItems = [
     { href: "/", icon: Home, label: "My Synchron" },
@@ -26,6 +27,9 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              onPointerUp={() => {
+                try { router.push(item.href) } catch (e) {}
+              }}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}
               title={item.label}

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Home, Calendar, Bell, Clipboard, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { useLoginPromptVisible } from "@/components/login-prompt-banner";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { isLoading, isRefreshing, timetableSource } = useTimetable() as any
   const { visible: loginPromptVisible } = useLoginPromptVisible()
   const navItems = [
@@ -29,6 +30,9 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onPointerUp={() => {
+                try { router.push(item.href) } catch (e) {}
+              }}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}
               title={item.label}
