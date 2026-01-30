@@ -850,18 +850,17 @@ export default function TimetablePage() {
                                     <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                                   </div>
                                 ) : (
-                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div
-                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
-                                      style={getSubjectColorStyle(period.subject, period.colour)}
-                                    >
-                                      {getSubjectAbbr(period.subject)}
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="text-sm font-medium text-on-surface truncate">{getDisplaySubject(period)}</div>
-                                    </div>
-                                    <div className="ml-2 text-sm font-medium text-on-surface-variant bg-surface p-2 rounded-md min-w-[44px] text-center">
-                                      {period.room || getDisplayRoom(period)}
+                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3 w-full">
+                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5">
+                                      <div
+                                        className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                        style={getSubjectColorStyle(period.subject, period.colour)}
+                                      >
+                                        {getSubjectAbbr(period.subject)}
+                                      </div>
+                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant bg-surface px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
+                                        {period.room || getDisplayRoom(period)}
+                                      </div>
                                     </div>
                                   </div>
                                 )
@@ -890,18 +889,17 @@ export default function TimetablePage() {
                                     <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                                   </div>
                                 ) : (
-                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
-                                    <div
-                                      className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
-                                      style={getSubjectColorStyle(period.subject, period.colour)}
-                                    >
-                                      {getSubjectAbbr(period.subject)}
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="text-sm font-medium text-on-surface truncate">{getDisplaySubject(period)}</div>
-                                    </div>
-                                    <div className="ml-2 text-sm font-medium text-on-surface-variant bg-surface p-2 rounded-md min-w-[44px] text-center">
-                                      {period.room || getDisplayRoom(period)}
+                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3 w-full">
+                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5">
+                                      <div
+                                        className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                        style={getSubjectColorStyle(period.subject, period.colour)}
+                                      >
+                                        {getSubjectAbbr(period.subject)}
+                                      </div>
+                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant bg-surface px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
+                                        {period.room || getDisplayRoom(period)}
+                                      </div>
                                     </div>
                                   </div>
                                 )
