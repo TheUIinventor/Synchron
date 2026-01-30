@@ -28,13 +28,21 @@ export function AppSidebar() {
           return (
             <button
               key={item.href}
-              onClick={() => {
-                const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
+              onClick={(e) => {
+                try { e.preventDefault?.() } catch {}
+                try { e.stopPropagation?.() } catch {}
+
                 try {
-                  window.location.href = target
-                } catch (e) {
-                  try { router.push(item.href) } catch (err) { /* swallow */ }
+                  router.push(item.href)
+                  return
+                } catch (err) {
+                  /* fall through */
                 }
+
+                try {
+                  const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
+                  window.location.assign(target)
+                } catch (_) {}
               }}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}

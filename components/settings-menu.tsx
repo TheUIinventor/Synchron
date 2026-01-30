@@ -20,12 +20,15 @@ export default function SettingsMenu() {
         // Persist easter-egg flag before navigating so it isn't lost
         try { localStorage.setItem("chronicl-easter-egg-discovered", "true") } catch {}
 
-        // Use assign for a deterministic navigation; fallback to router.push
+        // Prefer SPA navigation using Next router
         try {
-          window.location.assign("https://synchron.work/settings")
-        } catch (e) {
-          try { router.push("/settings") } catch (_) {}
+          router.push("/settings")
+          return
+        } catch (err) {
+          /* fall through to hard navigation */
         }
+
+        try { window.location.assign("https://synchron.work/settings") } catch (_) {}
       }}
     >
       <div className="glass-icon-enhanced rounded-full p-1">
