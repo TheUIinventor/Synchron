@@ -3516,8 +3516,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
       const targetDayName = mainTimetableDayName === "Sunday" || mainTimetableDayName === "Saturday" ? "Monday" : mainTimetableDayName
       const targetIso = dayForMainTimetable.toISOString().slice(0,10)
       // Only update if the selected date actually changed to avoid triggering
-      // repeated fetches every tick when the date is identical.
-      if (targetIso !== currentSelectedIso) {
+      // repeated fetches every tick when the date is identical. Also ensure
+      // we initialize `selectedDay` when it's empty on startup so components
+      // that read it don't see a blank value.
+      if (targetIso !== currentSelectedIso || !selectedDay) {
         setSelectedDay(targetDayName)
         setSelectedDateObject(dayForMainTimetable) // Set the actual Date object
         setIsShowingNextDay(showingNextDayFlag)
@@ -3564,7 +3566,7 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         currentPeriod: null,
       })
     }
-  }, [timetableData, selectedDateObject]) // include selectedDateObject to compare and avoid redundant updates
+  }, [timetableData, selectedDateObject, selectedDay]) // include selectedDateObject + selectedDay to avoid redundant updates and initialize day
 
   // Initial update and 1-second interval for all time-based states
   useEffect(() => {
