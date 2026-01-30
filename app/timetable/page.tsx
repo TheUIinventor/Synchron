@@ -140,6 +140,7 @@ export default function TimetablePage() {
   const [showDiag, setShowDiag] = useState(false)
   const [diagLoading, setDiagLoading] = useState(false)
   const [diagResult, setDiagResult] = useState<any | null>(null)
+  const [selectedCycleSubject, setSelectedCycleSubject] = useState<string | null>(null)
 
   const fetchDiagnostics = async () => {
     setShowDiag(true)
@@ -853,26 +854,37 @@ export default function TimetablePage() {
                                           </div>
                                         ) : (
                                           <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3 w-full">
-                                            {(() => {
-                                              const displayColour = getSubjectColorOverride(period.subject) || period.colour
-                                              const cardTint = displayColour ? { backgroundColor: `#${displayColour}11` } : undefined
-                                              return (
-                                                <div className="flex items-center justify-between w-full rounded-md p-1.5" style={cardTint}>
-                                                  {displayColour ? (
-                                                    <div className="w-1 min-w-[4px] rounded-lg self-stretch mr-2" style={{ backgroundColor: `#${displayColour}` }} />
-                                                  ) : null}
-                                                  <div
-                                                    className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
-                                                    style={getSubjectColorStyle(period.subject, period.colour)}
-                                                  >
-                                                    {getSubjectAbbr(period.subject)}
-                                                  </div>
-                                                  <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
-                                                    {period.room || getDisplayRoom(period)}
-                                                  </div>
-                                                </div>
-                                              )
-                                            })()}
+                                                    {(() => {
+                                                      const subj = String(period.subject || '')
+                                                      const displayColour = getSubjectColorOverride(period.subject) || period.colour
+                                                      const cardTint = displayColour ? { backgroundColor: `#${displayColour}11` } : undefined
+                                                      const isAnySelected = Boolean(selectedCycleSubject)
+                                                      const isSelected = selectedCycleSubject === subj
+                                                      const containerClass = `flex items-center justify-between w-full rounded-md p-1.5 cursor-pointer ${isSelected ? 'ring-2 ring-primary/60' : ''} ${isAnySelected && !isSelected ? 'opacity-60' : ''}`
+                                                      return (
+                                                        <div
+                                                          role="button"
+                                                          tabIndex={0}
+                                                          onClick={() => setSelectedCycleSubject(isSelected ? null : subj)}
+                                                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCycleSubject(isSelected ? null : subj) } }}
+                                                          className={containerClass}
+                                                          style={cardTint}
+                                                        >
+                                                          {displayColour ? (
+                                                            <div className={`w-1 min-w-[4px] rounded-lg self-stretch mr-2 ${isAnySelected && !isSelected ? 'opacity-40' : ''}`} style={{ backgroundColor: `#${displayColour}` }} />
+                                                          ) : null}
+                                                          <div
+                                                            className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${(!isAnySelected || isSelected) ? getSubjectColor(period.subject, period.colour) : 'bg-surface-container text-on-surface-variant'}`}
+                                                            style={(!isAnySelected || isSelected) ? getSubjectColorStyle(period.subject, period.colour) : undefined}
+                                                          >
+                                                            {getSubjectAbbr(period.subject)}
+                                                          </div>
+                                                          <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface ${isAnySelected && !isSelected ? 'opacity-60' : ''}`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
+                                                            {period.room || getDisplayRoom(period)}
+                                                          </div>
+                                                        </div>
+                                                      )
+                                                    })()}
                                           </div>
                                         )
                                       ))}
@@ -906,20 +918,31 @@ export default function TimetablePage() {
                                         ) : (
                                           <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3 w-full">
                                             {(() => {
+                                              const subj = String(period.subject || '')
                                               const displayColour = getSubjectColorOverride(period.subject) || period.colour
                                               const cardTint = displayColour ? { backgroundColor: `#${displayColour}11` } : undefined
+                                              const isAnySelected = Boolean(selectedCycleSubject)
+                                              const isSelected = selectedCycleSubject === subj
+                                              const containerClass = `flex items-center justify-between w-full rounded-md p-1.5 cursor-pointer ${isSelected ? 'ring-2 ring-primary/60' : ''} ${isAnySelected && !isSelected ? 'opacity-60' : ''}`
                                               return (
-                                                <div className="flex items-center justify-between w-full rounded-md p-1.5" style={cardTint}>
+                                                <div
+                                                  role="button"
+                                                  tabIndex={0}
+                                                  onClick={() => setSelectedCycleSubject(isSelected ? null : subj)}
+                                                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCycleSubject(isSelected ? null : subj) } }}
+                                                  className={containerClass}
+                                                  style={cardTint}
+                                                >
                                                   {displayColour ? (
-                                                    <div className="w-1 min-w-[4px] rounded-lg self-stretch mr-2" style={{ backgroundColor: `#${displayColour}` }} />
+                                                    <div className={`w-1 min-w-[4px] rounded-lg self-stretch mr-2 ${isAnySelected && !isSelected ? 'opacity-40' : ''}`} style={{ backgroundColor: `#${displayColour}` }} />
                                                   ) : null}
                                                   <div
-                                                    className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
-                                                    style={getSubjectColorStyle(period.subject, period.colour)}
+                                                    className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${(!isAnySelected || isSelected) ? getSubjectColor(period.subject, period.colour) : 'bg-surface-container text-on-surface-variant'}`}
+                                                    style={(!isAnySelected || isSelected) ? getSubjectColorStyle(period.subject, period.colour) : undefined}
                                                   >
                                                     {getSubjectAbbr(period.subject)}
                                                   </div>
-                                                  <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
+                                                  <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface ${isAnySelected && !isSelected ? 'opacity-60' : ''}`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
                                                     {period.room || getDisplayRoom(period)}
                                                   </div>
                                                 </div>
