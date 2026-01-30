@@ -758,6 +758,28 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const refreshDebugHandlersRef = useRef<{ capture?: any; bubble?: any } | null>(null)
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
+
+  // If the server provided a grouped `timetableByWeek` but we don't yet
+  // have a `currentWeek` selection, infer a dominant week from the
+  // grouped data and initialize `currentWeek`. This avoids rendering the
+  // wrong A/B group on startup until an explicit `weekType` arrives.
+  useEffect(() => {
+    try {
+      if ((currentWeek !== 'A' && currentWeek !== 'B') && externalTimetableByWeek) {
+        let tallyA = 0
+        let tallyB = 0
+        for (const groups of Object.values(externalTimetableByWeek)) {
+          try {
+            if (groups && Array.isArray(groups.A)) tallyA += groups.A.length
+            if (groups && Array.isArray(groups.B)) tallyB += groups.B.length
+          } catch (e) {}
+        }
+        if (tallyA > tallyB) setCurrentWeek('A')
+        else if (tallyB > tallyA) setCurrentWeek('B')
+        // if tied, leave as null and let other heuristics decide later
+      }
+    } catch (e) {}
+  }, [externalTimetableByWeek, currentWeek])
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [reauthRequired, setReauthRequired] = useState<boolean>(false)
   const [lastUserSelectedAt, setLastUserSelectedAt] = useState<number | null>(null)
