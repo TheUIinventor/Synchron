@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Home, Calendar, Bell, Clipboard, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTimetable } from "@/contexts/timetable-context";
@@ -8,7 +9,6 @@ import { useLoginPromptVisible } from "@/components/login-prompt-banner";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { isLoading, isRefreshing, timetableSource } = useTimetable() as any
   const { visible: loginPromptVisible } = useLoginPromptVisible()
   const navItems = [
@@ -26,11 +26,9 @@ export function AppSidebar() {
           const Icon = item.icon;
 
           return (
-            <button
+            <Link
               key={item.href}
-              onClick={() => {
-                try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
-              }}
+              href={item.href}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}
               title={item.label}
@@ -59,7 +57,7 @@ export function AppSidebar() {
               >
                 {item.label}
               </span>
-            </button>
+            </Link>
           );
         })}
       </div>

@@ -13,7 +13,7 @@ import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } fro
 import { useLoginPromptVisible } from "@/components/login-prompt-banner";
 import { getNextBell } from "@/utils/bell-utils";
 import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { cn, stripLeadingCasualCode } from "@/lib/utils";
 import { getSubjectColorOverride, isPastelModeEnabled } from "@/utils/subject-color-override";
 import { hexToInlineStyle } from "@/utils/color-utils";
@@ -254,7 +254,6 @@ export default function HomeClient() {
   }
 
   const { currentPeriod, nextPeriod, timeUntil, isCurrentlyInClass, nextPeriodStart } = currentMomentPeriodInfo as any;
-  const router = useRouter()
   const shouldShowTransition = (() => {
     try {
       if (!nextPeriod) return false
@@ -496,9 +495,9 @@ export default function HomeClient() {
               </div>
             </div>
 
-            <button type="button" onClick={() => { try { router.push('/settings') } catch (e) { try { window.location.href = '/settings' } catch {} } }} className="rounded-full p-2 hover:bg-surface-variant transition-colors">
+            <Link href="/settings" className="rounded-full p-2 hover:bg-surface-variant transition-colors">
               <SettingsIcon className="h-5 w-5 text-muted-foreground" />
-            </button>
+            </Link>
             {/* Top-right home page auth button converted to a logout button per request */}
             {auth && auth.logout ? (
               <Button
@@ -547,7 +546,7 @@ export default function HomeClient() {
             {/* Primary Status Card */}
             {/* Mobile-only compact pill (shows countdown and next period) */}
             {!noClassesByBells && (
-              <button type="button" onClick={() => { try { router.push('/timetable') } catch (e) { try { window.location.href = '/timetable' } catch {} } }} className="block sm:hidden w-full">
+              <Link href="/timetable" className="block sm:hidden w-full">
                 <div className="mx-auto max-w-[680px] px-3 py-2 rounded-full bg-primary text-primary-foreground font-medium flex items-center justify-between shadow-sm">
                   <>
                     <span className="text-sm md:text-base truncate">
@@ -556,7 +555,7 @@ export default function HomeClient() {
                     <ArrowRight className="ml-3 h-4 w-4 opacity-90" />
                   </>
                 </div>
-              </button>
+              </Link>
             )}
 
             {/* Desktop / tablet expressive card (hidden on small screens) */}
@@ -745,7 +744,7 @@ export default function HomeClient() {
                 </div>
               </div>
 
-               <button type="button" onClick={() => { try { router.push('/notices') } catch (e) { try { window.location.href = '/notices' } catch {} } }} className="hidden sm:flex rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex-col justify-between hover:brightness-95 transition-all cursor-pointer h-full">
+               <Link href="/notices" className="hidden sm:flex rounded-m3-xl bg-tertiary-container text-tertiary-container-foreground p-4 flex-col justify-between hover:brightness-95 transition-all cursor-pointer h-full">
                   <div className="flex items-center gap-2 mb-4 opacity-80">
                     <Bell className="h-5 w-5" />
                     <span className="font-medium">Notices</span>

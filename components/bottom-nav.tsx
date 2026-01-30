@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, Calendar, Bell, Menu, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
 
   const navItems = [
     { href: "/", icon: Home, label: "My Synchron" },
@@ -24,14 +23,9 @@ export function BottomNav() {
           const Icon = item.icon;
 
           return (
-            // Use Link for semantics but also handle clicks via router.push to
-            // ensure navigation occurs even if a parent event handler prevents
-            // the default anchor navigation (some overlays or listeners may do this).
-            <button
+            <Link
               key={item.href}
-              onClick={() => {
-                try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
-              }}
+              href={item.href}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}
               title={item.label}
@@ -53,8 +47,8 @@ export function BottomNav() {
                   strokeWidth={isActive ? 2.5 : 2}
                 />
               </div>
-            </button>
-          );
+            </Link>
+          )
         })}
       </div>
     </div>
