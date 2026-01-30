@@ -814,16 +814,13 @@ export default function TimetablePage() {
             {/* Grid Timetable */}
             <Card className="bg-surface-container rounded-m3-xl border-none shadow-elevation-1">
               <div className="p-6">
-                <div className="text-center mb-6">
-                  <h2 className="text-xl font-semibold text-on-surface">Full Cycle Timetable</h2>
-                  <p className="text-sm text-on-surface-variant">Week A and Week B</p>
-                </div>
+                {/* Header removed: per-day labels shown instead of global title */}
 
                 {/* Days Header */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 mb-6">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
                     <div key={day} className="text-center">
-                      <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}{(externalWeekType ?? currentWeek) ? ` ${externalWeekType ?? currentWeek}` : ''}</h3>
+                      <h3 className="font-semibold text-on-surface-variant text-base">{day.substring(0, 3)}</h3>
                     </div>
                   ))}
                 </div>
@@ -839,7 +836,7 @@ export default function TimetablePage() {
                         {/* Week A */}
                         <div className="p-2 rounded-md bg-surface-container-high">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="font-medium">Week A</div>
+                            <div className="font-medium">{`${day.substring(0,3)} A`}</div>
                           </div>
                               {(() => {
                                 // Prefer provider's grouped data if available
@@ -899,7 +896,7 @@ export default function TimetablePage() {
                         {/* Week B */}
                         <div className="p-2 rounded-md bg-surface-container-high">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="font-medium">Week B</div>
+                            <div className="font-medium">{`${day.substring(0,3)} B`}</div>
                           </div>
                               {(() => {
                                 try {
