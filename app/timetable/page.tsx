@@ -7,6 +7,7 @@ import { ChevronLeft, Calendar as CalendarIcon, Utensils } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getWeek } from 'date-fns'
 import { trackSectionUsage } from "@/utils/usage-tracker"
+import PageTransition from "@/components/page-transition"
 import { useTimetable } from "@/contexts/timetable-context"
 import { parseTimeRange, formatTo12Hour, isSchoolDayOver, getNextSchoolDay } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
@@ -439,7 +440,7 @@ export default function TimetablePage() {
   if (!mounted) return null
 
   return (
-    <>
+    <PageTransition>
       <div className="w-full mx-auto px-2 sm:px-3 md:px-4 py-4 pb-28 sm:pb-20 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between mb-6 fade-in">
           <Link
@@ -843,28 +844,27 @@ export default function TimetablePage() {
                             // Prefer provider's grouped data if available
                             try {
                               const itemsA = tt && tt[day] && Array.isArray(tt[day].A) ? tt[day].A : (timetableData[day] || [])
-                              return <div className="space-y-2">
-                                {itemsA.map((period: any) => (
+                              return itemsA.map((period: any) => (
                                 period.subject === 'Break' ? (
                                   <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
                                     <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                                   </div>
                                 ) : (
                                   <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3 w-full">
-                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5 ring-1 ring-primary/10">
+                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5">
                                       <div
                                         className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
                                         style={getSubjectColorStyle(period.subject, period.colour)}
                                       >
                                         {getSubjectAbbr(period.subject)}
                                       </div>
-                                      <div className={`ml-2 text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
+                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant bg-surface px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
                                         {period.room || getDisplayRoom(period)}
                                       </div>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
+                                )
+                              ))
                             } catch (e) {
                               return <div className="text-xs text-on-surface-variant">No data</div>
                             }
@@ -883,28 +883,27 @@ export default function TimetablePage() {
                                 // no grouped data available; indicate there's only one week available
                                 return <div className="text-xs text-on-surface-variant">Only one week available</div>
                               }
-                              return <div className="space-y-2">
-                                {itemsB.map((period: any) => (
+                              return itemsB.map((period: any) => (
                                 period.subject === 'Break' ? (
                                   <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
                                     <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
                                   </div>
                                 ) : (
                                   <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3 w-full">
-                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5 ring-1 ring-primary/10">
+                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5">
                                       <div
                                         className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
                                         style={getSubjectColorStyle(period.subject, period.colour)}
                                       >
                                         {getSubjectAbbr(period.subject)}
                                       </div>
-                                      <div className={`ml-2 text-sm font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
+                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant bg-surface px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
                                         {period.room || getDisplayRoom(period)}
                                       </div>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
+                                )
+                              ))
                             } catch (e) {
                               return <div className="text-xs text-on-surface-variant">No data</div>
                             }
@@ -928,6 +927,6 @@ export default function TimetablePage() {
           title="Select a Date"
         />
       </div>
-    </>
+    </PageTransition>
   )
 }
