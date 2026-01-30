@@ -12,7 +12,6 @@ export default function SettingsMenu() {
       variant="outline"
       size="icon"
       className="rounded-full w-10 h-10 glass-button border-0 hover:bg-white/30 dark:hover:bg-white/15 transition-all duration-200 bg-transparent"
-      style={{ pointerEvents: 'auto' }}
       onClick={() => {
         router.push("/settings")
         localStorage.setItem("chronicl-easter-egg-discovered", "true")

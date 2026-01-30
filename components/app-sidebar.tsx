@@ -29,11 +29,9 @@ export function AppSidebar() {
             <button
               key={item.href}
               onClick={() => {
-                console.log('[AppSidebar] Clicked:', item.href);
                 try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
               }}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
-              style={{ pointerEvents: 'auto' }}
               aria-label={item.label}
               title={item.label}
             >
