@@ -756,7 +756,7 @@ export default function HomeClient() {
                 </h3>
                 
                 <div className="space-y-3 flex-1 pr-2">
-                  {isSchoolDay && todaysPeriods.length > 0 ? (
+                  {((isSchoolDay) || (displayDate.toDateString() !== currentDate.toDateString())) && todaysPeriods.length > 0 ? (
                     todaysPeriods.map((period, i) => {
                       // prefer explicit period.time, otherwise use provider bell bucket
                       let startTime = (period.time || '')
