@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
   };
   if (incomingCookie) baseHeaders['Cookie'] = incomingCookie;
   if (accessToken) baseHeaders['Authorization'] = `Bearer ${accessToken}`;
-
+  
+//  else baseHeaders['Cookie'] = incomingCookie;
   const tryEndpoint = async (host: string, path: string) => {
     try {
       const fullUrl = `https://${host}${path}`;
