@@ -29,23 +29,15 @@ export function BottomNav() {
             // the default anchor navigation (some overlays or listeners may do this).
             <button
               key={item.href}
-              onClick={(e) => {
-                try { e.preventDefault?.() } catch {}
-                try { e.stopPropagation?.() } catch {}
-
-                // Prefer SPA navigation using Next router to avoid full page reloads
+              onClick={() => {
+                const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
                 try {
-                  router.push(item.href)
-                  return
-                } catch (err) {
-                  /* fall through to hard navigation */
+                  // Prefer a hard navigation to the canonical domain
+                  window.location.href = target
+                } catch (e) {
+                  // Fallback to client-side Next navigation if available
+                  try { router.push(item.href) } catch (err) { /* swallow */ }
                 }
-
-                // Fallback: navigate to canonical domain if router isn't available
-                try {
-                  const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
-                  window.location.assign(target)
-                } catch (_) {}
               }}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}
