@@ -840,35 +840,48 @@ export default function TimetablePage() {
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium">Week A</div>
                           </div>
-                          {(() => {
-                            // Prefer provider's grouped data if available
-                            try {
-                              const itemsA = tt && tt[day] && Array.isArray(tt[day].A) ? tt[day].A : (timetableData[day] || [])
-                              return itemsA.map((period: any) => (
-                                period.subject === 'Break' ? (
-                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
-                                    <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
-                                  </div>
-                                ) : (
-                                  <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3 w-full">
-                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5">
-                                      <div
-                                        className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
-                                        style={getSubjectColorStyle(period.subject, period.colour)}
-                                      >
-                                        {getSubjectAbbr(period.subject)}
-                                      </div>
-                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant bg-surface px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
-                                        {period.room || getDisplayRoom(period)}
-                                      </div>
+                              {(() => {
+                                // Prefer provider's grouped data if available
+                                try {
+                                  const itemsA = tt && tt[day] && Array.isArray(tt[day].A) ? tt[day].A : (timetableData[day] || [])
+                                  return (
+                                    <div className="space-y-2">
+                                      {itemsA.map((period: any) => (
+                                        period.subject === 'Break' ? (
+                                          <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3">
+                                            <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
+                                          </div>
+                                        ) : (
+                                          <div key={(period.id ?? period.period) + '-A'} className="flex items-center gap-3 w-full">
+                                            {(() => {
+                                              const displayColour = getSubjectColorOverride(period.subject) || period.colour
+                                              const cardTint = displayColour ? { backgroundColor: `#${displayColour}11` } : undefined
+                                              return (
+                                                <div className="flex items-center justify-between w-full rounded-md p-1.5" style={cardTint}>
+                                                  {displayColour ? (
+                                                    <div className="w-1 min-w-[4px] rounded-lg self-stretch mr-2" style={{ backgroundColor: `#${displayColour}` }} />
+                                                  ) : null}
+                                                  <div
+                                                    className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                                    style={getSubjectColorStyle(period.subject, period.colour)}
+                                                  >
+                                                    {getSubjectAbbr(period.subject)}
+                                                  </div>
+                                                  <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
+                                                    {period.room || getDisplayRoom(period)}
+                                                  </div>
+                                                </div>
+                                              )
+                                            })()}
+                                          </div>
+                                        )
+                                      ))}
                                     </div>
-                                  </div>
-                                )
-                              ))
-                            } catch (e) {
-                              return <div className="text-xs text-on-surface-variant">No data</div>
-                            }
-                          })()}
+                                  )
+                                } catch (e) {
+                                  return <div className="text-xs text-on-surface-variant">No data</div>
+                                }
+                              })()}
                         </div>
 
                         {/* Week B */}
@@ -876,38 +889,51 @@ export default function TimetablePage() {
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium">Week B</div>
                           </div>
-                          {(() => {
-                            try {
-                              const itemsB = tt && tt[day] && Array.isArray(tt[day].B) ? tt[day].B : []
-                              if ((!itemsB || itemsB.length === 0) && (!tt || !tt[day])) {
-                                // no grouped data available; indicate there's only one week available
-                                return <div className="text-xs text-on-surface-variant">Only one week available</div>
-                              }
-                              return itemsB.map((period: any) => (
-                                period.subject === 'Break' ? (
-                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
-                                    <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
-                                  </div>
-                                ) : (
-                                  <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3 w-full">
-                                    <div className="flex items-center justify-between w-full rounded-md bg-surface p-1.5">
-                                      <div
-                                        className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
-                                        style={getSubjectColorStyle(period.subject, period.colour)}
-                                      >
-                                        {getSubjectAbbr(period.subject)}
-                                      </div>
-                                      <div className={`ml-2 text-sm font-medium text-on-surface-variant bg-surface px-2 py-0.5 rounded-md min-w-[44px] text-center`}>
-                                        {period.room || getDisplayRoom(period)}
-                                      </div>
+                              {(() => {
+                                try {
+                                  const itemsB = tt && tt[day] && Array.isArray(tt[day].B) ? tt[day].B : []
+                                  if ((!itemsB || itemsB.length === 0) && (!tt || !tt[day])) {
+                                    // no grouped data available; indicate there's only one week available
+                                    return <div className="text-xs text-on-surface-variant">Only one week available</div>
+                                  }
+                                  return (
+                                    <div className="space-y-2">
+                                      {itemsB.map((period: any) => (
+                                        period.subject === 'Break' ? (
+                                          <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3">
+                                            <div className="flex-1 text-sm text-on-surface-variant">{period.period}</div>
+                                          </div>
+                                        ) : (
+                                          <div key={(period.id ?? period.period) + '-B'} className="flex items-center gap-3 w-full">
+                                            {(() => {
+                                              const displayColour = getSubjectColorOverride(period.subject) || period.colour
+                                              const cardTint = displayColour ? { backgroundColor: `#${displayColour}11` } : undefined
+                                              return (
+                                                <div className="flex items-center justify-between w-full rounded-md p-1.5" style={cardTint}>
+                                                  {displayColour ? (
+                                                    <div className="w-1 min-w-[4px] rounded-lg self-stretch mr-2" style={{ backgroundColor: `#${displayColour}` }} />
+                                                  ) : null}
+                                                  <div
+                                                    className={`rounded-md px-2 py-0.5 text-xs font-medium flex-shrink-0 text-center ${getSubjectColor(period.subject, period.colour)}`}
+                                                    style={getSubjectColorStyle(period.subject, period.colour)}
+                                                  >
+                                                    {getSubjectAbbr(period.subject)}
+                                                  </div>
+                                                  <div className={`ml-2 text-sm font-medium text-on-surface-variant px-2 py-0.5 rounded-md min-w-[44px] text-center bg-surface`} style={displayColour ? { backgroundColor: `#${displayColour}22` } : undefined}>
+                                                    {period.room || getDisplayRoom(period)}
+                                                  </div>
+                                                </div>
+                                              )
+                                            })()}
+                                          </div>
+                                        )
+                                      ))}
                                     </div>
-                                  </div>
-                                )
-                              ))
-                            } catch (e) {
-                              return <div className="text-xs text-on-surface-variant">No data</div>
-                            }
-                          })()}
+                                  )
+                                } catch (e) {
+                                  return <div className="text-xs text-on-surface-variant">No data</div>
+                                }
+                              })()}
                         </div>
                       </div>
                     )
