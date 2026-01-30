@@ -29,15 +29,32 @@ export function BottomNav() {
             // the default anchor navigation (some overlays or listeners may do this).
             <button
               key={item.href}
-              onClick={() => {
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                 const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
+
+                const btn = e.currentTarget as HTMLElement
+                // prevent accidental double-click navigation
+                if (btn.dataset.navigating === "1") return
+                btn.dataset.navigating = "1"
+
+                // Animate the icon container for a short, snappy click feedback
                 try {
-                  // Prefer a hard navigation to the canonical domain
-                  window.location.href = target
-                } catch (e) {
-                  // Fallback to client-side Next navigation if available
-                  try { router.push(item.href) } catch (err) { /* swallow */ }
-                }
+                  const icon = btn.querySelector('.nav-icon') as HTMLElement | null
+                  if (icon) {
+                    icon.style.transition = 'transform 180ms ease'
+                    icon.style.transform = 'translateY(2px) scale(0.96)'
+                  }
+                } catch (err) {}
+
+                // Delay navigation to allow the animation to play
+                setTimeout(() => {
+                  try {
+                    // Hard navigate to canonical domain
+                    window.location.assign(target)
+                  } catch (e) {
+                    try { router.push(item.href) } catch (err) {}
+                  }
+                }, 200)
               }}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}
@@ -46,21 +63,26 @@ export function BottomNav() {
               <div
                 className={cn(
                   "relative flex items-center justify-center h-12 w-16 rounded-full transition-all duration-500 ease-expressive",
-                  isActive
+                  <div
                     ? "bg-primary-container text-primary-container-foreground w-20"
                     : "text-muted-foreground hover:bg-surface-variant/50"
                 )}
                 style={{ pointerEvents: 'auto' }}
               >
                 <Icon
-                  className={cn(
-                    "h-6 w-6 transition-transform duration-300",
+                    style={{ pointerEvents: 'auto' }}
+                    // class used by click animation handler
+                    aria-hidden
+                  >
+                    <div className="nav-icon">
+                      <Icon
                     isActive ? "scale-110" : "group-hover:scale-110"
                   )}
                   strokeWidth={isActive ? 2.5 : 2}
                 />
               </div>
-            </button>
+                      />
+                    </div>
           );
         })}
       </div>

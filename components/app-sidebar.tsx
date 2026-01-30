@@ -28,13 +28,28 @@ export function AppSidebar() {
           return (
             <button
               key={item.href}
-              onClick={() => {
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                 const target = item.href === "/" ? "https://synchron.work" : `https://synchron.work${item.href}`
+
+                const btn = e.currentTarget as HTMLElement
+                if (btn.dataset.navigating === "1") return
+                btn.dataset.navigating = "1"
+
                 try {
-                  window.location.href = target
-                } catch (e) {
-                  try { router.push(item.href) } catch (err) { /* swallow */ }
-                }
+                  const icon = btn.querySelector('.nav-icon') as HTMLElement | null
+                  if (icon) {
+                    icon.style.transition = 'transform 180ms ease'
+                    icon.style.transform = 'translateY(2px) scale(0.96)'
+                  }
+                } catch (err) {}
+
+                setTimeout(() => {
+                  try {
+                    window.location.assign(target)
+                  } catch (e) {
+                    try { router.push(item.href) } catch (err) {}
+                  }
+                }, 200)
               }}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}
@@ -48,13 +63,15 @@ export function AppSidebar() {
                     : "text-muted-foreground hover:bg-surface-variant/50 hover:text-foreground"
                 )}
               >
-                <Icon
-                  className={cn(
-                    "h-6 w-6 transition-transform duration-300",
-                    isActive ? "scale-110" : "group-hover:scale-110"
-                  )}
-                  strokeWidth={isActive ? 2.5 : 2}
-                />
+                <div className="nav-icon">
+                  <Icon
+                    className={cn(
+                      "h-6 w-6 transition-transform duration-300",
+                      isActive ? "scale-110" : "group-hover:scale-110"
+                    )}
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+                </div>
               </div>
               <span
                 className={cn(
