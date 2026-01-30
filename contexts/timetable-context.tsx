@@ -703,9 +703,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   }
 
   let aggressivePref = readAggressivePref()
-  let MIN_REFRESH_MS = aggressivePref ? 9 * 1000 : 45 * 1000
-  let VISIBLE_REFRESH_MS = aggressivePref ? 12 * 1000 : 60 * 1000
-  let HIDDEN_REFRESH_MS = aggressivePref ? 60 * 1000 : 5 * 60 * 1000
+  // Significantly reduced refresh intervals to lower CPU usage
+  let MIN_REFRESH_MS = aggressivePref ? 30 * 1000 : 90 * 1000       // 30s / 90s (was 9s / 45s)
+  let VISIBLE_REFRESH_MS = aggressivePref ? 40 * 1000 : 120 * 1000   // 40s / 120s (was 12s / 60s)
+  let HIDDEN_REFRESH_MS = aggressivePref ? 300 * 1000 : 600 * 1000   // 5m / 10m (was 60s / 5m)
 
   // Listen for runtime changes to the aggressive-refresh preference so we
   // can update intervals immediately when the user flips the switch.
@@ -715,9 +716,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         try {
           const val = !!(ev && ev.detail && ev.detail.value)
           aggressivePref = val
-          MIN_REFRESH_MS = aggressivePref ? 9 * 1000 : 45 * 1000
-          VISIBLE_REFRESH_MS = aggressivePref ? 12 * 1000 : 60 * 1000
-          HIDDEN_REFRESH_MS = aggressivePref ? 60 * 1000 : 5 * 60 * 1000
+          MIN_REFRESH_MS = aggressivePref ? 30 * 1000 : 90 * 1000       // 30s / 90s (was 9s / 45s)
+          VISIBLE_REFRESH_MS = aggressivePref ? 40 * 1000 : 120 * 1000   // 40s / 120s (was 12s / 60s)
+          HIDDEN_REFRESH_MS = aggressivePref ? 300 * 1000 : 600 * 1000   // 5m / 10m (was 60s / 5m)
           try { console.debug('[timetable.provider] aggressive-refresh changed ->', aggressivePref) } catch (e) {}
         } catch (e) {}
       })

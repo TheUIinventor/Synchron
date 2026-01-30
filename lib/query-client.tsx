@@ -8,12 +8,13 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 /**
  * QueryClient configured following Timetabl app patterns:
  * - gcTime: Infinity - data stays in cache forever (cleared only on logout)
- * - refetchInterval: 5 minutes - auto-refresh in background
+ * - refetchInterval: 15 minutes - auto-refresh less frequently to reduce CPU/network
  * - networkMode: 'always' - queries run even when offline (from cache)
+ * - refetchIntervalInBackground: false - disable background refresh to reduce resource usage
  * 
  * This gives us:
  * 1. Fast initial loads from cached data
- * 2. Automatic background refreshes
+ * 2. Lower CPU and network usage with less frequent background refreshes
  * 3. Offline support with cached data
  */
 function makeQueryClient() {
@@ -21,9 +22,9 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         gcTime: Infinity, // Keep data in cache forever
-        staleTime: 5 * 60 * 1000, // Data is fresh for 5 minutes
-        refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
-        refetchIntervalInBackground: true,
+        staleTime: 15 * 60 * 1000, // Data is fresh for 15 minutes (reduced refetch frequency)
+        refetchInterval: 15 * 60 * 1000, // Auto-refresh every 15 minutes (reduced from 5)
+        refetchIntervalInBackground: false, // Disable background refetch to reduce CPU usage
         networkMode: 'always', // Run queries even when offline
         retry: 3,
         retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),

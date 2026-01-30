@@ -162,11 +162,11 @@ export function useDtt(date?: string) {
   return useQuery({
     queryKey: dayTimetableKey(date ? { date } : undefined),
     queryFn: () => fetchDayTimetable(date),
-    // Caching configuration
-    staleTime: 5 * 60 * 1000, // Data is fresh for 5 minutes
+    // Caching configuration - reduced from 5 minutes to lower CPU usage
+    staleTime: 15 * 60 * 1000, // Data is fresh for 15 minutes
     gcTime: Infinity, // Keep in cache forever
-    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
-    refetchIntervalInBackground: true,
+    refetchInterval: 15 * 60 * 1000, // Auto-refresh every 15 minutes (reduced from 5)
+    refetchIntervalInBackground: false, // Disable background refresh
     // On error, retry 3 times with exponential backoff
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
@@ -186,10 +186,10 @@ export function useTimetable() {
     queryKey: fullTimetableKey(),
     queryFn: fetchFullTimetable,
     // Caching configuration - cycle timetable changes less often
-    staleTime: 30 * 60 * 1000, // Data is fresh for 30 minutes
+    staleTime: 60 * 60 * 1000, // Data is fresh for 60 minutes (increased from 30)
     gcTime: Infinity, // Keep in cache forever
-    refetchInterval: 30 * 60 * 1000, // Auto-refresh every 30 minutes
-    refetchIntervalInBackground: true,
+    refetchInterval: 60 * 60 * 1000, // Auto-refresh every 60 minutes (increased from 30)
+    refetchIntervalInBackground: false, // Disable background refresh
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
@@ -250,7 +250,7 @@ export function useDay(from?: string, to?: string) {
     queryKey: calendarDaysKey(from && to ? { from, to } : undefined),
     queryFn: () => fetchCalendarDays(from!, to!),
     enabled: !!from && !!to, // Only fetch if both dates provided
-    staleTime: 60 * 60 * 1000, // Calendar data is fresh for 1 hour
+    staleTime: 24 * 60 * 60 * 1000, // Calendar data is fresh for 24 hours (increased)
     gcTime: Infinity,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
@@ -275,7 +275,7 @@ export function useTerms() {
   return useQuery({
     queryKey: calendarTermsKey(),
     queryFn: fetchCalendarTerms,
-    staleTime: 24 * 60 * 60 * 1000, // Term dates are fresh for 24 hours
+    staleTime: 7 * 24 * 60 * 60 * 1000, // Term dates are fresh for 7 days
     gcTime: Infinity,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
