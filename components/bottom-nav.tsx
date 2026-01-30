@@ -29,13 +29,15 @@ export function BottomNav() {
             // the default anchor navigation (some overlays or listeners may do this).
             <button
               key={item.href}
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
                 try { router.push(item.href) } catch (e) { try { window.location.href = item.href } catch (err) {} }
               }}
-              className="relative group flex flex-col items-center justify-center bg-transparent border-none"
-              style={{ pointerEvents: 'auto' }}
+              className="relative group flex flex-col items-center justify-center bg-transparent border-none cursor-pointer"
+              style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
               aria-label={item.label}
-              title={item.label}
+              type="button"
             >
               <div
                 className={cn(
