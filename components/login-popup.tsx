@@ -85,11 +85,11 @@ export default function LoginPopup() {
 
   return (
     <>
-      {/* Blurred background overlay */}
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-40 pointer-events-auto" />
+      {/* Blurred background overlay (allow clicks to pass through to navigation) */}
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-40 pointer-events-none" />
 
       {/* Centered popup card */}
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-auto">
         <Card className="w-full max-w-md bg-surface border-outline shadow-elevation-3 rounded-3xl">
           <div className="p-6 sm:p-8 flex flex-col items-center text-center space-y-6">
             {/* Icon */}

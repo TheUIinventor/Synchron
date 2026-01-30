@@ -1,14 +1,12 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Home, Calendar, Bell, Clipboard, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTimetable } from "@/contexts/timetable-context";
 import { useLoginPromptVisible } from "@/components/login-prompt-banner";
 
-// Rebuilt AppSidebar internals: simple buttons that call router.push on pointer
-// up and keyboard activation. This avoids relying on anchor behavior which
-// some global handlers may intercept.
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -21,10 +19,6 @@ export function AppSidebar() {
     { href: "/clipboard", icon: Clipboard, label: "Clipboard" },
   ];
 
-  const navigate = (href: string) => {
-    try { router.push(href) } catch (e) { try { window.location.href = href } catch {} }
-  }
-
   return (
     <aside className="fixed left-0 top-0 bottom-0 z-[9999] hidden md:flex flex-col items-center w-20 lg:w-24 py-8 bg-surface-container/80 backdrop-blur-md border-r border-border/50">
       <div className="flex-1 flex flex-col items-center gap-4 w-full">
@@ -33,15 +27,21 @@ export function AppSidebar() {
           const Icon = item.icon;
 
           return (
-            <button
+            <Link
               key={item.href}
-              type="button"
-              aria-current={isActive ? 'page' : undefined}
+              href={item.href}
+              onPointerUp={() => {
+                try { router.push(item.href) } catch (e) {}
+              }}
+              onPointerDown={() => {
+                try { setTimeout(() => { router.push(item.href) }, 20) } catch (e) {}
+              }}
+              onClick={(e) => {
+                try { e.preventDefault(); setTimeout(() => { router.push(item.href) }, 0) } catch (e) {}
+              }}
+              className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}
               title={item.label}
-              onPointerUp={() => navigate(item.href)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(item.href) } }}
-              className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
             >
               <div
                 className={cn(
@@ -67,7 +67,7 @@ export function AppSidebar() {
               >
                 {item.label}
               </span>
-            </button>
+            </Link>
           );
         })}
       </div>
