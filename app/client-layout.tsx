@@ -162,6 +162,45 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     } catch (e) {}
   }, [])
 
+  // Dev-only click/pointer event debugger. Enable by running
+  // `sessionStorage.setItem('synchron:debug-clicks', 'true')` in the console
+  // then reproduce the issue and check DevTools console for logged events.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const enabled = sessionStorage.getItem('synchron:debug-clicks') === 'true'
+      if (!enabled) return
+
+      const logEvent = (e: Event) => {
+        try {
+          const ev: any = e
+          const path = (ev.composedPath ? ev.composedPath() : ev.path) || []
+          const tidy = path.slice(0, 8).map((el: any) => {
+            try {
+              if (!el) return String(el)
+              const tag = el.tagName || el.nodeName || String(el)
+              const id = el.id ? `#${el.id}` : ''
+              const cls = el.className ? `.${String(el.className).replace(/\s+/g, '.')}` : ''
+              return `${tag}${id}${cls}`
+            } catch (err) { return String(el) }
+          })
+          // eslint-disable-next-line no-console
+          console.debug('[click-debug]', { type: e.type, target: e.target, defaultPrevented: (e as any).defaultPrevented, path: tidy })
+        } catch (err) { /* ignore */ }
+      }
+
+      document.addEventListener('pointerdown', logEvent, true)
+      document.addEventListener('pointerup', logEvent, true)
+      document.addEventListener('click', logEvent, true)
+
+      return () => {
+        try { document.removeEventListener('pointerdown', logEvent, true) } catch (e) {}
+        try { document.removeEventListener('pointerup', logEvent, true) } catch (e) {}
+        try { document.removeEventListener('click', logEvent, true) } catch (e) {}
+      }
+    } catch (e) {}
+  }, [])
+
   // Register service worker and capture install prompt for PWA
   useEffect(() => {
     if (typeof window === 'undefined') return
