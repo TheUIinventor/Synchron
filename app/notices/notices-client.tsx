@@ -172,17 +172,8 @@ export default function NoticesClient() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div 
-                    className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
-                    dangerouslySetInnerHTML={{
-                      __html: (() => {
-                        let msg = notice.text || notice.details || notice.content || notice.message || "";
-                        msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
-                        return msg;
-                      })()
-                    }}
-                  />
-                  
+                  <NoticeCard notice={notice} idx={idx} />
+
                   {notice.authorName && (
                     <div className="mt-4 flex items-center gap-3 pt-4 border-t border-outline-variant/50">
                       <div className="h-8 w-8 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
@@ -209,4 +200,68 @@ export default function NoticesClient() {
       </div>
     </main>
   );
+}
+
+// Small helper component to render a notice with a collapsed one-line preview
+function NoticeCard({ notice, idx }: { notice: any, idx: number }) {
+  const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  const ref = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const check = () => {
+      try {
+        // Apply the same collapsed style temporarily to measure
+        const prevDisplay = el.style.display
+        const prevWebkitBoxOrient = (el.style as any).WebkitBoxOrient
+        const prevWebkitLineClamp = (el.style as any).WebkitLineClamp
+        el.style.display = '-webkit-box'
+        ;(el.style as any).WebkitBoxOrient = 'vertical'
+        ;(el.style as any).WebkitLineClamp = '1'
+        // If the scrollHeight is greater than clientHeight we have overflow
+        const isOverflow = el.scrollHeight > el.clientHeight + 1
+        setOverflowing(isOverflow)
+        // Restore
+        el.style.display = prevDisplay
+        ;(el.style as any).WebkitBoxOrient = prevWebkitBoxOrient
+        ;(el.style as any).WebkitLineClamp = prevWebkitLineClamp
+      } catch (e) {
+        // ignore
+      }
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [notice])
+
+  const raw = (notice.text || notice.details || notice.content || notice.message || "").replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim()
+
+  const collapsedStyle: React.CSSProperties = {
+    display: '-webkit-box',
+    WebkitLineClamp: 1 as any,
+    WebkitBoxOrient: 'vertical' as any,
+    overflow: 'hidden'
+  }
+
+  return (
+    <div>
+      <div
+        ref={ref}
+        className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
+        style={!expanded ? collapsedStyle : undefined}
+        dangerouslySetInnerHTML={{ __html: raw }}
+        aria-expanded={expanded}
+      />
+
+      {overflowing && (
+        <div className="mt-2">
+          <Button variant="link" onClick={() => setExpanded(prev => !prev)}>
+            {expanded ? 'Show less' : 'Show more'}
+          </Button>
+        </div>
+      )}
+    </div>
+  )
 }
