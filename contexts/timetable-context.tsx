@@ -2520,12 +2520,21 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Try a quick probe to determine if userinfo is authenticated
+      // Quick probe to determine if userinfo is authenticated — prefer cached/init flag
       let userinfoOk = false
       try {
-        const ui = await fetch('/api/portal/userinfo', { credentials: 'include' })
-        const ctype = ui.headers.get('content-type') || ''
-        if (ui.ok && ctype.includes('application/json')) userinfoOk = true
+        const cached = typeof window !== 'undefined' && window.sessionStorage ? window.sessionStorage.getItem('synchron:user-logged-in') : null
+        if (cached === 'true') {
+          userinfoOk = true
+        } else {
+          try {
+            const ui = await fetch('/api/portal/userinfo', { credentials: 'include' })
+            const ctype = ui.headers.get('content-type') || ''
+            if (ui.ok && ctype.includes('application/json')) userinfoOk = true
+          } catch (e) {
+            // ignore
+          }
+        }
       } catch (e) {
         // ignore
       }

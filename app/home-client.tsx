@@ -198,13 +198,11 @@ export default function HomeClient() {
           return
         }
 
-        // 1) Light: userinfo immediately
+        // 1) Light: userinfo immediately (use sbhsPortal wrapper with short cache)
         try {
-          const u = await fetch('/api/portal/userinfo', { credentials: 'include' })
-          if (u.ok) {
-            const jd = await u.json()
-            // store small piece of info locally for UI usage
-            try { localStorage.setItem('synchron-given-name', jd?.data?.givenName || '') } catch (e) {}
+          const prof = await sbhsPortal.getStudentProfile()
+          if (prof && prof.success && prof.data && prof.data.givenName) {
+            try { localStorage.setItem('synchron-given-name', prof.data.givenName || '') } catch (e) {}
           }
         } catch (e) {}
 
@@ -233,7 +231,7 @@ export default function HomeClient() {
             const toStr = to.toISOString().slice(0,10)
             const c = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(from)}&to=${encodeURIComponent(toStr)}`, { credentials: 'include' })
             const out: any = { timetable: null, calendar: null }
-            try { if (t.ok) out.timetable = await t.json() } catch (e) {}
+            try { if (t.ok) { out.timetable = await t.json(); try { localStorage.setItem('synchron-last-timetable', JSON.stringify(out.timetable)) } catch (e) {} } } catch (e) {}
             try { if (c.ok) out.calendar = await c.json() } catch (e) {}
             // merge into cache with previous medium results
             const prevRaw = localStorage.getItem(CACHE_KEY)

@@ -9,6 +9,23 @@ const cacheHeaders = (req: any) => {
 
 // Proxy the SBHS portal userinfo endpoint server-side to avoid CORS issues
 export async function GET(req: NextRequest) {
+  // Lightweight in-memory cache to reduce repeated upstream probes
+  try {
+    ;(globalThis as any).__synchron_userinfo_cache = (globalThis as any).__synchron_userinfo_cache || new Map()
+  } catch (e) {}
+
+  const cacheMap: Map<string, any> = (globalThis as any).__synchron_userinfo_cache
+  const cacheKeyRaw = req.headers.get('cookie') || req.cookies.get('sbhs_access_token')?.value || 'anon'
+  const CACHE_TTL_MS = 30 * 1000 // 30 seconds
+  try {
+    if (cacheMap && cacheMap.has(cacheKeyRaw)) {
+      const ent = cacheMap.get(cacheKeyRaw)
+      if (ent && ent.ts && (Date.now() - ent.ts) < CACHE_TTL_MS) {
+        // Serve cached response clone
+        try { return NextResponse.json(ent.value, { headers: cacheHeaders(req) }) } catch (e) {}
+      }
+    }
+  } catch (e) {}
   const apiUrl = 'https://student.sbhs.net.au/details/userinfo.json'
   const accessToken = req.cookies.get('sbhs_access_token')?.value
   const refreshToken = req.cookies.get('sbhs_refresh_token')?.value
@@ -172,12 +189,13 @@ export async function GET(req: NextRequest) {
         if (found) {
           const given = found.split(/\s+/)[0];
           const res = NextResponse.json(
-            { success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${r.url}` },
-            { headers: cacheHeaders(req) }
-          );
-          const sc = r.headers.get('set-cookie');
-          if (sc) res.headers.set('set-cookie', sc.replace(/;\s*Domain=[^;]+/gi, ''));
-          return res;
+              { success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${r.url}` },
+              { headers: cacheHeaders(req) }
+            );
+            const sc = r.headers.get('set-cookie');
+            if (sc) res.headers.set('set-cookie', sc.replace(/;\s*Domain=[^;]+/gi, ''));
+            try { cacheMap.set(cacheKeyRaw, { ts: Date.now(), value: { success: true, data: { givenName: given, fullName: found, raw: j }, source: `api:${r.url}` } }) } catch (e) {}
+            return res;
         }
       } catch (e) {
         // Continue to next result
@@ -396,10 +414,14 @@ export async function GET(req: NextRequest) {
     }
 
     if (forwardedSetCookie) {
-      return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) })
+      const payload = { success: true, data, responseHeaders: okHeaders }
+      try { cacheMap.set(cacheKeyRaw, { ts: Date.now(), value: payload }) } catch (e) {}
+      return NextResponse.json(payload, { headers: Object.assign({}, { 'set-cookie': forwardedSetCookie }, cacheHeaders(req)) })
     }
 
-    return NextResponse.json({ success: true, data, responseHeaders: okHeaders }, { headers: cacheHeaders(req) })
+    const payload = { success: true, data, responseHeaders: okHeaders }
+    try { cacheMap.set(cacheKeyRaw, { ts: Date.now(), value: payload }) } catch (e) {}
+    return NextResponse.json(payload, { headers: cacheHeaders(req) })
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Proxy error', details: String(error) }, { status: 500, headers: cacheHeaders(req) })
   }

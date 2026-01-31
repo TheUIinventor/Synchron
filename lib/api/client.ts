@@ -291,21 +291,39 @@ class SBHSPortalClient {
     // If running in the browser, prefer our server-side proxy to avoid CORS and cookie issues
     try {
       if (typeof window !== "undefined") {
+        // Short client-side cache to avoid repeated calls within a short window
+        try {
+          const raw = sessionStorage.getItem('synchron-userinfo-cache')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            if (parsed && parsed.ts && (Date.now() - parsed.ts) < (30 * 1000) && parsed.data) {
+              return { success: true, data: parsed.data }
+            }
+          }
+        } catch (e) {}
+
         const res = await fetch(`/api/portal/userinfo`, { credentials: 'include' })
         if (!res.ok) {
           // fall back to direct portal request if proxy fails
           return this.makePortalRequest<StudentProfile>("/details/userinfo.json")
         }
         const payload = await res.json()
-        // If proxy returns success wrapper, normalize it
-        if (payload && payload.success && payload.data) {
-          return { success: true, data: payload.data }
+        // If proxy returns success wrapper, normalize it and cache
+        try {
+          if (payload && payload.success && payload.data) {
+            try { sessionStorage.setItem('synchron-userinfo-cache', JSON.stringify({ ts: Date.now(), data: payload.data })) } catch (e) {}
+            return { success: true, data: payload.data }
+          }
+          if (payload && payload.data) {
+            try { sessionStorage.setItem('synchron-userinfo-cache', JSON.stringify({ ts: Date.now(), data: payload.data })) } catch (e) {}
+            return { success: true, data: payload.data }
+          }
+          // If payload itself looks like profile, cache and return it
+          try { sessionStorage.setItem('synchron-userinfo-cache', JSON.stringify({ ts: Date.now(), data: payload })) } catch (e) {}
+          return { success: true, data: payload }
+        } catch (e) {
+          return { success: true, data: payload }
         }
-        if (payload && payload.data) {
-          return { success: true, data: payload.data }
-        }
-        // If payload itself looks like profile, return it
-        return { success: true, data: payload }
       }
     } catch (err) {
       // ignore and fall back to portal request
