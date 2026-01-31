@@ -146,7 +146,9 @@ export default function NoticesClient() {
                           </SelectContent>
                         </Select>
                       </div>
-        </div>
+                        </div>
+                      </div>
+            </div>
 
         {/* Content */}
         {loading ? (
