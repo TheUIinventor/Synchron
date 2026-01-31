@@ -752,6 +752,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   })
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
+  // Prevent aggressive background refreshes for a short startup cooldown
+  // after the provider mounts and initial load completes.
+  const startupCooldownRef = useRef<number | null>(Date.now())
   // Debug hooks: when sessionStorage['synchron:debug-refresh'] === 'true',
   // install temporary capture/bubble listeners during refresh to diagnose
   // click/pointer swallowing that may occur while a background refresh runs.
@@ -2364,7 +2367,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     // Throttle aggressive refreshes: ensure we don't refresh more often than MIN_REFRESH_MS
     try {
       const now = Date.now()
-      if (!force && lastRefreshTsRef.current && (now - lastRefreshTsRef.current) < MIN_REFRESH_MS) {
+      // Also respect a startup cooldown window (skip refreshes during the
+      // first 8 seconds after mount) to avoid duplicate requests with the
+      // initial load and client-side bootstrap.
+      const STARTUP_COOLDOWN_MS = 8000
+      const inStartupCooldown = startupCooldownRef.current && (now - (startupCooldownRef.current || 0)) < STARTUP_COOLDOWN_MS
+      if (!force && (inStartupCooldown || (lastRefreshTsRef.current && (now - lastRefreshTsRef.current) < MIN_REFRESH_MS))) {
         try { console.debug('[timetable.provider] refresh skipped: rate limit') } catch (e) {}
         setIsRefreshing(false)
         if (!hadCache) setIsLoading(false)

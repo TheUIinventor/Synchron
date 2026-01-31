@@ -166,6 +166,92 @@ export default function HomeClient() {
     }
   }, [])
 
+  // Client-side staggered bootstrap to reduce server-side bursts and
+  // avoid heavy parallel requests on login. We cache lightweight results
+  // in localStorage to prevent repeated fetches across quick reloads.
+  useEffect(() => {
+    let mounted = true
+    const CACHE_KEY = 'synchron-bootstrap-v1'
+    const CACHE_TTL = 1000 * 60 * 5 // 5 minutes
+
+    const loadFromCache = () => {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        if (!parsed || !parsed.ts) return null
+        if ((Date.now() - parsed.ts) > CACHE_TTL) return null
+        return parsed.data
+      } catch (e) { return null }
+    }
+
+    const saveToCache = (data: any) => {
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })) } catch (e) {}
+    }
+
+    const doBootstrap = async () => {
+      try {
+        // avoid doing this if we already have cached bootstrap results
+        const cached = loadFromCache()
+        if (cached) {
+          try { console.debug('[bootstrap.client] using cached bootstrap') } catch (e) {}
+          return
+        }
+
+        // 1) Light: userinfo immediately
+        try {
+          const u = await fetch('/api/portal/userinfo', { credentials: 'include' })
+          if (u.ok) {
+            const jd = await u.json()
+            // store small piece of info locally for UI usage
+            try { localStorage.setItem('synchron-given-name', jd?.data?.givenName || '') } catch (e) {}
+          }
+        } catch (e) {}
+
+        // 2) Medium: notices + awards after a short delay
+        setTimeout(async () => {
+          try {
+            const [n, a] = await Promise.all([
+              fetch('/api/portal/notices', { credentials: 'include' }),
+              fetch('/api/portal/awards', { credentials: 'include' }),
+            ])
+            const out: any = { notices: null, awards: null }
+            try { if (n.ok) out.notices = await n.json() } catch (e) {}
+            try { if (a.ok) out.awards = await a.json() } catch (e) {}
+            saveToCache(out)
+          } catch (e) {}
+        }, 500)
+
+        // 3) Heavy: timetable + calendar after a longer delay to avoid startup spike
+        setTimeout(async () => {
+          try {
+            const displayDate = (new Date()).toISOString().slice(0,10)
+            const t = await fetch(`/api/timetable?date=${encodeURIComponent(displayDate)}`, { credentials: 'include' })
+            // calendar: fetch narrower range to reduce payload
+            const from = displayDate
+            const to = new Date(); to.setDate(to.getDate() + 90)
+            const toStr = to.toISOString().slice(0,10)
+            const c = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(from)}&to=${encodeURIComponent(toStr)}`, { credentials: 'include' })
+            const out: any = { timetable: null, calendar: null }
+            try { if (t.ok) out.timetable = await t.json() } catch (e) {}
+            try { if (c.ok) out.calendar = await c.json() } catch (e) {}
+            // merge into cache with previous medium results
+            const prevRaw = localStorage.getItem(CACHE_KEY)
+            let merged: any = { ts: Date.now(), data: {} }
+            try { if (prevRaw) merged = JSON.parse(prevRaw) } catch (e) {}
+            merged.data = Object.assign({}, merged.data || {}, out)
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify(merged)) } catch (e) {}
+          } catch (e) {}
+        }, 1500)
+      } catch (e) {}
+    }
+
+    // Run bootstrap asynchronously on mount; it's safe to fire-and-forget
+    try { doBootstrap() } catch (e) {}
+
+    return () => { mounted = false }
+  }, [])
+
   useEffect(() => {
     function reload(e?: Event) {
       try {

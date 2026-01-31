@@ -47,7 +47,8 @@ export async function GET(req: NextRequest) {
     fetchEndpoint('timetable', '/api/timetable?date=' + formatDate(new Date())),
     fetchEndpoint('notices', '/api/portal/notices'),
     fetchEndpoint('awards', '/api/portal/awards'),
-    fetchEndpoint('calendar', '/api/calendar?endpoint=days&from=' + formatDate(new Date()) + '&to=' + formatDate(addDays(new Date(), 365))),
+    // reduce calendar window to 90 days to limit payload size
+    fetchEndpoint('calendar', '/api/calendar?endpoint=days&from=' + formatDate(new Date()) + '&to=' + formatDate(addDays(new Date(), 90))),
   ])
 
   return NextResponse.json(
