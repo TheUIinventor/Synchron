@@ -109,46 +109,40 @@ export default function NoticesClient() {
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 px-2">
           <h1 className="text-3xl font-semibold hidden md:block">Notices</h1>
           
-                  {/* Responsive split layout: left = 1/4 filters (desktop), right = 3/4 notices */}
-                  <div className="w-full flex flex-col md:flex-row gap-6">
-                    {/* Left: vertical year filters (desktop) */}
-                    <div className="hidden md:flex md:w-1/4 flex-col items-start gap-3 pr-4">
-                      {fixedYears.map((year) => (
-                        <Button
-                          key={year}
-                          variant={selectedYear === year ? "default" : "outline"}
-                          onClick={() => setSelectedYear(year)}
-                          className={cn(
-                            "w-full text-left rounded-full px-4 py-2 transition-all",
-                            selectedYear === year ? "shadow-md" : "border-outline hover:bg-surface-variant"
-                          )}
-                        >
-                          {year}
-                        </Button>
-                      ))}
-                    </div>
+          {/* Mobile Filter */}
+          <div className="w-full md:hidden">
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-full rounded-full bg-surface-container-high border-none h-12 px-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 opacity-50" />
+                  <SelectValue placeholder="Filter by Year" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {fixedYears.map((y) => (
+                  <SelectItem key={y} value={y}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-                    {/* Right: Notices content */}
-                    <div className="w-full md:w-3/4">
-                      {/* Mobile Filter (kept on top for small screens) */}
-                      <div className="w-full md:hidden mb-4">
-                        <Select value={selectedYear} onValueChange={setSelectedYear}>
-                          <SelectTrigger className="w-full rounded-full bg-surface-container-high border-none h-12 px-4">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 opacity-50" />
-                              <SelectValue placeholder="Filter by Year" />
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {fixedYears.map((y) => (
-                              <SelectItem key={y} value={y}>{y}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                        </div>
-                      </div>
-            </div>
+          {/* Desktop Filter */}
+          <div className="hidden md:flex gap-2 overflow-x-auto pb-2 max-w-full no-scrollbar">
+            {fixedYears.map((year) => (
+              <Button
+                key={year}
+                variant={selectedYear === year ? "default" : "outline"}
+                onClick={() => setSelectedYear(year)}
+                className={cn(
+                  "rounded-full px-6 transition-all",
+                  selectedYear === year ? "shadow-md" : "border-outline hover:bg-surface-variant"
+                )}
+              >
+                {year}
+              </Button>
+            ))}
+          </div>
+        </div>
 
         {/* Content */}
         {loading ? (
@@ -164,20 +158,20 @@ export default function NoticesClient() {
         ) : filteredNotices.length > 0 ? (
           <div className="space-y-4 px-2 md:px-0">
             {filteredNotices.map((notice, idx) => (
-              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-200 bg-surface-container-low">
-                <CardHeader className="pb-1">
-                  <div className="flex justify-between items-start gap-3">
-                    <CardTitle className="text-lg font-semibold leading-tight">
+              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start gap-4">
+                    <CardTitle className="text-xl font-bold leading-tight">
                       {notice.title || notice.type}
                     </CardTitle>
                     {notice.displayYears && (
-                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20 text-sm">
+                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20">
                         {notice.displayYears}
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="py-2">
+                <CardContent>
                   <div 
                     className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
                     dangerouslySetInnerHTML={{
@@ -190,8 +184,8 @@ export default function NoticesClient() {
                   />
                   
                   {notice.authorName && (
-                    <div className="mt-3 flex items-center gap-3 pt-3 border-t border-outline-variant/50">
-                      <div className="h-7 w-7 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
+                    <div className="mt-4 flex items-center gap-3 pt-4 border-t border-outline-variant/50">
+                      <div className="h-8 w-8 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
                         {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
                       </div>
                       <span className="text-sm font-medium opacity-80">{notice.authorName}</span>
