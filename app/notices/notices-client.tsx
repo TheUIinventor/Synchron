@@ -92,7 +92,11 @@ export default function NoticesClient() {
         if (!n.displayYears) return false;
         const tags = expandYearTags(n.displayYears);
         if (tags.includes(selectedYear)) return true;
-        if (tags.some((t: string) => t.toLowerCase() === 'all students and staff')) return true;
+        // Treat 'All' or 'All Students and Staff' as visible to everyone
+        if (tags.some((t: string) => ['all', 'all students and staff', 'all students & staff'].includes(t.toLowerCase()))) return true;
+        // Treat 'All Students' as visible to student years (Year 7-12) but not Staff
+        const hasAllStudentsTag = tags.some((t: string) => t.toLowerCase() === 'all students');
+        if (hasAllStudentsTag && selectedYear.startsWith('Year ')) return true;
         if (tags.includes('Staff') && selectedYear === 'Staff') return true;
         return false;
       });
