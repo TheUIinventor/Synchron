@@ -26,6 +26,18 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
   // This is critical after OAuth redirects back to home page
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    try {
+      if (typeof window !== 'undefined') {
+        const devLogs = (() => {
+          try { return localStorage.getItem('synchron:dev-logs') === 'true' } catch (e) { return false }
+        })();
+        if (!devLogs) {
+          console.log = () => {}
+          console.debug = () => {}
+          console.info = () => {}
+        }
+      }
+    } catch (e) {}
     console.log('[ClientLayout] Mounted, fetching auth status');
     (async () => {
       await initAuthBlocking();
