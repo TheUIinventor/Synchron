@@ -231,7 +231,7 @@ export default function HomeClient() {
             const toStr = to.toISOString().slice(0,10)
             const c = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(from)}&to=${encodeURIComponent(toStr)}`, { credentials: 'include' })
             const out: any = { timetable: null, calendar: null }
-            try { if (t.ok) { out.timetable = await t.json(); try { localStorage.setItem('synchron-last-timetable', JSON.stringify(out.timetable)) } catch (e) {} } } catch (e) {}
+            try { if (t.ok) { out.timetable = await t.json(); try { localStorage.setItem('synchron-last-timetable', JSON.stringify(out.timetable)); try { window.dispatchEvent(new CustomEvent('synchron:last-timetable-updated', { detail: { ts: Date.now() } })) } catch (e) {} } catch (e) {} } } catch (e) {}
             try { if (c.ok) out.calendar = await c.json() } catch (e) {}
             // merge into cache with previous medium results
             const prevRaw = localStorage.getItem(CACHE_KEY)

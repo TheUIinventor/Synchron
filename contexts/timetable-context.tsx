@@ -733,6 +733,77 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     }
   } catch (e) {}
 
+  // Listen for updates to the persisted `synchron-last-timetable` so the
+  // provider can immediately apply colours and latest cached timetable
+  // when another part of the app (e.g. client bootstrap) writes it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const applyCached = () => {
+      try {
+        const raw = localStorage.getItem('synchron-last-timetable')
+        if (!raw) return
+        let parsed: any = null
+        try { parsed = JSON.parse(raw) } catch (e) { return }
+        const maybeMap = __extractMapFromCache(parsed.timetable || parsed) || __extractMapFromCache(parsed)
+        if (!maybeMap) return
+        // Merge colours if subjects present
+        const cachedSubjects = parsed?.subjects || parsed?.timetable?.subjects || parsed?.upstream?.subjects || null
+        if (cachedSubjects) {
+          try {
+            const shortToColour: Record<string, string> = {}
+            for (const k of Object.keys(cachedSubjects)) {
+              try {
+                const v = cachedSubjects[k]
+                const short = (v && (v.shortTitle || v.short_title || v.subject || v.short)) ? (v.shortTitle || v.short_title || v.subject || v.short) : null
+                const colour = (v && (v.colour || v.color)) ? (v.colour || v.color) : null
+                if (short && colour) shortToColour[String(short).trim()] = String(colour)
+              } catch (e) {}
+            }
+            if (Object.keys(shortToColour).length > 0) {
+              const withColours: Record<string, Period[]> = {}
+              // Prefer current externalTimetable when present; only add missing colours
+              const base = externalTimetable || maybeMap
+              for (const day of Object.keys(base)) {
+                withColours[day] = (base[day] || []).map((p) => {
+                  if (!p.colour && p.subject && shortToColour[String(p.subject).trim()]) {
+                    return { ...p, colour: shortToColour[String(p.subject).trim()] }
+                  }
+                  return p
+                })
+              }
+              setExternalTimetable(withColours)
+            } else {
+              // No colours to apply; still ensure timetable is set if missing
+              if (!externalTimetable) setExternalTimetable(maybeMap)
+            }
+            if (!externalSubjects) setExternalSubjects(cachedSubjects)
+            setTimetableSource('cache')
+            setLastRecordedTimetable(externalTimetable || maybeMap)
+          } catch (e) {
+            // ignore
+          }
+        } else {
+          // No subjects; ensure timetable present
+          if (!externalTimetable) {
+            setExternalTimetable(maybeMap)
+            setTimetableSource('cache')
+            setLastRecordedTimetable(maybeMap)
+          }
+        }
+      } catch (e) {}
+    }
+
+    const onCustom = (ev: Event) => { try { applyCached() } catch (e) {} }
+    const onStorage = (ev: StorageEvent) => {
+      try {
+        if (ev.key === 'synchron-last-timetable') applyCached()
+      } catch (e) {}
+    }
+    window.addEventListener('synchron:last-timetable-updated', onCustom)
+    window.addEventListener('storage', onStorage)
+    return () => { try { window.removeEventListener('synchron:last-timetable-updated', onCustom); window.removeEventListener('storage', onStorage) } catch (e) {} }
+  }, [externalTimetable, externalSubjects])
+
   // If we have locally cached substitutions and no fresh substitution run
   // has occurred yet, we will use them as a best-effort while the live
   // refresh completes in the background.
