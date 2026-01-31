@@ -158,30 +158,33 @@ export default function NoticesClient() {
         ) : filteredNotices.length > 0 ? (
           <div className="space-y-2 px-2 md:px-0">
             {filteredNotices.map((notice, idx) => (
-              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low p-2">
-                <CardHeader className="pb-0">
-                  <div className="flex justify-between items-center gap-3">
-                    <CardTitle className="text-base font-semibold leading-tight">
-                      {notice.title || notice.type}
-                    </CardTitle>
-                    {notice.displayYears && (
-                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20 text-xs px-2 py-0.5 rounded-full">
-                        {notice.displayYears}
-                      </Badge>
-                    )}
+              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low p-1">
+                <CardHeader className="py-1 px-2">
+                  <div className="flex items-start gap-3 w-full">
+                    <div className="flex-1">
+                      <CardTitle className="text-sm font-semibold leading-tight">
+                        {notice.title || notice.type}
+                      </CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {notice.displayYears && (
+                        <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20 text-[11px] px-2 py-0.5 rounded-full">
+                          {notice.displayYears}
+                        </Badge>
+                      )}
+                      {notice.authorName && (
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-5 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
+                            {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
+                          </div>
+                          <span className="text-sm opacity-80 whitespace-nowrap">{notice.authorName}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent className="py-1">
+                <CardContent className="py-0 px-2">
                   <NoticeCard notice={notice} idx={idx} />
-
-                  {notice.authorName && (
-                    <div className="mt-2 flex items-center gap-1 pt-2 border-t border-outline-variant/50">
-                      <div className="h-5 w-5 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
-                        {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
-                      </div>
-                      <span className="text-sm font-medium opacity-80">{notice.authorName}</span>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             ))}
