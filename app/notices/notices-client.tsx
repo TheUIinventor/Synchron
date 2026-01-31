@@ -1,12 +1,4 @@
 "use client";
-import { useEffect, useState } from "react";
-import InstallAppButton from "@/components/install-app-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, Filter, Utensils } from "lucide-react";
-"use client";
 import { useEffect, useMemo, useState } from "react";
 import InstallAppButton from "@/components/install-app-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
