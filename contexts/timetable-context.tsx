@@ -1461,7 +1461,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
             const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
             const hasMatchingClass = matching.length > 0
-            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
+            if (typeof window !== 'undefined' && window.localStorage && localStorage.getItem('synchron:dev-logs') === 'true') {
+              try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
+            }
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
             // Only insert break rows for entries that look like actual breaks (Recess, Lunch, etc.)
@@ -1581,7 +1583,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
             const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
             const hasMatchingClass = matching.length > 0
-            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
+            if (typeof window !== 'undefined' && window.localStorage && localStorage.getItem('synchron:dev-logs') === 'true') {
+              try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
+            }
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
             // Only insert break rows for entries that look like actual breaks (Recess, Lunch, etc.)
@@ -1659,7 +1663,9 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             const classStarts = dayPeriods.map((p) => ({ p, s: parseStartMinutesForDay(dayPeriods, p.time) }))
             const matching = classStarts.filter((c) => Math.abs(c.s - bellStart) <= 1)
             const hasMatchingClass = matching.length > 0
-            try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
+            if (typeof window !== 'undefined' && window.localStorage && localStorage.getItem('synchron:dev-logs') === 'true') {
+              try { console.log('[timetable.provider] bell-check', { day: day, bell: b.period || b, bellTime: b.time, bellStart, hasMatchingClass, matchingStarts: matching.map(m => ({ period: m.p.period, time: m.p.time, start: m.s })) }) } catch (e) {}
+            }
             if (hasMatchingClass) continue
             const label = b.period || 'Break'
             // Only insert break rows for entries that look like actual breaks (Recess, Lunch, etc.)
