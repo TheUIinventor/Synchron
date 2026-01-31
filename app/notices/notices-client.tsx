@@ -103,10 +103,10 @@ export default function NoticesClient() {
 
   return (
     <main className="notices-main min-h-screen flex flex-col items-center w-full pb-24">
-      <div className="w-full max-w-3xl space-y-6">
+      <div className="w-full max-w-6xl space-y-2">
         
         {/* Header & Filters */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 px-2">
+        <div className="flex flex-col md:flex-row gap-3 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-3 px-2">
           <h1 className="text-3xl font-semibold hidden md:block">Notices</h1>
           
           {/* Mobile Filter */}
@@ -127,7 +127,7 @@ export default function NoticesClient() {
           </div>
 
           {/* Desktop Filter */}
-          <div className="hidden md:flex gap-2 overflow-x-auto pb-2 max-w-full no-scrollbar">
+          <div className="hidden md:flex gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar">
             {fixedYears.map((year) => (
               <Button
                 key={year}
@@ -156,27 +156,27 @@ export default function NoticesClient() {
             <p>Error: {error}</p>
           </div>
         ) : filteredNotices.length > 0 ? (
-          <div className="space-y-4 px-2 md:px-0">
+          <div className="space-y-2 px-2 md:px-0">
             {filteredNotices.map((notice, idx) => (
-              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low p-3">
-                <CardHeader className="pb-1">
-                  <div className="flex justify-between items-start gap-3">
-                    <CardTitle className="text-lg font-semibold leading-tight">
+              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low p-2">
+                <CardHeader className="pb-0">
+                  <div className="flex justify-between items-center gap-3">
+                    <CardTitle className="text-base font-semibold leading-tight">
                       {notice.title || notice.type}
                     </CardTitle>
                     {notice.displayYears && (
-                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20 text-xs px-2 py-1 rounded-full">
+                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20 text-xs px-2 py-0.5 rounded-full">
                         {notice.displayYears}
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="py-2">
+                <CardContent className="py-1">
                   <NoticeCard notice={notice} idx={idx} />
 
                   {notice.authorName && (
-                    <div className="mt-3 flex items-center gap-2 pt-3 border-t border-outline-variant/50">
-                      <div className="h-6 w-6 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
+                    <div className="mt-2 flex items-center gap-1 pt-2 border-t border-outline-variant/50">
+                      <div className="h-5 w-5 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
                         {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
                       </div>
                       <span className="text-sm font-medium opacity-80">{notice.authorName}</span>
