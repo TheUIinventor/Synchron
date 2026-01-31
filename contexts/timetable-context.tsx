@@ -8,78 +8,71 @@ import { PortalScraper } from "@/lib/api/portal-scraper"
 import { getTimeUntilNextPeriod, isSchoolDayOver, getNextSchoolDay, getCurrentDay, findFirstNonBreakPeriodOnDate, formatDurationShort } from "@/utils/time-utils"
 import { stripLeadingCasualCode } from "@/lib/utils"
 
-      try {
-        // Backoff for the home-timetable probe when it recently failed with auth errors
-        const HOME_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
-        if (lastHomeProbeFailRef.current && (Date.now() - lastHomeProbeFailRef.current) < HOME_COOLDOWN_MS) {
-          // skip home probe due to recent failure
-        } else {
-          const ht = await fetch('/api/portal/home-timetable', { credentials: 'include' })
-          const htctype = ht.headers.get('content-type') || ''
-          try { if (!ht.ok && (ht.status === 401 || ht.status === 403)) lastHomeProbeFailRef.current = Date.now() } catch (e) {}
-          if (ht.ok && htctype.includes('application/json')) {
-            const jht = await ht.json()
-            // Only extract bell times if we don't already have any - the authoritative
-            // data comes from /api/timetable which may have date-specific variations
-            if (jht && !externalBellTimes && !lastSeenBellTimesRef.current) {
-              try {
-                const computed = buildBellTimesFromPayload(jht)
-                const finalBellTimes: Record<string, any[]> = { 'Mon/Tues': [], 'Wed/Thurs': [], 'Fri': [] }
-                const src = jht.bellTimes || {}
-                for (const k of ['Mon/Tues', 'Wed/Thurs', 'Fri']) {
-                  if (src[k] && Array.isArray(src[k]) && src[k].length) finalBellTimes[k] = src[k]
-                  else if (computed[k] && Array.isArray(computed[k]) && computed[k].length) finalBellTimes[k] = computed[k]
-                  else finalBellTimes[k] = []
-                }
-                const hasAny = Object.values(finalBellTimes).some((arr) => Array.isArray(arr) && arr.length > 0)
-                if (hasAny) {
-                  setExternalBellTimes(finalBellTimes)
-                  lastSeenBellTimesRef.current = finalBellTimes
-                  lastSeenBellTsRef.current = Date.now()
-                }
-              } catch (e) {
-                // ignore extraction errors
-              }
-            }
+// Define the period type
+export type Period = {
+  id?: number
+  period: string
+  time: string
+  subject: string
+  title?: string // Full subject title (e.g., "8 Mathematics A" vs shortTitle "MAT A")
+  teacher: string
+  room: string
+  year?: string // Year level (e.g., "9", "10", "11" - higher year takes precedence for accelerant classes)
+  weekType?: "A" | "B"
+  isSubstitute?: boolean // New: Indicates a substitute teacher
+  isRoomChange?: boolean // New: Indicates a room change
+  // Optional fields populated during normalization
+  fullTeacher?: string
+  casualSurname?: string
+  displayTeacher?: string
+  displayRoom?: string // Room destination if room change
+  originalRoom?: string // Original room before change
+  // Subject colour (hex without # prefix, e.g., "448ae6")
+  colour?: string
+}
 
-            // If the homepage scraper or API augmentation marked today as a holiday,
-            // respect that and immediately show an empty timetable (do not proceed
-            // to fetch /api/timetable which may be blocked by auth or return HTML).
-            try {
-              const isHolidaySignal = Boolean(
-                jht?.holiday === true || jht?.isHoliday === true || jht?.noTimetable === true || (jht && jht.timetable && Object.keys(jht.timetable).length === 0)
-              )
-              if (isHolidaySignal) {
-                // Clear caches to avoid stale cached timetables rehydrating
-                try {
-                  if (typeof window !== 'undefined' && window.localStorage) {
-                    try { localStorage.removeItem('synchron-last-timetable') } catch (e) {}
-                    try { clearClientCaches() } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-subs') } catch (e) {}
-                    try { localStorage.removeItem('synchron-last-belltimes') } catch (e) {}
-                    try { localStorage.removeItem('synchron-authoritative-variations') } catch (e) {}
-                    try { localStorage.removeItem('synchron-break-layouts') } catch (e) {}
-                  }
-                } catch (e) {}
+// Define the bell time type
+export type BellTime = {
+  period: string
+  time: string
+}
 
-                // Set empty timetable and mark source so UI shows 'No periods'
-                setExternalTimetable(emptyByDay)
-                setExternalTimetableByWeek(null)
-                setTimetableSource('portal-home-empty')
-                setExternalWeekType(null)
-                try { setLastFetchedDate((new Date()).toISOString().slice(0,10)); setLastFetchedPayloadSummary({ holiday: true }) } catch (e) {}
-                setIsRefreshing(false)
-                if (!hadCache) setIsLoading(false)
-                return
-              }
-            } catch (e) {
-              // ignore holiday-check errors and continue
-            }
-          }
-        }
-      } catch (e) {
-        // ignore and continue to next strategies
-      }
+// Define the timetable context type
+type TimetableContextType = {
+  currentWeek: "A" | "B" | null
+  selectedDay: string // Day for the main timetable display (e.g., "Monday")
+  selectedDateObject: Date // The actual Date object for the selectedDay
+  setSelectedDay: (day: string) => void
+  setSelectedDateObject: (d: Date) => void
+  timetableData: Record<string, Period[]>
+  currentMomentPeriodInfo: {
+    // Renamed from nextPeriodInfo to be clearer
+    nextPeriod: Period | null
+    timeUntil: string
+    isCurrentlyInClass: boolean
+    currentPeriod: Period | null
+  }
+  // Backwards-compatible alias name used across older components
+  nextPeriodInfo?: {
+    nextPeriod: Period | null
+    timeUntil: string
+    isCurrentlyInClass: boolean
+    currentPeriod: Period | null
+  }
+  isShowingCachedWhileLoading?: boolean
+  bellTimes: Record<string, BellTime[]>
+  isShowingNextDay: boolean // Indicates if the main timetable is showing next day
+  timetableSource?: string | null // indicates where timetable data came from (e.g. 'fallback-sample' or external url)
+  isLoading: boolean
+  isRefreshing?: boolean
+  error: string | null
+  // Trigger an in-place retry (handshake + fetch) to attempt to load live timetable again
+  refreshExternal?: () => Promise<void>
+  // Full A/B grouped timetable when available from the server
+  timetableByWeek?: Record<string, { A: Period[]; B: Period[]; unknown: Period[] }>
+  externalWeekType?: "A" | "B" | null // authoritative week type reported by the server
+  // Authentication state for showing re-auth prompts
+  isAuthenticated?: boolean | null
   reauthRequired?: boolean
 }
 
@@ -690,11 +683,6 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const cachedBreakLayoutsRef = useRef<Record<string, Period[]> | null>(__initialBreakLayouts)
   const lastRefreshTsRef = useRef<number | null>(null)
   const holidayDateRef = useRef<boolean>(false)
-  // Track recent failures for certain probe endpoints (e.g., calendar/home-timetable)
-  // so we can avoid retrying them too frequently when the server returns 401/403
-  // and similar errors during startup (which caused network/CPU spikes).
-  const lastCalendarFailRef = useRef<number | null>(null)
-  const lastHomeProbeFailRef = useRef<number | null>(null)
 
   // Background refresh tuning - values depend on user preference.
   // Aggressive mode polls frequently (useful for demo/dev), while
@@ -3717,52 +3705,42 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         // Check calendar for selected date — if it's a holiday, clear caches and show empty timetable
         try {
           try {
-            // If the calendar endpoint recently failed with an auth error,
-            // avoid retrying it for a short cooldown to prevent tight retry
-            // loops that spike network/CPU (common when upstream returns 401).
-            const CALENDAR_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
-            if (lastCalendarFailRef.current && (Date.now() - lastCalendarFailRef.current) < CALENDAR_COOLDOWN_MS) {
-              // skip calendar check due to recent failure
-            } else {
-              const calResSel = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
-              const cctypeSel = calResSel.headers.get('content-type') || ''
-              // Record auth failures so we can back off
-              try { if (!calResSel.ok && (calResSel.status === 401 || calResSel.status === 403)) lastCalendarFailRef.current = Date.now() } catch (e) {}
-              if (calResSel.ok && cctypeSel.includes('application/json')) {
-                const calJsonSel = await calResSel.json()
-                let dayInfoSel: any = null
-                if (Array.isArray(calJsonSel) && calJsonSel.length) dayInfoSel = calJsonSel[0]
-                else if (calJsonSel && typeof calJsonSel === 'object' && calJsonSel[ds]) dayInfoSel = calJsonSel[ds]
-                else if (calJsonSel && typeof calJsonSel === 'object') {
-                  for (const k of Object.keys(calJsonSel)) {
-                    const v = calJsonSel[k]
-                    if (v && (v.date === ds || String(k) === ds)) { dayInfoSel = v; break }
-                  }
+            const calResSel = await fetch(`/api/calendar?endpoint=days&from=${encodeURIComponent(ds)}&to=${encodeURIComponent(ds)}`, { credentials: 'include' })
+            const cctypeSel = calResSel.headers.get('content-type') || ''
+            if (calResSel.ok && cctypeSel.includes('application/json')) {
+              const calJsonSel = await calResSel.json()
+              let dayInfoSel: any = null
+              if (Array.isArray(calJsonSel) && calJsonSel.length) dayInfoSel = calJsonSel[0]
+              else if (calJsonSel && typeof calJsonSel === 'object' && calJsonSel[ds]) dayInfoSel = calJsonSel[ds]
+              else if (calJsonSel && typeof calJsonSel === 'object') {
+                for (const k of Object.keys(calJsonSel)) {
+                  const v = calJsonSel[k]
+                  if (v && (v.date === ds || String(k) === ds)) { dayInfoSel = v; break }
                 }
-                const isHolidaySel = Boolean(
-                  dayInfoSel && (
-                    dayInfoSel.isHoliday === true ||
-                    dayInfoSel.holiday === true ||
-                    String(dayInfoSel.is_school_day).toLowerCase() === 'false' ||
-                    String(dayInfoSel.status).toLowerCase().includes('holiday') ||
-                    String(dayInfoSel.type || '').toLowerCase().includes('holiday') ||
-                    String(dayInfoSel.dayType || '').toLowerCase().includes('holiday')
-                  )
+              }
+              const isHolidaySel = Boolean(
+                dayInfoSel && (
+                  dayInfoSel.isHoliday === true ||
+                  dayInfoSel.holiday === true ||
+                  String(dayInfoSel.is_school_day).toLowerCase() === 'false' ||
+                  String(dayInfoSel.status).toLowerCase().includes('holiday') ||
+                  String(dayInfoSel.type || '').toLowerCase().includes('holiday') ||
+                  String(dayInfoSel.dayType || '').toLowerCase().includes('holiday')
                 )
-                if (isHolidaySel) {
-                  holidayDateRef.current = true
-                  try {
-                    if (typeof window !== 'undefined' && window.localStorage) {
-                      try { clearClientCaches() } catch (e) {}
-                    }
-                  } catch (e) {}
-                  setExternalTimetable(emptyByDay)
-                  setExternalTimetableByWeek(null)
-                  setTimetableSource('calendar-holiday')
-                  setExternalWeekType(null)
-                  try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
-                  return
-                }
+              )
+              if (isHolidaySel) {
+                holidayDateRef.current = true
+                try {
+                  if (typeof window !== 'undefined' && window.localStorage) {
+                    try { clearClientCaches() } catch (e) {}
+                  }
+                } catch (e) {}
+                setExternalTimetable(emptyByDay)
+                setExternalTimetableByWeek(null)
+                setTimetableSource('calendar-holiday')
+                setExternalWeekType(null)
+                try { setLastFetchedDate(ds); setLastFetchedPayloadSummary({ holiday: true, source: 'calendar' }) } catch (e) {}
+                return
               }
             }
           } catch (e) {

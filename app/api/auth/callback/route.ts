@@ -54,19 +54,11 @@ export async function GET(req: NextRequest) {
     homeUrl.searchParams.set('auth_success', 'true')
     const res = NextResponse.redirect(homeUrl.toString())
     
-    // Trigger bootstrap endpoint immediately in background to pre-fetch data
-    // This ensures userinfo, timetable, notices, awards, etc. are available when user lands on home page
-    try {
-      const bootstrapUrl = new URL('/api/bootstrap', req.nextUrl.origin)
-      // Fire and forget - don't wait for bootstrap to complete
-      fetch(bootstrapUrl.toString(), {
-        headers: {
-          'Cookie': `sbhs_access_token=${access}`,
-        },
-      }).catch(err => console.error('[auth/callback] Bootstrap fetch failed:', err))
-    } catch (err) {
-      console.error('[auth/callback] Error triggering bootstrap:', err)
-    }
+    // Previously we triggered `/api/bootstrap` here server-side which
+    // caused a burst of parallel server fetches immediately after login.
+    // To reduce server CPU and network contention on startup, the client
+    // will now initiate bootstrap/fetch operations after hydration.
+    // Leaving this out avoids duplicate server-side work.
     res.cookies.set('sbhs_access_token', access, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== 'development',
