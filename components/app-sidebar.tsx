@@ -30,10 +30,16 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              onPointerUp={(e) => {
+              onPointerUp={() => {
                 try {
-                  e.preventDefault();
-                  router.push(item.href);
+                  router.push(item.href).catch(() => { window.location.assign(item.href) })
+                } catch (err) {
+                  try { window.location.assign(item.href) } catch (e) {}
+                }
+              }}
+              onClick={() => {
+                try {
+                  router.push(item.href).catch(() => { window.location.assign(item.href) })
                 } catch (err) {
                   try { window.location.assign(item.href) } catch (e) {}
                 }
