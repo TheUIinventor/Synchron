@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import InstallAppButton from "@/components/install-app-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,43 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle, Filter, Utensils } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const FIXED_YEARS = [
-  "All",
-  "Year 7",
-  "Year 8",
-  "Year 9",
-  "Year 10",
-  "Year 11",
-  "Year 12",
-  "Staff",
-];
-
-function expandYearTags(displayYears: string) {
-  if (!displayYears || typeof displayYears !== 'string') return [];
-  const tags = displayYears.split(',').map((y: string) => y.trim()).filter(Boolean);
-  const expanded: string[] = [];
-  for (const tag of tags) {
-    const rangeMatch = tag.match(/^Years? (\d+)-(\d+)$/i);
-    if (rangeMatch) {
-      const start = parseInt(rangeMatch[1], 10);
-      const end = parseInt(rangeMatch[2], 10);
-      for (let y = start; y <= end; y++) expanded.push(`Year ${y}`);
-      continue;
-    }
-    const singleMatch = tag.match(/^Year (\d+)$/i);
-    if (singleMatch) {
-      expanded.push(`Year ${singleMatch[1]}`);
-      continue;
-    }
-    expanded.push(tag);
-  }
-  return expanded;
-}
-
-function normalizeTag(t: string) {
-  return String(t || '').trim().toLowerCase();
-}
-
 export default function NoticesClient() {
   const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,149 +15,197 @@ export default function NoticesClient() {
   const [selectedYear, setSelectedYear] = useState<string>("All");
 
   useEffect(() => {
-    let mounted = true;
     async function fetchNotices() {
       setLoading(true);
       setError(null);
       try {
-        let data: any = null;
-        if (typeof window !== 'undefined') {
-          const cached = sessionStorage.getItem('notices-data');
-          if (cached) data = JSON.parse(cached);
+        let data = null;
+        if (typeof window !== "undefined") {
+          const cached = sessionStorage.getItem("notices-data");
+          if (cached) {
+            data = JSON.parse(cached);
+          }
         }
         if (!data) {
-          const res = await fetch('/api/notices');
-          if (!res.ok) throw new Error('Failed to fetch notices');
-          data = await res.json();
+          const response = await fetch("/api/notices");
+          if (!response.ok) throw new Error("Failed to fetch notices");
+          data = await response.json();
         }
-        const list = Array.isArray(data) ? data : (Array.isArray(data.notices) ? data.notices : (Array.isArray(data.news) ? data.news : []));
-        if (mounted) setNotices(list);
+        if (Array.isArray(data)) {
+          setNotices(data);
+        } else if (Array.isArray(data.notices)) {
+          setNotices(data.notices);
+        } else if (Array.isArray(data.news)) {
+          setNotices(data.news);
+        } else {
+          setNotices([]);
+        }
       } catch (err) {
-        if (mounted) setError(err instanceof Error ? err.message : 'Unknown error');
+        setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
     }
     fetchNotices();
-    return () => { mounted = false };
   }, []);
 
-  // Compute filtered list efficiently
-  const filteredNotices = useMemo(() => {
-    if (selectedYear === 'All') return notices;
-    return notices.filter(n => {
-      if (!n || !n.displayYears) return false;
-      const tags = expandYearTags(n.displayYears);
-      if (tags.includes(selectedYear)) return true;
-      const lowerTags = tags.map(normalizeTag);
-      // 'All' or 'All Students and Staff' -> visible to everyone
-      if (lowerTags.some(t => ['all', 'all students and staff', 'all students & staff'].includes(t))) return true;
-      // 'All Students' -> visible to student years (Year 7-12)
-      if (lowerTags.includes('all students') && selectedYear.startsWith('Year ')) return true;
-      // Staff tag
-      if (tags.includes('Staff') && selectedYear === 'Staff') return true;
-      return false;
+  const fixedYears = [
+    "All",
+    "Year 7",
+    "Year 8",
+    "Year 9",
+    "Year 10",
+    "Year 11",
+    "Year 12",
+    "Staff"
+  ];
+
+  function expandYearTags(displayYears: string) {
+    const tags = displayYears.split(',').map((y: string) => y.trim());
+    let expanded: string[] = [];
+    tags.forEach(tag => {
+      // Match 'Years 8-11' or 'Year 8-11'
+      const rangeMatch = tag.match(/^Years? (\d+)-(\d+)$/i);
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1], 10);
+        const end = parseInt(rangeMatch[2], 10);
+        for (let y = start; y <= end; y++) {
+          expanded.push(`Year ${y}`);
+        }
+        return;
+      }
+      // Match 'Year 8'
+      const singleMatch = tag.match(/^Year (\d+)$/i);
+      if (singleMatch) {
+        expanded.push(`Year ${singleMatch[1]}`);
+        return;
+      }
+      // Pass through Staff, All Students and Staff, etc.
+      expanded.push(tag);
     });
-  }, [notices, selectedYear]);
+    return expanded;
+  }
+
+  const filteredNotices = selectedYear === "All"
+    ? notices
+    : notices.filter(n => {
+        if (!n.displayYears) return false;
+        const tags = expandYearTags(n.displayYears);
+        if (tags.includes(selectedYear)) return true;
+        // Treat 'All' or 'All Students and Staff' as visible to everyone
+        if (tags.some((t: string) => ['all', 'all students and staff', 'all students & staff'].includes(t.toLowerCase()))) return true;
+        // Treat 'All Students' as visible to student years (Year 7-12) but not Staff
+        const hasAllStudentsTag = tags.some((t: string) => t.toLowerCase() === 'all students');
+        if (hasAllStudentsTag && selectedYear.startsWith('Year ')) return true;
+        if (tags.includes('Staff') && selectedYear === 'Staff') return true;
+        return false;
+      });
 
   return (
-    <main className="notices-main w-full pb-24">
-      <div className="mx-auto max-w-3xl px-4">
-        {/* Sticky header like timetable: title + filters */}
-        <div className="sticky top-0 z-20 bg-background/90 backdrop-blur-md py-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-2xl md:text-3xl font-semibold">Notices</h2>
+    <main className="notices-main min-h-screen flex flex-col items-center w-full pb-24">
+      <div className="w-full max-w-3xl space-y-6">
+        
+        {/* Header & Filters */}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 px-2">
+          <h1 className="text-3xl font-semibold hidden md:block">Notices</h1>
+          
+          {/* Mobile Filter */}
+          <div className="w-full md:hidden">
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-full rounded-full bg-surface-container-high border-none h-12 px-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 opacity-50" />
+                  <SelectValue placeholder="Filter by Year" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {fixedYears.map((y) => (
+                  <SelectItem key={y} value={y}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Desktop chips */}
-            <div className="hidden md:flex gap-2 items-center overflow-x-auto no-scrollbar">
-              {FIXED_YEARS.map(y => (
-                <Button
-                  key={y}
-                  variant={selectedYear === y ? 'default' : 'outline'}
-                  onClick={() => setSelectedYear(y)}
-                  className={cn('rounded-full px-4 py-2 select-none', selectedYear === y ? 'shadow-md' : 'hover:bg-surface-variant')}
-                >
-                  {y}
-                </Button>
-              ))}
-            </div>
-
-            {/* Mobile select */}
-            <div className="md:hidden w-48">
-              <Select value={selectedYear} onValueChange={(v) => setSelectedYear(String(v))}>
-                <SelectTrigger className="w-full rounded-full bg-surface-container-high border-none h-10 px-3">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 opacity-60" />
-                    <SelectValue />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {FIXED_YEARS.map(fy => <SelectItem key={fy} value={fy}>{fy}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Desktop Filter */}
+          <div className="hidden md:flex gap-2 overflow-x-auto pb-2 max-w-full no-scrollbar">
+            {fixedYears.map((year) => (
+              <Button
+                key={year}
+                variant={selectedYear === year ? "default" : "outline"}
+                onClick={() => setSelectedYear(year)}
+                className={cn(
+                  "rounded-full px-6 transition-all",
+                  selectedYear === year ? "shadow-md" : "border-outline hover:bg-surface-variant"
+                )}
+              >
+                {year}
+              </Button>
+            ))}
           </div>
         </div>
 
-        {/* Content area */}
-        <div className="mt-6 space-y-4">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-muted-foreground animate-pulse">Fetching notices...</p>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-destructive">
-              <AlertCircle className="h-10 w-10" />
-              <p>Error: {error}</p>
-            </div>
-          ) : filteredNotices.length > 0 ? (
-            filteredNotices.map((notice, idx) => {
-              const title = notice.title || notice.type || 'Notice';
-              const body = (notice.text || notice.details || notice.content || notice.message || '').replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
-              const dateStr = notice.publishedAt || notice.date || notice.createdAt || '';
-              const author = notice.authorName || notice.author || '';
-              return (
-                <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-200 bg-surface-container-low">
-                  <CardHeader className="py-3 px-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg font-semibold leading-tight">{title}</CardTitle>
-                        <div className="mt-1 text-sm text-muted-foreground flex items-center gap-3">
-                          {author && <span className="font-medium">{author}</span>}
-                          {dateStr && <time className="opacity-80">{new Date(dateStr).toLocaleDateString()}</time>}
-                        </div>
-                      </div>
-                      {notice.displayYears && (
-                        <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary">
-                          {notice.displayYears}
-                        </Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground px-4 pb-4">
-                    <div dangerouslySetInnerHTML={{ __html: body }} />
-                    {notice.link && (
-                      <div className="mt-4">
-                        <a href={notice.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View original</a>
-                      </div>
+        {/* Content */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground animate-pulse">Fetching notices...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-destructive">
+            <AlertCircle className="h-10 w-10" />
+            <p>Error: {error}</p>
+          </div>
+        ) : filteredNotices.length > 0 ? (
+          <div className="space-y-4 px-2 md:px-0">
+            {filteredNotices.map((notice, idx) => (
+              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start gap-4">
+                    <CardTitle className="text-xl font-bold leading-tight">
+                      {notice.title || notice.type}
+                    </CardTitle>
+                    {notice.displayYears && (
+                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20">
+                        {notice.displayYears}
+                      </Badge>
                     )}
-                  </CardContent>
-                </Card>
-              )
-            })
-          ) : (
-            <div className="py-16 text-center">
-              <Utensils className="h-12 w-12 mx-auto mb-4 text-primary/40" />
-              <h3 className="text-xl font-bold text-on-surface mb-2">No notices available</h3>
-              <p className="text-on-surface-variant">Nothing to see here for {selectedYear}</p>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div 
+                    className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
+                    dangerouslySetInnerHTML={{
+                      __html: (() => {
+                        let msg = notice.text || notice.details || notice.content || notice.message || "";
+                        msg = msg.replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim();
+                        return msg;
+                      })()
+                    }}
+                  />
+                  
+                  {notice.authorName && (
+                    <div className="mt-4 flex items-center gap-3 pt-4 border-t border-outline-variant/50">
+                      <div className="h-8 w-8 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
+                        {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
+                      </div>
+                      <span className="text-sm font-medium opacity-80">{notice.authorName}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+            
+            <div className="flex justify-center pt-8 pb-4">
+              <InstallAppButton />
             </div>
-          )}
-
-          <div className="flex justify-center pt-6 pb-12">
-            <InstallAppButton />
           </div>
-        </div>
+        ) : (
+          <div className="py-16 text-center">
+            <Utensils className="h-12 w-12 mx-auto mb-4 text-primary/40" />
+            <h3 className="text-xl font-bold text-on-surface mb-2">No notices available</h3>
+            <p className="text-on-surface-variant">Nothing to see here for {selectedYear}</p>
+          </div>
+        )}
       </div>
     </main>
   );
