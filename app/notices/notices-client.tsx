@@ -158,25 +158,25 @@ export default function NoticesClient() {
         ) : filteredNotices.length > 0 ? (
           <div className="space-y-4 px-2 md:px-0">
             {filteredNotices.map((notice, idx) => (
-              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start gap-4">
-                    <CardTitle className="text-xl font-bold leading-tight">
+              <Card key={idx} className="overflow-hidden border-none shadow-elevation-1 hover:shadow-elevation-2 transition-all duration-300 bg-surface-container-low p-3">
+                <CardHeader className="pb-1">
+                  <div className="flex justify-between items-start gap-3">
+                    <CardTitle className="text-lg font-semibold leading-tight">
                       {notice.title || notice.type}
                     </CardTitle>
                     {notice.displayYears && (
-                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20">
+                      <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary hover:bg-primary/20 text-xs px-2 py-1 rounded-full">
                         {notice.displayYears}
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="py-2">
                   <NoticeCard notice={notice} idx={idx} />
 
                   {notice.authorName && (
-                    <div className="mt-4 flex items-center gap-3 pt-4 border-t border-outline-variant/50">
-                      <div className="h-8 w-8 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
+                    <div className="mt-3 flex items-center gap-2 pt-3 border-t border-outline-variant/50">
+                      <div className="h-6 w-6 rounded-full bg-tertiary/20 text-tertiary-foreground flex items-center justify-center text-xs font-bold">
                         {notice.authorName.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
                       </div>
                       <span className="text-sm font-medium opacity-80">{notice.authorName}</span>
@@ -249,15 +249,15 @@ function NoticeCard({ notice, idx }: { notice: any, idx: number }) {
     <div>
       <div
         ref={ref}
-        className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
+        className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground mb-0"
         style={!expanded ? collapsedStyle : undefined}
         dangerouslySetInnerHTML={{ __html: raw }}
         aria-expanded={expanded}
       />
 
       {overflowing && (
-        <div className="mt-2">
-          <Button variant="link" onClick={() => setExpanded(prev => !prev)}>
+        <div className="mt-1">
+          <Button variant="link" className="px-3 py-1 text-sm" onClick={() => setExpanded(prev => !prev)}>
             {expanded ? 'Show less' : 'Show more'}
           </Button>
         </div>
