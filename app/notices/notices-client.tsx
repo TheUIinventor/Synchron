@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import InstallAppButton from "@/components/install-app-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -238,7 +238,7 @@ function NoticeCard({ notice, idx }: { notice: any, idx: number }) {
 
   const raw = (notice.text || notice.details || notice.content || notice.message || "").replace(/^<p>/i, '').replace(/<\/p>$/i, '').trim()
 
-  const collapsedStyle: React.CSSProperties = {
+  const collapsedStyle: any = {
     display: '-webkit-box',
     WebkitLineClamp: 1 as any,
     WebkitBoxOrient: 'vertical' as any,
