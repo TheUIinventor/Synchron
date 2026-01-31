@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
+
+// Silence noisy console output on server unless explicit env flag is set.
+try {
+  const devFlag = typeof process !== 'undefined' && process.env && process.env.SYNCHRON_DEV_LOGS === 'true'
+  if (!devFlag) {
+    console.log = () => {}
+    console.debug = () => {}
+    console.info = () => {}
+  }
+} catch (e) {}
 // Force dynamic rendering since we use request.url and cookies
 export const dynamic = 'force-dynamic'
 
