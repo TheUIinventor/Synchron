@@ -245,11 +245,12 @@ function NoticeCard({ notice, idx }: { notice: any, idx: number }) {
     display: '-webkit-box',
     WebkitLineClamp: 1 as any,
     WebkitBoxOrient: 'vertical' as any,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    paddingRight: '3.5rem' // leave room for the inline 'Show more' box
   }
 
   return (
-    <div>
+    <div className="relative">
       <div
         ref={ref}
         className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground mb-0"
@@ -258,10 +259,20 @@ function NoticeCard({ notice, idx }: { notice: any, idx: number }) {
         aria-expanded={expanded}
       />
 
-      {overflowing && (
+      {overflowing && !expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="absolute right-2 top-0 inline-flex items-center justify-center border border-outline rounded px-2 py-0.5 text-xs bg-surface/90 hover:bg-surface"
+          aria-label="Show more"
+        >
+          Show more
+        </button>
+      )}
+
+      {overflowing && expanded && (
         <div className="mt-1">
-          <Button variant="link" className="px-3 py-1 text-sm" onClick={() => setExpanded(prev => !prev)}>
-            {expanded ? 'Show less' : 'Show more'}
+          <Button variant="link" className="px-3 py-1 text-sm" onClick={() => setExpanded(false)}>
+            Show less
           </Button>
         </div>
       )}
