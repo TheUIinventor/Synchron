@@ -1,16 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Silence noisy console output on server unless explicit env flag is set.
-// This reduces Vercel log I/O and CPU overhead in production.
-try {
-  const devFlag = typeof process !== 'undefined' && process.env && process.env.SYNCHRON_DEV_LOGS === 'true'
-  if (!devFlag) {
-    console.log = () => {}
-    console.debug = () => {}
-    console.info = () => {}
-  }
-} catch (e) {}
-
 const cacheHeaders = (req: NextRequest) => {
   return { 'Cache-Control': 'private, max-age=0, must-revalidate' }
 }

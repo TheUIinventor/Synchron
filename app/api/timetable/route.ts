@@ -2,17 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-// Silence noisy console output on server/edge unless explicit env flag is set.
-// This avoids heavy log output on Vercel from this frequently-invoked route.
-try {
-  const devFlag = (typeof process !== 'undefined' && process.env && process.env.SYNCHRON_DEV_LOGS === 'true') || (typeof globalThis !== 'undefined' && (globalThis as any).__SYNCHRON_DEV_LOGS === true)
-  if (!devFlag) {
-    console.log = () => {}
-    console.debug = () => {}
-    console.info = () => {}
-  }
-} catch (e) {}
-
 const SHARED_CACHE = 'public, s-maxage=60, stale-while-revalidate=3600'
 const NON_SHARED_CACHE = 'private, max-age=0, must-revalidate'
 const cacheHeaders = (req: any) => {

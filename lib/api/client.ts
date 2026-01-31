@@ -1,15 +1,5 @@
 "use client"
 
-// Client-side debug gating: avoid spamming debug logs unless user enables them.
-try {
-  if (typeof window !== 'undefined') {
-    const dev = (() => { try { return localStorage.getItem('synchron:dev-logs') === 'true' } catch (e) { return false } })()
-    if (!dev) {
-      console.debug = () => {}
-    }
-  }
-} catch (e) {}
-
 // SBHS Student Portal Configuration
 const PORTAL_BASE_URL = "https://student.sbhs.net.au"
 const API_BASE_URL = process.env.NEXT_PUBLIC_SBHS_API_URL || `${PORTAL_BASE_URL}/api`
