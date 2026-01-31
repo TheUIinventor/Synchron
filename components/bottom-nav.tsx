@@ -27,14 +27,13 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              onPointerUp={() => {
-                try { router.push(item.href) } catch (e) {}
-              }}
-              onPointerDown={() => {
-                try { setTimeout(() => { router.push(item.href) }, 20) } catch (e) {}
-              }}
-              onClick={(e) => {
-                try { e.preventDefault(); setTimeout(() => { router.push(item.href) }, 0) } catch (e) {}
+              onPointerUp={(e) => {
+                try {
+                  e.preventDefault();
+                  router.push(item.href);
+                } catch (err) {
+                  try { window.location.assign(item.href) } catch (e) {}
+                }
               }}
               className="relative group flex flex-col items-center justify-center bg-transparent border-none"
               aria-label={item.label}

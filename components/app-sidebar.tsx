@@ -30,14 +30,13 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              onPointerUp={() => {
-                try { router.push(item.href) } catch (e) {}
-              }}
-              onPointerDown={() => {
-                try { setTimeout(() => { router.push(item.href) }, 20) } catch (e) {}
-              }}
-              onClick={(e) => {
-                try { e.preventDefault(); setTimeout(() => { router.push(item.href) }, 0) } catch (e) {}
+              onPointerUp={(e) => {
+                try {
+                  e.preventDefault();
+                  router.push(item.href);
+                } catch (err) {
+                  try { window.location.assign(item.href) } catch (e) {}
+                }
               }}
               className="group flex flex-col items-center gap-1 w-full px-2 bg-transparent border-none cursor-pointer"
               aria-label={item.label}

@@ -39,10 +39,11 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       }
     } catch (e) {}
     console.log('[ClientLayout] Mounted, fetching auth status');
-    (async () => {
-      await initAuthBlocking();
-      console.log('[ClientLayout] Auth fetch complete');
-    })();
+    // Run auth probe in the background so it doesn't interfere with
+    // immediate UI interactions (navigation, clicks, etc.).
+    initAuthBlocking()
+      .then(() => console.log('[ClientLayout] Auth fetch complete'))
+      .catch(() => {});
   }, []);
 
   // If auth completes and indicates the user is logged in, trigger immediate
