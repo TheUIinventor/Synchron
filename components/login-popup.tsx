@@ -15,20 +15,27 @@ export default function LoginPopup() {
     // Log mount once for diagnostics
     console.log('[LoginPopup] Mount')
 
-    let intervalId: number | null = null
+    let timeoutId: number | null = null
     let lastSeen: string | null = null
+    let attempts = 0
+    const MAX_ATTEMPTS = 6
+    let backoffMs = 500
+
+    const clearPolling = () => {
+      if (timeoutId != null) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+    }
 
     const updateAuthStatus = () => {
       try {
         const cachedStatus = sessionStorage.getItem('synchron:user-logged-in')
         // Only act when the cached value is available
-        if (cachedStatus === null) return
+        if (cachedStatus === null) return false
 
         // If we reach here, we have a defined cached value; stop polling
-        if (intervalId !== null) {
-          clearInterval(intervalId)
-          intervalId = null
-        }
+        clearPolling()
 
         if (cachedStatus !== lastSeen) {
           lastSeen = cachedStatus
@@ -41,28 +48,47 @@ export default function LoginPopup() {
             setIsLoggedIn(false)
           }
         }
+        return true
       } catch (err) {
         // ignore
+        return false
       }
     }
 
     // Initial read: if the key is already present, this will set state immediately
-    updateAuthStatus()
+    if (updateAuthStatus()) {
+      // already resolved, nothing else to do
+    } else {
+      // Use event-driven updates first (same-window custom event)
+      const onCustom = () => { updateAuthStatus() }
+      window.addEventListener('synchron:userinfo-ready', onCustom)
 
-    // If the key is not present yet, poll at a reasonable interval (1s) until it appears
-    if (sessionStorage.getItem('synchron:user-logged-in') === null) {
-      intervalId = window.setInterval(updateAuthStatus, 1000)
-    }
+      // Also listen for storage events (cross-tab updates)
+      const onStorage = (e: StorageEvent) => {
+        if (e.key === 'synchron:user-logged-in' || e.key === 'synchron:userinfo-ready') updateAuthStatus()
+      }
+      window.addEventListener('storage', onStorage)
 
-    // Also listen for storage events (cross-tab updates)
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'synchron:user-logged-in') updateAuthStatus()
-    }
-    window.addEventListener('storage', onStorage)
+      // Bounded exponential-backoff fallback polling to catch same-window cases
+      const scheduleNext = () => {
+        if (attempts >= MAX_ATTEMPTS) return
+        attempts += 1
+        timeoutId = window.setTimeout(() => {
+          const done = updateAuthStatus()
+          backoffMs = Math.min(backoffMs * 2, 6000)
+          if (!done) scheduleNext()
+        }, backoffMs)
+      }
+      scheduleNext()
 
-    return () => {
-      if (intervalId !== null) clearInterval(intervalId)
-      window.removeEventListener('storage', onStorage)
+      // Cleanup
+      const cleanup = () => {
+        clearPolling()
+        try { window.removeEventListener('synchron:userinfo-ready', onCustom) } catch (e) {}
+        try { window.removeEventListener('storage', onStorage) } catch (e) {}
+      }
+
+      return cleanup
     }
   }, [])
 

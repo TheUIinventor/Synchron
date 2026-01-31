@@ -3737,8 +3737,17 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     function handleVisibility() {
       try {
-        if (document.visibilityState === 'visible') startWithInterval(VISIBLE_REFRESH_MS)
-        else startWithInterval(HIDDEN_REFRESH_MS)
+        if (document.visibilityState === 'visible') {
+          startWithInterval(VISIBLE_REFRESH_MS)
+        } else {
+          // When hidden, clear the periodic background refresh to avoid
+          // unnecessary network activity and retained timers. Resume only
+          // when the document becomes visible again.
+          if (intervalId != null) {
+            window.clearInterval(intervalId)
+            intervalId = null
+          }
+        }
       } catch (e) {}
     }
 
