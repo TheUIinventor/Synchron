@@ -98,6 +98,21 @@ function toPeriod(item: any, fallbackWeekType: WeekType | null = null) {
 // It forwards browser cookies and bearer token to the portal and returns a
 // normalized per-day timetable object.
 export async function GET(req: NextRequest) {
+  // Server-side quick configuration: mute verbose console output unless explicitly enabled
+  try {
+    const isDev = String(process.env.SYNCHRON_DEV_LOGS || '').toLowerCase() === 'true'
+    if (!isDev) {
+      console.log = () => {}
+      console.debug = () => {}
+      console.info = () => {}
+    }
+  } catch (e) {}
+
+  // Simple per-instance in-memory cache for anonymous requests to reduce upstream load
+  // Keyed by requested URL (date param); TTL is short to avoid stale data.
+  try {
+    ;(globalThis as any).__synchron_timetable_cache = (globalThis as any).__synchron_timetable_cache || new Map()
+  } catch (e) {}
   const url = new URL(req.url)
   const dateParam = url.searchParams.get('date') || undefined
   const accessToken = req.cookies.get('sbhs_access_token')?.value
@@ -146,6 +161,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Serve from cache for anonymous/public requests to lower server CPU
+    const cacheMap: Map<string, any> = (globalThis as any).__synchron_timetable_cache
+    const isAnon = !accessToken && !incomingCookie
+    const cacheKey = `timetable::${dateParam || 'all'}`
+    const CACHE_TTL_MS = 30 * 1000 // 30s for public cache
+    if (isAnon && cacheMap && cacheMap.has(cacheKey)) {
+      const rec = cacheMap.get(cacheKey)
+      if (rec && rec.ts && (Date.now() - rec.ts) < CACHE_TTL_MS) {
+        return NextResponse.json(rec.value, { status: 200, headers: cacheHeaders(req) })
+      }
+    }
     // If the client requested a specific date, prefer that date when
     // resolving ambiguous/unknown weekday labels. This prevents the
     // route from falling back to the server's current day (which can

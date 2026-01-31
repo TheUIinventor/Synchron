@@ -172,7 +172,7 @@ export default function HomeClient() {
   useEffect(() => {
     let mounted = true
     const CACHE_KEY = 'synchron-bootstrap-v1'
-    const CACHE_TTL = 1000 * 60 * 5 // 5 minutes
+    const CACHE_TTL = 30 * 1000 // 30 seconds - keep bootstrap fresh so API colours apply promptly
 
     const loadFromCache = () => {
       try {

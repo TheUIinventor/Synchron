@@ -10,6 +10,15 @@ const cacheHeaders = (req: NextRequest) => {
  * Runs server-side to leverage the fresh access token and avoid CORS issues
  */
 export async function GET(req: NextRequest) {
+  // Mute verbose server logs unless explicitly enabled
+  try {
+    const isDev = String(process.env.SYNCHRON_DEV_LOGS || '').toLowerCase() === 'true'
+    if (!isDev) {
+      console.log = () => {}
+      console.debug = () => {}
+      console.info = () => {}
+    }
+  } catch (e) {}
   const accessToken = req.cookies.get('sbhs_access_token')?.value
   
   if (!accessToken) {

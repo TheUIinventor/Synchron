@@ -27,6 +27,15 @@ const cacheHeaders = (req: any) => {
 const SBHS_API_BASE = 'https://student.sbhs.net.au/api'
 
 export async function GET(request: NextRequest) {
+  // Mute verbose server logs unless explicitly enabled to reduce hosting CPU/log costs
+  try {
+    const isDev = String(process.env.SYNCHRON_DEV_LOGS || '').toLowerCase() === 'true'
+    if (!isDev) {
+      console.log = () => {}
+      console.debug = () => {}
+      console.info = () => {}
+    }
+  } catch (e) {}
   try {
     const { searchParams } = new URL(request.url)
     const endpoint = searchParams.get('endpoint')
