@@ -10,11 +10,21 @@ export default function LoginPopup() {
   const { initiateLogin } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false) // Default to false, not null
+    const [hasCachedTimetable, setHasCachedTimetable] = useState<boolean | null>(null)
   useEffect(() => {
     setMounted(true)
     // Log mount once for diagnostics
     console.log('[LoginPopup] Mount')
 
+    // Detect presence of a cached timetable. If present we prefer the
+    // unobtrusive login prompt banner instead of a fullscreen modal so the
+    // user can continue to view cached data when the portal is down.
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('synchron-last-timetable') : null
+      setHasCachedTimetable(Boolean(raw))
+    } catch (e) {
+      setHasCachedTimetable(false)
+    }
     let intervalId: number | null = null
     let lastSeen: string | null = null
 
@@ -67,7 +77,13 @@ export default function LoginPopup() {
   }, [])
 
   // Don't render until mounted
-  if (!mounted) {
+  // Don't render until mounted or until we know about cached timetable state
+  if (!mounted || hasCachedTimetable === null) return null
+
+  // If we have a cached timetable, prefer the inline login prompt banner
+  // (it is rendered elsewhere) so do not show the fullscreen popup.
+  if (hasCachedTimetable) {
+    console.log('[LoginPopup] Suppressing fullscreen popup because cached timetable exists')
     return null
   }
 
