@@ -492,12 +492,26 @@ export default function HomeClient() {
     if (!p) return null
     // Prefer the provider-computed `displayTeacher` when available which
     // already prefers `casualSurname` over codes and strips leading casual codes.
-    if ((p as any).displayTeacher) return stripLeadingCasualCode((p as any).displayTeacher)
+    if ((p as any).displayTeacher) return safeString(stripLeadingCasualCode((p as any).displayTeacher))
     // Fallbacks
-    if (p.isSubstitute && (p as any).casualSurname) return (p as any).casualSurname
+    if (p.isSubstitute && (p as any).casualSurname) return safeString((p as any).casualSurname)
     const candidate = p.fullTeacher || p.teacher || null
-    if (p.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
-    return candidate
+    if (p.isSubstitute && candidate) return safeString(stripLeadingCasualCode(candidate))
+    return candidate != null ? safeString(candidate) : null
+  }
+
+  const safeString = (v: any) => {
+    try {
+      if (v === null || v === undefined) return ''
+      return String(v)
+    } catch (e) { return '' }
+  }
+
+  const getDisplayRoom = (p: any) => {
+    try {
+      const display = (p as any)?.displayRoom || (p as any)?.toRoom || (p as any)?.roomTo || (p as any)?.["room_to"] || (p as any)?.newRoom || p?.room
+      return safeString(display || '')
+    } catch (e) { return '' }
   }
 
   const isSubstitutePeriod = (p: any) => {
@@ -721,7 +735,7 @@ export default function HomeClient() {
                     <span>•</span>
                     {(() => {
                       // Display room with highlighting for room changes (same logic as timetable list)
-                      const displayRoom = (currentPeriod as any)?.displayRoom || (currentPeriod as any)?.toRoom || (currentPeriod as any)?.roomTo || (currentPeriod as any)?.["room_to"] || (currentPeriod as any)?.newRoom || currentPeriod?.room || "Campus"
+                      const displayRoom = getDisplayRoom(currentPeriod) || 'Campus'
                       return (
                         <span className={currentPeriod?.isRoomChange ? 'inline-block px-3 py-1 rounded-md font-medium bg-blue-600 text-white' : 'text-current'}>
                           {displayRoom}
@@ -975,7 +989,7 @@ export default function HomeClient() {
                                     {/* Room: prefer destination room fields when present; highlight if a room change */}
                                     {(() => {
                                       // NOTE: Do NOT include `.to` - that field is commonly used for end times
-                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                                      const displayRoom = getDisplayRoom(period)
                                       return (
                                         <span className={`truncate max-w-[72px] text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`} style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>{displayRoom}</span>
                                       )
@@ -1005,7 +1019,7 @@ export default function HomeClient() {
                                       <span className={`truncate max-w-[56px] text-xs ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : 'text-on-surface-variant'}`}
                                         style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}
                                       >
-                                        {(period as any).displayRoom || period.room}
+                                        {getDisplayRoom(period)}
                                       </span>
                                     </div>
                                   </div>
@@ -1056,7 +1070,7 @@ export default function HomeClient() {
                                     <span className="mx-2">•</span>
                                     {(() => {
                                       // NOTE: Do NOT include `.to` - that field is commonly used for end times
-                                      const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                                      const displayRoom = getDisplayRoom(period)
                                       return (
                                         <span className={`text-sm ${period.isRoomChange ? 'inline-block px-2 py-0.5 rounded-md font-medium' : (isSubstitutePeriod(period) ? 'text-on-primary-foreground' : 'text-on-surface-variant')}`}
                                           style={period.isRoomChange ? { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' } : {}}>

@@ -684,6 +684,65 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const lastRefreshTsRef = useRef<number | null>(null)
   const holidayDateRef = useRef<boolean>(false)
 
+  // Sanitize external timetable payloads to ensure display fields are primitives
+  const safeString = (v: any) => {
+    try {
+      if (v === null || v === undefined) return ''
+      return String(v)
+    } catch (e) { return '' }
+  }
+
+  const normalizeTimetableMap = (m: Record<string, Period[]> | null) => {
+    try {
+      if (!m) return m
+      const out: Record<string, Period[]> = {}
+      for (const day of Object.keys(m)) {
+        try {
+          const arr = Array.isArray(m[day]) ? m[day] : []
+          out[day] = arr.map((p: any) => {
+            try {
+              return {
+                ...p,
+                period: safeString(p?.period || ''),
+                time: safeString(p?.time || ''),
+                subject: safeString(p?.subject || ''),
+                title: p?.title ? safeString(p.title) : p?.title,
+                teacher: p?.teacher ? safeString(p.teacher) : p?.teacher,
+                fullTeacher: p?.fullTeacher ? safeString(p.fullTeacher) : p?.fullTeacher,
+                casualSurname: p?.casualSurname ? safeString(p.casualSurname) : p?.casualSurname,
+                displayTeacher: p?.displayTeacher ? safeString(p.displayTeacher) : p?.displayTeacher,
+                room: p?.room ? safeString(p.room) : p?.room,
+                displayRoom: p?.displayRoom ? safeString(p.displayRoom) : p?.displayRoom,
+                originalRoom: p?.originalRoom ? safeString(p.originalRoom) : p?.originalRoom,
+                colour: p?.colour ? safeString(p.colour) : p?.colour,
+              } as Period
+            } catch (e) { return p }
+          })
+        } catch (e) {
+          out[day] = m[day] || []
+        }
+      }
+      return out
+    } catch (e) { return m }
+  }
+
+  useEffect(() => {
+    try {
+      if (!externalTimetable) return
+      const normalized = normalizeTimetableMap(externalTimetable)
+      try {
+        const a = JSON.stringify(normalized)
+        const b = JSON.stringify(externalTimetable)
+        if (a !== b) {
+          setExternalTimetable(normalized)
+        }
+      } catch (e) {
+        // fallback: if JSON fails, still attempt to set normalized
+        setExternalTimetable(normalized)
+      }
+    } catch (e) {}
+  }, [externalTimetable])
+
   // Background refresh tuning - values depend on user preference.
   // Aggressive mode polls frequently (useful for demo/dev), while
   // conservative mode uses larger intervals to reduce network usage.
