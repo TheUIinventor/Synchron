@@ -1,4 +1,4 @@
-# Say Hello to Synchron!
+# Say Hello to _Your_ Synchron!
 <img width="1918" height="875" alt="Screenshot 2026-01-30 200317" src="https://github.com/user-attachments/assets/fd13f1ff-8965-420b-9d30-21ee76c125b9" />
 
 
@@ -32,7 +32,7 @@
 *mobile ui still in development
 
 
-Your Dashboard
-Everything in the right spot.
+## Your Dashboard
+### Everything in the right spot.
 <img width="1916" height="871" alt="Screenshot 2026-01-30 194656" src="https://github.com/user-attachments/assets/b3ce1c30-6eb1-45e4-b970-6161d6c0197f" />
 *mobile ui still in development
