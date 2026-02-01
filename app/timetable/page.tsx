@@ -274,33 +274,41 @@ export default function TimetablePage() {
 
   // Get subject abbreviation
   const getSubjectAbbr = (subject: string) => {
-    const abbrMap: Record<string, string> = {
-      English: "ENG",
-      Mathematics: "MAT",
-      Science: "SCI",
-      History: "HIS",
-      Geography: "GEO",
-      Computing: "COM",
-      Music: "MUS",
-      Art: "ART",
-      PE: "PE",
-      Break: "BRK",
+    try {
+      const s = String(subject || '')
+      const abbrMap: Record<string, string> = {
+        English: "ENG",
+        Mathematics: "MAT",
+        Science: "SCI",
+        History: "HIS",
+        Geography: "GEO",
+        Computing: "COM",
+        Music: "MUS",
+        Art: "ART",
+        PE: "PE",
+        Break: "BRK",
+      }
+      return abbrMap[s] || s.substring(0, 3).toUpperCase()
+    } catch (e) {
+      return String(subject || '').substring(0, 3).toUpperCase()
     }
-    return abbrMap[subject] || subject.substring(0, 3).toUpperCase()
   }
 
   // Get display name for period (remove "Break" for recess/lunch)
   // Prefers full title when available, falls back to subject
   const getDisplaySubject = (period: any) => {
-    if (period.subject === "Break") {
-      return period.period // Show "Recess", "Lunch 1", etc. instead of "Break"
-    }
-    // Prefer title field if it exists and is different from subject
-    if ((period as any)?.title && (period as any).title !== (period as any).subject) {
-      return (period as any).title
-    }
-    // Fallback to subject
-    return period.subject
+    try {
+      if (!period) return ''
+      if (period.subject === "Break") {
+        return String(period.period || '') // Show "Recess", "Lunch 1", etc. instead of "Break"
+      }
+      // Prefer title field if it exists and is different from subject
+      if ((period as any)?.title && (period as any).title !== (period as any).subject) {
+        return String((period as any).title)
+      }
+      // Fallback to subject
+      return String(period.subject || '')
+    } catch (e) { return '' }
   }
 
   const getDisplayRoom = (period: any) => {
@@ -311,7 +319,7 @@ export default function TimetablePage() {
       const display = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)['room_to'] || (period as any).newRoom
       if (display && String(display).trim()) return String(display)
     } catch (e) {}
-    return period.room || ''
+    try { return String(period.room || '') } catch (e) { return '' }
   }
 
   const isSubstitutePeriod = (p: any) => {
@@ -697,23 +705,29 @@ export default function TimetablePage() {
                         subjectLabel.includes('period 0') || subjectLabel.includes('roll call') || subjectLabel.includes('end of day')
                       // Get display label for non-class periods
                       const nonClassLabel = (() => {
-                        if (period.subject === 'Break') return period.period
-                        if (periodLabel === '0' || subjectLabel.includes('period 0')) return 'Period 0'
-                        if (periodLabel === 'rc' || subjectLabel.includes('roll call')) return 'Roll Call'
-                        if (periodLabel === 'eod' || subjectLabel.includes('end of day')) return 'End of Day'
-                        return period.period || period.subject
+                        try {
+                          if (period.subject === 'Break') return String(period.period || '')
+                          if (periodLabel === '0' || subjectLabel.includes('period 0')) return 'Period 0'
+                          if (periodLabel === 'rc' || subjectLabel.includes('roll call')) return 'Roll Call'
+                          if (periodLabel === 'eod' || subjectLabel.includes('end of day')) return 'End of Day'
+                          return String(period.period || period.subject || '')
+                        } catch (e) { return '' }
                       })()
                       const teacherDisplay = (() => {
-                        if (!period) return null
-                        if ((period as any).displayTeacher) return stripLeadingCasualCode((period as any).displayTeacher)
-                        if (period.isSubstitute && (period as any).casualSurname) return (period as any).casualSurname
-                        const candidate = period.fullTeacher || period.teacher || null
-                        if (period.isSubstitute && candidate) return stripLeadingCasualCode(candidate)
-                        return candidate
+                        try {
+                          if (!period) return null
+                          if ((period as any).displayTeacher) return String(stripLeadingCasualCode((period as any).displayTeacher))
+                          if (period.isSubstitute && (period as any).casualSurname) return String((period as any).casualSurname)
+                          const candidate = period.fullTeacher || period.teacher || null
+                          if (period.isSubstitute && candidate) return String(stripLeadingCasualCode(candidate))
+                          return candidate != null ? String(candidate) : null
+                        } catch (e) { return null }
                       })()
                       const roomDisplay = (() => {
-                        const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
-                        return displayRoom
+                        try {
+                          const displayRoom = (period as any).displayRoom || (period as any).toRoom || (period as any).roomTo || (period as any)["room_to"] || (period as any).newRoom || period.room
+                          return displayRoom != null ? String(displayRoom) : ''
+                        } catch (e) { return '' }
                       })()
                       
                       const cardClass = 'flex-1 w-full min-w-0 px-3 py-2 rounded-xl border transition-all shadow-sm bg-surface hover:bg-surface-container-high border-transparent hover:border-outline-variant'
