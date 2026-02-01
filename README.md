@@ -1,5 +1,8 @@
 # Say Hello to _Your_ Synchron!
 
+## Latest Build Notes at
+https://tinyurl.com/synchronlatest
+
 ## Canvas Integration
 ### Click on a class on your home page to navigate to that class's Canvas page.
 ![Canvas Integration](https://github.com/user-attachments/assets/d825d408-44da-4000-a90b-6ec5c2426106)
