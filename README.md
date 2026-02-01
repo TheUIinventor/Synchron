@@ -1,6 +1,4 @@
 # Say Hello to _Your_ Synchron!
-<img width="1918" height="875" alt="Screenshot 2026-01-30 200317" src="https://github.com/user-attachments/assets/fd13f1ff-8965-420b-9d30-21ee76c125b9" />
-
 
 ## Canvas Integration
 ### Click on a class on your home page to navigate to that class's Canvas page.
