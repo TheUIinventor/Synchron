@@ -60,6 +60,8 @@ export default function RootLayout({
             `,
           }}
         />
+        {/* Favicon / PWA meta from RealFaviconGenerator */}
+        <meta name="apple-mobile-web-app-title" content="Synchron" />
 
         {/* CRITICAL: Check for OAuth callback FIRST - must run synchronously before anything else */}
         <script
