@@ -38,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta name="apple-mobile-web-app-title" content="Synchron" />
         {/* Instrumentation: log every sessionStorage.setItem call to trace overwrites */}
         <script
           dangerouslySetInnerHTML={{
@@ -60,8 +61,6 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Favicon / PWA meta from RealFaviconGenerator */}
-        <meta name="apple-mobile-web-app-title" content="Synchron" />
 
         {/* CRITICAL: Check for OAuth callback FIRST - must run synchronously before anything else */}
         <script
