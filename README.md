@@ -1,6 +1,6 @@
 # Say Hello to _Your_ Synchron!
 
-## Latest Build Notes at
+### Latest Build Notes at
 https://tinyurl.com/synchronlatest
 
 ## Canvas Integration
