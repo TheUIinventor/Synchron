@@ -3698,8 +3698,10 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
 
     function startSlowTick() {
       if (intervalId != null) window.clearInterval(intervalId)
-      // slow update every 15s when tab is hidden
-      intervalId = window.setInterval(updateAllTimeStates, 15000)
+      // When hidden, avoid frequent ticking to save CPU — do not set a
+      // continuous interval. We'll update once on visibility regain.
+      // Keep intervalId as null to indicate no active fast tick.
+      intervalId = null
     }
 
     function handleVisibility() {

@@ -75,14 +75,32 @@ export default function CombinedStatus() {
   }, [])
 
   useEffect(() => {
-    const updateStatus = () => {
+    let interval: number | null = null
+
+    const startTick = () => {
+      if (interval != null) window.clearInterval(interval)
       setCurrentTime(getCurrentTime())
+      interval = window.setInterval(() => setCurrentTime(getCurrentTime()), 1000)
     }
 
-    updateStatus()
-    // Keep 1 second updates for time display
-    const interval = setInterval(updateStatus, 1000)
-    return () => clearInterval(interval)
+    const stopTick = () => {
+      if (interval != null) { window.clearInterval(interval); interval = null }
+    }
+
+    const handleVisibility = () => {
+      try {
+        if (document.visibilityState === 'visible') startTick()
+        else stopTick()
+      } catch (e) {}
+    }
+
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      stopTick()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
 
   return (

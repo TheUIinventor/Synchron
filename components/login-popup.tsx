@@ -32,11 +32,11 @@ export default function LoginPopup() {
       try {
         const cachedStatus = sessionStorage.getItem('synchron:user-logged-in')
         // Only act when the cached value is available
-        if (cachedStatus === null) return
+        if (cachedStatus === null) return false
 
         // If we reach here, we have a defined cached value; stop polling
         if (intervalId !== null) {
-          clearInterval(intervalId)
+          try { clearTimeout(intervalId) } catch (e) { try { clearInterval(intervalId) } catch (e) {} }
           intervalId = null
         }
 
@@ -51,28 +51,46 @@ export default function LoginPopup() {
             setIsLoggedIn(false)
           }
         }
+        return true
       } catch (err) {
         // ignore
+        return false
       }
     }
 
     // Initial read: if the key is already present, this will set state immediately
-    updateAuthStatus()
-
-    // If the key is not present yet, poll at a reasonable interval (1s) until it appears
-    if (sessionStorage.getItem('synchron:user-logged-in') === null) {
-      intervalId = window.setInterval(updateAuthStatus, 1000)
+    if (updateAuthStatus()) {
+      // already resolved
+      return
     }
 
-    // Also listen for storage events (cross-tab updates)
+    // Otherwise, prefer event-driven updates and bounded fallback polling
+    const onCustom = () => updateAuthStatus()
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'synchron:user-logged-in') updateAuthStatus()
+      if (e.key === 'synchron:user-logged-in' || e.key === 'synchron:userinfo-ready') updateAuthStatus()
     }
+    window.addEventListener('synchron:userinfo-ready', onCustom)
     window.addEventListener('storage', onStorage)
 
+    // Bounded exponential backoff polling (avoids permanent 1s interval)
+    let attempts = 0
+    const MAX_ATTEMPTS = 6
+    let backoff = 500
+    const schedule = () => {
+      if (attempts >= MAX_ATTEMPTS) return
+      attempts += 1
+      intervalId = window.setTimeout(() => {
+        const done = updateAuthStatus()
+        backoff = Math.min(backoff * 2, 6000)
+        if (!done) schedule()
+      }, backoff) as unknown as number
+    }
+    schedule()
+
     return () => {
-      if (intervalId !== null) clearInterval(intervalId)
-      window.removeEventListener('storage', onStorage)
+      if (intervalId !== null) clearTimeout(intervalId)
+      try { window.removeEventListener('synchron:userinfo-ready', onCustom) } catch (e) {}
+      try { window.removeEventListener('storage', onStorage) } catch (e) {}
     }
   }, [])
 

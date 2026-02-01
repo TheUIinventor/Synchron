@@ -177,16 +177,23 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
     applyThemeColors(colors, root)
 
     // Observe class changes on the document element (e.g., `dark` toggled) and re-apply theme variables.
+    let scheduled = false
     const obs = new MutationObserver((mutations) => {
       for (const m of mutations) {
         if (m.type === "attributes" && m.attributeName === "class") {
-          // Re-apply computed variables for the current color theme when `class` changes
-          applyThemeColors(getThemeColors(colorTheme), document.documentElement)
+          // Coalesce rapid mutations into a single update to avoid repeated work
+          if (!scheduled) {
+            scheduled = true
+            requestAnimationFrame(() => {
+              try { applyThemeColors(getThemeColors(colorTheme), document.documentElement) } catch (e) {}
+              scheduled = false
+            })
+          }
         }
       }
     })
     obs.observe(document.documentElement, { attributes: true })
-    return () => obs.disconnect()
+    return () => { try { obs.disconnect() } catch (e) {} }
   }, [colorTheme])
 
   // Apply initial font theme

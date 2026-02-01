@@ -105,9 +105,32 @@ export default function HomeClient() {
   })
 
   useEffect(() => {
-    // keep clock updated every second so countdowns refresh on mobile pill
-    const t = setInterval(() => setCurrentDate(new Date()), 1000);
-    return () => clearInterval(t);
+    let intervalId: number | null = null
+
+    const startClock = () => {
+      if (intervalId != null) window.clearInterval(intervalId)
+      setCurrentDate(new Date())
+      intervalId = window.setInterval(() => setCurrentDate(new Date()), 1000)
+    }
+
+    const stopClock = () => {
+      if (intervalId != null) { window.clearInterval(intervalId); intervalId = null }
+    }
+
+    const handleVisibility = () => {
+      try {
+        if (document.visibilityState === 'visible') startClock()
+        else stopClock()
+      } catch (e) {}
+    }
+
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      stopClock()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, []);
 
   useEffect(() => {
@@ -312,9 +335,25 @@ export default function HomeClient() {
     }
 
     checkSchoolDay()
-    // Check every minute since currentDate updates every second
-    const interval = setInterval(checkSchoolDay, 60000)
-    return () => clearInterval(interval)
+    let interval: number | null = null
+
+    const startMinuteChecks = () => {
+      if (interval != null) window.clearInterval(interval)
+      interval = window.setInterval(checkSchoolDay, 60000)
+    }
+    const stopMinuteChecks = () => { if (interval != null) { window.clearInterval(interval); interval = null } }
+
+    const handleVisibility = () => {
+      try {
+        if (document.visibilityState === 'visible') startMinuteChecks()
+        else stopMinuteChecks()
+      } catch (e) {}
+    }
+
+    handleVisibility()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => { try { document.removeEventListener('visibilitychange', handleVisibility) } catch (e) {}; stopMinuteChecks() }
   }, [currentDate])
 
   
