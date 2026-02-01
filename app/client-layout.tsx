@@ -284,8 +284,8 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
               {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
               {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
               <ConditionalTopRightIcons />
-              {/* Show global top-right login prompt when appropriate (banner decides visibility) */}
-              <LoginPromptBanner />
+              {/* Show global top-right login prompt on all pages except home */}
+              {pathname !== '/' && <LoginPromptBanner />}
               <LoginPopup />
               <AppSidebar />
               <div className="px-2 sm:px-3 md:pl-20 lg:pl-28 pb-8 md:pb-10">{children}</div>
