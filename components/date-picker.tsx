@@ -36,7 +36,16 @@ export function DatePicker({
   // Update display month when selectedDate prop changes
   React.useEffect(() => {
     if (open) {
-      setDisplayMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))
+      try {
+        if (selectedDate && typeof (selectedDate as any).getFullYear === 'function') {
+          setDisplayMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))
+        } else {
+          // Fallback to today when selectedDate is invalid
+          setDisplayMonth(new Date())
+        }
+      } catch (e) {
+        setDisplayMonth(new Date())
+      }
     }
   }, [selectedDate, open])
 
@@ -188,12 +197,19 @@ export function DatePicker({
           <div className="bg-muted p-4 rounded-lg text-center">
             <p className="text-sm text-muted-foreground mb-1">Selected:</p>
             <p className="text-lg font-semibold">
-              {selectedDate.toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
+              {(() => {
+                try {
+                  if (selectedDate && typeof (selectedDate as any).toLocaleDateString === 'function') {
+                    return selectedDate.toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  }
+                } catch (e) {}
+                return new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+              })()}
             </p>
           </div>
 
