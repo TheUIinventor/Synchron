@@ -130,25 +130,36 @@ export async function GET(req: NextRequest) {
   if (accessToken) baseHeaders['Authorization'] = `Bearer ${accessToken}`
 
   // Helper: fetch JSON from either student portal or API host, following small redirect chains
-  async function getJson(path: string) {
+  // WITH TIMEOUT to prevent slow SBHS API from blocking responses
+  async function getJson(path: string, timeoutMs = 6000) {
     const sep = path.includes('?') ? '&' : '?'
     // Don't add dateParam again - it should already be in the path if needed
     let nextUrl = path
     let response: Response | null = null
-    for (let i = 0; i < 5; i++) {
-      response = await fetch(nextUrl, { headers: baseHeaders, redirect: 'manual' })
-      const code = response.status
-      if ([301, 302, 303, 307, 308].includes(code)) {
-        const loc = response.headers.get('location')
-        if (loc) {
-          // resolve relative redirects
-          try { nextUrl = new URL(loc, nextUrl).toString() } catch { nextUrl = loc }
-          continue
+    
+    // Create abort signal that times out
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+    
+    try {
+      for (let i = 0; i < 5; i++) {
+        response = await fetch(nextUrl, { headers: baseHeaders, redirect: 'manual', signal: controller.signal })
+        const code = response.status
+        if ([301, 302, 303, 307, 308].includes(code)) {
+          const loc = response.headers.get('location')
+          if (loc) {
+            // resolve relative redirects
+            try { nextUrl = new URL(loc, nextUrl).toString() } catch { nextUrl = loc }
+            continue
+          }
         }
+        break
       }
-      break
+    } finally {
+      clearTimeout(timeout)
     }
-    if (!response) return { ok: false, status: 0, text: '' }
+    
+    if (!response) return { ok: false, status: 0, text: '', timedOut: true }
     const text = await response.text()
     const ctype = response.headers.get('content-type') || ''
     if (ctype.includes('application/json')) {
@@ -244,15 +255,19 @@ export async function GET(req: NextRequest) {
         : `${host}/api/timetable/bells.json`
       const fullUrl = `${host}/api/timetable/timetable.json`
       
-      // OPTIMIZATION: Fetch all 3 endpoints in parallel for faster loading
-      const [dr, fr, br] = await Promise.all([
-        getJson(dayUrl),
-        getJson(fullUrl),
-        getJson(bellUrl)
+      // OPTIMIZATION: Fetch all 3 endpoints in parallel with aggressive timeouts
+      // Use Promise.allSettled instead of Promise.all so timeouts don't block everything
+      const results = await Promise.allSettled([
+        getJson(dayUrl, 5000),
+        getJson(fullUrl, 5000),
+        getJson(bellUrl, 5000)
       ])
       
+      const dr = results[0].status === 'fulfilled' ? results[0].value : { ok: false }
+      const fr = results[1].status === 'fulfilled' ? results[1].value : { ok: false }
+      const br = results[2].status === 'fulfilled' ? results[2].value : { ok: false }
+      
       // If any of these responded successfully with JSON, adopt them and stop trying further hosts
-      // Only break if at least one response was successful (ok: true) and returned valid JSON
       if ((dr as any).ok || (fr as any).ok || (br as any).ok) {
         // At least one endpoint succeeded on this host; use this host
         dayRes = dr; fullRes = fr; bellsRes = br

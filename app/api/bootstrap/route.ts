@@ -5,9 +5,10 @@ const cacheHeaders = (req: NextRequest) => {
 }
 
 /**
- * Bootstrap endpoint called immediately after sign-in
- * Pre-fetches essential data to populate the app (userinfo, timetable, notices, awards, calendar, etc.)
- * Runs server-side to leverage the fresh access token and avoid CORS issues
+ * Lightweight Bootstrap endpoint - returns ONLY critical data for instant UI render
+ * Fetches timetable for today with tight timeouts to fail fast
+ * Calendar, awards, notices are loaded lazily by client to prevent blocking
+ * Target: < 3 seconds for 95th percentile
  */
 export async function GET(req: NextRequest) {
   // Mute verbose server logs unless explicitly enabled
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
       console.info = () => {}
     }
   } catch (e) {}
+  
   const accessToken = req.cookies.get('sbhs_access_token')?.value
   
   if (!accessToken) {
@@ -32,38 +34,52 @@ export async function GET(req: NextRequest) {
   const results: any = {}
   const errors: any = {}
 
-  // Helper to fetch an endpoint with error handling
-  const fetchEndpoint = async (name: string, path: string) => {
+  // Helper to fetch an endpoint with aggressive timeout
+  const fetchEndpoint = async (name: string, path: string, timeoutMs = 4000) => {
     try {
       const url = `${origin}${path}`
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), timeoutMs)
+      
       const res = await fetch(url, {
         headers: {
           'Cookie': `sbhs_access_token=${accessToken}`,
         },
+        signal: controller.signal,
       })
+      
+      clearTimeout(timeout)
+      
       const data = await res.json()
       results[name] = data
       console.log(`[bootstrap] ✓ Fetched ${name}`)
     } catch (err) {
+      // Silently fail for non-critical endpoints
+      if (name !== 'timetable') {
+        console.debug(`[bootstrap] ⏭️  Skipped ${name} (will load lazy)`)
+        return
+      }
       errors[name] = String(err)
-      console.error(`[bootstrap] ✗ Error fetching ${name}:`, err)
+      console.error(`[bootstrap] ✗ Error fetching critical ${name}:`, err)
     }
   }
 
-  // Fetch core data in parallel
-  await Promise.all([
-    fetchEndpoint('userinfo', '/api/portal/userinfo'),
-    fetchEndpoint('timetable', '/api/timetable?date=' + formatDate(new Date())),
-    fetchEndpoint('notices', '/api/portal/notices'),
-    fetchEndpoint('awards', '/api/portal/awards'),
-    // reduce calendar window to 90 days to limit payload size
-    fetchEndpoint('calendar', '/api/calendar?endpoint=days&from=' + formatDate(new Date()) + '&to=' + formatDate(addDays(new Date(), 90))),
-  ])
+  // Fetch ONLY critical data (timetable) with tight timeout
+  // Calendar, awards, notices are skipped and will be loaded lazily by client
+  await fetchEndpoint('timetable', '/api/timetable?date=' + formatDate(new Date()), 4000)
+
+  // Only fetch userinfo if we have time (optional, can come from timetable response)
+  await Promise.race([
+    fetchEndpoint('userinfo', '/api/portal/userinfo', 2000),
+    new Promise(r => setTimeout(r, 2000)) // Give max 2s
+  ]).catch(() => {})
 
   return NextResponse.json(
     {
-      success: true,
+      success: !!results.timetable,
       results,
+      // Signal to client that calendar, awards, notices should load lazily
+      lazyLoad: ['calendar', 'awards', 'notices'],
       ...(Object.keys(errors).length > 0 && { errors }),
     },
     { headers: cacheHeaders(req) }

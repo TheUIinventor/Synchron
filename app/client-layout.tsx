@@ -97,6 +97,28 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // LAZY LOAD: Fetch non-critical data (calendar, awards, notices) after timetable renders
+  // This prevents these slower endpoints from blocking the initial page load
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    // Start lazy loading after a short delay to let timetable render first
+    const lazyLoadTimer = setTimeout(() => {
+      try {
+        const ready = sessionStorage.getItem('synchron:userinfo-ready')
+        const loggedIn = sessionStorage.getItem('synchron:user-logged-in')
+        
+        if (ready === 'true' && loggedIn === 'true') {
+          // Trigger background refresh which will fetch calendar, awards, notices
+          // Do this in background so it doesn't block UI
+          try { window.dispatchEvent(new CustomEvent('synchron:load-non-critical-data')) } catch (e) {}
+        }
+      } catch (e) {}
+    }, 2000) // 2 seconds after mounted
+    
+    return () => clearTimeout(lazyLoadTimer)
+  }, [])
+
   // Show a friendly confirmation when we land after logout
   useEffect(() => {
     if (typeof window === 'undefined') return

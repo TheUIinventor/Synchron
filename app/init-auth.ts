@@ -19,6 +19,12 @@ export async function initAuthBlocking() {
   const day = String(now.getDate()).padStart(2, '0');
   const dateStr = `${year}/${month}/${day}`;
 
+  // OPTIMIZATION: Use aggressive timeout to fail fast if SBHS API is slow
+  // This prevents auth check from blocking the page for 5-10 minutes
+  const abortController = new AbortController();
+  const timeoutMs = 6000; // 6 second timeout
+  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+
   // Fetch timetable for today - this checks auth faster than /api/portal/userinfo
   try {
     const startTime = Date.now();
@@ -27,6 +33,7 @@ export async function initAuthBlocking() {
     const res = await fetch(`/api/timetable?date=${dateStr}`, {
       method: 'GET',
       credentials: 'include',
+      signal: abortController.signal,
     });
     
     const data = await res.json();
@@ -48,10 +55,13 @@ export async function initAuthBlocking() {
     } catch (e) {}
   } catch (err) {
     console.error('[init-auth] ✗ Error checking auth:', err);
+    // On timeout or error, assume not logged in
     sessionStorage.setItem('synchron:user-logged-in', 'false');
     sessionStorage.setItem('synchron:userinfo-ready', 'true');
     try {
       window.dispatchEvent(new CustomEvent('synchron:userinfo-ready'))
     } catch (e) {}
+  } finally {
+    clearTimeout(timeout);
   }
 }
