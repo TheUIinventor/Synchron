@@ -476,7 +476,12 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
             if (!best || when > (best.savedAt || 0)) best = { savedAt: when, key: k, parsed }
           } catch (e) { /* ignore parse errors */ }
         }
-        if (best && best.parsed) __initialProcessedCache = best.parsed
+        if (best && best.parsed) {
+          __initialProcessedCache = best.parsed
+          try { console.log('[timetable.provider] hydrated processed cache from localStorage:', { key: best.key, savedAt: new Date(best.savedAt).toISOString() }) } catch (e) {}
+        } else {
+          try { console.log('[timetable.provider] no processed cache found in localStorage') } catch (e) {}
+        }
       } catch (e) {}
     }
   } catch (e) {}
@@ -504,6 +509,16 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
         const map = __extractMapFromCache(maybe)
         if (map) __initialExternalTimetable = map
       } catch (e) {}
+    }
+  } catch (e) {}
+  // Log initial cache state for debugging 20-reload issue
+  try {
+    if (typeof window !== 'undefined') {
+      const dayCount = __initialExternalTimetable ? Object.keys(__initialExternalTimetable).reduce((sum, day) => sum + (__initialExternalTimetable![day]?.length || 0), 0) : 0
+      console.log('[timetable.provider] ⚡ INITIALIZATION: found initial timetable with', dayCount, 'periods across', __initialExternalTimetable ? Object.keys(__initialExternalTimetable).length : 0, 'days')
+      if (!__initialExternalTimetable) {
+        console.log('[timetable.provider] ⚠ WARNING: No timetable loaded on mount! This will cause loading spinner until refreshExternal completes.')
+      }
     }
   } catch (e) {}
   const __initialExternalTimetableByWeek = ((): Record<string, { A: Period[]; B: Period[]; unknown: Period[] } | null> | null => {
@@ -573,7 +588,11 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     try { const src = __initialProcessedCache || __initialParsedCache; const w = src?.weekType; return (w === 'A' || w === 'B') ? w : null } catch (e) { return null }
   })()
   const [selectedDay, setSelectedDay] = useState<string>("") // Day for main timetable
-  const [selectedDateObject, setSelectedDateObject] = useState<Date>(new Date()) // Date object for selectedDay
+  const [selectedDateObject, setSelectedDateObject] = useState<Date>(() => {
+    const now = new Date()
+    console.log('[timetable.provider] 📅 Initializing selectedDateObject to:', now.toDateString(), 'day=', now.toLocaleDateString('en-US', { weekday: 'long' }))
+    return now
+  }) // Date object for selectedDay
   // Keep selectedDateObjectRef in sync with state so interval callbacks can access the latest value
   useEffect(() => {
     selectedDateObjectRef.current = selectedDateObject
@@ -647,6 +666,39 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
   const [externalTimetable, setExternalTimetable] = useState<Record<string, Period[]> | null>(null)
   const [externalSubjects, setExternalSubjects] = useState<Record<string, any> | null>(null)
   const [lastRecordedTimetable, setLastRecordedTimetable] = useState<Record<string, Period[]> | null>(externalTimetable)
+  
+  // Track when externalTimetable changes to detect unexpected cache clearing
+  useEffect(() => {
+    try {
+      if (!externalTimetable) {
+        console.log('[timetable.provider] 🔴 externalTimetable is null/empty')
+      } else {
+        const totalPeriods = Object.values(externalTimetable).reduce((sum, arr) => sum + (arr?.length || 0), 0)
+        console.log('[timetable.provider] 🟢 externalTimetable updated:', totalPeriods, 'periods')
+      }
+    } catch (e) {}
+  }, [externalTimetable])
+
+  // CRITICAL FIX for 20-reload issue: Immediately hydrate cached timetable on mount
+  // so users see something instantly instead of waiting for refreshExternal
+  useEffect(() => {
+    try {
+      if (externalTimetable) return // Already have data
+      
+      // Set cached timetable immediately if available
+      if (__initialExternalTimetable) {
+        console.log('[timetable.provider] ⚡ Immediately hydrating cached timetable on mount')
+        setExternalTimetable(__initialExternalTimetable)
+        
+        // Also restore other cached state for instant UI
+        if (__initialExternalTimetableByWeek) setExternalTimetableByWeek(__initialExternalTimetableByWeek)
+        if (__initialExternalBellTimes) setExternalBellTimes(__initialExternalBellTimes)
+        if (__initialWeekType) setExternalWeekType(__initialWeekType)
+      }
+    } catch (e) {
+      console.error('[timetable.provider] Error hydrating initial cache:', e)
+    }
+  }, []) // Run only once on mount
   const [timetableSource, setTimetableSource] = useState<string | null>(() => {
     try {
       if (__initialTimetableSource) return __initialTimetableSource
@@ -3820,8 +3872,14 @@ export function TimetableProvider({ children }: { children: ReactNode }) {
     const fetchForDate = async () => {
       try {
         const ds = (selectedDateObject || new Date()).toISOString().slice(0, 10)
+        const dayName = (selectedDateObject || new Date()).toLocaleDateString('en-US', { weekday: 'long' })
+        console.log('[timetable.provider] 📅 fetchForDate effect triggered:', { date: ds, dayName, lastRequested: lastRequestedDateRef.current })
+        
         // If we've just requested this same date, skip duplicate fetch
-        if (lastRequestedDateRef.current === ds) return
+        if (lastRequestedDateRef.current === ds) {
+          console.log('[timetable.provider] 🔄 Skipping duplicate fetch for date:', ds)
+          return
+        }
           // Try to read a persisted processed payload from the react-query cache
           // NOTE: We do NOT return early even if we have cached data, because the
           // cached timetable may not have had substitutions applied yet. We continue
