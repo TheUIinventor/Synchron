@@ -1,0 +1,377 @@
+
+"use client"
+
+import TopRightActionIcons from "@/components/top-right-action-icons"
+import LoginPopup from "@/components/login-popup"
+import LoginPromptBanner from "@/components/login-prompt-banner"
+import { initAuthBlocking } from './init-auth'
+import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+import { useState } from 'react'
+import { useToast } from '@/hooks/use-toast'
+
+import type { ReactNode } from "react"
+import { BottomNav } from "@/components/bottom-nav"
+import { AppSidebar } from "@/components/app-sidebar"
+import { ThemeProvider, UserSettingsProvider } from "@/components/theme-provider"
+import { TimetableProvider } from "@/contexts/timetable-context"
+import { QueryClientProviderWrapper } from '@/lib/query-client'
+import ErrorBoundary from "@/components/error-boundary"
+
+export default function ClientLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const { toast } = useToast()
+  const [authInitialized, setAuthInitialized] = useState(false)
+
+  // Simplified auth initialization
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    let mounted = true
+    
+    // Disable excessive logging
+    try {
+      const devLogs = localStorage.getItem('synchron:dev-logs') === 'true'
+      if (!devLogs) {
+        console.log = () => {}
+        console.debug = () => {}
+        console.info = () => {}
+      }
+    } catch (e) {}
+
+    // Initialize auth once
+    initAuthBlocking()
+      .then(() => {
+        if (mounted) {
+          setAuthInitialized(true)
+        }
+      })
+      .catch((e) => {
+        console.error('Auth initialization failed:', e)
+        if (mounted) {
+          setAuthInitialized(true) // Still mark as initialized to prevent hanging
+        }
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // Simple background refresh - only when user is authenticated
+  useEffect(() => {
+    if (!authInitialized) return
+    if (typeof window === 'undefined') return
+
+    let refreshTimeout: NodeJS.Timeout | null = null
+
+    const scheduleRefresh = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout)
+      
+      refreshTimeout = setTimeout(() => {
+        try {
+          const loggedIn = sessionStorage.getItem('synchron:user-logged-in') === 'true'
+          if (loggedIn && document.visibilityState === 'visible') {
+            // Trigger a simple background refresh event
+            window.dispatchEvent(new CustomEvent('synchron:background-refresh'))
+          }
+        } catch (e) {}
+        
+        scheduleRefresh() // Schedule next refresh
+      }, 5 * 60 * 1000) // Every 5 minutes
+    }
+
+    scheduleRefresh()
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout)
+    }
+  }, [authInitialized])
+
+  // Clean URL params from OAuth redirects  
+  useEffect(() => {
+    try {
+      if (pathname === '/' && window.location.search.includes('code=')) {
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
+    } catch (e) {}
+  }, [pathname])
+  // This ensures data is available instantly rather than waiting for intervals.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let timeouts: number[] = []
+
+    const scheduleBackgroundRefreshes = () => {
+      try {
+        const ready = sessionStorage.getItem('synchron:userinfo-ready')
+        const loggedIn = sessionStorage.getItem('synchron:user-logged-in')
+        if (ready === 'true' && loggedIn === 'true') {
+          const markerKey = 'synchron:did-autoreload'
+          const did = sessionStorage.getItem(markerKey)
+          if (did) return
+          try { sessionStorage.setItem(markerKey, String(Date.now())) } catch (e) {}
+
+          // Trigger immediate refresh (no delay) followed by additional refreshes
+          // to ensure data is fetched right away after sign-in
+          try { window.dispatchEvent(new CustomEvent('synchron:run-background-refresh')) } catch (e) {}
+          
+          const delays = [500, 2000, 5000] // Faster sequence: 500ms, 2s, 5s
+          for (const d of delays) {
+            const id = window.setTimeout(() => {
+              try { window.dispatchEvent(new CustomEvent('synchron:run-background-refresh')) } catch (e) {}
+            }, d)
+            timeouts.push(id as unknown as number)
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Listen for same-window event dispatched by init-auth or head-script
+    window.addEventListener('synchron:userinfo-ready', scheduleBackgroundRefreshes)
+    // Also respond to cross-window storage updates
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'synchron:userinfo-ready' || e.key === 'synchron:user-logged-in') scheduleBackgroundRefreshes()
+    }
+    window.addEventListener('storage', onStorage)
+
+    // Try immediately in case auth was already set before this effect ran
+    scheduleBackgroundRefreshes()
+
+    return () => {
+      try { window.removeEventListener('synchron:userinfo-ready', scheduleBackgroundRefreshes) } catch (e) {}
+      try { window.removeEventListener('storage', onStorage) } catch (e) {}
+      try { for (const t of timeouts) clearTimeout(t) } catch (e) {}
+    }
+  }, [])
+
+  // LAZY LOAD: Fetch non-critical data (calendar, awards, notices) after timetable renders
+  // This prevents these slower endpoints from blocking the initial page load
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    // Start lazy loading after a short delay to let timetable render first
+    const lazyLoadTimer = setTimeout(() => {
+      try {
+        const ready = sessionStorage.getItem('synchron:userinfo-ready')
+        const loggedIn = sessionStorage.getItem('synchron:user-logged-in')
+        
+        if (ready === 'true' && loggedIn === 'true') {
+          // Trigger background refresh which will fetch calendar, awards, notices
+          // Do this in background so it doesn't block UI
+          try { window.dispatchEvent(new CustomEvent('synchron:load-non-critical-data')) } catch (e) {}
+        }
+      } catch (e) {}
+    }, 2000) // 2 seconds after mounted
+    
+    return () => clearTimeout(lazyLoadTimer)
+  }, [])
+
+  // Show a friendly confirmation when we land after logout
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const loggedOut = params.get('logged_out') === 'true'
+      if (loggedOut) {
+        try {
+          toast({ title: 'Signed out', description: 'You have been logged out.' })
+        } catch (e) {
+          // fallback: no-op
+        }
+        // Clean up URL so it doesn't persist
+        try { window.history.replaceState({}, document.title, window.location.pathname) } catch (e) {}
+      }
+    } catch (e) {}
+  }, [])
+
+  // Emergency unregister is disabled by default to avoid reload loops that
+  // block navigation and user interactions. To enable temporarily set
+  // `sessionStorage['synchron:do-emergency']= 'true'` from the console.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const doEmergency = sessionStorage.getItem('synchron:do-emergency') === 'true'
+      if (!doEmergency) return
+      const already = sessionStorage.getItem('synchron:force-update') === 'true'
+      if (already) return
+      if ('serviceWorker' in navigator || 'caches' in window) {
+        ;(async () => {
+          try {
+            if ('serviceWorker' in navigator) {
+              const regs = await navigator.serviceWorker.getRegistrations()
+              for (const r of regs) {
+                try { await r.unregister() } catch (e) {}
+              }
+            }
+            if ('caches' in window) {
+              try {
+                const keys = await caches.keys()
+                for (const k of keys) {
+                  try { await caches.delete(k) } catch (e) {}
+                }
+              } catch (e) {}
+            }
+          } catch (e) {
+            console.debug('emergency sw clear failed', e)
+          } finally {
+            try { sessionStorage.setItem('synchron:force-update', 'true') } catch (e) {}
+            try { location.reload() } catch (e) {}
+          }
+        })()
+      }
+    } catch (e) {}
+  }, [])
+
+  // Prefetch core routes to speed up navigation (home, timetable, notices, clipboard, settings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const router = useRouter()
+      const routes = ['/', '/timetable', '/notices', '/clipboard', '/settings']
+      const doPrefetch = () => {
+        try {
+          for (const r of routes) {
+            try { router.prefetch(r) } catch (e) {}
+          }
+        } catch (e) {}
+      }
+      // Use requestIdleCallback if available to avoid blocking critical work
+      if ('requestIdleCallback' in window) {
+        ;(window as any).requestIdleCallback(() => doPrefetch(), { timeout: 2000 })
+      } else {
+        setTimeout(() => doPrefetch(), 1000)
+      }
+    } catch (e) {}
+  }, [])
+
+  // Register service worker and capture install prompt for PWA
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Service worker registration removed to avoid persistent cached bundles
+    // that can lock clients into old, broken builds. This app relies on
+    // normal HTTP caching; PWAs can be reintroduced with care in future.
+
+    // Capture the beforeinstallprompt event so the UI can trigger prompt later
+    function onBeforeInstall(e: any) {
+      // Prevent the default mini-infobar from showing
+      e.preventDefault()
+      // Store the event for later use (components can read window.__synchron_deferredInstall)
+      try { (window as any).__synchron_deferredInstall = e } catch (err) {}
+      // Optionally, dispatch a custom event so any UI can show an install button
+      window.dispatchEvent(new CustomEvent('synchron:beforeinstallprompt', { detail: {} }))
+    }
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstall as EventListener)
+    window.addEventListener('appinstalled', () => {
+      try { delete (window as any).__synchron_deferredInstall } catch (e) {}
+      window.dispatchEvent(new CustomEvent('synchron:appinstalled'))
+    })
+
+    return () => {
+      try { window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener) } catch (e) {}
+    }
+  }, [])
+
+  // Dynamic scaler: adjust root UI scale slightly when vertical space is constrained
+  useEffect(() => {
+    let raf = 0
+    function adjustScale() {
+      if (typeof window === 'undefined') return
+      const doc = document.documentElement
+      const body = document.body
+      const vw = window.innerWidth
+      // Only apply on large/wide viewports to avoid affecting mobile
+      if (vw < 1200) {
+        doc.style.setProperty('--ui-scale', '1')
+        return
+      }
+
+      const clientH = window.innerHeight
+      const contentH = Math.max(doc.scrollHeight, body.scrollHeight)
+
+      if (contentH <= clientH) {
+        doc.style.setProperty('--ui-scale', '1')
+        return
+      }
+
+      // Compute needed scale but clamp between 0.85 and 1
+      const needed = clientH / contentH
+      // Apply a small page-specific multiplier on the home page to trim
+      // vertical space (5% reduction) — this only affects the home route.
+      const isHome = typeof window !== 'undefined' && (pathname === '/' || pathname === '')
+      const pageMultiplier = isHome ? 0.90 : 1
+      const scale = Math.max(0.85, Math.min(1, needed * pageMultiplier))
+      // Only update the property when it actually changes to avoid layout thrash
+      const prev = doc.style.getPropertyValue('--ui-scale') || ''
+      if (prev !== String(scale)) doc.style.setProperty('--ui-scale', String(scale))
+    }
+
+    function onResize() {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(adjustScale)
+    }
+
+    // Run initial adjustment immediately, then re-run after short delays to
+    // accommodate late-loading fonts/images and small DOM mutations that can
+    // change layout height. This reduces flicker where a single early measurement
+    // flips the scale then resets on subsequent layout passes.
+    adjustScale()
+    const t1 = setTimeout(adjustScale, 200)
+    const t2 = setTimeout(adjustScale, 800)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+
+    // Also observe DOM mutations that might change height (e.g., fonts load)
+    const mo = new MutationObserver(() => onResize())
+    mo.observe(document.body, { childList: true, subtree: true })
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+      mo.disconnect()
+      if (raf) cancelAnimationFrame(raf)
+      clearTimeout(t1)
+      clearTimeout(t2)
+      // Reset the scale when unmounting to avoid leaking into other pages
+      document.documentElement.style.setProperty('--ui-scale', '1')
+    }
+  }, [pathname])
+  
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem
+      disableTransitionOnChange={false}
+      storageKey="synchron-theme-preference"
+    >
+      <UserSettingsProvider>
+        <ErrorBoundary>
+          <QueryClientProviderWrapper>
+            <TimetableProvider>
+              {/* Add padding-left for desktop nav, keep padding-bottom for mobile nav */}
+              {/* Only show the fixed top-right action icons on the home page to avoid duplication */}
+              <ConditionalTopRightIcons />
+              {/* Show global top-right login prompt on all pages except home */}
+              {pathname !== '/' && <LoginPromptBanner />}
+              <LoginPopup />
+              <AppSidebar />
+              <div className="px-2 sm:px-3 md:pl-20 lg:pl-28 pb-8 md:pb-10">{children}</div>
+              <BottomNav />
+            </TimetableProvider>
+          </QueryClientProviderWrapper>
+        </ErrorBoundary>
+      </UserSettingsProvider>
+    </ThemeProvider>
+  )
+}
+
+function ConditionalTopRightIcons() {
+  // usePathname is client-only and returns the current pathname. Only show the
+  // global fixed icons on the home page ("/") per user request.
+  const pathname = usePathname();
+  if (!pathname) return null;
+  return pathname === "/" ? <TopRightActionIcons /> : null;
+}
