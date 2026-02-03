@@ -75,19 +75,16 @@ export default function CombinedStatus() {
   }, [])
 
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
+    let interval: number | null = null
 
     const startTick = () => {
-      if (interval != null) clearInterval(interval)
+      if (interval != null) window.clearInterval(interval)
       setCurrentTime(getCurrentTime())
-      interval = setInterval(() => setCurrentTime(getCurrentTime()), 30000) // Update every 30 seconds instead of every second
+      interval = window.setInterval(() => setCurrentTime(getCurrentTime()), 1000)
     }
 
     const stopTick = () => {
-      if (interval != null) { 
-        clearInterval(interval)
-        interval = null 
-      }
+      if (interval != null) { window.clearInterval(interval); interval = null }
     }
 
     const handleVisibility = () => {
@@ -97,8 +94,7 @@ export default function CombinedStatus() {
       } catch (e) {}
     }
 
-    // Start immediately
-    startTick()
+    handleVisibility()
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
