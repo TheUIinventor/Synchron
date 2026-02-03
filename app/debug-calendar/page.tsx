@@ -30,7 +30,7 @@ export default function DebugCalendarPage() {
       setLoading(false)
     }
   }
-// Render UI
+// Render Ui
   return (
     <div className="min-h-screen bg-surface p-6">
       <div className="max-w-2xl mx-auto">
